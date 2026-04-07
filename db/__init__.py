@@ -1,0 +1,1 @@
+# Torna a pasta db/ um pacote Python reconhecível

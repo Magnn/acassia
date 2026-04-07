@@ -1,0 +1,77 @@
+{
+  "generated_at": "2026-04-07T22:17:32.617479+00:00",
+  "total": 6,
+  "passed": 6,
+  "failed": 0,
+  "score": 100.0,
+  "score_by_stage": {
+    "saudacao": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "score": 100.0
+    },
+    "coleta": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "score": 100.0
+    },
+    "resiliencia_entrega": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "score": 100.0
+    },
+    "oferta": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "score": 100.0
+    },
+    "recuperacao": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "score": 100.0
+    }
+  },
+  "results": [
+    {
+      "case": "node1_saida_saudacao",
+      "ok": true,
+      "details": "node1 gerou 3 baloes",
+      "stage": "saudacao"
+    },
+    {
+      "case": "node5_tentativas_previas",
+      "ok": true,
+      "details": "coleta de tentativas previa ok",
+      "stage": "coleta"
+    },
+    {
+      "case": "reparo_entrega_nodes",
+      "ok": true,
+      "details": "todos os nodes responderam com reparo padrao",
+      "stage": "resiliencia_entrega"
+    },
+    {
+      "case": "node8_firmo_gate",
+      "ok": true,
+      "details": "gate FIRMO ok",
+      "stage": "oferta"
+    },
+    {
+      "case": "node8_link_pos_firmo",
+      "ok": true,
+      "details": "link liberado corretamente apos FIRMO",
+      "stage": "oferta"
+    },
+    {
+      "case": "node9_tentativas",
+      "ok": true,
+      "details": "node9 respondeu nas 3 tentativas",
+      "stage": "recuperacao"
+    }
+  ]
+}

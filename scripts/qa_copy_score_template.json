@@ -1,0 +1,60 @@
+{
+  "version_label": "vX.Y.Z",
+  "date": "2026-04-07",
+  "scenarios": {
+    "A": {
+      "name": "amor_de_volta_defesa_arrogante",
+      "items": {
+        "coleta_nome_limpo": {"critical": false, "pass": true},
+        "coleta_desejo_declarado": {"critical": false, "pass": true},
+        "coleta_sem_redundancia": {"critical": false, "pass": true},
+        "coleta_pergunta_com_pausa": {"critical": true, "pass": true},
+        "coleta_tentativas_previas": {"critical": true, "pass": false},
+        "coleta_sem_presuncao": {"critical": false, "pass": false},
+        "coleta_universo_correto": {"critical": true, "pass": true},
+        "coleta_dados_concretos_capturados": {"critical": true, "pass": false},
+
+        "node6_ancoragem_texto_real": {"critical": true, "pass": false},
+        "node6_sem_generico": {"critical": true, "pass": false},
+        "node6_cadeia_logica_p1_p5": {"critical": true, "pass": false},
+        "node6_expansao_dor": {"critical": false, "pass": true},
+        "node6_expansao_tripla": {"critical": true, "pass": false},
+        "node6_storybrand_negativo": {"critical": false, "pass": false},
+        "node6_xeque_mate_claro": {"critical": false, "pass": true},
+        "node6_pausa_apos_pergunta": {"critical": true, "pass": true},
+        "node6_nome_distribuido": {"critical": false, "pass": true},
+
+        "node7_reage_ultimo_input": {"critical": true, "pass": false},
+        "node7_sem_recitar_script": {"critical": false, "pass": false},
+        "node7_desejo_em_foco": {"critical": false, "pass": true},
+        "node7_tom_simples_humano": {"critical": false, "pass": true},
+        "node7_transfere_culpa_empatia": {"critical": false, "pass": true},
+        "node7_desqualifica_tentativas_respeito": {"critical": true, "pass": false},
+        "node7_mecanismo_nome_especifico": {"critical": true, "pass": true},
+        "node7_urgencia_real": {"critical": true, "pass": true},
+        "node7_cta_continuidade": {"critical": false, "pass": true},
+
+        "node8_transicao_emocional_preco": {"critical": true, "pass": false},
+        "node8_oferta_ancorada_desejo": {"critical": true, "pass": true},
+        "node8_sem_promessa_milagre": {"critical": false, "pass": true},
+        "node8_mini_transacoes_completas": {"critical": true, "pass": false},
+        "node8_logica_ticket": {"critical": false, "pass": true},
+        "node8_negociacao_escada_correta": {"critical": true, "pass": true},
+        "node8_firmo_antes_link": {"critical": false, "pass": true},
+        "node8_preco_com_ancoragem": {"critical": false, "pass": false},
+
+        "conv_interacao_real": {"critical": true, "pass": true},
+        "conv_sem_atropelo": {"critical": true, "pass": true},
+        "conv_baloes_curtos": {"critical": false, "pass": true},
+        "conv_sem_repeticao": {"critical": false, "pass": true},
+        "conv_sem_erros_proibidos": {"critical": true, "pass": false},
+
+        "cet_baixo_ok": {"critical": false, "pass": true},
+        "cet_medio_ok": {"critical": false, "pass": true},
+        "cet_alto_ok": {"critical": true, "pass": false}
+      }
+    },
+    "B": {"name": "amor_de_volta_morno_cetico", "items": {}},
+    "C": {"name": "separacao_novo_ciclo", "items": {}}
+  }
+}

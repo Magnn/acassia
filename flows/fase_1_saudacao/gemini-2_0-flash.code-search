@@ -1,0 +1,9 @@
+# Query: gemini-2.0-flash
+# ContextLines: 1
+
+1 result - 1 file
+
+personalizer.py:
+  10  class Personalizer:
+  11:     def __init__(self, api_key: str | None = None, model_name: str = "gemini-1.5-flash-latest"):
+  12          env_key = os.getenv("GEMINI_API_KEY")

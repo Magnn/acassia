@@ -1,0 +1,48 @@
+# Ambiente e segredos
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Dados locais / runtime
+*.db
+*.db-wal
+*.db-shm
+downloads/
+
+# Ferramentas / OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Testes / cobertura
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+
+# Binários / ferramentas locais (não versionar)
+ngrok.exe

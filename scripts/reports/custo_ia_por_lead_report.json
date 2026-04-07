@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-04-07T15:35:42.967856+00:00",
+  "window_days": 30,
+  "price_per_million_brl": 1.8,
+  "budget_tokens_per_lead": 12000,
+  "budget_cost_brl": 0.0216,
+  "leads_with_tokens": 0,
+  "avg_tokens_per_lead": 0.0,
+  "avg_cost_per_lead_brl": 0.0,
+  "avg_budget_usage_pct": 0.0,
+  "top": []
+}

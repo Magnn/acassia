@@ -1,0 +1,30 @@
+---
+description: Visão de produto — plataforma de funis WhatsApp + IA por etapas; fase atual (Cigana) como validação.
+alwaysApply: true
+---
+
+# Visão de produto (north star)
+
+Objetivo final: **qualquer pessoa que atenda (ou venda) pelo WhatsApp** poder usar esta base para **montar funis avançados** e/ou **configurar uma IA de atendimento completo**, **dividido por etapas**, alimentado por **dados básicos do modelo de negócio** da pessoa (oferta, público, tom, objeções típicas, prova social, checkout, etc.), e **ligar ao Zap** com o mínimo de atrito — para **configurar e começar a vender**.
+
+Cada “bloco” do funil (nó, etapa, gatilho, copy, recuperação, handoff) deve ser pensado para poder ser **preenchido com facilidade extrema** no futuro, mas com **profundidade em microdetalhes** por baixo: campos e defaults que reflitam **frameworks consagrados** de vendas, copy, jornada do cliente, objeção, prova, escassez ética, recuperação de carrinho, etc. — sempre **adaptáveis ao nicho**, nunca genéricos demais para serem inúteis.
+
+## Fase atual (explícita)
+
+Hoje o repositório **valida a tese** com o funil **Cigana Esmeralda**: ganhar **resultados reais** (conversão, retenção, recuperação) antes de generalizar a plataforma. Código e configuração devem **servir essa validação primeiro**, mas **sem fechar portas** para multi-tenant, temas por cliente, e “pacotes de framework” reutilizáveis.
+
+## Implicações para o código (hoje e amanhã)
+
+- **Config sobre código**: o que for “tom de negócio”, limites de etapa, textos-base, preços, links, delays, nomes de nós — preferir **camadas de config** (`config_cliente`, metadados no lead, templates) em vez de hardcode espalhado; quando hardcode for inevitável no funil Cigana, **isolar** e marcar como específico do cliente piloto.
+- **Contratos estáveis**: `ContextoConversa`, `Acao`, `stage_intel`, classificadores e recovery devem permanecer **extensíveis** (novos campos opcionais, metadata tipada de forma tolerante) para plugar depois “perfil de negócio” e blocos novos sem reescrever o motor.
+- **Um nó = uma responsabilidade + metadados ricos**: cada `node_*` deve continuar documentando **objetivo da etapa**, **entradas/saídas** e **o que pode ir para config** quando existir o construtor visual ou o wizard.
+- **Observabilidade**: logs e auditoria pensados para **debugar funis alheios** no futuro (IDs de lead, nó, intenção, sem vazar PII em log bruto).
+- **Segurança e compliance**: opt-out, consentimento, limites de mensagem — tratados como **primeira classe** porque qualquer operador de Zap vai precisar disso na plataforma.
+
+## O que “capricho nos detalhes” significa aqui
+
+- Microcopy e ritmo (delays, balões) alinhados à etapa; recuperação que respeita o estado do funil.
+- Instruções para o modelo (personalizer, stage intelligence) **explícitas** e **testáveis**, não só adjetivos.
+- Reduzir falsos positivos (intenção, preço, handoff) com **regras claras** e **fallback** humano.
+
+Quando houver dúvida entre “rápido só para a Cigana” e “estrutura que escala”, **preferir a estrutura** desde que o esforço seja razoável e não antecipe produto que ainda não foi pedido.
