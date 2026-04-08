@@ -1005,7 +1005,12 @@ def api_flows_simulate():
             return jsonify({"ok": False, "error": "payload inválido"}), 400
         rep = validate_flow_document(body)
         doc = rep.get("normalized") or body
-        sim = simulate_flow(doc, max_steps=int(body.get("max_steps") or 40))
+        try:
+            ms = int(body.get("max_steps") or 40)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "max_steps inválido"}), 400
+        ms = max(1, min(ms, 500))
+        sim = simulate_flow(doc, max_steps=ms)
         return jsonify(_json_safe_for_api({"ok": True, "validation": rep, "simulation": sim})), 200
     except Exception as e:
         logger.error("🚨 [API] /api/flows/simulate: %s", e)

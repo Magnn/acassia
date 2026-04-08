@@ -6,12 +6,14 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import ipaddress
 import json
 import logging
 import os
 import re
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
 from flask import Flask, jsonify, request
@@ -23,14 +25,19 @@ from tenant_context import get_request_tenant_id
 logger = logging.getLogger(__name__)
 
 _MAX_BODY_PREVIEW = 400_000
+_SAFE_WEBHOOK_TEST_HOSTS = {
+    h.strip().lower()
+    for h in (os.getenv("FLOW_WEBHOOK_TEST_ALLOWED_HOSTS", "") or "").split(",")
+    if h.strip()
+}
 
 
 def _secret_master_bytes() -> bytes:
-    raw = (
-        os.getenv("ACASSIA_FLOW_SECRETS_KEY")
-        or os.getenv("WEBAPP_TOKEN")
-        or "dev-insecure-flow-secrets"
-    ).encode("utf-8")
+    k = (os.getenv("ACASSIA_FLOW_SECRETS_KEY") or "").strip()
+    if not k:
+        # Fail-safe para evitar segredo previsível em produção.
+        raise RuntimeError("ACASSIA_FLOW_SECRETS_KEY ausente")
+    raw = k.encode("utf-8")
     return hashlib.sha256(raw).digest()
 
 
@@ -65,6 +72,29 @@ def _json_safe(obj: Any) -> Any:
         if isinstance(obj, (list, tuple)):
             return [_json_safe(x) for x in obj]
         return str(obj)
+
+
+def _parse_positive_int(raw: Any, default: int, min_v: int, max_v: int) -> int:
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(min_v, min(v, max_v))
+
+
+def _is_blocked_webhook_host(hostname: str) -> bool:
+    h = (hostname or "").strip().lower()
+    if not h:
+        return True
+    if h in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    if _SAFE_WEBHOOK_TEST_HOSTS and h not in _SAFE_WEBHOOK_TEST_HOSTS:
+        return True
+    try:
+        ip = ipaddress.ip_address(h)
+        return bool(ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved)
+    except ValueError:
+        return False
 
 
 def _bp_row(db, tid: str, bid: int) -> Optional[models.FlowBlueprint]:
@@ -417,7 +447,7 @@ def register_flow_platform_routes(app: Flask) -> None:
     def api_flow_runs_list():
         tid = get_request_tenant_id()
         blueprint_id = request.args.get("blueprint_id")
-        limit = min(int(request.args.get("limit") or 50), 200)
+        limit = _parse_positive_int(request.args.get("limit"), default=50, min_v=1, max_v=200)
         db = SessionLocal()
         try:
             q = db.query(models.FlowRun).filter(models.FlowRun.tenant_id == tid)
@@ -572,12 +602,21 @@ def register_flow_platform_routes(app: Flask) -> None:
         url = (body.get("url") or "").strip()
         if not url or not (url.startswith("http://") or url.startswith("https://")):
             return jsonify({"ok": False, "error": "url http(s) obrigatória"}), 400
+        pu = urlparse(url)
+        if pu.scheme not in {"http", "https"}:
+            return jsonify({"ok": False, "error": "apenas http/https permitido"}), 400
+        if _is_blocked_webhook_host(pu.hostname or ""):
+            return jsonify({"ok": False, "error": "host bloqueado para webhook test"}), 403
         method = (body.get("method") or "POST").upper()
         if method not in ("GET", "POST", "PUT", "PATCH"):
             method = "POST"
         headers = body.get("headers") if isinstance(body.get("headers"), dict) else {}
         payload = body.get("payload")
-        timeout = min(float(body.get("timeout_sec") or 8), 30)
+        try:
+            timeout = float(body.get("timeout_sec") or 8)
+        except (TypeError, ValueError):
+            timeout = 8.0
+        timeout = max(1.0, min(timeout, 30.0))
         try:
             if method == "GET":
                 r = requests.get(url, headers=headers, timeout=timeout)
@@ -702,6 +741,8 @@ def register_flow_platform_routes(app: Flask) -> None:
         tid = get_request_tenant_id()
         db = SessionLocal()
         try:
+            if not (os.getenv("ACASSIA_FLOW_SECRETS_KEY") or "").strip():
+                return jsonify({"ok": False, "error": "configure ACASSIA_FLOW_SECRETS_KEY"}), 503
             if request.method == "GET":
                 rows = db.query(models.TenantFlowSecret).filter_by(tenant_id=tid).all()
                 items = []

@@ -1474,10 +1474,10 @@
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
         /* ── RANGE SLIDER ────────────────────────────────────────── */
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--c-border2); border-radius: 2px; }
         input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%;
+            -webkit-appearance: none; appearance: none; height: 14px; width: 14px; border-radius: 50%;
             background: var(--c-purple); margin-top: -5px; cursor: pointer;
             box-shadow: 0 0 8px var(--c-purple-glow);
         }

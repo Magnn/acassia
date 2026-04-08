@@ -22,7 +22,6 @@ import logging
 import random
 import re
 import os
-import glob
 from datetime import datetime, timezone
 from typing import List, Tuple, Dict
 
@@ -423,27 +422,15 @@ def _validar_foto_mao_com_gemini(ctx) -> bool:
             except Exception as e:
                 logger.warning("⚠️ [VISION] Erro URL: %s", e)
 
-        if not media_bytes:
-            try:
-                _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                downloads_dir = os.path.join(_ROOT, "downloads")
-                if os.path.exists(downloads_dir):
-                    arquivos = glob.glob(os.path.join(downloads_dir, "*.*"))
-                    if arquivos:
-                        mais_recente = max(arquivos, key=os.path.getctime)
-                        with open(mais_recente, "rb") as f:
-                            media_bytes = f.read()
-            except Exception as e:
-                logger.warning("⚠️ [VISION] Erro local: %s", e)
-
     if not media_bytes:
-        logger.warning("⚠️ [VISION] Sem bytes. Aprovando por segurança.")
-        return True
+        logger.warning("⚠️ [VISION] Sem bytes de imagem para validação.")
+        return False
 
     try:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            return True
+            # Sem API key, considera foto válida apenas se há bytes reais no turno.
+            return bool(media_bytes)
 
         mime = _mime_por_magic_bytes(media_bytes)
         client = genai.Client(api_key=api_key)
@@ -475,7 +462,8 @@ def _validar_foto_mao_com_gemini(ctx) -> bool:
         return "SIM" in t2
     except Exception as e:
         logger.error("🚨 [VISION] Gemini: %s", e)
-        return True
+        # Em erro transitório da IA, não aprova sem evidência visual mínima.
+        return bool(media_bytes)
 
 
 _SYSTEM_COLETA_DINAMICA = """Você é Esmeralda Ácassia (Cigana Esmeralda): mesma voz dos passos anteriores — quiromancia com presença, como conversa no terreiro ou à beira da mesa, nunca como script de call center nem questionário.
