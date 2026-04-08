@@ -900,10 +900,21 @@ class Engine:
             return [b.strip() for b in texto.split("[BALAO]") if b.strip()]
         return [p.strip() for p in texto.split("\n\n") if p.strip()]
 
+    _RE_URL_NO_TEXTO = re.compile(r"(https?://\S+)", re.I)
+
+    @staticmethod
+    def _limpar_pontuacao_apos_url(u: str) -> str:
+        """Remove vírgula/ponto final colado ao link (não quebra o path com /)."""
+        s = (u or "").strip()
+        while len(s) > 12 and s[-1] in ".,;:!?）":
+            s = s[:-1]
+        return s
+
     def _fatiar_texto_envio_seguro(self, texto: str) -> list[str]:
         """
         Fatiamento resiliente para WhatsApp:
         preserva sentenças, corta excesso e evita explosão de balões.
+        Qualquer URL http(s) permanece em balão único (nunca fatiada no meio).
         """
         def _emoji_ou_pontuacao_somente(s: str) -> bool:
             t = str(s or "").strip()
@@ -915,18 +926,26 @@ class Engine:
         bruto = str(texto or "").strip()
         # URL pura deve ir em balão único (evita quebrar "https://www.instagram.com/...").
         if re.match(r"^https?://\S+$", bruto, re.I):
-            return [bruto]
+            return [self._limpar_pontuacao_apos_url(bruto)]
 
-        base = self._quebrar_baloes(bruto)
         out: list[str] = []
-        for parte in base:
-            chunks = fatiar_texto_ritmo_celular(
-                parte,
-                max_linhas_visuais=MOBILE_MAX_LINHAS_BALO,
-                chars_por_linha=MOBILE_CHARS_POR_LINHA,
-            )
-            for ch in chunks:
-                out.extend(quebrar_por_linhas_max(ch, MOBILE_MAX_LINHAS_BALO))
+        # Segmenta texto vs URLs: URLs nunca passam por fatiar_texto_ritmo_celular.
+        for trecho in self._RE_URL_NO_TEXTO.split(bruto):
+            t = (trecho or "").strip()
+            if not t:
+                continue
+            if re.match(r"^https?://\S+", t, re.I):
+                out.append(self._limpar_pontuacao_apos_url(t))
+                continue
+            base = self._quebrar_baloes(t)
+            for parte in base:
+                chunks = fatiar_texto_ritmo_celular(
+                    parte,
+                    max_linhas_visuais=MOBILE_MAX_LINHAS_BALO,
+                    chars_por_linha=MOBILE_CHARS_POR_LINHA,
+                )
+                for ch in chunks:
+                    out.extend(quebrar_por_linhas_max(ch, MOBILE_MAX_LINHAS_BALO))
         limpos = [str(x or "").strip() for x in out if str(x or "").strip()]
 
         # Regra UX: emoji isolado deve ficar junto do balão anterior.
