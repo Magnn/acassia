@@ -660,7 +660,7 @@ class Engine:
             ctx = ContextoConversa(
                 lead_id=lead.id, telefone=telefone, node_atual="14_confirmacao_entrega",
                 historico=[], texto_recebido="SISTEMA_WEBHOOK", tipo_mensagem="system", 
-                interactive_reply_id=None, personalizer=self.personalizer
+                interactive_reply_id=None, nome_lead=(getattr(lead, "nome", "") or ""), personalizer=self.personalizer
             )
             ctx.metadata["__config__"] = CONFIG_CLIENTE
             try:
@@ -675,6 +675,7 @@ class Engine:
                 inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
             except Exception:
                 pass
+            self._restaurar_memoria(lead, ctx)
             acoes = self._executar_node("14_confirmacao_entrega", ctx, db, lead)
             self._processar_fila(lead.id, ctx, acoes)
         finally:
@@ -711,6 +712,7 @@ class Engine:
                 inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
             except Exception:
                 pass
+            self._restaurar_memoria(lead, ctx)
             self._processar_fila(lead.id, ctx, acoes)
         except Exception as e:
             logger.error(f"🚨 [RECUPERAÇÃO] {telefone}: {e}", exc_info=True)
@@ -1068,6 +1070,17 @@ class Engine:
             "14_confirmacao_entrega",
         }
     )
+    _META_KEYS_EXCLUIR_PERSISTENCIA = frozenset(
+        {
+            "__config__",
+            "__acassia_studio__",
+            "node_atual_exec",
+            "node5_ignorar_ruido_um_turno",
+            "node6_fallback_acionado_turno",
+            "node7_fallback_acionado_turno",
+            "node8_fallback_acionado_turno",
+        }
+    )
 
     def _ack_estado_silencioso(self, node: str) -> str:
         n = (node or "").strip().lower()
@@ -1102,6 +1115,20 @@ class Engine:
             if s and not nome_eh_placeholder(s):
                 return s.split()[0].strip().capitalize()
         return VOCATIVO_SEM_NOME
+
+    @classmethod
+    def _metadata_persistivel(cls, meta: dict) -> dict:
+        out: dict = {}
+        for k, v in (meta or {}).items():
+            ks = str(k or "")
+            if not ks:
+                continue
+            if ks in cls._META_KEYS_EXCLUIR_PERSISTENCIA:
+                continue
+            if ks.endswith("_turno") or ks.endswith("_temp"):
+                continue
+            out[ks] = v
+        return out
 
     @staticmethod
     def _lead_ja_passou_funil_ou_comprou(lead) -> bool:
@@ -1450,11 +1477,7 @@ class Engine:
             if m.get("genero_lead"):
                 lead.genero = str(m["genero_lead"])[:24]
 
-            meta_para_salvar = {
-                k: v
-                for k, v in ctx.metadata.items()
-                if k not in ("__config__", "__acassia_studio__")
-            }
+            meta_para_salvar = self._metadata_persistivel(dict(ctx.metadata))
             lead.metadata_json = meta_para_salvar
 
         if getattr(ctx, "intencao", None):

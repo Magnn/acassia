@@ -38,6 +38,13 @@ def executar_v2(ctx) -> tuple:
     genero = genero_efetivo_para_copy(nome, meta)
     meta["genero_lead"] = genero
     ctx.metadata = meta
+    desejo = str(meta.get("desejo_declarado") or meta.get("desejo_oculto") or "").strip()
+    dor = str(meta.get("resumo_dor") or "").strip()
+    eco_ctx = ""
+    if desejo:
+        eco_ctx = f"Eu mantenho firme aqui o seu pedido de {desejo[:90]}."
+    elif dor:
+        eco_ctx = f"Eu estou cuidando com atenção desse ponto que você trouxe: {dor[:110]}."
 
     acoes = [
         # Reação imediata à vibração do altar
@@ -56,6 +63,14 @@ def executar_v2(ctx) -> tuple:
         # Simulação de ação física (separar materiais)
         Acao(tipo="delay", segundos=random.randint(10, 15)),
         Acao(tipo="text", conteudo="Vou separar agora mesmo todos os materiais que lhe mostrei e começar a sua preparação energética individual."),
+        *(
+            [
+                Acao(tipo="delay", segundos=random.randint(6, 10)),
+                Acao(tipo="text", conteudo=eco_ctx),
+            ]
+            if eco_ctx
+            else []
+        ),
         
         # Pedido de dados para o ritual
         Acao(tipo="delay", segundos=random.randint(14, 22)),
