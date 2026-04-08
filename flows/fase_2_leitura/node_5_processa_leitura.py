@@ -194,6 +194,33 @@ def _extrair_tentativas_previas(texto: str) -> str:
         return t[:220]
     return ""
 
+
+def _normalizar_fragmento_ctx(s: str) -> str:
+    t = " ".join((s or "").split()).strip()
+    if not t:
+        return ""
+    # Remove ruídos frequentes de confirmação que não ajudam a leitura.
+    if t.lower() in _RUIDO:
+        return ""
+    # Evita colar payload com divisores técnicos.
+    t = re.sub(r"\s*\|\s*", " | ", t)
+    return t
+
+
+def _montar_texto_contexto_node5(desabafo_pre: str, contexto_extra: str, msg_lead: str) -> str:
+    partes: List[str] = []
+    vistos: set[str] = set()
+    for raw in (desabafo_pre, contexto_extra, msg_lead):
+        t = _normalizar_fragmento_ctx(str(raw or ""))
+        if not t:
+            continue
+        k = re.sub(r"\s+", " ", t.lower()).strip(" .!?…")
+        if k in vistos:
+            continue
+        vistos.add(k)
+        partes.append(t)
+    return " ".join(partes).strip()
+
 # ── EXECUTOR PRINCIPAL ──
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     meta = getattr(ctx, "metadata", {}) or {}
@@ -217,23 +244,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 metadata={"skip_gancho_final": True},
             ),
         ], "5_processa_leitura"
-    # 💎 RESGATE: Puxa o contexto salvo do Node 4 se existir
+    # 💎 RESGATE: consolida contexto sem duplicar ruído entre nodes
     desabafo_pre = meta.get("desabafo_original", "")
     contexto_extra = meta.get("contexto_extra_final", "")
-    # Evita duplicar a mesma mensagem (Node 4 grava contexto_extra_final == msg do lead)
-    _d = (desabafo_pre or "").strip()
-    _ce = (contexto_extra or "").strip()
-    _ml = msg_lead.strip()
-    _partes: List[str] = []
-    if _d:
-        _partes.append(_d)
-    if _ce and _ce.lower() != _ml.lower():
-        _partes.append(_ce)
-    if _ml:
-        _partes.append(_ml)
-    elif _ce and not _ml:
-        _partes.append(_ce)
-    texto_completo = " ".join(_partes).strip()
+    texto_completo = _montar_texto_contexto_node5(desabafo_pre, contexto_extra, msg_lead)
     loops = meta.get("node5_loops_ativos", 0)
 
     genero_prelim = genero_efetivo_para_copy(

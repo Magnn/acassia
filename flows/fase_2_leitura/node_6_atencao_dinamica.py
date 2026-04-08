@@ -111,6 +111,24 @@ def _extrair_blocos_fallback(texto: str, max_blocos: int = 12, min_len: int = 8)
             break
     return out[:max_blocos]
 
+
+def _limpar_meta_textual(v: str, max_len: int = 220) -> str:
+    t = " ".join((v or "").split()).strip()
+    if not t:
+        return ""
+    if t.upper() in {"INDEFINIDO", "NONE", "NULL", "N/A"}:
+        return ""
+    return t[:max_len]
+
+
+def _assinar_semantica_curta(texto: str) -> str:
+    t = re.sub(r"[^a-z0-9\s]", " ", (texto or "").lower())
+    toks = [w for w in t.split() if len(w) > 2]
+    if not toks:
+        return ""
+    # assinatura curta para bloquear repetições do mesmo sentido
+    return " ".join(toks[:8])
+
 # ── PROMPT DE GERAÇÃO DA LEITURA (quiromancia, mesma voz dos nodes anteriores) ──
 _SYSTEM_LEITURA_SUPREMA = """Você é Esmeralda Ácassia (Cigana Esmeralda), a mesma voz calorosa e firme da conversa: quiromancia com presença, como no templo, não como telemarketing.
 
@@ -219,15 +237,18 @@ def executar_v2(ctx) -> tuple:
     tempo = meta.get("tempo_sofrimento", "muito tempo")
     energia = meta.get("nivel_energia", "Ansioso")
     obj_silenciosa = meta.get("objecao_silenciosa", "Nenhuma")
-    nome_pessoa_envolvida = str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO")
-    tempo_exato = str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO")
-    evento_gatilho = str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO")
-    dado_concreto = str(
+    nome_pessoa_envolvida_raw = _limpar_meta_textual(str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO"), 80)
+    tempo_exato_raw = _limpar_meta_textual(str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO"), 60)
+    evento_gatilho_raw = _limpar_meta_textual(str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO"), 120)
+    dado_concreto = _limpar_meta_textual(str(
         meta.get("node5_dado_concreto")
         or meta.get("node5_tentativas_previas")
         or meta.get("desejo_declarado")
         or ""
-    ).strip()
+    ).strip(), 180)
+    nome_pessoa_envolvida = nome_pessoa_envolvida_raw or "INDEFINIDO"
+    tempo_exato = tempo_exato_raw or "INDEFINIDO"
+    evento_gatilho = evento_gatilho_raw or "INDEFINIDO"
 
     nome_mecanismo_ctx = definir_nome_mecanismo_se_generico(meta, dor_fb)
     perfil_copy = perfil_copy_para_prompt(meta, msg_lead)
@@ -369,6 +390,7 @@ def executar_v2(ctx) -> tuple:
     # Expressão Regular Expandida contra QUALQUER palavra de conexão que fique pendurada no final
     regex_corte_fatal = r'([,;:-]|\b(e|mas|ou|que|de|da|do|em|no|na|seu|sua|meu|minha|o|a|os|as|um|uma|com|por|para|se|é|são|sao|foi|vai|como|quando|onde|porque|qual|quem|pelo|pela|dos|das|nos|nas|este|esta|esse|essa|isso|isto|aquilo|aquele|aquela|sendo|tendo|estando))\s*$'
 
+    assinaturas_vistas = set()
     for i, conteudo_raw in enumerate(blocos_gerados):
         if not conteudo_raw: continue
         
@@ -380,6 +402,12 @@ def executar_v2(ctx) -> tuple:
         conteudo_str = remover_marcadores_bloco_ia_vazados(conteudo_str)
         conteudo_str = unificar_vocativos_por_genero(conteudo_str, genero, nome_fmt)
         conteudo_str = aplicar_substituicoes_proibidas(conteudo_str)
+        assinatura = _assinar_semantica_curta(conteudo_str)
+        if assinatura and assinatura in assinaturas_vistas:
+            logger.info("event=node6_bloco_suprimido_redundancia bloco=%s", i + 1)
+            continue
+        if assinatura:
+            assinaturas_vistas.add(assinatura)
 
         # 🛡️ SMART COMPLETION GUARD v5 (O Exterminador de Cortes)
         if len(conteudo_str) < 5 or re.search(regex_corte_fatal, conteudo_str.lower()):

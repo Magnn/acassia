@@ -81,6 +81,23 @@ def _extrair_blocos_fallback(texto: str, max_blocos: int = 7, min_len: int = 8) 
     return out[:max_blocos]
 
 
+def _limpar_meta_textual(v: str, max_len: int = 220) -> str:
+    t = " ".join((v or "").split()).strip()
+    if not t:
+        return ""
+    if t.upper() in {"INDEFINIDO", "NONE", "NULL", "N/A"}:
+        return ""
+    return t[:max_len]
+
+
+def _assinar_semantica_curta(texto: str) -> str:
+    t = re.sub(r"[^a-z0-9\s]", " ", (texto or "").lower())
+    toks = [w for w in t.split() if len(w) > 2]
+    if not toks:
+        return ""
+    return " ".join(toks[:8])
+
+
 def _reacao_curta_ao_input(msg_lead: str, nome_fmt: str) -> str:
     t = (msg_lead or "").strip().lower()
     if re.search(r"\b(sim|faz sentido|bateu|ressonou|verdade)\b", t):
@@ -179,9 +196,13 @@ def executar_v2(ctx) -> tuple:
     energia = meta.get("nivel_energia", "Ansioso")
     mecanismo = definir_nome_mecanismo_se_generico(meta, dor_clean)
     ctx_desejo_res = contexto_desejo_resultado_para_prompt(meta, mecanismo)
-    nome_pessoa_envolvida = str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO")
-    tempo_exato = str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO")
-    evento_gatilho = str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO")
+    nome_pessoa_envolvida = _limpar_meta_textual(
+        str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO"), 80
+    ) or "INDEFINIDO"
+    tempo_exato = _limpar_meta_textual(str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO"), 60) or "INDEFINIDO"
+    evento_gatilho = _limpar_meta_textual(
+        str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO"), 120
+    ) or "INDEFINIDO"
     perfil_copy = perfil_copy_para_prompt(meta, msg_lead)
 
     blocos_gerados = []
@@ -277,6 +298,7 @@ def executar_v2(ctx) -> tuple:
     leitura_pre = max(7, min(len(msg_lead) // 22, 12))
     acoes.append(Acao(tipo="delay", segundos=leitura_pre))
 
+    assinaturas_vistas = set()
     for i, conteudo_raw in enumerate(blocos_gerados):
         if not conteudo_raw: continue
         
@@ -288,6 +310,12 @@ def executar_v2(ctx) -> tuple:
         conteudo_str = remover_marcadores_bloco_ia_vazados(conteudo_str)
         conteudo_str = unificar_vocativos_por_genero(conteudo_str, genero, nome_fmt)
         conteudo_str = aplicar_substituicoes_proibidas(conteudo_str)
+        assinatura = _assinar_semantica_curta(conteudo_str)
+        if assinatura and assinatura in assinaturas_vistas:
+            logger.info("event=node7_bloco_suprimido_redundancia bloco=%s", i + 1)
+            continue
+        if assinatura:
+            assinaturas_vistas.add(assinatura)
         if not conteudo_str:
             continue
 
