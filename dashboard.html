@@ -1488,6 +1488,177 @@
             text-transform: none;
             letter-spacing: 0;
         }
+        /* Inspector — Cérebro IA (SaaS slate / indigo) */
+        .flow-inspector-ai {
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(165deg, #f8fafc 0%, #f1f5f9 55%, #eef2ff 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+            padding: 12px 12px 10px;
+            margin: 0 0 10px;
+        }
+        .flow-inspector-ai__head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .flow-inspector-ai__head-ico {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: #fff;
+            font-size: 12px;
+            box-shadow: 0 2px 8px -2px rgba(79, 70, 229, 0.45);
+        }
+        .flow-inspector-ai__head-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .flow-inspector-ai__title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e293b;
+            letter-spacing: -0.01em;
+        }
+        .flow-inspector-ai__sub {
+            font-size: 9px;
+            color: #64748b;
+            margin-top: 2px;
+            line-height: 1.35;
+        }
+        .flow-inspector-ai__field {
+            margin-bottom: 10px;
+        }
+        .flow-inspector-ai__field:last-child {
+            margin-bottom: 0;
+        }
+        .flow-inspector-ai__label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 5px;
+        }
+        .flow-inspector-ai__label i {
+            width: 14px;
+            text-align: center;
+            color: #6366f1;
+            opacity: 0.88;
+            font-size: 10px;
+        }
+        .flow-inspector-ai__select,
+        .flow-inspector-ai__input {
+            width: 100%;
+            padding: 7px 9px;
+            font-size: 11px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #0f172a;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .flow-inspector-ai__select:focus,
+        .flow-inspector-ai__input:focus,
+        .flow-inspector-ai__textarea:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.65);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+        }
+        .flow-inspector-ai__textarea {
+            width: 100%;
+            min-height: 72px;
+            max-height: min(36vh, 280px);
+            padding: 8px 10px;
+            font-size: 11px;
+            line-height: 1.45;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #0f172a;
+            resize: vertical;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .flow-inspector-ai__slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .flow-inspector-ai__slider-row input[type='range'] {
+            flex: 1;
+            min-width: 0;
+            accent-color: #6366f1;
+            height: 6px;
+        }
+        .flow-inspector-ai__temp-val {
+            font-variant-numeric: tabular-nums;
+            font-size: 11px;
+            font-weight: 700;
+            color: #4338ca;
+            min-width: 2.25rem;
+            text-align: right;
+        }
+        .flow-inspector-ai__toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: rgba(255, 255, 255, 0.85);
+        }
+        .flow-inspector-ai__toggle span {
+            font-size: 10px;
+            font-weight: 600;
+            color: #334155;
+        }
+        .flow-inspector-ai__switch {
+            position: relative;
+            width: 38px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+        .flow-inspector-ai__switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+        .flow-inspector-ai__switch-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #cbd5e1;
+            border-radius: 999px;
+            transition: background 0.2s ease;
+        }
+        .flow-inspector-ai__switch-slider::before {
+            content: '';
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+            transition: transform 0.2s ease;
+        }
+        .flow-inspector-ai__switch input:checked + .flow-inspector-ai__switch-slider {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+        }
+        .flow-inspector-ai__switch input:checked + .flow-inspector-ai__switch-slider::before {
+            transform: translateX(16px);
+        }
         .flow-node-head[title] {
             cursor: grab;
         }
@@ -3824,16 +3995,16 @@
                     </div>
                 </div>
 
-                <!-- GPT — IA (violeta) -->
+                <!-- Cérebro IA — LLM (Missão 5.1) -->
                 <div draggable="true" data-flow-palette-type="gpt" ondragstart="flowPaletteDragStart(event)" onclick="addSpecificNode('gpt')" class="flow-palette-card flow-palette-card--ia">
                     <span class="flow-palette-strip" aria-hidden="true"></span>
                     <div class="flow-palette-card-inner">
-                        <div class="flow-palette-ico"><i class="fas fa-magic"></i></div>
+                        <div class="flow-palette-ico"><i class="fas fa-brain"></i></div>
                         <div class="min-w-0 flex-1">
                             <div class="flow-palette-row">
-                                <h4 class="flow-palette-title">GPT</h4>
+                                <h4 class="flow-palette-title">Cérebro IA</h4>
                             </div>
-                            <p class="flow-palette-desc">LLM: modelo, temperatura, prompt</p>
+                            <p class="flow-palette-desc">Modelo, system prompt, temperatura, variável e memória</p>
                         </div>
                     </div>
                 </div>
@@ -5261,6 +5432,13 @@ const FLOW_GPT_MODELS = [
     { value: 'gpt-4o-mini', label: 'GPT-4o mini (rápido)' },
     { value: 'gpt-4o', label: 'GPT-4o' },
     { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+];
+/** Modelos do painel Cérebro IA (Missão 5.1) — valores estáveis para blueprint / motor */
+const FLOW_INSPECTOR_AI_MODELS = [
+    { value: 'gpt-4o', label: 'GPT-4o' },
+    { value: 'gpt-3.5-turbo', label: 'GPT-3.5-Turbo' },
+    { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
+    { value: 'gemini-1.5-pro', label: 'Gemini Pro' },
 ];
 const FLOW_PERGUNTA_MODOS = [
     { value: 'texto_livre', label: 'Resposta em texto livre' },
@@ -6860,6 +7038,11 @@ function flowHumanizeInspectorKey(k) {
         windows: 'Janelas',
         reply_mode: 'Modo de resposta',
         script: 'Roteiro',
+        ai_model: 'Modelo (IA)',
+        ai_system_prompt: 'System prompt (IA)',
+        ai_temperature: 'Temperatura (IA)',
+        ai_output_var: 'Variável de saída (IA)',
+        ai_memory: 'Memória curta (IA)',
     };
     const s = String(k || '');
     if (map[s]) return map[s];
@@ -6914,6 +7097,137 @@ function flowInspectorRenderGeneric(meta, cfg, spec, bodyEl) {
     flowEnhanceInspectorVariableButtons(body);
 }
 
+function flowGptResolvedAiConfig(cfg) {
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    let model =
+        c.ai_model != null && String(c.ai_model).trim() !== '' ? String(c.ai_model).trim() : String(c.model || 'gpt-4o').trim();
+    if (!model) model = 'gpt-4o';
+    const systemPrompt =
+        c.ai_system_prompt != null ? String(c.ai_system_prompt) : c.prompt != null ? String(c.prompt) : '';
+    let temp = 0.7;
+    if (c.ai_temperature != null && String(c.ai_temperature) !== '') {
+        const n = parseFloat(String(c.ai_temperature));
+        if (Number.isFinite(n)) temp = Math.min(1, Math.max(0, n));
+    } else if (c.temperature != null && String(c.temperature) !== '') {
+        const n = parseFloat(String(c.temperature));
+        if (Number.isFinite(n)) temp = Math.min(1, Math.max(0, n));
+    }
+    const outputVar =
+        c.ai_output_var != null && String(c.ai_output_var).trim() !== ''
+            ? String(c.ai_output_var).trim()
+            : 'resposta_ia';
+    const memory = c.ai_memory === true || c.ai_memory === 'true' || c.ai_memory === 1 || c.ai_memory === '1';
+    return { model, systemPrompt, temp, outputVar, memory };
+}
+
+function flowInspectorRenderGpt(meta, cfg, bodyEl) {
+    const body = bodyEl || flowGetInspectorBodyEl();
+    if (!body) return;
+    const safeId = String(meta.id || 'n').replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
+    const r = flowGptResolvedAiConfig(cfg);
+    const known = new Set(FLOW_INSPECTOR_AI_MODELS.map((m) => m.value));
+    const modelOpts =
+        flowOptsHtmlSelected(FLOW_INSPECTOR_AI_MODELS, 'value', 'label', r.model) +
+        (!known.has(r.model) && r.model
+            ? `<option value="${flowEsc(r.model)}" selected>${flowEsc(r.model)} (legado)</option>`
+            : '');
+    const tempStr = r.temp.toFixed(2);
+    body.innerHTML = `
+        <div class="flow-inspector-meta"><span class="flow-inspector-kind">${flowEsc(meta.typ)}</span> · <code class="flow-tech-id">${flowEsc(meta.id)}</code> · entradas ${meta.incom} · saídas ${meta.outgo}</div>
+        <div class="flow-inspector-ai">
+            <div class="flow-inspector-ai__head">
+                <div class="flow-inspector-ai__head-ico" aria-hidden="true"><i class="fas fa-brain"></i></div>
+                <div class="flow-inspector-ai__head-text">
+                    <div class="flow-inspector-ai__title">Cérebro de IA</div>
+                    <div class="flow-inspector-ai__sub">Modelo, personalidade (system), criatividade, variável de saída e memória de curto prazo.</div>
+                </div>
+            </div>
+            <div class="flow-inspector-ai__field">
+                <label class="flow-inspector-ai__label" for="flow-ai-model-${safeId}"><i class="fas fa-microchip"></i> Modelo</label>
+                <select id="flow-ai-model-${safeId}" class="flow-inspector-ai__select" data-flow-inspector-key="ai_model" autocomplete="off">${modelOpts}</select>
+            </div>
+            <div class="flow-inspector-ai__field">
+                <label class="flow-inspector-ai__label" for="flow-ai-sys-${safeId}"><i class="fas fa-user-astronaut"></i> System prompt</label>
+                <textarea id="flow-ai-sys-${safeId}" class="flow-inspector-ai__textarea" data-flow-inspector-key="ai_system_prompt" placeholder="Define a personalidade, tom e regras fixas da IA…">${flowEsc(r.systemPrompt)}</textarea>
+            </div>
+            <div class="flow-inspector-ai__field">
+                <label class="flow-inspector-ai__label" for="flow-ai-temp-${safeId}"><i class="fas fa-thermometer-half"></i> Temperatura</label>
+                <div class="flow-inspector-ai__slider-row">
+                    <input type="range" id="flow-ai-temp-${safeId}" min="0" max="1" step="0.05" value="${tempStr}" data-flow-inspector-key="ai_temperature" aria-valuemin="0" aria-valuemax="1" />
+                    <span class="flow-inspector-ai__temp-val" id="flow-ai-temp-disp-${safeId}">${tempStr}</span>
+                </div>
+            </div>
+            <div class="flow-inspector-ai__field">
+                <label class="flow-inspector-ai__label" for="flow-ai-out-${safeId}"><i class="fas fa-sign-out-alt"></i> Variável de saída</label>
+                <input type="text" id="flow-ai-out-${safeId}" class="flow-inspector-ai__input" data-flow-inspector-key="ai_output_var" value="${flowEsc(r.outputVar)}" placeholder="ex: resposta_ia ou {{resposta_ia}}" autocomplete="off" />
+            </div>
+            <div class="flow-inspector-ai__field">
+                <div class="flow-inspector-ai__toggle">
+                    <span><i class="fas fa-database" style="margin-right:6px;color:#6366f1;opacity:.85"></i>Memória de curto prazo</span>
+                    <label class="flow-inspector-ai__switch" title="Guardar contexto recente no fluxo">
+                        <input type="checkbox" data-flow-inspector-key="ai_memory" ${r.memory ? 'checked' : ''} />
+                        <span class="flow-inspector-ai__switch-slider" aria-hidden="true"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;padding-top:10px;border-top:1px solid var(--c-border)">
+            <button type="button" class="btn btn-primary" style="flex:1;font-size:11px;font-weight:600" onclick="applyFlowInspectorFormConfig()"><i class="fas fa-check"></i> Aplicar ao bloco</button>
+            <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px" onclick="openRawFlowInspectorJson()" title="Editar JSON cru"><i class="fas fa-code"></i></button>
+        </div>
+    `;
+    const rng = body.querySelector('#flow-ai-temp-' + safeId) || body.querySelector('[data-flow-inspector-key="ai_temperature"]');
+    const disp = body.querySelector('#flow-ai-temp-disp-' + safeId) || body.querySelector('.flow-inspector-ai__temp-val');
+    if (rng && disp) {
+        const sync = () => {
+            disp.textContent = parseFloat(String(rng.value || '0')).toFixed(2);
+        };
+        rng.addEventListener('input', sync);
+        rng.addEventListener('change', sync);
+        sync();
+    }
+    flowEnhanceInspectorVariableButtons(body);
+}
+
+function applyFlowInspectorAiBrain() {
+    const nodeId = _flowSelectedNodeId;
+    const node = nodeId ? flowCanvasNodeById(nodeId) : null;
+    if (!node || String(node.getAttribute('data-node-type') || '') !== 'gpt') return;
+    let obj = {};
+    try {
+        obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
+    } catch (_) {}
+    if (typeof obj !== 'object' || obj === null) obj = {};
+    const wrap = node.querySelector('.flow-node-inspector-body');
+    const scope = wrap || node;
+    const modelEl = scope.querySelector('[data-flow-inspector-key="ai_model"]');
+    const sysEl = scope.querySelector('[data-flow-inspector-key="ai_system_prompt"]');
+    const tempEl = scope.querySelector('[data-flow-inspector-key="ai_temperature"]');
+    const outEl = scope.querySelector('[data-flow-inspector-key="ai_output_var"]');
+    const memEl = scope.querySelector('[data-flow-inspector-key="ai_memory"]');
+    if (modelEl) obj.ai_model = String(modelEl.value || '').trim() || 'gpt-4o';
+    if (sysEl) obj.ai_system_prompt = String(sysEl.value || '');
+    if (tempEl) {
+        const n = parseFloat(String(tempEl.value));
+        obj.ai_temperature = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.7;
+    }
+    if (outEl) {
+        let ov = String(outEl.value || '').trim();
+        if (!ov) ov = 'resposta_ia';
+        obj.ai_output_var = ov;
+    }
+    if (memEl) obj.ai_memory = !!memEl.checked;
+    obj.model = obj.ai_model;
+    obj.prompt = obj.ai_system_prompt;
+    obj.temperature = String(obj.ai_temperature);
+    try {
+        node.setAttribute('data-flow-config', JSON.stringify(obj));
+    } catch (_) {}
+    pushFlowHistory();
+    toast('Cérebro IA guardado no bloco.', 'emerald');
+    requestFlowAutoSave();
+}
+
 function applyFlowInspectorFormConfig() {
     if (_flowSelectedEdgeId) {
         const body = document.getElementById('flow-inspector-body');
@@ -6925,6 +7239,10 @@ function applyFlowInspectorFormConfig() {
     const nodeId = _flowSelectedNodeId;
     const node = nodeId ? flowCanvasNodeById(nodeId) : null;
     if (!node) return;
+    if (String(node.getAttribute('data-node-type') || '') === 'gpt') {
+        applyFlowInspectorAiBrain();
+        return;
+    }
     let obj = {};
     try {
         obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
@@ -7312,6 +7630,12 @@ async function openFlowInspector(nodeEl) {
         updateFlowMinimap();
         return;
     }
+    if (typ === 'gpt') {
+        flowInspectorRenderGpt({ typ, title, incom, outgo, id }, cfg, bodyEl);
+        redrawFlowEdges();
+        updateFlowMinimap();
+        return;
+    }
     const catalog = await ensureFlowSchemaCatalog();
     const spec = (catalog && catalog[typ]) || { required_config: [], optional_keys: [] };
     flowInspectorRenderGeneric({ typ, title, incom, outgo, id }, cfg, spec, bodyEl);
@@ -7350,6 +7674,13 @@ function applyFlowInspectorConfig() {
     } catch (_) {
         toast('JSON inválido no config.', 'rose');
         return;
+    }
+    if (String(node.getAttribute('data-node-type') || '') === 'gpt') {
+        if (obj.ai_model != null) obj.model = obj.ai_model;
+        if (obj.ai_system_prompt !== undefined) obj.prompt = obj.ai_system_prompt;
+        if (obj.ai_temperature != null && String(obj.ai_temperature) !== '') {
+            obj.temperature = String(obj.ai_temperature);
+        }
     }
     node.setAttribute('data-flow-config', JSON.stringify(obj));
     pushFlowHistory();
@@ -8429,7 +8760,12 @@ function flowSimSubstituteVars(text, lead) {
     const L = lead || _flowSimState.lead || {};
     const getVal = (rawKey) => {
         const key = String(rawKey).trim();
-        if (key === 'resposta') return _flowSimState.context.lastAnswer || '';
+        const ctx = _flowSimState.context || {};
+        if (Object.prototype.hasOwnProperty.call(ctx, key)) {
+            const v = ctx[key];
+            return v != null ? String(v) : '';
+        }
+        if (key === 'resposta') return ctx.lastAnswer != null ? String(ctx.lastAnswer) : '';
         if (key === 'lead.nome') return L.nome != null ? String(L.nome) : '';
         if (key === 'lead.telefone') return L.telefone != null ? String(L.telefone) : '';
         if (key.indexOf('lead.') === 0) {
@@ -9062,16 +9398,27 @@ async function flowSimulateStep(nodeId) {
             type === 'voice_studio'
                 ? cfg.script || ''
                 : type === 'gpt'
-                  ? cfg.prompt || ''
+                  ? (String(cfg.ai_system_prompt || '').trim() !== '' ? cfg.ai_system_prompt : cfg.prompt || '')
                   : cfg.instructions || '';
         const preview = flowSimSubstituteVars(raw, L);
         flowSimChatAppend('sys', 'A gerar resposta (simulado)…');
+        if (type === 'gpt' && cfg.ai_memory) {
+            flowSimChatAppend('sys', 'Memória de curto prazo: ligada (simulação local).');
+        }
         await flowSimDelay(450);
         const fake =
             '[IA] ' +
             (preview
                 ? preview.slice(0, 280) + (preview.length > 280 ? '…' : '')
                 : 'Olá! Sou o assistente simulado. Configura o prompt no bloco.');
+        if (type === 'gpt') {
+            if (!_flowSimState.context) _flowSimState.context = {};
+            const outRaw = String(cfg.ai_output_var || 'resposta_ia').trim();
+            const outKey =
+                outRaw.replace(/^\{\{\s*|\s*\}\}$/g, '').replace(/[{}]/g, '').trim() || 'resposta_ia';
+            _flowSimState.context[outKey] = fake;
+            _flowSimState.context.lastAiOutput = fake;
+        }
         flowSimChatAppend('bot', fake);
         return flowSimTakeFirstOutgoing(nodeId);
     }
@@ -12117,7 +12464,18 @@ function flowDefaultConfigByType(type) {
     if (t === 'notificar') return { channel: 'log', message: '' };
     if (t === 'divisao') return { weights: 'A:50,B:50' };
     if (t === 'api') return { method: 'GET', url: '', query_string: '', headers: '', body: '' };
-    if (t === 'gpt') return { prompt: '', model: 'gpt-4o-mini', temperature: '0.7' };
+    if (t === 'gpt') {
+        return {
+            ai_model: 'gpt-4o',
+            ai_system_prompt: '',
+            ai_temperature: 0.7,
+            ai_output_var: 'resposta_ia',
+            ai_memory: false,
+            model: 'gpt-4o',
+            prompt: '',
+            temperature: '0.7',
+        };
+    }
     if (t === 'agente_ia') return { instructions: '', model: 'gpt-4o-mini', temperature: '0.5' };
     if (t === 'voice_studio') return { script: '', voice_profile: 'padrao' };
     if (t === 'anotacao') return { note: '' };
@@ -12138,7 +12496,7 @@ function flowNodeToneClassForType(type) {
         api: 'flow-tone-blue',
         notificar: 'flow-tone-blue',
         nucleo_ia: 'flow-tone-emerald',
-        gpt: 'flow-tone-emerald',
+        gpt: 'flow-tone-violet',
         agente_ia: 'flow-tone-emerald',
         anotacao: 'flow-tone-emerald',
         delay: 'flow-tone-amber',
@@ -12270,7 +12628,7 @@ function addSpecificNode(type, pos) {
     else if(type === 'notificar') { headerBg = 'linear-gradient(135deg,#1e3a8a,#3b82f6)'; icon = 'fas fa-bell'; title = 'Notificar Atendente'; }
     else if(type === 'divisao') { headerBg = 'linear-gradient(135deg,#be185d,#ec4899)'; icon = 'fas fa-share-alt'; title = 'Divisão'; }
     else if(type === 'api') { headerBg = 'linear-gradient(135deg,#0f766e,#14b8a6)'; icon = 'fas fa-share-nodes'; title = 'API Request'; }
-    else if(type === 'gpt') { headerBg = 'linear-gradient(135deg,#047857,#10b981)'; icon = 'fas fa-magic'; title = 'GPT'; }
+    else if(type === 'gpt') { headerBg = 'linear-gradient(135deg,#312e81,#4f46e5)'; icon = 'fas fa-brain'; title = 'Cérebro IA'; }
     else if(type === 'agente_ia') { headerBg = 'linear-gradient(135deg,#7e22ce,#a855f7)'; icon = 'fas fa-robot'; title = 'Agente IA'; }
     else if(type === 'voice_studio') { headerBg = 'linear-gradient(135deg,#be123c,#f43f5e)'; icon = 'fas fa-user-voice'; title = 'Voice Studio'; }
     else if(type === 'anotacao') { headerBg = 'linear-gradient(135deg,#0f766e,#0d9488)'; icon = 'fas fa-sticky-note'; title = 'Anotação'; }
@@ -12368,19 +12726,9 @@ function addSpecificNode(type, pos) {
             <textarea class="input-field" data-flow-cfg="note" placeholder="Anotação interna" style="${ta};height:50px"></textarea>`;
     } else if (type === 'gpt') {
         bodyFields = `
-            ${fh('LLM (OpenAI / Langflow): modelo, temperatura e prompt — execução real depende do motor.')}
+            ${fh('Cérebro IA: modelo, system prompt, temperatura, variável de saída e memória — configure no painel do inspetor (expandir).')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
-            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Modelo</label>
-            <select data-flow-cfg="model" class="input-field" style="${fs}">${gptModelOpts}</select>
-            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Temperatura (0–2)</label>
-            <input type="number" min="0" max="2" step="0.1" data-flow-cfg="temperature" placeholder="0.7" class="input-field" style="${fs}">
-            <div class="flow-snippet-row">
-                <button type="button" onclick="flowGptTempClick(this,0)">0</button>
-                <button type="button" onclick="flowGptTempClick(this,0.3)">0.3</button>
-                <button type="button" onclick="flowGptTempClick(this,0.7)">0.7</button>
-                <button type="button" onclick="flowGptTempClick(this,1)">1</button>
-            </div>
-            <textarea class="input-field" data-flow-cfg="prompt" placeholder="Prompt do sistema / utilizador" style="${ta};height:50px"></textarea>`;
+            <p style="font-size:10px;color:var(--c-muted);margin:0;line-height:1.45">Abra o inspetor para editar <strong>modelo</strong>, <strong>system prompt</strong>, <strong>temperatura</strong> (0–1), <strong>variável de saída</strong> e <strong>memória</strong>. Alterações gravam em <code style="font-size:9px">data-flow-config</code> (chaves <code style="font-size:9px">ai_*</code>).</p>`;
     } else if (type === 'agente_ia') {
         bodyFields = `
             ${fh('Agente (Botpress / Copilot Studio): persona estável; modelo e temperatura para API futura.')}

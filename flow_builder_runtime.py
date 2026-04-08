@@ -131,7 +131,16 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "GPT / LLM",
         "runtime": "llm",
         "required_config": (),
-        "optional_keys": ("prompt", "model", "temperature"),
+        "optional_keys": (
+            "prompt",
+            "model",
+            "temperature",
+            "ai_model",
+            "ai_system_prompt",
+            "ai_temperature",
+            "ai_output_var",
+            "ai_memory",
+        ),
     },
     "agente_ia": {
         "label": "Agente IA",
