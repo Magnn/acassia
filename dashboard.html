@@ -980,6 +980,67 @@
             background: var(--c-surface2);
             border-bottom: 1px solid var(--c-border);
         }
+        .flow-builder-tab-btn {
+            padding: 4px 14px;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--c-muted);
+            background: none;
+            border: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .flow-builder-tab-btn:hover { color: var(--c-text); background: rgba(124, 90, 245, 0.08); }
+        .flow-builder-tab-btn--active {
+            background: var(--c-purple) !important;
+            color: #fff !important;
+        }
+        #flow-builder-tab-panels {
+            flex-shrink: 0;
+            display: none;
+            flex-direction: column;
+            border-bottom: 1px solid var(--c-border);
+            background: var(--c-surface2);
+            max-height: min(260px, 42vh);
+            z-index: 15;
+            overflow: hidden;
+        }
+        #flow-builder-tab-panels.flow-builder-tab-panels--open { display: flex; }
+        .flow-builder-panel-inner {
+            padding: 10px 16px;
+            overflow: auto;
+            font-size: 11px;
+            flex: 1;
+            min-height: 0;
+        }
+        .flow-logs-pre {
+            margin: 0;
+            padding: 10px 12px;
+            background: var(--c-surface);
+            border: 1px solid var(--c-border);
+            border-radius: 8px;
+            font-size: 10px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 200px;
+            overflow: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            color: var(--c-text);
+        }
+        .flow-bp-row {
+            display: grid;
+            grid-template-columns: 72px 1fr auto;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--c-border);
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .flow-bp-row:hover { background: rgba(124, 90, 245, 0.06); }
+        .flow-bp-row--sel { background: rgba(124, 90, 245, 0.12); }
         .flow-node-inspector-title {
             font-size: 11px;
             font-weight: 700;
@@ -2330,6 +2391,7 @@
             <div>
                 <h2 style="font-family:var(--f-display);font-weight:800;font-size:22px;display:flex;align-items:center;gap:10px"><i class="fas fa-code-branch" style="color:var(--c-purple)"></i> Fluxos de conversa</h2>
                 <p id="fluxos-subtitle" style="font-size:11px;color:var(--c-muted);margin-top:4px">0 fluxos cadastrados</p>
+                <p id="fluxos-catalog-hint" class="hidden" style="font-size:10px;color:var(--c-amber);margin-top:2px">Catálogo remoto indisponível — a mostrar dados de exemplo.</p>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button type="button" class="btn btn-emerald" onclick="newFlow()"><i class="fas fa-plus"></i> Novo fluxo</button>
@@ -2569,9 +2631,9 @@
                 <div id="flow-publish-status" style="font-size:10px;color:var(--c-muted);text-align:center;margin-top:2px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">Publicado: —</div>
                 <div style="font-size:9px;color:var(--c-muted2);text-align:center;margin-top:2px;max-width:320px;line-height:1.35">Ligações: arraste do ● direito até o ● esquerdo, ou clique saída → entrada.</div>
                 <div style="display:flex;background:var(--c-surface2);border:1px solid var(--c-border);border-radius:8px;overflow:hidden;margin-top:4px">
-                    <button style="padding:4px 14px;font-size:10px;font-weight:700;color:var(--c-muted);background:none;border:none;cursor:pointer">Logs</button>
-                    <button style="padding:4px 14px;font-size:10px;font-weight:700;background:var(--c-purple);color:white;border:none;cursor:pointer">Automação</button>
-                    <button style="padding:4px 14px;font-size:10px;font-weight:700;color:var(--c-muted);background:none;border:none;cursor:pointer">Relatórios</button>
+                    <button type="button" id="btn-flow-tab-logs" class="flow-builder-tab-btn" onclick="setFlowBuilderTab('logs')">Logs</button>
+                    <button type="button" id="btn-flow-tab-automacao" class="flow-builder-tab-btn flow-builder-tab-btn--active" onclick="setFlowBuilderTab('automacao')">Automação</button>
+                    <button type="button" id="btn-flow-tab-relatorios" class="flow-builder-tab-btn" onclick="setFlowBuilderTab('relatorios')">Relatórios</button>
                 </div>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center;max-width:min(100%,520px)">
@@ -2588,10 +2650,24 @@
                 <button class="icon-btn" style="background:var(--c-surface2);border:1px solid var(--c-border)" title="Configurar dispositivos" onclick="openDeviceModal()"><i class="fas fa-mobile-screen-button text-lg" style="color:var(--c-purple2)"></i></button>
                 <button class="icon-btn" style="background:var(--c-surface2);border:1px solid var(--c-border)" title="Configurar versões" onclick="openVersionsSidebar()"><i class="fas fa-history text-lg" style="color:var(--c-purple2)"></i></button>
                 <button class="icon-btn" style="background:var(--c-surface2);border:1px solid var(--c-border)" title="Treinar Modelo (I.A)" onclick="openAIModal()"><i class="fas fa-brain text-lg" style="color:var(--c-purple2)"></i></button>
-                <button class="icon-btn" style="background:var(--c-surface2);border:1px solid var(--c-border)" title="Configurações"><i class="fas fa-cog text-lg" style="color:var(--c-purple2)"></i></button>
+                <button class="icon-btn" style="background:var(--c-surface2);border:1px solid var(--c-border)" title="Configurações do tenant" onclick="go('configuracoes')"><i class="fas fa-cog text-lg" style="color:var(--c-purple2)"></i></button>
                 <button type="button" class="btn btn-emerald" style="font-size:12px;background:#84cc16;color:white;border:none" onclick="deployFlowSave()"><i class="fas fa-rocket"></i> Salvar deploy</button>
             </div>
         </header>
+
+        <div id="flow-builder-tab-panels" aria-hidden="true">
+            <div id="flow-builder-panel-logs" class="flow-builder-panel-inner hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                    <span style="font-size:11px;font-weight:700;color:var(--c-text)">Saída (Validar / Compilar / Simular)</span>
+                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:4px 8px" onclick="clearFlowBuilderLogs()">Limpar</button>
+                </div>
+                <pre id="flow-builder-logs-pre" class="flow-logs-pre" style="max-height:min(200px,28vh)">(sem saída ainda — use Validar, Compilar ou Simular)</pre>
+            </div>
+            <div id="flow-builder-panel-relatorios" class="flow-builder-panel-inner hidden">
+                <div style="font-size:11px;font-weight:700;color:var(--c-text);margin-bottom:8px">Resumo do tenant / motor</div>
+                <div id="flow-builder-relatorios-inner" style="font-size:11px;color:var(--c-muted);line-height:1.5">A carregar…</div>
+            </div>
+        </div>
 
         <div class="flow-canvas" style="flex:1;position:relative;overflow:auto" id="flow-canvas-area" onclick="flowCanvasBackgroundClick(event)">
             <div id="flow-builder-toolbar" class="flow-builder-toolbar">
@@ -2666,6 +2742,53 @@
                 <li><strong style="color:var(--c-text)">Botão do meio</strong> do rato — arrastar vista</li>
                 <li><strong style="color:var(--c-text)">?</strong> — esta ajuda</li>
             </ul>
+        </div>
+    </div>
+
+    <div id="modal-flow-deploy" class="modal-overlay hidden fixed inset-0 z-[76] bg-black/50 flex items-center justify-center p-4" onclick="if(event.target===this) closeFlowDeployModal()">
+        <div class="modal-content card" style="width:460px;max-width:96vw;padding:16px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;box-shadow:var(--shadow)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:10px">
+                <strong style="font-family:var(--f-display);font-size:14px">Salvar deploy</strong>
+                <button type="button" class="icon-btn" onclick="closeFlowDeployModal()" title="Fechar"><i class="fas fa-times"></i></button>
+            </div>
+            <p style="font-size:11px;color:var(--c-muted);line-height:1.65;margin:0 0 12px">
+                O deploy local <strong style="color:var(--c-text)">valida o fluxo</strong> e <strong style="color:var(--c-text)">guarda o rascunho</strong> neste browser.
+                O <strong style="color:var(--c-text)">motor Python em <code style="font-size:10px">flows/</code></strong> não é gerado automaticamente a partir do canvas — continua a ser mantido no repositório/servidor como hoje.
+            </p>
+            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost" onclick="closeFlowDeployModal()">Cancelar</button>
+                <button type="button" class="btn btn-emerald" onclick="flowDeployConfirm()"><i class="fas fa-check"></i> Validar e guardar rascunho</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-flow-blueprint-picker" class="modal-overlay hidden fixed inset-0 z-[76] bg-black/50 flex items-center justify-center p-4" onclick="if(event.target===this) closeFlowBlueprintPickerModal()">
+        <div class="modal-content card" style="width:520px;max-width:96vw;padding:16px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;box-shadow:var(--shadow);max-height:85vh;display:flex;flex-direction:column">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px">
+                <strong style="font-family:var(--f-display);font-size:14px">Abrir fluxo do servidor</strong>
+                <button type="button" class="icon-btn" onclick="closeFlowBlueprintPickerModal()" title="Fechar"><i class="fas fa-times"></i></button>
+            </div>
+            <input type="search" id="flow-bp-picker-search" class="input-field" style="width:100%;font-size:12px;margin-bottom:8px" placeholder="Pesquisar por ID ou título…" oninput="flowBlueprintPickerFilter(this.value)" autocomplete="off">
+            <div id="flow-bp-picker-list" style="overflow:auto;flex:1;min-height:120px;max-height:min(360px,50vh);border:1px solid var(--c-border);border-radius:8px;background:var(--c-surface2)"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost" onclick="closeFlowBlueprintPickerModal()">Cancelar</button>
+                <button type="button" class="btn btn-emerald" onclick="flowBlueprintPickerOpenSelected()"><i class="fas fa-folder-open"></i> Abrir selecionado</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-flow-execute-lead" class="modal-overlay hidden fixed inset-0 z-[76] bg-black/50 flex items-center justify-center p-4" onclick="if(event.target===this) closeFlowExecuteLeadModal()">
+        <div class="modal-content card" style="width:400px;max-width:96vw;padding:16px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;box-shadow:var(--shadow)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <strong style="font-family:var(--f-display);font-size:14px">Executar no lead</strong>
+                <button type="button" class="icon-btn" onclick="closeFlowExecuteLeadModal()" title="Fechar"><i class="fas fa-times"></i></button>
+            </div>
+            <p style="font-size:11px;color:var(--c-muted);margin:0 0 10px">ID do lead para enfileirar ações WhatsApp (fluxo já guardado no servidor).</p>
+            <input type="number" id="flow-execute-lead-input" class="input-field" style="width:100%;font-size:13px;margin-bottom:12px" placeholder="Ex.: 12345" min="1" step="1">
+            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost" onclick="closeFlowExecuteLeadModal()">Cancelar</button>
+                <button type="button" class="btn btn-emerald" onclick="flowExecuteLeadSubmit()"><i class="fab fa-whatsapp"></i> Enfileirar</button>
+            </div>
         </div>
     </div>
 
@@ -3423,6 +3546,7 @@ function go(name, contextTitle = null) {
         switchAgenteTab('studio');
     }
     if (name === 'builder') {
+        setFlowBuilderTab('automacao');
         ['modal-new-flow', 'modal-success-flow'].forEach((id) => {
             const m = document.getElementById(id);
             if (m) { m.classList.remove('show'); m.classList.add('hidden'); }
@@ -3447,6 +3571,12 @@ let _fluxFolder = 'root';
 let _fluxosSummaryCache = null;
 
 let _fluxCatalogRemote = [];
+let _fluxCatalogIsFallback = false;
+let _flowBuilderTab = 'automacao';
+let _flowBuilderLogText = '';
+let _flowBlueprintPickerList = [];
+let _flowBlueprintPickerFiltered = [];
+let _flowBlueprintPickerSelectedId = null;
 
 async function loadFluxCatalogFromApi() {
     try {
@@ -3463,8 +3593,9 @@ async function loadFluxCatalogFromApi() {
             lastRun: String(f.last_run || '—'),
             builderContext: String(f.builder_context || f.name || 'Fluxo'),
         }));
+        _fluxCatalogIsFallback = false;
     } catch (_) {
-        // fallback leve para evitar UI vazia caso API falhe
+        _fluxCatalogIsFallback = true;
         _fluxCatalogRemote = [
             { kind: 'production', name: 'Fluxo principal', trigger: 'Motor Python', integration: 'whatsapp', flowId: '#73700', lastRun: 'ativo', builderContext: 'AcassIA CRM (Principal)' },
         ];
@@ -3576,6 +3707,11 @@ function renderFluxosList() {
 
 async function loadFluxosSummary() {
     await loadFluxCatalogFromApi();
+    const catHint = document.getElementById('fluxos-catalog-hint');
+    if (catHint) {
+        if (_fluxCatalogIsFallback) catHint.classList.remove('hidden');
+        else catHint.classList.add('hidden');
+    }
     const pipe = document.getElementById('fluxos-pipeline');
     try {
         const res = await fetch(`${API}/api/flows/summary`);
@@ -4882,8 +5018,106 @@ function loadOrRenderBuilderCanvas(contextTitle) {
     renderBaseFlow();
 }
 
-function deployFlowSave() {
+function setFlowBuilderTab(tab) {
+    const t = tab === 'logs' || tab === 'relatorios' ? tab : 'automacao';
+    _flowBuilderTab = t;
+    const panels = document.getElementById('flow-builder-tab-panels');
+    const bLogs = document.getElementById('btn-flow-tab-logs');
+    const bAuto = document.getElementById('btn-flow-tab-automacao');
+    const bRel = document.getElementById('btn-flow-tab-relatorios');
+    const pLogs = document.getElementById('flow-builder-panel-logs');
+    const pRel = document.getElementById('flow-builder-panel-relatorios');
+    [bLogs, bAuto, bRel].forEach((b) => { if (b) b.classList.remove('flow-builder-tab-btn--active'); });
+    if (t === 'automacao') {
+        if (panels) panels.classList.remove('flow-builder-tab-panels--open');
+        if (pLogs) pLogs.classList.add('hidden');
+        if (pRel) pRel.classList.add('hidden');
+        if (bAuto) bAuto.classList.add('flow-builder-tab-btn--active');
+        if (panels) panels.setAttribute('aria-hidden', 'true');
+        return;
+    }
+    if (panels) {
+        panels.classList.add('flow-builder-tab-panels--open');
+        panels.setAttribute('aria-hidden', 'false');
+    }
+    if (t === 'logs') {
+        if (pLogs) pLogs.classList.remove('hidden');
+        if (pRel) pRel.classList.add('hidden');
+        if (bLogs) bLogs.classList.add('flow-builder-tab-btn--active');
+    } else {
+        if (pLogs) pLogs.classList.add('hidden');
+        if (pRel) pRel.classList.remove('hidden');
+        if (bRel) bRel.classList.add('flow-builder-tab-btn--active');
+        flowLoadRelatoriosPanel();
+    }
+}
+
+function appendFlowBuilderLog(title, body) {
+    const ts = new Date().toLocaleTimeString('pt-PT');
+    const text = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+    const block = '\n--- ' + title + ' @ ' + ts + ' ---\n' + text + '\n';
+    _flowBuilderLogText = (_flowBuilderLogText + block).slice(-120000);
+    const pre = document.getElementById('flow-builder-logs-pre');
+    if (pre) pre.textContent = _flowBuilderLogText;
+    setFlowBuilderTab('logs');
+}
+
+function clearFlowBuilderLogs() {
+    _flowBuilderLogText = '';
+    const pre = document.getElementById('flow-builder-logs-pre');
+    if (pre) pre.textContent = '(sem saída — use Validar, Compilar ou Simular)';
+}
+
+async function flowLoadRelatoriosPanel() {
+    const el = document.getElementById('flow-builder-relatorios-inner');
+    if (!el) return;
+    el.textContent = 'A carregar…';
+    try {
+        const res = await fetch(`${API}/api/flows/summary`);
+        const j = await res.json();
+        if (!res.ok || !j.ok) throw new Error(j.error || 'summary_failed');
+        const phases = (j.phases || []).length;
+        const mnodes = (j.motor_nodes || []).length;
+        el.innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:10px">
+                <div>
+                    <div style="font-size:9px;color:var(--c-muted2);text-transform:uppercase">Nós (canvas)</div>
+                    <div style="font-weight:700;font-size:16px;color:var(--c-text)">${j.total_nodes ?? '—'}</div>
+                </div>
+                <div>
+                    <div style="font-size:9px;color:var(--c-muted2);text-transform:uppercase">Fases motor</div>
+                    <div style="font-weight:700;font-size:16px;color:var(--c-text)">${phases}</div>
+                </div>
+                <div>
+                    <div style="font-size:9px;color:var(--c-muted2);text-transform:uppercase">Leads</div>
+                    <div style="font-weight:700;font-size:16px;color:var(--c-text)">${j.leads_total ?? '—'}</div>
+                </div>
+                <div>
+                    <div style="font-size:9px;color:var(--c-muted2);text-transform:uppercase">WhatsApp</div>
+                    <div style="font-weight:700;font-size:16px">${j.whatsapp_configured === true ? '<span style="color:var(--c-emerald)">OK</span>' : '<span style="color:var(--c-amber)">Pendente</span>'}</div>
+                </div>
+            </div>
+            <div style="font-size:10px;color:var(--c-muted);border-top:1px solid var(--c-border);padding-top:8px">
+                Módulos Python em disco: ${mnodes}. Estado publicado: veja a linha «Publicado» no cabeçalho do builder.
+            </div>`;
+    } catch (_) {
+        el.innerHTML = '<span style="color:var(--c-rose)">Não foi possível carregar /api/flows/summary.</span>';
+    }
+}
+
+function closeFlowDeployModal() {
+    const m = document.getElementById('modal-flow-deploy');
+    if (m) m.classList.add('hidden');
+}
+
+function flowDeployConfirm() {
+    closeFlowDeployModal();
     validateFlowDraft({ forDeploy: true });
+}
+
+function deployFlowSave() {
+    const m = document.getElementById('modal-flow-deploy');
+    if (m) m.classList.remove('hidden');
 }
 
 async function validateFlowDraft(opts = {}) {
@@ -4900,6 +5134,9 @@ async function validateFlowDraft(opts = {}) {
         if (!res.ok && !j) throw new Error('validate_failed');
         const errors = Array.isArray(j.errors) ? j.errors : [];
         const warnings = Array.isArray(j.warnings) ? j.warnings : [];
+        if (!silent) {
+            appendFlowBuilderLog('Validação', { ok: !errors.length, errors, warnings, response: j });
+        }
         if (errors.length) {
             const msg = errors.slice(0, 2).map((e) => `• ${e.message}`).join(' ');
             if (!silent) toast(`Fluxo inválido: ${msg}`, 'rose');
@@ -4919,7 +5156,10 @@ async function validateFlowDraft(opts = {}) {
         }
         return true;
     } catch (_) {
-        if (!silent) toast('Falha ao validar fluxo na API.', 'rose');
+        if (!silent) {
+            appendFlowBuilderLog('Validação (erro)', 'Falha de rede ou resposta inválida da API.');
+            toast('Falha ao validar fluxo na API.', 'rose');
+        }
         return false;
     }
 }
@@ -4935,9 +5175,11 @@ async function compileFlowDraft() {
         const j = await res.json();
         const steps = j.plan && j.plan.steps ? j.plan.steps : [];
         const n = steps.length;
-        toast(`Compilação: ${n} passo(s). ${j.ok ? 'OK' : 'Com avisos — veja consola (F12).'}`, j.ok ? 'emerald' : 'amber');
+        appendFlowBuilderLog('Compilação', j);
+        toast(`Compilação: ${n} passo(s). ${j.ok ? 'OK' : 'Com avisos — detalhe no separador Logs.'}`, j.ok ? 'emerald' : 'amber');
         console.log('[flow compile]', j);
     } catch (_) {
+        appendFlowBuilderLog('Compilação (erro)', 'Falha ao compilar (rede ou API).');
         toast('Falha ao compilar fluxo.', 'rose');
     }
 }
@@ -4952,9 +5194,11 @@ async function simulateFlowDraft() {
         });
         const j = await res.json();
         const trace = j.simulation && j.simulation.trace ? j.simulation.trace : [];
-        toast(`Simulação: ${trace.length} passo(s). Detalhe na consola (F12).`, 'purple');
+        appendFlowBuilderLog('Simulação', j);
+        toast(`Simulação: ${trace.length} passo(s). Detalhe no separador Logs.`, 'purple');
         console.log('[flow simulate]', j);
     } catch (_) {
+        appendFlowBuilderLog('Simulação (erro)', 'Falha na simulação (rede ou API).');
         toast('Falha na simulação.', 'rose');
     }
 }
@@ -5041,18 +5285,35 @@ async function publishFlowBlueprintServer() {
     }
 }
 
-async function executeFlowBlueprintOnLead() {
+function closeFlowExecuteLeadModal() {
+    const m = document.getElementById('modal-flow-execute-lead');
+    if (m) m.classList.add('hidden');
+}
+
+function executeFlowBlueprintOnLead() {
     if (!_currentFlowBlueprintId) {
         toast('Guarde primeiro no servidor (Servidor).', 'amber');
         return;
     }
-    const lidStr = window.prompt('ID do lead (número) para enviar o fluxo pela fila WhatsApp:');
-    if (!lidStr) return;
+    const inp = document.getElementById('flow-execute-lead-input');
+    if (inp) inp.value = '';
+    const m = document.getElementById('modal-flow-execute-lead');
+    if (m) m.classList.remove('hidden');
+}
+
+async function flowExecuteLeadSubmit() {
+    if (!_currentFlowBlueprintId) {
+        toast('Guarde primeiro no servidor (Servidor).', 'amber');
+        return;
+    }
+    const inp = document.getElementById('flow-execute-lead-input');
+    const lidStr = inp ? inp.value.trim() : '';
     const lid = parseInt(lidStr, 10);
     if (!lidStr || isNaN(lid) || lid <= 0) {
         toast('ID inválido.', 'rose');
         return;
     }
+    closeFlowExecuteLeadModal();
     setAppBusy(true, 'A enfileirar ações…');
     try {
         const res = await fetch(`${API}/api/flows/blueprints/${_currentFlowBlueprintId}/execute`, {
@@ -5066,6 +5327,7 @@ async function executeFlowBlueprintOnLead() {
             throw new Error((j.error || 'execute_failed') + hint);
         }
         toast(`Fila: ${j.queued_actions} ação(ões) para lead ${j.lead_id}.`, 'emerald');
+        appendFlowBuilderLog('Executar lead', { lead_id: j.lead_id, queued_actions: j.queued_actions, response: j });
     } catch (e) {
         toast(String(e.message || e), 'rose');
     } finally {
@@ -5073,22 +5335,69 @@ async function executeFlowBlueprintOnLead() {
     }
 }
 
-async function loadFlowBlueprintPicker() {
-    setAppBusy(true, 'A carregar lista de fluxos…');
+function closeFlowBlueprintPickerModal() {
+    const m = document.getElementById('modal-flow-blueprint-picker');
+    if (m) m.classList.add('hidden');
+    _flowBlueprintPickerSelectedId = null;
+}
+
+function flowBlueprintPickerFilterRows(q) {
+    const needle = String(q || '').trim().toLowerCase();
+    if (!needle) return _flowBlueprintPickerList.slice();
+    return _flowBlueprintPickerList.filter((b) => {
+        const id = String(b.id);
+        const t = String(b.title || '').toLowerCase();
+        return id.includes(needle) || t.includes(needle);
+    });
+}
+
+function flowBlueprintPickerFilter(q) {
+    const rows = flowBlueprintPickerFilterRows(q);
+    renderFlowBlueprintPickerRows(rows);
+}
+
+function flowBlueprintPickerSelectRow(id) {
+    _flowBlueprintPickerSelectedId = id;
+    renderFlowBlueprintPickerRows(_flowBlueprintPickerFiltered);
+}
+
+function renderFlowBlueprintPickerRows(rows) {
+    _flowBlueprintPickerFiltered = rows;
+    if (_flowBlueprintPickerSelectedId && !rows.some((r) => r.id === _flowBlueprintPickerSelectedId)) {
+        _flowBlueprintPickerSelectedId = rows[0] ? rows[0].id : null;
+    }
+    const container = document.getElementById('flow-bp-picker-list');
+    if (!container) return;
+    if (!rows.length) {
+        container.innerHTML = '<div style="padding:16px;text-align:center;font-size:11px;color:var(--c-muted)">Nenhum resultado.</div>';
+        return;
+    }
+    container.innerHTML = rows.map((b) => {
+        const id = b.id;
+        const title = String(b.title || '').replace(/</g, '');
+        const titleAttr = title.replace(/"/g, '&quot;');
+        const sel = _flowBlueprintPickerSelectedId === id ? ' flow-bp-row--sel' : '';
+        return `<div class="flow-bp-row${sel}" data-bid="${id}" onclick="flowBlueprintPickerSelectRow(${id})" ondblclick="flowLoadBlueprintById(${id})">
+            <span style="font-weight:700;color:var(--c-purple)">#${id}</span>
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${titleAttr}">${title}</span>
+            <button type="button" class="btn btn-ghost" style="font-size:10px;padding:4px 8px" onclick="event.stopPropagation();flowLoadBlueprintById(${id})">Abrir</button>
+        </div>`;
+    }).join('');
+}
+
+function flowBlueprintPickerOpenSelected() {
+    if (!_flowBlueprintPickerSelectedId) {
+        toast('Selecione um fluxo na lista.', 'amber');
+        return;
+    }
+    flowLoadBlueprintById(_flowBlueprintPickerSelectedId);
+}
+
+async function flowLoadBlueprintById(bid) {
+    if (!bid) return;
+    closeFlowBlueprintPickerModal();
+    setAppBusy(true, 'A abrir fluxo…');
     try {
-        const res = await fetch(`${API}/api/flows/blueprints`);
-        const j = await res.json();
-        if (!j.ok || !Array.isArray(j.blueprints) || !j.blueprints.length) {
-            toast('Nenhum fluxo guardado no servidor para este tenant.', 'amber');
-            return;
-        }
-        const lines = j.blueprints.map((b) => `${b.id} — ${b.title}`).join('\n');
-        setAppBusy(false);
-        const idStr = window.prompt('ID do fluxo a abrir (número):\n\n' + lines);
-        if (!idStr) return;
-        const bid = parseInt(idStr, 10);
-        if (!bid) return;
-        setAppBusy(true, 'A abrir fluxo…');
         const r2 = await fetch(`${API}/api/flows/blueprints/${bid}`);
         const d = await r2.json();
         if (!r2.ok || !d.ok || !d.blueprint || !d.blueprint.body) {
@@ -5109,9 +5418,32 @@ async function loadFlowBlueprintPicker() {
         toast('Fluxo carregado do servidor.', 'emerald');
         refreshFlowPublishStatus();
     } catch (_) {
-        toast('Falha ao listar/carregar fluxos.', 'rose');
+        toast('Falha ao carregar fluxo.', 'rose');
     } finally {
         setAppBusy(false);
+    }
+}
+
+async function loadFlowBlueprintPicker() {
+    setAppBusy(true, 'A carregar lista de fluxos…');
+    try {
+        const res = await fetch(`${API}/api/flows/blueprints`);
+        const j = await res.json();
+        setAppBusy(false);
+        if (!j.ok || !Array.isArray(j.blueprints) || !j.blueprints.length) {
+            toast('Nenhum fluxo guardado no servidor para este tenant.', 'amber');
+            return;
+        }
+        _flowBlueprintPickerList = j.blueprints;
+        _flowBlueprintPickerSelectedId = j.blueprints[0] ? j.blueprints[0].id : null;
+        const search = document.getElementById('flow-bp-picker-search');
+        if (search) search.value = '';
+        const m = document.getElementById('modal-flow-blueprint-picker');
+        if (m) m.classList.remove('hidden');
+        renderFlowBlueprintPickerRows(flowBlueprintPickerFilterRows(''));
+    } catch (_) {
+        setAppBusy(false);
+        toast('Falha ao listar fluxos.', 'rose');
     }
 }
 
