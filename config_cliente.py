@@ -239,6 +239,11 @@ def carregar() -> dict:
         "link_pagamento":    link_pgto,
         "link_downsell":     link_downsell,
         "link_prova_social": link_prova_social,
+        "imagem_perfil_instagram": _obter_limpo(
+            "CLIENTE_IMAGEM_PERFIL_INSTAGRAM",
+            "IMAGEM_PERFIL_INSTAGRAM_URL",
+            "",
+        ),
         "imagem_altar":      _obter_limpo("CLIENTE_IMAGEM_ALTAR", None, ""),
         "depoimentos_urls":  depoimentos,
         "cakto": {

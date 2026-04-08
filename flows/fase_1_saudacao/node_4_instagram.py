@@ -38,6 +38,7 @@ _REGEX_CORTE_FATAL = r"([,;:\-]|\b(?:a|ao|as|e|é|eh|éh|foi|o|os|se|à|em|mas|o
 # Valida se termina em pontuação ou emoji (Garante conclusão do pensamento)
 _PONTUACAO_VALIDA = r".*[.\!\?…\u2600-\u26FF\u2700-\u27BF\U0001f300-\U0001faff]$"
 _RE_LINK_VALIDO = re.compile(r"^https?://[^\s/$.?#].[^\s]*\.[A-Za-z]{2,}([/?#].*)?$", re.I)
+_RE_LINK_INSTAGRAM_ESTRITO = re.compile(r"^https?://(?:www\.)?instagram\.com/[A-Za-z0-9._\-]+/?$", re.I)
 # Lead diz que URL não abre (antes do handoff Node 5): acolher + alternativa (@ ou nome do perfil)
 _RE_TEXTO_LINK_IG_QUEBRADO = re.compile(
     r"(?i)(link\s+(quebrad|errad|invalido|inválido)|"
@@ -104,14 +105,24 @@ def _normalizar_link_ig(link_raw: str) -> str:
     if not link:
         return ""
     if _RE_LINK_VALIDO.match(link):
+        # Preferir perfil (não reel/página interna) para manter URL estável.
+        if _RE_LINK_INSTAGRAM_ESTRITO.match(link):
+            return link
+        m_perfil = re.search(r"https?://(?:www\.)?instagram\.com/([A-Za-z0-9._\-]+)/?", link, re.I)
+        if m_perfil:
+            return f"https://www.instagram.com/{m_perfil.group(1)}/"
         return link
     if re.match(r"^https?://\S{10,}", link, re.I):
         return link.split()[0].rstrip(".,;)")
+    # Fallback: tenta extrair um @usuario perdido no texto.
+    m_handle = re.search(r"@([A-Za-z0-9._]+)", link_raw or "")
+    if m_handle:
+        return f"https://www.instagram.com/{m_handle.group(1)}/"
     logger.warning("[NODE 4] link_prova_social do .env com formato duvidoso (não enviado): %s", link[:120])
     return ""
 
 
-def _acoes_texto_e_url_instagram(link_ig: str) -> List[Acao]:
+def _acoes_texto_e_url_instagram(link_ig: str, imagem_perfil_ig: str = "") -> List[Acao]:
     """Ponte verbal + URL isolada, ou aviso se .env não tiver LINK_INSTAGRAM."""
     if not (link_ig or "").strip():
         logger.warning(
@@ -128,8 +139,17 @@ def _acoes_texto_e_url_instagram(link_ig: str) -> List[Acao]:
                 metadata={"skip_gancho_final": True},
             ),
         ]
-    return [
+    out = [
         Acao(tipo="delay", segundos=random.randint(6, 10)),
+    ]
+    if (imagem_perfil_ig or "").strip():
+        out.extend(
+            [
+                Acao(tipo="image", url=imagem_perfil_ig.strip()),
+                Acao(tipo="delay", segundos=random.randint(4, 7)),
+            ]
+        )
+    out.extend([
         Acao(
             tipo="text",
             conteudo=(
@@ -144,7 +164,8 @@ def _acoes_texto_e_url_instagram(link_ig: str) -> List[Acao]:
             conteudo=link_ig.strip(),
             metadata={"skip_gancho_final": True},
         ),
-    ]
+    ])
+    return out
 
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     """Executa o nó de antecâmara e prova social."""
@@ -158,6 +179,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
     config = meta.get("__config__", {})
     link_ig = _normalizar_link_ig(str(config.get("link_prova_social") or ""))
+    imagem_perfil_ig = str(config.get("imagem_perfil_instagram") or "").strip()
     desabafo_prompt = (_seg["desabafo_prompt"] or "esse peso que você trouxe").strip()
 
     if lead_reportou_problema_entrega(texto_puro):
@@ -269,14 +291,11 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                         )
                     )
 
-                acoes.extend(_acoes_texto_e_url_instagram(link_ig))
+                acoes.extend(_acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig))
 
-                hook = (
-                    f"Quando der uma passadinha lá, {nome_fmt}, me diz com sinceridade: "
-                    "o que bateu mais forte no peito ao ver — esperança, curiosidade ou ainda aquele aperto?"
-                )
+                hook = f"Quando passar por lá, {nome_fmt}, o que bateu mais forte no teu peito?"
                 acoes.append(Acao(tipo="delay", segundos=random.randint(12, 20)))
-                acoes.append(Acao(tipo="text", conteudo=hook))
+                acoes.append(Acao(tipo="text", conteudo=hook, metadata={"skip_gancho_final": True}))
 
                 meta["insta_enviado"] = True
                 meta["node5_ignorar_ruido_um_turno"] = True
@@ -300,14 +319,12 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             conteudo=f"Acalma o coração, {nome_fmt}. Vou me concentrar nas suas linhas com calma. 🙏",
             metadata={"skip_gancho_final": True},
         ),
-        *_acoes_texto_e_url_instagram(link_ig),
+        *_acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig),
         Acao(tipo="delay", segundos=random.randint(12, 20)),
         Acao(
             tipo="text",
-            conteudo=(
-                f"Quando der uma passadinha lá, {nome_fmt}, o que sentiu primeiro: um alívio leve "
-                "ou ainda aquele nó no peito?"
-            ),
+            conteudo=f"Quando passar por lá, {nome_fmt}, o que bateu mais forte no teu peito?",
+            metadata={"skip_gancho_final": True},
         ),
     ]
 

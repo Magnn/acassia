@@ -910,7 +910,12 @@ class Engine:
             # Somente símbolos/emoji/pontuação (sem letras/dígitos) -> não enviar como balão isolado.
             return re.fullmatch(r"[\W_]+", t, flags=re.UNICODE) is not None
 
-        base = self._quebrar_baloes(texto or "")
+        bruto = str(texto or "").strip()
+        # URL pura deve ir em balão único (evita quebrar "https://www.instagram.com/...").
+        if re.match(r"^https?://\S+$", bruto, re.I):
+            return [bruto]
+
+        base = self._quebrar_baloes(bruto)
         out: list[str] = []
         for parte in base:
             chunks = fatiar_texto_ritmo_celular(
