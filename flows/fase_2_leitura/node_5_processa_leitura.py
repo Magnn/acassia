@@ -429,12 +429,14 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 metadata=meta,
             )
             pergunta = (pergunta or "").strip()
+            if pergunta and "?" not in pergunta:
+                pergunta = pergunta.rstrip(".!… ") + "?"
             if len(pergunta) > 12:
                 ctx.metadata = meta
                 ctx.estado_coleta = "node5_aprofundar_perfil"
                 return [
                     Acao(tipo="delay", segundos=random.randint(4, 9)),
-                    Acao(tipo="text", conteudo=pergunta),
+                    Acao(tipo="text", conteudo=pergunta, metadata={"skip_gancho_final": True}),
                 ], "5_processa_leitura"
         except Exception as e:
             logger.error(f"🚨 [NODE 5] Falha pergunta confiança: {e}")

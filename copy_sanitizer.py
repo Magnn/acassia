@@ -915,21 +915,10 @@ def garantir_gancho_ultimo_texto_acao(conteudo: str, contexto: str = "") -> str:
     Se o último segmento lógico não tiver gancho, acrescenta pergunta curta.
     Não altera mensagens de encerramento ou opt-out.
     """
+    # Gancho mecânico global removido: transições/perguntas devem ser construídas
+    # de forma contextual nos próprios nodes.
     raw = (conteudo or "").strip()
-    if not raw:
-        return "Me manda um *oi* quando estiver por aqui — combinado? 👇"
-    if texto_eh_encerramento_ou_excecao(raw):
-        return raw
-    ult = ultimo_segmento_logico_balao(raw)
-    if texto_eh_encerramento_ou_excecao(ult):
-        return raw
-    if texto_tem_gancho_conversa(ult):
-        return raw
-    if acolhimento_empatico_sem_pergunta_explicita(ult):
-        return raw
-    sufixo = "\n\nMe responde um *ok* aqui quando puder — combinado? 👇"
-    logger.debug("[GANCHO_FINAL] append context=%s", contexto)
-    return raw.rstrip() + sufixo
+    return raw
 
 
 def aplicar_gancho_na_lista_acoes(acoes: List[Any]) -> List[Any]:
