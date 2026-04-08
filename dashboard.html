@@ -1761,6 +1761,174 @@
             margin: 6px 0 0;
             line-height: 1.35;
         }
+        /* Inspector — API / Conector (Missão 5.3) */
+        .flow-inspector-api {
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(165deg, #f8fafc 0%, #f1f5f9 48%, #eef2ff 100%);
+            padding: 10px 10px 8px;
+            margin: 0 0 10px;
+        }
+        .flow-inspector-api__head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .flow-inspector-api__head-ico {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0f766e, #6366f1);
+            color: #fff;
+            font-size: 12px;
+            box-shadow: 0 2px 8px -2px rgba(79, 70, 229, 0.35);
+        }
+        .flow-inspector-api__title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .flow-inspector-api__sub {
+            font-size: 9px;
+            color: #64748b;
+            margin-top: 2px;
+            line-height: 1.35;
+        }
+        .flow-inspector-api__field {
+            margin-bottom: 10px;
+        }
+        .flow-inspector-api__label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 4px;
+        }
+        .flow-inspector-api__label i {
+            color: #6366f1;
+            opacity: 0.9;
+            font-size: 10px;
+            width: 14px;
+            text-align: center;
+        }
+        .flow-inspector-api__select,
+        .flow-inspector-api__input-full {
+            width: 100%;
+            padding: 7px 9px;
+            font-size: 11px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #0f172a;
+        }
+        .flow-inspector-api__textarea {
+            width: 100%;
+            min-height: 72px;
+            max-height: min(32vh, 220px);
+            padding: 8px 10px;
+            font-size: 11px;
+            font-family: ui-monospace, monospace;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            resize: vertical;
+        }
+        .flow-inspector-api__table-wrap {
+            border: 1px solid #e8ecf1;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .flow-inspector-api__table-head {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 0;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            background: #f8fafc;
+            padding: 6px 8px;
+            border-bottom: 1px solid #e8ecf1;
+        }
+        .flow-inspector-api__table-head--map {
+            grid-template-columns: 1fr 1fr auto;
+        }
+        .flow-inspector-api__row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 6px;
+            align-items: center;
+            padding: 6px 8px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .flow-inspector-api__row:last-child {
+            border-bottom: none;
+        }
+        .flow-inspector-api__row input {
+            width: 100%;
+            padding: 6px 8px;
+            font-size: 10px;
+            border-radius: 6px;
+            border: 1px solid #e8ecf1;
+            background: #fafbfc;
+            color: #0f172a;
+        }
+        .flow-inspector-api__row-remove {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border-radius: 6px;
+            border: 1px solid #e8ecf1;
+            background: #fafafa;
+            color: #94a3b8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .flow-inspector-api__row-remove:hover {
+            border-color: rgba(225, 29, 72, 0.35);
+            color: #be123c;
+        }
+        .flow-inspector-api__btn-add {
+            margin-top: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 7px;
+            border: 1px dashed #cbd5e1;
+            background: rgba(255, 255, 255, 0.7);
+            color: #475569;
+            cursor: pointer;
+        }
+        .flow-inspector-api__btn-add:hover {
+            border-color: rgba(99, 102, 241, 0.45);
+            color: #4338ca;
+        }
+        .flow-inspector-api__section-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #334155;
+            margin: 12px 0 6px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(148, 163, 184, 0.25);
+        }
+        .flow-inspector-api__section-title:first-of-type {
+            border-top: none;
+            padding-top: 0;
+            margin-top: 0;
+        }
         .flow-node-head[title] {
             cursor: grab;
         }
@@ -5553,6 +5721,7 @@ const FLOW_COND_OPERATORS = [
     { value: 'empty', label: 'Está vazio' },
     { value: 'not_empty', label: 'Não está vazio' },
 ];
+const FLOW_API_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 const FLOW_PERGUNTA_MODOS = [
     { value: 'texto_livre', label: 'Resposta em texto livre' },
     { value: 'lista_opcoes', label: 'Lista de opções (estilo WhatsApp)' },
@@ -7158,6 +7327,11 @@ function flowHumanizeInspectorKey(k) {
         ai_memory: 'Memória curta (IA)',
         rules: 'Regras (condição)',
         logic: 'Lógica global (condição)',
+        api_method: 'Método HTTP (API)',
+        api_url: 'URL (API)',
+        api_headers: 'Cabeçalhos (API)',
+        api_body: 'Corpo (API)',
+        api_mapping: 'Mapeamento resposta (API)',
     };
     const s = String(k || '');
     if (map[s]) return map[s];
@@ -7489,6 +7663,219 @@ function applyFlowInspectorCondicao() {
     requestFlowAutoSave();
 }
 
+function flowApiSyncLegacyKeysFromApi(obj) {
+    if (typeof obj !== 'object' || !obj) return;
+    if (obj.api_method != null) obj.method = obj.api_method;
+    if (obj.api_url !== undefined) obj.url = obj.api_url;
+    if (obj.api_body !== undefined) obj.body = obj.api_body;
+    try {
+        const h = obj.api_headers && typeof obj.api_headers === 'object' && !Array.isArray(obj.api_headers) ? obj.api_headers : {};
+        obj.headers = JSON.stringify(h);
+    } catch (_) {
+        obj.headers = '{}';
+    }
+}
+
+function flowApiResolvedConfigForInspector(cfg) {
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    const method = String(c.api_method || c.method || 'GET').toUpperCase();
+    const url = c.api_url != null ? String(c.api_url) : String(c.url || '');
+    const body = c.api_body != null ? String(c.api_body) : String(c.body || '');
+    const q = c.query_string != null ? String(c.query_string) : '';
+    let hdrObj = {};
+    if (c.api_headers && typeof c.api_headers === 'object' && !Array.isArray(c.api_headers)) {
+        hdrObj = { ...c.api_headers };
+    } else if (c.headers && typeof c.headers === 'string' && c.headers.trim()) {
+        try {
+            const p = JSON.parse(c.headers);
+            if (p && typeof p === 'object' && !Array.isArray(p)) hdrObj = p;
+        } catch (_) {}
+    }
+    const entries = Object.entries(hdrObj);
+    const headerRows = entries.length ? entries.map(([k, v]) => ({ key: k, value: String(v ?? '') })) : [{ key: '', value: '' }];
+    let mapping = Array.isArray(c.api_mapping)
+        ? c.api_mapping.map((m) => ({
+              path: String((m && m.path) || m.json_path || ''),
+              dest: String((m && m.dest) || m.to || ''),
+          }))
+        : [];
+    if (!mapping.length) mapping = [{ path: '', dest: '' }];
+    return { method, url, body, query_string: q, headerRows, mapping };
+}
+
+function flowInspectorApiHeaderRowHtml(row) {
+    const k = flowEsc(String(row.key ?? ''));
+    const v = flowEsc(String(row.value ?? ''));
+    return `
+        <div class="flow-inspector-api__row" data-flow-api-hdr="1">
+            <input type="text" class="input-field" data-flow-api-hdr-key placeholder="Chave" value="${k}" autocomplete="off" />
+            <input type="text" class="input-field" data-flow-api-hdr-val placeholder="Valor" value="${v}" autocomplete="off" />
+            <button type="button" class="flow-inspector-api__row-remove" onclick="flowInspectorApiRemoveHeader(this)" title="Remover" aria-label="Remover"><i class="fas fa-times"></i></button>
+        </div>`;
+}
+
+function flowInspectorApiMappingRowHtml(row) {
+    const p = flowEsc(String(row.path ?? ''));
+    const d = flowEsc(String(row.dest ?? ''));
+    return `
+        <div class="flow-inspector-api__row" data-flow-api-map="1">
+            <input type="text" class="input-field" data-flow-api-map-path placeholder="ex: order.status" value="${p}" autocomplete="off" />
+            <input type="text" class="input-field" data-flow-api-map-dest placeholder="ex: {{status_pedido}}" value="${d}" autocomplete="off" />
+            <button type="button" class="flow-inspector-api__row-remove" onclick="flowInspectorApiRemoveMapping(this)" title="Remover" aria-label="Remover"><i class="fas fa-times"></i></button>
+        </div>`;
+}
+
+function flowInspectorApiAddHeader(btn) {
+    const wrap = btn && btn.closest('.flow-inspector-api');
+    const tw = wrap && wrap.querySelector('[data-flow-api-headers-table]');
+    if (!tw) return;
+    tw.insertAdjacentHTML('beforeend', flowInspectorApiHeaderRowHtml({ key: '', value: '' }));
+    const body = btn.closest('.flow-node-inspector-body');
+    flowEnhanceInspectorVariableButtons(body);
+}
+
+function flowInspectorApiRemoveHeader(btn) {
+    const row = btn && btn.closest('[data-flow-api-hdr="1"]');
+    const tw = row && row.parentElement;
+    if (!tw || !row) return;
+    if (tw.querySelectorAll('[data-flow-api-hdr="1"]').length <= 1) {
+        const k = row.querySelector('[data-flow-api-hdr-key]');
+        const v = row.querySelector('[data-flow-api-hdr-val]');
+        if (k) k.value = '';
+        if (v) v.value = '';
+        return;
+    }
+    row.remove();
+}
+
+function flowInspectorApiAddMapping(btn) {
+    const wrap = btn && btn.closest('.flow-inspector-api');
+    const tw = wrap && wrap.querySelector('[data-flow-api-mapping-table]');
+    if (!tw) return;
+    tw.insertAdjacentHTML('beforeend', flowInspectorApiMappingRowHtml({ path: '', dest: '' }));
+    const body = btn.closest('.flow-node-inspector-body');
+    flowEnhanceInspectorVariableButtons(body);
+}
+
+function flowInspectorApiRemoveMapping(btn) {
+    const row = btn && btn.closest('[data-flow-api-map="1"]');
+    const tw = row && row.parentElement;
+    if (!tw || !row) return;
+    if (tw.querySelectorAll('[data-flow-api-map="1"]').length <= 1) {
+        const p = row.querySelector('[data-flow-api-map-path]');
+        const d = row.querySelector('[data-flow-api-map-dest]');
+        if (p) p.value = '';
+        if (d) d.value = '';
+        return;
+    }
+    row.remove();
+}
+
+function flowInspectorRenderApi(meta, cfg, bodyEl) {
+    const body = bodyEl || flowGetInspectorBodyEl();
+    if (!body) return;
+    const safeId = String(meta.id || 'n').replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
+    const r = flowApiResolvedConfigForInspector(cfg);
+    const methodOpts = FLOW_API_METHODS.map((m) => {
+        const sel = r.method === m ? ' selected' : '';
+        return `<option value="${m}"${sel}>${m}</option>`;
+    }).join('');
+    const hdrRows = r.headerRows.map((row) => flowInspectorApiHeaderRowHtml(row)).join('');
+    const mapRows = r.mapping.map((row) => flowInspectorApiMappingRowHtml(row)).join('');
+    body.innerHTML = `
+        <div class="flow-inspector-meta"><span class="flow-inspector-kind">${flowEsc(meta.typ)}</span> · <code class="flow-tech-id">${flowEsc(meta.id)}</code> · entradas ${meta.incom} · saídas ${meta.outgo}</div>
+        <div class="flow-inspector-api">
+            <div class="flow-inspector-api__head">
+                <div class="flow-inspector-api__head-ico" aria-hidden="true"><i class="fas fa-plug"></i></div>
+                <div>
+                    <div class="flow-inspector-api__title">Cérebro de API</div>
+                    <div class="flow-inspector-api__sub">Cliente HTTP, cabeçalhos, corpo JSON e mapeamento da resposta para variáveis do fluxo.</div>
+                </div>
+            </div>
+            <div class="flow-inspector-api__field">
+                <label class="flow-inspector-api__label" for="flow-api-method-${safeId}"><i class="fas fa-exchange-alt"></i> Método</label>
+                <select id="flow-api-method-${safeId}" class="flow-inspector-api__select" data-flow-api-field="method" autocomplete="off">${methodOpts}</select>
+            </div>
+            <div class="flow-inspector-api__field">
+                <label class="flow-inspector-api__label" for="flow-api-url-${safeId}"><i class="fas fa-link"></i> URL</label>
+                <input id="flow-api-url-${safeId}" type="text" class="input-field flow-inspector-api__input-full" data-flow-inspector-key="api_url" value="${flowEsc(r.url)}" placeholder="https://api.exemplo.com/v1/recurso" autocomplete="off" />
+            </div>
+            <div class="flow-inspector-api__field">
+                <label class="flow-inspector-api__label" for="flow-api-qs-${safeId}"><i class="fas fa-question-circle"></i> Query string (opcional)</label>
+                <input id="flow-api-qs-${safeId}" type="text" class="input-field flow-inspector-api__input-full" data-flow-inspector-key="query_string" value="${flowEsc(r.query_string)}" placeholder="foo=1&amp;bar={{lead.id}}" autocomplete="off" />
+            </div>
+            <div class="flow-inspector-api__section-title">Headers</div>
+            <div class="flow-inspector-api__table-wrap">
+                <div class="flow-inspector-api__table-head"><span>Chave</span><span>Valor</span><span></span></div>
+                <div data-flow-api-headers-table>${hdrRows}</div>
+            </div>
+            <button type="button" class="flow-inspector-api__btn-add" onclick="flowInspectorApiAddHeader(this)"><i class="fas fa-plus"></i> Adicionar header</button>
+            <div class="flow-inspector-api__field" style="margin-top:10px">
+                <label class="flow-inspector-api__label" for="flow-api-body-${safeId}"><i class="fas fa-code"></i> Body (JSON)</label>
+                <textarea id="flow-api-body-${safeId}" class="input-field flow-inspector-api__textarea" data-flow-inspector-key="api_body" placeholder='{"foo": "{{variavel}}"}'>${flowEsc(r.body)}</textarea>
+            </div>
+            <div class="flow-inspector-api__section-title">Mapeamento de dados</div>
+            <p style="font-size:9px;color:#94a3b8;margin:0 0 6px;line-height:1.4">Caminho no JSON de resposta (notação com pontos) → variável de destino no contexto.</p>
+            <div class="flow-inspector-api__table-wrap">
+                <div class="flow-inspector-api__table-head flow-inspector-api__table-head--map"><span>Caminho</span><span>Variável destino</span><span></span></div>
+                <div data-flow-api-mapping-table>${mapRows}</div>
+            </div>
+            <button type="button" class="flow-inspector-api__btn-add" onclick="flowInspectorApiAddMapping(this)"><i class="fas fa-plus"></i> Adicionar mapeamento</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;padding-top:10px;border-top:1px solid var(--c-border)">
+            <button type="button" class="btn btn-primary" style="flex:1;font-size:11px;font-weight:600" onclick="applyFlowInspectorFormConfig()"><i class="fas fa-check"></i> Aplicar ao bloco</button>
+            <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px" onclick="openRawFlowInspectorJson()" title="Editar JSON cru"><i class="fas fa-code"></i></button>
+        </div>
+    `;
+    flowEnhanceInspectorVariableButtons(body);
+}
+
+function applyFlowInspectorApi() {
+    const nodeId = _flowSelectedNodeId;
+    const node = nodeId ? flowCanvasNodeById(nodeId) : null;
+    if (!node || String(node.getAttribute('data-node-type') || '') !== 'api') return;
+    let obj = {};
+    try {
+        obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
+    } catch (_) {}
+    if (typeof obj !== 'object' || obj === null) obj = {};
+    const wrap = node.querySelector('.flow-node-inspector-body');
+    if (!wrap) return;
+    const mEl = wrap.querySelector('[data-flow-api-field="method"]');
+    if (mEl) obj.api_method = String(mEl.value || 'GET').toUpperCase();
+    wrap.querySelectorAll('[data-flow-inspector-key]').forEach((el) => {
+        const k = el.getAttribute('data-flow-inspector-key');
+        if (!k) return;
+        obj[k] = String(el.value != null ? el.value : '');
+    });
+    const hdr = {};
+    wrap.querySelectorAll('[data-flow-api-hdr="1"]').forEach((row) => {
+        const k = row.querySelector('[data-flow-api-hdr-key]');
+        const v = row.querySelector('[data-flow-api-hdr-val]');
+        if (!k) return;
+        const kk = String(k.value || '').trim();
+        if (kk) hdr[kk] = v ? String(v.value || '') : '';
+    });
+    obj.api_headers = hdr;
+    const maps = [];
+    wrap.querySelectorAll('[data-flow-api-map="1"]').forEach((row) => {
+        const p = row.querySelector('[data-flow-api-map-path]');
+        const d = row.querySelector('[data-flow-api-map-dest]');
+        if (!p) return;
+        const path = String(p.value || '').trim();
+        const dest = d ? String(d.value || '').trim() : '';
+        if (path || dest) maps.push({ path, dest });
+    });
+    obj.api_mapping = maps;
+    flowApiSyncLegacyKeysFromApi(obj);
+    try {
+        node.setAttribute('data-flow-config', JSON.stringify(obj));
+    } catch (_) {}
+    pushFlowHistory();
+    toast('API (conector) guardada.', 'emerald');
+    requestFlowAutoSave();
+}
+
 function applyFlowInspectorFormConfig() {
     if (_flowSelectedEdgeId) {
         const body = document.getElementById('flow-inspector-body');
@@ -7506,6 +7893,10 @@ function applyFlowInspectorFormConfig() {
     }
     if (String(node.getAttribute('data-node-type') || '') === 'condicao') {
         applyFlowInspectorCondicao();
+        return;
+    }
+    if (String(node.getAttribute('data-node-type') || '') === 'api') {
+        applyFlowInspectorApi();
         return;
     }
     let obj = {};
@@ -7907,6 +8298,12 @@ async function openFlowInspector(nodeEl) {
         updateFlowMinimap();
         return;
     }
+    if (typ === 'api') {
+        flowInspectorRenderApi({ typ, title, incom, outgo, id }, cfg, bodyEl);
+        redrawFlowEdges();
+        updateFlowMinimap();
+        return;
+    }
     const catalog = await ensureFlowSchemaCatalog();
     const spec = (catalog && catalog[typ]) || { required_config: [], optional_keys: [] };
     flowInspectorRenderGeneric({ typ, title, incom, outgo, id }, cfg, spec, bodyEl);
@@ -7952,6 +8349,9 @@ function applyFlowInspectorConfig() {
         if (obj.ai_temperature != null && String(obj.ai_temperature) !== '') {
             obj.temperature = String(obj.ai_temperature);
         }
+    }
+    if (String(node.getAttribute('data-node-type') || '') === 'api') {
+        flowApiSyncLegacyKeysFromApi(obj);
     }
     node.setAttribute('data-flow-config', JSON.stringify(obj));
     pushFlowHistory();
@@ -9686,6 +10086,123 @@ function flowSimWaitAfterStepIfNeeded() {
     });
 }
 
+function flowSimNormalizeMappingDest(dest) {
+    let s = String(dest ?? '').trim();
+    s = s.replace(/^\{\{\s*|\s*\}\}$/g, '').trim();
+    return s || 'api_mapped';
+}
+
+function flowSimJsonPathGet(obj, path) {
+    if (obj == null || path == null) return undefined;
+    const parts = String(path)
+        .split('.')
+        .map((p) => p.trim())
+        .filter(Boolean);
+    let cur = obj;
+    for (const p of parts) {
+        if (cur == null) return undefined;
+        cur = cur[p];
+    }
+    return cur;
+}
+
+function flowApiBuildUrlForSim(cfg, L) {
+    let base = flowSimSubstituteVars(String(cfg.api_url != null ? cfg.api_url : cfg.url || ''), L);
+    const qs = String(cfg.query_string || '').trim();
+    if (qs) {
+        const sub = flowSimSubstituteVars(qs, L);
+        const sep = base.indexOf('?') >= 0 ? '&' : '?';
+        base = base + sep + sub;
+    }
+    return base;
+}
+
+function flowApiResolvedHeadersObjectForSim(cfg, L) {
+    const o = {};
+    let src = {};
+    if (cfg.api_headers && typeof cfg.api_headers === 'object' && !Array.isArray(cfg.api_headers)) {
+        src = cfg.api_headers;
+    } else if (cfg.headers && typeof cfg.headers === 'string' && cfg.headers.trim()) {
+        try {
+            const p = JSON.parse(cfg.headers);
+            if (p && typeof p === 'object' && !Array.isArray(p)) src = p;
+        } catch (_) {}
+    }
+    Object.keys(src).forEach((k) => {
+        o[k] = flowSimSubstituteVars(String(src[k] ?? ''), L);
+    });
+    return o;
+}
+
+function flowSimApiSimulatedPayload(bodyRaw, url) {
+    return {
+        _simulated: true,
+        order: { status: 'confirmed', id: 'SIM-001' },
+        echo: bodyRaw ? String(bodyRaw).slice(0, 120) : null,
+        requested_url: url || '',
+    };
+}
+
+async function flowSimulateApiNode(_nodeId, cfg, L) {
+    const url = flowApiBuildUrlForSim(cfg, L);
+    flowSimChatAppend('sys', '⚙️ Chamando API: ' + (url || '(sem URL)') + '…');
+    const method = String(cfg.api_method || cfg.method || 'GET').toUpperCase();
+    const headersObj = flowApiResolvedHeadersObjectForSim(cfg, L);
+    const bodyRaw = flowSimSubstituteVars(String(cfg.api_body != null ? cfg.api_body : cfg.body || ''), L);
+    let json = null;
+    let httpOk = false;
+    try {
+        if (url && /^https?:\/\//i.test(url)) {
+            const init = { method, headers: { ...headersObj } };
+            const hasBody = bodyRaw && ['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) >= 0;
+            if (hasBody) {
+                if (!init.headers['Content-Type'] && !init.headers['content-type']) {
+                    init.headers['Content-Type'] = 'application/json';
+                }
+                init.body = bodyRaw;
+            }
+            const r = await fetch(url, init);
+            httpOk = r.ok;
+            const ct = (r.headers.get('content-type') || '').toLowerCase();
+            if (ct.includes('application/json')) {
+                json = await r.json();
+            } else {
+                const t = await r.text();
+                try {
+                    json = JSON.parse(t);
+                } catch (_) {
+                    json = { _raw: t };
+                }
+            }
+        }
+    } catch (_) {
+        json = null;
+    }
+    if (json == null) {
+        json = flowSimApiSimulatedPayload(bodyRaw, url);
+        httpOk = true;
+    }
+    flowSimChatAppend('sys', httpOk ? '✅ API respondeu com sucesso' : '⚠️ API: verificar resposta (HTTP)');
+    if (!_flowSimState.context) _flowSimState.context = {};
+    const maps = Array.isArray(cfg.api_mapping) ? cfg.api_mapping : [];
+    const lines = [];
+    maps.forEach((m) => {
+        const path = String((m && m.path) || '').trim();
+        const destKey = flowSimNormalizeMappingDest((m && m.dest) || '');
+        if (!path && !m.dest) return;
+        const val = flowSimJsonPathGet(json, path);
+        const str =
+            val != null && typeof val === 'object' ? JSON.stringify(val) : val != null ? String(val) : '';
+        _flowSimState.context[destKey] = str;
+        lines.push(destKey + '=' + str.slice(0, 80) + (str.length > 80 ? '…' : ''));
+    });
+    if (lines.length) {
+        flowSimChatAppend('sys', 'Mapeamento: ' + lines.join(' · '));
+    } else {
+        flowSimChatAppend('sys', 'Resposta (prévia): ' + JSON.stringify(json).slice(0, 420));
+    }
+}
+
 /**
  * Executa um nó e devolve o id do nó seguinte (ou null se fim).
  * Interpretador local: syncFlowFormValuesIntoDom + DOM + _flowEdges (texto sempre atual do canvas).
@@ -9806,7 +10323,13 @@ async function flowSimulateStep(nodeId) {
         return flowSimTakeFirstOutgoing(nodeId);
     }
 
-    if (type === 'acao' || type === 'notificar' || type === 'api') {
+    if (type === 'api') {
+        await flowSimulateApiNode(nodeId, cfg, L);
+        await flowSimDelay(120);
+        return flowSimTakeFirstOutgoing(nodeId);
+    }
+
+    if (type === 'acao' || type === 'notificar') {
         const bits = flowSimSubstituteVars(cfg.payload || cfg.message || cfg.body || cfg.url || '', L);
         if (bits) flowSimChatAppend('sys', '[' + type + '] ' + bits.slice(0, 200));
         else flowSimChatAppend('sys', 'Passo: ' + type);
@@ -12799,7 +13322,20 @@ function flowDefaultConfigByType(type) {
     if (t === 'expediente') return { timezone: 'America/Sao_Paulo', windows: '' };
     if (t === 'notificar') return { channel: 'log', message: '' };
     if (t === 'divisao') return { weights: 'A:50,B:50' };
-    if (t === 'api') return { method: 'GET', url: '', query_string: '', headers: '', body: '' };
+    if (t === 'api') {
+        return {
+            api_method: 'GET',
+            api_url: '',
+            api_headers: {},
+            api_body: '',
+            api_mapping: [],
+            method: 'GET',
+            url: '',
+            query_string: '',
+            headers: '{}',
+            body: '',
+        };
+    }
     if (t === 'gpt') {
         return {
             ai_model: 'gpt-4o',
@@ -13039,15 +13575,9 @@ function addSpecificNode(type, pos) {
             <textarea class="input-field" data-flow-cfg="payload" placeholder="Mensagem ao cliente, JSON ou instrução interna" style="${ta};height:56px"></textarea>`;
     } else if (type === 'api') {
         bodyFields = `
-            ${fh('HTTP (Postman/n8n): URL base + query em GET; headers JSON; corpo JSON. Requer FLOW_BLUEPRINT_ALLOW_HTTP=1 no servidor.')}
+            ${fh('Conector HTTP: método, URL, headers, body e mapeamento da resposta — use o inspetor (ícone de sliders).')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="url" placeholder="https://api.exemplo.com/v1/recurso" class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="query_string" placeholder="Query string (GET), ex: foo=1&bar=2" class="input-field" style="${fs}">
-            <select data-flow-cfg="method" class="input-field" style="${fs}">
-                <option value="GET">GET</option><option value="POST">POST</option><option value="PUT">PUT</option><option value="PATCH">PATCH</option><option value="DELETE">DELETE</option>
-            </select>
-            <textarea class="input-field" data-flow-cfg="headers" placeholder='Cabeçalhos JSON: {"Authorization":"Bearer …","Content-Type":"application/json"}' style="${ta};height:36px"></textarea>
-            <textarea class="input-field" data-flow-cfg="body" placeholder="Corpo JSON (POST/PUT/PATCH)" style="${ta};height:40px"></textarea>`;
+            <p style="font-size:10px;color:var(--c-muted);margin:0;line-height:1.45">Abra o inspetor para configurar <strong>api_method</strong>, <strong>api_url</strong>, <strong>api_headers</strong>, <strong>api_body</strong> e <strong>api_mapping</strong>.</p>`;
     } else if (type === 'notificar') {
         bodyFields = `
             ${fh('Alertas a equipa (Slack/Teams/email): escolha o canal e a mensagem.')}
