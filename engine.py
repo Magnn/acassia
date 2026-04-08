@@ -47,7 +47,7 @@ from flows.fase_1_saudacao.sniffer_fase1 import (
     resolver_avanco_node_fase1,
     sniffer_instagram_meta,
 )
-from flows.funnel_gates import nome_eh_placeholder
+from flows.funnel_gates import nome_eh_placeholder, VOCATIVO_SEM_NOME
 
 # 🚨 IMPORTAÇÃO DAS DATACLASSES CENTRALIZADAS (Resolve o ImportError)
 from schema import Acao, ContextoConversa
@@ -62,6 +62,7 @@ from copy_sanitizer import (
     tentar_salvar_balao_ia_cortado,
     extrair_evidencias_conversa,
     motivo_redundancia_texto,
+    nome_lead_para_exibicao,
     preview_url_flag_para_whatsapp,
 )
 from conversation_policy import (
@@ -673,10 +674,14 @@ class Engine:
                 return
 
             acoes = self._montar_mensagens_recuperacao(motivo, lead)
-            ctx   = ContextoConversa(
+            _nl_rec = (getattr(lead, "nome", None) or "").strip()
+            _nome_lead_rec = _nl_rec if _nl_rec and not nome_eh_placeholder(_nl_rec) else VOCATIVO_SEM_NOME
+            ctx = ContextoConversa(
                 lead_id=lead.id, telefone=telefone, node_atual=lead.node_atual or "8_oferta_principal",
                 historico=self._buscar_historico(db, lead.id, 5), texto_recebido=f"SISTEMA_ABANDONO_{motivo.upper()}",
-                tipo_mensagem="system", interactive_reply_id=None, nome_lead=lead.nome or "meu anjo", 
+                tipo_mensagem="system",
+                interactive_reply_id=None,
+                nome_lead=_nome_lead_rec,
                 personalizer=self.personalizer
             )
             ctx.metadata["__config__"] = CONFIG_CLIENTE
@@ -694,8 +699,7 @@ class Engine:
 
     def _montar_mensagens_recuperacao(self, motivo: str, lead) -> list[Acao]:
         # Formatação do nome focada no tratamento correto
-        nome_raw = getattr(lead, "nome", "") or "meu anjo"
-        nome = nome_raw.capitalize()
+        nome = nome_lead_para_exibicao((getattr(lead, "nome", "") or "").strip()).capitalize()
 
         if motivo in ["pix_pendente", "pending", "waiting_payment", "pix_generated"]:
             return [
@@ -1007,13 +1011,11 @@ class Engine:
 
     @staticmethod
     def _vocativo_curto_lead(lead, ctx: ContextoConversa) -> str:
-        nm = (getattr(lead, "nome", None) or "").strip()
-        if nm:
-            return nm.split()[0].strip().capitalize()
-        n2 = (getattr(ctx, "nome_lead", None) or "").strip()
-        if n2:
-            return n2.split()[0].strip().capitalize()
-        return "meu bem"
+        for src in ((getattr(lead, "nome", None) or ""), (getattr(ctx, "nome_lead", None) or "")):
+            s = (src or "").strip()
+            if s and not nome_eh_placeholder(s):
+                return s.split()[0].strip().capitalize()
+        return VOCATIVO_SEM_NOME
 
     def _rotear_state_machine(self, db, lead, ctx: ContextoConversa) -> list[Acao]:
         if self._lead_reportou_problema_entrega(ctx.texto_recebido or ""):

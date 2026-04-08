@@ -14,6 +14,8 @@ import random
 import re
 from typing import List, Literal, Optional, Dict, Any, Mapping
 
+from flows.funnel_gates import nome_eh_placeholder, VOCATIVO_SEM_NOME
+
 logger = logging.getLogger(__name__)
 
 # Lista única de primeiros nomes masculinos comuns (PT) — inferência de vocativo antes do Node 5
@@ -305,22 +307,22 @@ def nome_lead_para_exibicao(nome_raw: str) -> str:
     """
     raw = (nome_raw or "").strip()
     if not raw:
-        return "meu anjo"
+        return VOCATIVO_SEM_NOME
     low = raw.lower()
     if low == "meu bem":
         return "meu bem"
     if low == "meu anjo":
         return "meu anjo"
     if len(raw) > 42 or "," in raw or "?" in raw:
-        return "meu bem"
+        return VOCATIVO_SEM_NOME
     toks = raw.split()
     if not toks:
-        return "meu anjo"
+        return VOCATIVO_SEM_NOME
     first = toks[0].lower().strip(".,;:!?")
     if first in ("boa", "olá", "ola", "oi", "bom"):
-        return "meu bem"
+        return VOCATIVO_SEM_NOME
     if len(toks) > 4:
-        return "meu bem"
+        return VOCATIVO_SEM_NOME
     return toks[0].strip().capitalize()
 
 
@@ -339,7 +341,7 @@ def contexto_lead_para_nodes(
     - desabafo_prompt: desabafo limpo para contexto de IA (sem abertura comercial genérica).
     """
     m = dict(meta or {})
-    nome = (nome_lead_raw or "").strip() or "meu anjo"
+    nome = (nome_lead_raw or "").strip() or VOCATIVO_SEM_NOME
     return {
         "nome_fmt": nome_lead_para_exibicao(nome),
         "resumo_dor_safe": resumo_dor_para_copy(
@@ -366,11 +368,7 @@ def extrair_evidencias_conversa(
     m = dict(metadata or {})
     txt = (texto_atual or "").strip().lower()
     tp_atual = (tipo_mensagem_atual or "").strip().lower()
-    nome_ok = bool((nome_lead or "").strip()) and (nome_lead or "").strip().lower() not in {
-        "meu bem",
-        "meu anjo",
-        "minha estrela",
-    }
+    nome_ok = bool((nome_lead or "").strip()) and not nome_eh_placeholder(nome_lead)
     confirmou_agora = bool(
         re.search(r"\b(ok|sim|pronto|feito|salvei|t[áa]\s+salvo|já\s+salvei|ja\s+salvei|isso\s+mesmo)\b", txt, re.I)
     )
@@ -506,8 +504,8 @@ def normalizar_enxerto_dor_sem_contexto(texto: str) -> str:
 def primeiro_nome_exibicao(nome: str) -> str:
     """Primeiro token com capitalização simples; evita eco estranho de frases inteiras no vocativo."""
     raw = (nome or "").strip()
-    if not raw or raw.lower() in ("meu anjo", "meu bem"):
-        return raw or "meu bem"
+    if not raw or nome_eh_placeholder(raw):
+        return VOCATIVO_SEM_NOME
     return raw.split()[0].strip().capitalize()
 
 

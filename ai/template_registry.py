@@ -23,6 +23,7 @@ from google import genai
 from db.database import SessionLocal
 from db.models import TemplateMsg
 from config_cliente import CONFIG_CLIENTE
+from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +198,7 @@ Retorne APENAS o texto da mensagem final."""
 
     def _substituir_variaveis(self, corpo: str, variaveis: dict) -> str:
         """Aplica os dados reais do lead no template."""
-        defaults = {"nome": "meu anjo"}
+        defaults = {"nome": VOCATIVO_SEM_NOME}
         defaults.update(variaveis)
         resultado = corpo
         for k, v in defaults.items():

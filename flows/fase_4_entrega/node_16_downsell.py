@@ -12,11 +12,12 @@ import logging
 import random
 from schema import Acao
 from copy_sanitizer import genero_efetivo_para_copy, nome_lead_para_exibicao, vocativo_cigana
+from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
 
 def executar_v2(ctx) -> tuple:
-    nome = (ctx.nome_lead or "meu anjo").strip() or "meu anjo"
+    nome = (ctx.nome_lead or "").strip() or VOCATIVO_SEM_NOME
     nome_fmt = nome_lead_para_exibicao(nome)
     
     meta = getattr(ctx, "metadata", {}) or {}

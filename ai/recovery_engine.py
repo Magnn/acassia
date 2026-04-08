@@ -35,6 +35,7 @@ from copy_sanitizer import (
     resolver_gatilho_emocional,
     aplicar_gancho_na_lista_acoes,
     preview_url_flag_para_whatsapp,
+    nome_lead_para_exibicao,
 )
 from config_cliente import CONFIG_CLIENTE
 from analytics.funnel_audit import registrar_node_transition
@@ -447,8 +448,8 @@ class RecoveryEngine:
     def _disparar_recovery(self, db: SessionLocal, lead: Lead, config: Dict[str, Any], agora: datetime):
         """Dispara a mensagem de recuperação para o lead."""
         try:
-            nome = lead.nome or ""
-            nome_fmt = nome.capitalize() if nome else "meu anjo"
+            nome = (lead.nome or "").strip()
+            nome_fmt = nome_lead_para_exibicao(nome).capitalize()
 
             # Pós-oferta: usar copy do node_9 (3 toques) alinhada ao recovery_stage
             if lead.node_atual == "aguardando_pagamento":

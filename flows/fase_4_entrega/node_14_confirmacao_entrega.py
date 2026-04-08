@@ -17,11 +17,12 @@ import logging
 import random
 from schema import Acao  # 🚨 FIX CIRCULAR: Importação centralizada para estabilidade
 from copy_sanitizer import genero_efetivo_para_copy, vocativo_cigana
+from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
 
 def executar_v2(ctx) -> tuple:
-    nome = ctx.nome_lead or "minha estrela"
+    nome = (ctx.nome_lead or "").strip() or VOCATIVO_SEM_NOME
     meta = getattr(ctx, "metadata", {}) or {}
     voc = vocativo_cigana(nome, metadata=meta)
     genero = genero_efetivo_para_copy(nome, meta)

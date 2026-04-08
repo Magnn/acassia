@@ -18,6 +18,11 @@ Documento vivo: alinhado ao código em `flows/funnel_gates.py` e ao sniffer em `
 | Foto | `foto_recebida` | `meta_tem_foto()` |
 | Desabafo | `desabafo_recebido` | `meta_tem_desabafo()` |
 
+## Vocativo quando ainda não há nome
+
+- **`VOCATIVO_SEM_NOME`** em `flows/funnel_gates.py` (hoje `"meu bem"`) é o default único quando o campo nome está vazio ou é placeholder.
+- **`nome_lead_para_exibicao`** e **`primeiro_nome_exibicao`** em `copy_sanitizer` usam esse contrato; nodes e recovery não devem hardcodar `"meu anjo"` / `"minha estrela"` como fallback de nome.
+
 ## Onde isto entra no código hoje
 
 - **Engine (sniffer):** preenche `foto_recebida`, `desabafo_recebido`, `lead_contato_salvo_declarado`, etc., antes do node.

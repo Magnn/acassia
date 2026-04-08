@@ -197,7 +197,7 @@ def _extrair_tentativas_previas(texto: str) -> str:
 # ── EXECUTOR PRINCIPAL ──
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     meta = getattr(ctx, "metadata", {}) or {}
-    nome_fmt = nome_lead_para_exibicao((ctx.nome_lead or "meu anjo").strip() or "meu anjo")
+    nome_fmt = nome_lead_para_exibicao((ctx.nome_lead or "").strip())
     
     msg_lead = str(ctx.texto_recebido or "").strip()
     if lead_reportou_problema_entrega(msg_lead):

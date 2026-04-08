@@ -12,6 +12,7 @@ from typing import List
 
 from schema import Acao
 from copy_sanitizer import normalizar_link_para_envio, preparar_texto_envio
+from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ def montar_acoes_suporte_checkout(
     link: str,
     node_atual: str,
 ) -> List[Acao]:
-    nome = (nome_vocativo or "").strip() or "meu bem"
+    nome = (nome_vocativo or "").strip() or VOCATIVO_SEM_NOME
     tem_link = _link_eh_configurado(link)
     acoes: List[Acao] = []
 

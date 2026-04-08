@@ -14,6 +14,8 @@ import logging
 import re
 from typing import Any, Dict, List
 
+from flows.funnel_gates import PLACEHOLDER_NOMES
+
 logger = logging.getLogger(__name__)
 
 _FASE1_ORDEM = (
@@ -23,9 +25,9 @@ _FASE1_ORDEM = (
     "4_instagram",
     "5_processa_leitura",
 )
-_NOMES_CHECKLIST_LIXO = frozenset(
+_NOMES_CHECKLIST_LIXO = PLACEHOLDER_NOMES | frozenset(
     {
-        "meu bem", "meu anjo", "minha estrela", "estou", "sim", "ok", "quero", "vou",
+        "estou", "sim", "ok", "quero", "vou",
         "salvei", "pronto", "ola", "oi", "ta", "tá", "ja", "já", "blz",
     }
 )

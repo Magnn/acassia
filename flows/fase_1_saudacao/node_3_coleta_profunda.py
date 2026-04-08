@@ -38,6 +38,7 @@ from copy_sanitizer import (
     genero_hint_para_prompt,
     nome_lead_para_exibicao,
 )
+from flows.funnel_gates import nome_eh_placeholder, VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
 
@@ -611,10 +612,10 @@ def _extrair_dados_ricos_ia(ctx, meta: dict) -> None:
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     meta = getattr(ctx, "metadata", {}) or {}
 
-    nome_db = (ctx.nome_lead or meta.get("nome_lead", "meu anjo") or "").strip() or "meu anjo"
+    nome_db = (ctx.nome_lead or meta.get("nome_lead") or "").strip() or VOCATIVO_SEM_NOME
     lixo_names = {"estou", "sim", "ok", "quero", "vou", "salvei", "pronto", "ola", "oi", "ta", "tá", "ja", "já", "blz"}
-    if nome_db.lower() in lixo_names:
-        nome_db = "meu anjo"
+    if nome_db.lower() in lixo_names or nome_eh_placeholder(nome_db):
+        nome_db = VOCATIVO_SEM_NOME
 
     nome_fmt = nome_lead_para_exibicao(nome_db)
     msg_lead = str(ctx.texto_recebido or "").strip()

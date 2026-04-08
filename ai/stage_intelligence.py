@@ -14,6 +14,8 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Set
 
+from flows.funnel_gates import PLACEHOLDER_NOMES, VOCATIVO_SEM_NOME
+
 logger = logging.getLogger(__name__)
 
 # ── Detecção de intenção comercial / preço (PT-BR) ───────────────────────────
@@ -53,11 +55,11 @@ _RE_CURIOSIDADE = re.compile(
     re.IGNORECASE | re.UNICODE,
 )
 
-# Nomes genéricos / placeholder — não elogiar como nome próprio
+# Nomes genéricos / placeholder — não elogiar como nome próprio (inclui PLACEHOLDER_NOMES)
 _NOMES_PLACEHOLDER: Set[str] = frozenset({
-    "", "meu bem", "meu anjo", "indefinido", "lead", "cliente", "anjo",
+    "", "indefinido", "lead", "cliente", "anjo",
     "querida", "querido", "amor",
-})
+}) | PLACEHOLDER_NOMES
 
 
 def _remetente(m: Any) -> str:
@@ -445,7 +447,7 @@ def _montar_bloco_instrucao(
                 modo,
                 primeiros_turnos=primeiros_turnos,
                 conversa_nova=conversa_nova,
-                nome=nome_lead or "meu bem",
+                nome=nome_lead or VOCATIVO_SEM_NOME,
                 nome_elogio=nome_elogio,
                 pfx=pfx,
                 curiosidade=curiosidade,

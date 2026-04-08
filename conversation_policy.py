@@ -13,6 +13,7 @@ import re
 from typing import Iterable, List
 
 from schema import Acao
+from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 _RE_PROBLEMA_ENTREGA = re.compile(
     r"\b(cortad[ao]|incomplet[ao]|atropel|card|cart[aã]o\s+de\s+contato|"
@@ -30,7 +31,7 @@ def lead_reportou_problema_entrega(texto: str) -> bool:
 
 
 def acoes_reparo_entrega_padrao(nome_vocativo: str) -> list[Acao]:
-    nv = (nome_vocativo or "").strip() or "meu bem"
+    nv = (nome_vocativo or "").strip() or VOCATIVO_SEM_NOME
     return [
         Acao(
             tipo="text",

@@ -26,6 +26,7 @@ from copy_sanitizer import (
     vocativo_cigana,
     preparar_texto_envio,
 )
+from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def _calcular_delay_humano(texto: str) -> int:
 def executar_v2(ctx, tentativa: int = 1) -> tuple:
     # 1. Resgate de Inteligência (Dados do Maestro - Node 5)
     metadata = getattr(ctx, "metadata", {}) or {}
-    nome = (ctx.nome_lead or "meu bem").strip() or "meu bem"
+    nome = (ctx.nome_lead or "").strip() or VOCATIVO_SEM_NOME
     nome_fmt = nome_lead_para_exibicao(nome)
     msg_ctx = str(getattr(ctx, "texto_recebido", "") or "").strip()
     metadata["genero_lead"] = genero_efetivo_para_copy(
