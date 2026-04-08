@@ -982,6 +982,26 @@
         }
         #svg-connections { z-index: 5; }
         #flow-temp-wire-path { filter: drop-shadow(0 0 4px rgba(124,90,245,.35)); }
+        .flow-builder-toolbar {
+            position: sticky; top: 0; z-index: 35;
+            display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+            padding: 8px 12px;
+            background: var(--c-surface);
+            border-bottom: 1px solid var(--c-border);
+            backdrop-filter: blur(8px);
+        }
+        #flow-canvas-viewport.flow-canvas--grid {
+            background-image:
+                linear-gradient(rgba(124, 90, 245, 0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(124, 90, 245, 0.07) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .flow-toolbar-btn--on {
+            background: rgba(124, 90, 245, 0.14) !important;
+            border: 1px solid rgba(124, 90, 245, 0.35) !important;
+        }
+        #flow-canvas-area.flow-pan-space { cursor: grab; }
+        #flow-canvas-area.flow-pan-space:active { cursor: grabbing; }
 
         /* ── FLUXOS (aba) ───────────────────────────────────────── */
         .fluxos-wrap { display: flex; flex-direction: column; gap: 18px; }
@@ -2468,7 +2488,24 @@
             </div>
         </header>
 
-        <div class="flow-canvas" style="flex:1;position:relative;overflow:auto" id="flow-canvas-area" onclick="if(event.target===this) cancelFlowWire()">
+        <div class="flow-canvas" style="flex:1;position:relative;overflow:auto" id="flow-canvas-area" onclick="flowCanvasBackgroundClick(event)">
+            <div id="flow-builder-toolbar" class="flow-builder-toolbar">
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowUndo()" title="Desfazer (Ctrl+Z)" id="flow-btn-undo" disabled><i class="fas fa-undo"></i></button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowRedo()" title="Refazer (Ctrl+Shift+Z)" id="flow-btn-redo" disabled><i class="fas fa-redo"></i></button>
+                <span style="width:1px;height:18px;background:var(--c-border);margin:0 2px;flex-shrink:0"></span>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowZoomOut()" title="Menos zoom"><i class="fas fa-minus"></i></button>
+                <span id="flow-zoom-label" style="font-size:10px;color:var(--c-muted);min-width:40px;text-align:center">100%</span>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowZoomIn()" title="Mais zoom"><i class="fas fa-plus"></i></button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowZoomReset()" title="Zoom 100%"><i class="fas fa-compress"></i></button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowFitView()" title="Encaixar vista nos blocos"><i class="fas fa-expand-arrows-alt"></i></button>
+                <span style="width:1px;height:18px;background:var(--c-border);margin:0 2px;flex-shrink:0"></span>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowToggleGrid()" title="Grelha e alinhamento (8px)" id="flow-btn-grid"><i class="fas fa-border-all"></i></button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowToggleMinimap()" title="Mini-mapa" id="flow-btn-minimap"><i class="fas fa-map"></i></button>
+                <span style="width:1px;height:18px;background:var(--c-border);margin:0 2px;flex-shrink:0"></span>
+                <input type="search" id="flow-node-search" placeholder="Buscar bloco…" class="input-field" style="max-width:160px;font-size:11px;padding:4px 8px" oninput="flowSearchNodes(this.value)" autocomplete="off">
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="openFlowShortcutsModal()" title="Atalhos (? )"><i class="fas fa-keyboard"></i></button>
+            </div>
+            <div id="flow-canvas-viewport" class="flow-canvas-viewport" style="position:relative;transform-origin:0 0;min-width:2000px;min-height:1200px">
             <!-- SVG de conexões estáticas (para visualização no base flow) -->
             <svg id="svg-connections" style="position:absolute;top:0;left:0;width:1800px;height:800px;pointer-events:none;z-index:0">
                 <defs>
@@ -2484,12 +2521,17 @@
             <div id="nodes-container">
                 <!-- Nodes Base preenchidos via JS para facilitar arrastar -->
             </div>
+            </div>
+
+            <div id="flow-minimap-wrap" style="display:none;position:absolute;bottom:88px;right:24px;width:140px;height:100px;z-index:40;background:var(--c-surface);border:1px solid var(--c-border);border-radius:8px;box-shadow:var(--shadow);overflow:hidden;cursor:pointer" title="Clique para centrar a vista" onclick="flowMinimapClick(event)">
+                <canvas id="flow-minimap-canvas" width="140" height="100" style="display:block;width:140px;height:100px"></canvas>
+            </div>
 
             <!-- Canvas controls -->
             <div style="position:sticky;bottom:16px;left:16px;display:flex;flex-direction:column;gap:8px;z-index:20">
-                <button class="icon-btn" style="background:var(--c-surface);border:1px solid var(--c-border);box-shadow:var(--shadow)"><i class="fas fa-plus"></i></button>
-                <button class="icon-btn" style="background:var(--c-surface);border:1px solid var(--c-border);box-shadow:var(--shadow)"><i class="fas fa-minus"></i></button>
-                <button class="icon-btn" style="background:var(--c-surface);border:1px solid var(--c-border);box-shadow:var(--shadow)"><i class="fas fa-expand"></i></button>
+                <button type="button" class="icon-btn" style="background:var(--c-surface);border:1px solid var(--c-border);box-shadow:var(--shadow)" onclick="flowZoomIn()" title="Mais zoom"><i class="fas fa-plus"></i></button>
+                <button type="button" class="icon-btn" style="background:var(--c-surface);border:1px solid var(--c-border);box-shadow:var(--shadow)" onclick="flowZoomOut()" title="Menos zoom"><i class="fas fa-minus"></i></button>
+                <button type="button" class="icon-btn" style="background:var(--c-surface);border:1px solid var(--c-border);box-shadow:var(--shadow)" onclick="flowFitView()" title="Encaixar vista"><i class="fas fa-expand"></i></button>
             </div>
             
             <!-- Botão ADICIONAR NÓ (Abre o Menu lateral) -->
@@ -2504,6 +2546,25 @@
                 </div>
                 <div id="flow-inspector-body" style="color:var(--c-muted);line-height:1.45"></div>
             </div>
+        </div>
+    </div>
+
+    <div id="modal-flow-shortcuts" class="modal-overlay hidden fixed inset-0 z-[75] bg-black/50 flex items-center justify-center p-4" onclick="if(event.target===this) closeFlowShortcutsModal()">
+        <div class="modal-content card" style="width:440px;max-width:96vw;padding:16px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;box-shadow:var(--shadow)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <strong style="font-family:var(--f-display);font-size:14px">Atalhos do Flow Builder</strong>
+                <button type="button" class="icon-btn" onclick="closeFlowShortcutsModal()" title="Fechar"><i class="fas fa-times"></i></button>
+            </div>
+            <ul style="font-size:11px;color:var(--c-muted);line-height:1.85;margin:0;padding-left:18px">
+                <li><strong style="color:var(--c-text)">Ctrl</strong> + roda do rato — zoom in/out</li>
+                <li><strong style="color:var(--c-text)">Ctrl+Z</strong> / <strong style="color:var(--c-text)">Ctrl+Shift+Z</strong> — desfazer / refazer</li>
+                <li><strong style="color:var(--c-text)">Ctrl+C</strong> / <strong style="color:var(--c-text)">Ctrl+V</strong> — copiar / colar bloco selecionado</li>
+                <li><strong style="color:var(--c-text)">Delete</strong> / <strong style="color:var(--c-text)">Backspace</strong> — remover bloco selecionado</li>
+                <li><strong style="color:var(--c-text)">Esc</strong> — fechar inspetor</li>
+                <li><strong style="color:var(--c-text)">Espaço</strong> + arrastar no canvas — mover vista (pan)</li>
+                <li><strong style="color:var(--c-text)">Botão do meio</strong> do rato — arrastar vista</li>
+                <li><strong style="color:var(--c-text)">?</strong> — esta ajuda</li>
+            </ul>
         </div>
     </div>
 
@@ -3372,6 +3433,384 @@ let _flowSelectedNodeId = null;
 let _currentFlowBlueprintId = null;
 let _flowSchemaCatalog = null;
 
+/** Zoom, histórico, mini-mapa e UX do canvas */
+let _flowZoom = 1;
+let _flowHistory = [];
+let _flowHistPointer = -1;
+let _flowHistoryRestoring = false;
+let _flowClipboard = null;
+let _flowSnapGrid = false;
+let _flowMinimapVisible = false;
+let _flowSpaceDown = false;
+
+function flowResetHistory() {
+    _flowHistory = [];
+    _flowHistPointer = -1;
+}
+
+function captureFlowState() {
+    syncFlowFormValuesIntoDom();
+    return { doc: serializeFlowCanvas(), edges: JSON.parse(JSON.stringify(_flowEdges || [])) };
+}
+
+function pushFlowHistory() {
+    if (_flowHistoryRestoring) return;
+    const snap = captureFlowState();
+    const key = JSON.stringify(snap);
+    if (_flowHistPointer >= 0 && JSON.stringify(_flowHistory[_flowHistPointer]) === key) return;
+    _flowHistory = _flowHistory.slice(0, _flowHistPointer + 1);
+    _flowHistory.push(snap);
+    _flowHistPointer = _flowHistory.length - 1;
+    while (_flowHistory.length > 50) {
+        _flowHistory.shift();
+        _flowHistPointer--;
+    }
+    flowUpdateUndoRedoButtons();
+}
+
+function flowUpdateUndoRedoButtons() {
+    const u = document.getElementById('flow-btn-undo');
+    const r = document.getElementById('flow-btn-redo');
+    if (u) u.disabled = _flowHistPointer <= 0;
+    if (r) r.disabled = _flowHistPointer >= _flowHistory.length - 1;
+}
+
+function restoreFlowSnapshot(snap) {
+    if (!snap || !snap.doc) return;
+    _flowHistoryRestoring = true;
+    try {
+        closeFlowInspector();
+        deserializeFlowCanvas(snap.doc);
+        updateFlowMinimap();
+    } finally {
+        _flowHistoryRestoring = false;
+    }
+}
+
+function flowUndo() {
+    if (_flowHistPointer <= 0) return;
+    _flowHistPointer--;
+    restoreFlowSnapshot(_flowHistory[_flowHistPointer]);
+    flowUpdateUndoRedoButtons();
+}
+
+function flowRedo() {
+    if (_flowHistPointer >= _flowHistory.length - 1) return;
+    _flowHistPointer++;
+    restoreFlowSnapshot(_flowHistory[_flowHistPointer]);
+    flowUpdateUndoRedoButtons();
+}
+
+function applyFlowViewportTransform() {
+    const vp = document.getElementById('flow-canvas-viewport');
+    if (!vp) return;
+    const z = Math.min(2, Math.max(0.25, _flowZoom || 1));
+    _flowZoom = z;
+    vp.style.transform = 'scale(' + z + ')';
+    vp.style.transformOrigin = '0 0';
+    const lab = document.getElementById('flow-zoom-label');
+    if (lab) lab.textContent = Math.round(z * 100) + '%';
+}
+
+function flowZoomIn() {
+    _flowZoom = Math.min(2, (_flowZoom || 1) + 0.1);
+    applyFlowViewportTransform();
+    redrawFlowEdges();
+    updateFlowMinimap();
+}
+
+function flowZoomOut() {
+    _flowZoom = Math.max(0.25, (_flowZoom || 1) - 0.1);
+    applyFlowViewportTransform();
+    redrawFlowEdges();
+    updateFlowMinimap();
+}
+
+function flowZoomReset() {
+    _flowZoom = 1;
+    applyFlowViewportTransform();
+    redrawFlowEdges();
+    updateFlowMinimap();
+}
+
+function flowFitView() {
+    const nodes = document.querySelectorAll('#nodes-container .flow-node');
+    const area = document.getElementById('flow-canvas-area');
+    if (!nodes.length || !area) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    nodes.forEach((el) => {
+        const x = parseFloat(el.style.left) || 0;
+        const y = parseFloat(el.style.top) || 0;
+        const w = el.offsetWidth || 180;
+        const h = el.offsetHeight || 80;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + w);
+        maxY = Math.max(maxY, y + h);
+    });
+    const pad = 80;
+    minX -= pad;
+    minY -= pad;
+    maxX += pad;
+    maxY += pad;
+    const bw = Math.max(320, maxX - minX);
+    const bh = Math.max(240, maxY - minY);
+    const aw = area.clientWidth;
+    const ah = area.clientHeight;
+    const z = Math.min(1.5, Math.max(0.25, Math.min(aw / bw, ah / bh)));
+    _flowZoom = z;
+    applyFlowViewportTransform();
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    area.scrollLeft = Math.max(0, cx - aw / 2);
+    area.scrollTop = Math.max(0, cy - ah / 2);
+    redrawFlowEdges();
+    updateFlowMinimap();
+}
+
+function flowToggleGrid() {
+    _flowSnapGrid = !_flowSnapGrid;
+    const vp = document.getElementById('flow-canvas-viewport');
+    const btn = document.getElementById('flow-btn-grid');
+    if (vp) vp.classList.toggle('flow-canvas--grid', _flowSnapGrid);
+    if (btn) btn.classList.toggle('flow-toolbar-btn--on', _flowSnapGrid);
+}
+
+function flowToggleMinimap() {
+    const wrap = document.getElementById('flow-minimap-wrap');
+    const btn = document.getElementById('flow-btn-minimap');
+    if (!wrap) return;
+    _flowMinimapVisible = !_flowMinimapVisible;
+    wrap.style.display = _flowMinimapVisible ? 'block' : 'none';
+    if (btn) btn.classList.toggle('flow-toolbar-btn--on', _flowMinimapVisible);
+    if (_flowMinimapVisible) updateFlowMinimap();
+}
+
+function updateFlowMinimap() {
+    const wrap = document.getElementById('flow-minimap-wrap');
+    const cvs = document.getElementById('flow-minimap-canvas');
+    if (!wrap || !cvs || wrap.style.display === 'none') return;
+    const ctx = cvs.getContext('2d');
+    if (!ctx) return;
+    const W = cvs.width;
+    const H = cvs.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(124,90,245,0.06)';
+    ctx.fillRect(0, 0, W, H);
+    const nodes = document.querySelectorAll('#nodes-container .flow-node');
+    if (!nodes.length) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    nodes.forEach((el) => {
+        const x = parseFloat(el.style.left) || 0;
+        const y = parseFloat(el.style.top) || 0;
+        const w = el.offsetWidth || 160;
+        const h = el.offsetHeight || 72;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + w);
+        maxY = Math.max(maxY, y + h);
+    });
+    const pad = 40;
+    minX -= pad;
+    minY -= pad;
+    maxX += pad;
+    maxY += pad;
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    const scale = Math.min(W / bw, H / bh);
+    const ox = (W - bw * scale) / 2 - minX * scale;
+    const oy = (H - bh * scale) / 2 - minY * scale;
+    nodes.forEach((el) => {
+        const x = parseFloat(el.style.left) || 0;
+        const y = parseFloat(el.style.top) || 0;
+        const w = el.offsetWidth || 160;
+        const h = el.offsetHeight || 72;
+        ctx.fillStyle = el.classList.contains('flow-node--selected') ? 'rgba(124,90,245,0.55)' : 'rgba(100,116,139,0.4)';
+        ctx.fillRect(x * scale + ox, y * scale + oy, Math.max(2, w * scale), Math.max(2, h * scale));
+    });
+}
+
+function flowMinimapClick(ev) {
+    ev.stopPropagation();
+    const area = document.getElementById('flow-canvas-area');
+    const cvs = document.getElementById('flow-minimap-canvas');
+    if (!area || !cvs) return;
+    const rect = cvs.getBoundingClientRect();
+    const mx = ev.clientX - rect.left;
+    const my = ev.clientY - rect.top;
+    const nodes = document.querySelectorAll('#nodes-container .flow-node');
+    if (!nodes.length) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    nodes.forEach((el) => {
+        const x = parseFloat(el.style.left) || 0;
+        const y = parseFloat(el.style.top) || 0;
+        const w = el.offsetWidth || 160;
+        const h = el.offsetHeight || 72;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + w);
+        maxY = Math.max(maxY, y + h);
+    });
+    const pad = 40;
+    minX -= pad;
+    minY -= pad;
+    maxX += pad;
+    maxY += pad;
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    const W = cvs.width;
+    const H = cvs.height;
+    const scale = Math.min(W / bw, H / bh);
+    const ox = (W - bw * scale) / 2 - minX * scale;
+    const oy = (H - bh * scale) / 2 - minY * scale;
+    const wx = (mx - ox) / scale;
+    const wy = (my - oy) / scale;
+    area.scrollLeft = Math.max(0, wx - area.clientWidth / 2);
+    area.scrollTop = Math.max(0, wy - area.clientHeight / 2);
+    redrawFlowEdges();
+}
+
+function flowSearchNodes(q) {
+    const needle = String(q || '').trim().toLowerCase();
+    document.querySelectorAll('#nodes-container .flow-node').forEach((el) => {
+        const head = el.querySelector('.flow-node-head');
+        const txt = ((head ? head.innerText : '') + ' ' + (el.getAttribute('data-node-type') || '')).toLowerCase();
+        const match = !needle || txt.includes(needle);
+        el.style.opacity = match ? '1' : '0.22';
+        el.style.filter = match ? '' : 'grayscale(0.85)';
+    });
+}
+
+function flowCopySelectedNode() {
+    const sel = document.querySelector('#nodes-container .flow-node.flow-node--selected');
+    if (!sel) return;
+    _flowClipboard = { html: sel.outerHTML };
+    toast('Bloco copiado.', 'purple');
+}
+
+function flowPasteNode() {
+    if (!_flowClipboard || !_flowClipboard.html) return;
+    const container = document.getElementById('nodes-container');
+    if (!container) return;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = _flowClipboard.html.trim();
+    const node = wrap.firstElementChild;
+    if (!node || !node.classList.contains('flow-node')) return;
+    node.setAttribute('data-flow-id', newFlowNodeId());
+    const x = Number.parseFloat(node.style.left || '0') || 0;
+    const y = Number.parseFloat(node.style.top || '0') || 0;
+    node.style.left = (x + 40) + 'px';
+    node.style.top = (y + 40) + 'px';
+    node.classList.remove('flow-node--selected');
+    container.appendChild(node);
+    initDragAndDrop();
+    redrawFlowEdges();
+    flowSetSelectedNode(node);
+    pushFlowHistory();
+    toast('Bloco colado.', 'emerald');
+}
+
+function flowCanvasBackgroundClick(event) {
+    const t = event.target;
+    if (t && t.closest && (t.closest('.flow-node') || t.closest('#flow-builder-toolbar') || t.closest('#flow-minimap-wrap') || t.closest('#flow-inspector'))) return;
+    cancelFlowWire();
+}
+
+function openFlowShortcutsModal() {
+    const m = document.getElementById('modal-flow-shortcuts');
+    if (!m) return;
+    m.classList.remove('hidden');
+}
+
+function closeFlowShortcutsModal() {
+    const m = document.getElementById('modal-flow-shortcuts');
+    if (!m) return;
+    m.classList.add('hidden');
+}
+
+function initFlowBuilderCanvasUx() {
+    const area = document.getElementById('flow-canvas-area');
+    if (!area || area.getAttribute('data-flow-ux') === '1') return;
+    area.setAttribute('data-flow-ux', '1');
+    area.addEventListener(
+        'wheel',
+        (e) => {
+            const vb = document.getElementById('view-builder');
+            if (!vb || vb.style.display === 'none') return;
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.06 : 0.06;
+            _flowZoom = Math.min(2, Math.max(0.25, (_flowZoom || 1) + delta));
+            applyFlowViewportTransform();
+            redrawFlowEdges();
+            updateFlowMinimap();
+        },
+        { passive: false }
+    );
+    area.addEventListener('mousedown', (e) => {
+        if (e.button !== 1) return;
+        const vb = document.getElementById('view-builder');
+        if (!vb || vb.style.display === 'none') return;
+        if (e.target.closest && e.target.closest('.flow-node')) return;
+        e.preventDefault();
+        const start = { x: e.clientX, y: e.clientY, sl: area.scrollLeft, st: area.scrollTop };
+        const onMove = (ev) => {
+            area.scrollLeft = start.sl - (ev.clientX - start.x);
+            area.scrollTop = start.st - (ev.clientY - start.y);
+            redrawFlowEdges();
+            updateFlowMinimap();
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+    area.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || !_flowSpaceDown) return;
+        const vb = document.getElementById('view-builder');
+        if (!vb || vb.style.display === 'none') return;
+        if (e.target.closest && (e.target.closest('.flow-node') || e.target.closest('#flow-builder-toolbar'))) return;
+        e.preventDefault();
+        const start = { x: e.clientX, y: e.clientY, sl: area.scrollLeft, st: area.scrollTop };
+        const onMove = (ev) => {
+            area.scrollLeft = start.sl - (ev.clientX - start.x);
+            area.scrollTop = start.st - (ev.clientY - start.y);
+            redrawFlowEdges();
+            updateFlowMinimap();
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+    document.addEventListener('keydown', (e) => {
+        const vb = document.getElementById('view-builder');
+        if (!vb || vb.style.display === 'none') return;
+        if (e.code !== 'Space' || e.target.closest('input, textarea, select')) return;
+        e.preventDefault();
+        _flowSpaceDown = true;
+        area.classList.add('flow-pan-space');
+    });
+    document.addEventListener('keyup', (e) => {
+        if (e.code !== 'Space') return;
+        _flowSpaceDown = false;
+        area.classList.remove('flow-pan-space');
+    });
+}
+
 function cancelFlowWire() {
     _flowConnectSource = null;
 }
@@ -3387,6 +3826,7 @@ function flowTryConnectEdge(fromId, toId) {
     _flowEdges.push({ id, from: fromId, to: toId });
     redrawFlowEdges();
     toast('Conexão criada.', 'emerald');
+    pushFlowHistory();
     return true;
 }
 
@@ -3583,6 +4023,7 @@ function flowConteudoSave() {
     if (typeof base !== 'object' || base === null) base = {};
     base.contents = st.contents;
     node.setAttribute('data-flow-config', JSON.stringify(base));
+    pushFlowHistory();
     toast('Conteúdos guardados no bloco.', 'emerald');
 }
 
@@ -3673,6 +4114,7 @@ function applyFlowInspectorFormConfig() {
         }
     });
     node.setAttribute('data-flow-config', JSON.stringify(obj));
+    pushFlowHistory();
     toast('Campos do bloco salvos.', 'emerald');
 }
 
@@ -3722,6 +4164,7 @@ function flowRemoveNodeEl(node) {
         _flowEdges = (_flowEdges || []).filter((e) => e.from !== id && e.to !== id);
         redrawFlowEdges();
     }
+    pushFlowHistory();
 }
 
 function flowDuplicateNode(btn) {
@@ -3743,6 +4186,7 @@ function flowDuplicateNode(btn) {
     initDragAndDrop();
     redrawFlowEdges();
     flowSetSelectedNode(clone);
+    pushFlowHistory();
     toast('Bloco duplicado.', 'emerald');
 }
 
@@ -3798,6 +4242,50 @@ function initFlowBuilderGlobalHandlers() {
         if (!vb || vb.style.display === 'none') return;
         if (e.key === 'Escape') {
             if (flowInspectorIsOpen()) closeFlowInspector();
+            closeFlowShortcutsModal();
+            return;
+        }
+        const inField = e.target && e.target.closest && e.target.closest('input, textarea, select');
+        if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'z' && !e.shiftKey) {
+            if (inField) return;
+            e.preventDefault();
+            flowUndo();
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && (String(e.key).toLowerCase() === 'y' || (String(e.key).toLowerCase() === 'z' && e.shiftKey))) {
+            if (inField) return;
+            e.preventDefault();
+            flowRedo();
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'c') {
+            if (inField) return;
+            const sel = document.querySelector('#nodes-container .flow-node.flow-node--selected');
+            if (!sel) return;
+            e.preventDefault();
+            flowCopySelectedNode();
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'v') {
+            if (inField) return;
+            e.preventDefault();
+            flowPasteNode();
+            return;
+        }
+        if (e.key === '?') {
+            if (inField) return;
+            e.preventDefault();
+            openFlowShortcutsModal();
+            return;
+        }
+        if (!inField && (e.key === '+' || e.key === '=' || e.key === 'NumpadAdd')) {
+            e.preventDefault();
+            flowZoomIn();
+            return;
+        }
+        if (!inField && (e.key === '-' || e.key === 'NumpadSubtract')) {
+            e.preventDefault();
+            flowZoomOut();
             return;
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -3940,6 +4428,7 @@ function applyFlowInspectorConfig() {
         return;
     }
     node.setAttribute('data-flow-config', JSON.stringify(obj));
+    pushFlowHistory();
     toast('Config aplicada ao bloco.', 'emerald');
 }
 
@@ -4077,6 +4566,10 @@ function loadOrRenderBuilderCanvas(contextTitle) {
     const slug = _flowSlug(plain);
     const doc = loadFlowDraftFromStorage(slug);
     if (doc && deserializeFlowCanvas(doc)) {
+        flowResetHistory();
+        pushFlowHistory();
+        initFlowBuilderCanvasUx();
+        flowZoomReset();
         return;
     }
     const t = plain.toLowerCase();
@@ -4295,6 +4788,10 @@ async function loadFlowBlueprintPicker() {
             document.getElementById('builder-title').innerHTML = `<i class="fab fa-whatsapp" style="color:var(--c-emerald)"></i> ${String(body.title).replace(/</g, '')}`;
         }
         deserializeFlowCanvas(body);
+        flowResetHistory();
+        pushFlowHistory();
+        initFlowBuilderCanvasUx();
+        flowZoomReset();
         toast('Fluxo carregado do servidor.', 'emerald');
         refreshFlowPublishStatus();
     } catch (_) {
@@ -6541,17 +7038,26 @@ async function assignCurrentLead() {
 
 /* ── CONSTRUTOR VISUAL (DRAG & DROP E NOVO FLUXO) ────────────────── */
 let draggedNode = null;
-let offsetX = 0, offsetY = 0;
+let _flowDragStart = null;
+let _flowDragMoved = false;
 
 function initDragAndDrop() {
-    document.querySelectorAll('.flow-node-head').forEach(head => {
-        head.onmousedown = function(e) {
+    document.querySelectorAll('.flow-node-head').forEach((head) => {
+        head.onmousedown = function (e) {
+            if (e.button !== 0) return;
             draggedNode = this.parentElement;
-            offsetX = e.clientX - draggedNode.offsetLeft;
-            offsetY = e.clientY - draggedNode.offsetTop;
+            _flowDragMoved = false;
+            const z = parseFloat(String(_flowZoom || 1)) || 1;
+            _flowDragStart = {
+                clientX: e.clientX,
+                clientY: e.clientY,
+                left: parseFloat(draggedNode.style.left) || 0,
+                top: parseFloat(draggedNode.style.top) || 0,
+                z,
+            };
             document.onmousemove = dragNode;
             document.onmouseup = stopDrag;
-        }
+        };
     });
     flowEnsureNodeActionButtons();
     initFlowNodeSelection();
@@ -6561,18 +7067,29 @@ function initDragAndDrop() {
 }
 
 function dragNode(e) {
-    if(!draggedNode) return;
-    const x = Math.max(0, e.clientX - offsetX);
-    const y = Math.max(0, e.clientY - offsetY);
-    draggedNode.style.left = x + 'px';
-    draggedNode.style.top = y + 'px';
+    if (!draggedNode || !_flowDragStart) return;
+    _flowDragMoved = true;
+    const z = _flowDragStart.z || 1;
+    let nx = _flowDragStart.left + (e.clientX - _flowDragStart.clientX) / z;
+    let ny = _flowDragStart.top + (e.clientY - _flowDragStart.clientY) / z;
+    if (typeof _flowSnapGrid !== 'undefined' && _flowSnapGrid) {
+        const g = 8;
+        nx = Math.round(nx / g) * g;
+        ny = Math.round(ny / g) * g;
+    }
+    draggedNode.style.left = Math.max(0, nx) + 'px';
+    draggedNode.style.top = Math.max(0, ny) + 'px';
 }
 
 function stopDrag() {
+    if (draggedNode && _flowDragMoved) pushFlowHistory();
     draggedNode = null;
+    _flowDragStart = null;
+    _flowDragMoved = false;
     document.onmousemove = null;
     document.onmouseup = null;
     redrawFlowEdges();
+    updateFlowMinimap();
 }
 
 function renderRecoveryFlowPreview() {
@@ -6605,6 +7122,10 @@ function renderRecoveryFlowPreview() {
         <path class="conn-path" d="M 330 175 C 360 175, 390 175, 420 175" fill="none" stroke="var(--c-border2)" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
     `;
     initDragAndDrop();
+    flowResetHistory();
+    pushFlowHistory();
+    initFlowBuilderCanvasUx();
+    flowZoomReset();
 }
 
 function renderBaseFlow() {
@@ -6648,6 +7169,10 @@ function renderBaseFlow() {
     `;
     
     initDragAndDrop();
+    flowResetHistory();
+    pushFlowHistory();
+    initFlowBuilderCanvasUx();
+    flowZoomReset();
 }
 
 function newFlow() {
@@ -6998,6 +7523,7 @@ function addSpecificNode(type) {
     `;
     container.appendChild(node);
     initDragAndDrop();
+    pushFlowHistory();
     toast(`${title} adicionado ao canvas.`, 'purple');
 }
 
