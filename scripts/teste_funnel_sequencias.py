@@ -16,7 +16,13 @@ if str(ROOT) not in sys.path:
 
 def main() -> int:
     loader = unittest.TestLoader()
-    suite = loader.loadTestsFromName("tests.test_funnel_gates")
+    suite = unittest.TestSuite()
+    for name in (
+        "tests.test_funnel_gates",
+        "tests.test_funnel_sniffer_writes",
+        "tests.test_sqlite_lead_metadata_e2e",
+    ):
+        suite.addTests(loader.loadTestsFromName(name))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     return 0 if result.wasSuccessful() else 1

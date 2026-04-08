@@ -25,7 +25,7 @@ Documento vivo: alinhado ao código em `flows/funnel_gates.py` e ao sniffer em `
 
 ## Onde isto entra no código hoje
 
-- **Engine (sniffer):** preenche `foto_recebida`, `desabafo_recebido`, `lead_contato_salvo_declarado`, etc., antes do node.
+- **Engine (sniffer):** chama `sniffer_aplicar_fase1_flags()` em `flows/funnel_gates.py`, que preenche `foto_recebida`, `desabafo_recebido`, `lead_contato_salvo_declarado`, etc., antes do node (logs continuam no `engine`).
 - **Node 1:** burst para `3_coleta_profunda` chama `pode_burst_coleta_sem_node2()` (mesma lógica que antes, centralizada).
 - **Node 2:** confirmação + vcard quando o funil exige o passo explícito.
 - **Node 3:** camadas de coleta assumem as flags acima; visão Gemini valida mão quando chega imagem no turno.
@@ -38,5 +38,7 @@ Documento vivo: alinhado ao código em `flows/funnel_gates.py` e ao sniffer em `
 ## Testes
 
 - `tests/test_funnel_gates.py` — predicados e burst.
-- `scripts/teste_funnel_sequencias.py` — corre a suíte acima (e pode crescer com cenários integrados).
+- `tests/test_funnel_sniffer_writes.py` — escritas do sniffer (`sniffer_aplicar_*`).
+- `tests/test_sqlite_lead_metadata_e2e.py` — SQLite em memória + `Lead.metadata_json` após sniffer.
+- `scripts/teste_funnel_sequencias.py` — corre a suíte `test_funnel_gates` (e pode crescer com cenários integrados).
 - `scripts/teste_node1_guardrails.py` — limites de balões no node 1 (fallback).

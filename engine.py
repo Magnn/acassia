@@ -47,7 +47,12 @@ from flows.fase_1_saudacao.sniffer_fase1 import (
     resolver_avanco_node_fase1,
     sniffer_instagram_meta,
 )
-from flows.funnel_gates import nome_eh_placeholder, VOCATIVO_SEM_NOME
+from flows.funnel_gates import (
+    nome_eh_placeholder,
+    snapshot_fase1_coleta,
+    sniffer_aplicar_fase1_flags,
+    VOCATIVO_SEM_NOME,
+)
 
 # 🚨 IMPORTAÇÃO DAS DATACLASSES CENTRALIZADAS (Resolve o ImportError)
 from schema import Acao, ContextoConversa
@@ -365,74 +370,30 @@ class Engine:
                     ctx.nome_lead = nm_meta
 
                 # ── GLOBAL SNIFFER (OUVIDO OMNISCIENTE) ──
-                # Interceta mídias e desabafos antes do Node 3 para não pedir de novo o que já chegou.
+                # Interceta mídias e desabafos antes do Node 3 — escritas em flows.funnel_gates.
                 meta = ctx.metadata
                 texto_sniff = (texto_recebido or "").strip()
                 if not texto_sniff and meta.get("caption"):
                     texto_sniff = str(meta.get("caption") or "").strip()
-                msg_lower = texto_sniff.lower()
-                palavras_msg = msg_lower.split()
 
-                if tipo_msg in ("image", "video") and not meta.get("foto_recebida"):
-                    meta["foto_recebida"] = True
-                    logger.info("👁️ [SNIFFER] Foto interceptada antecipadamente para o lead %s.", lead.id)
-
-                if not meta.get("foto_recebida"):
-                    for hm in ctx.historico or []:
-                        if getattr(hm, "remetente", "") != "user":
-                            continue
-                        t_hist = str(getattr(hm, "tipo", "") or "").lower()
-                        if t_hist in ("image", "video"):
-                            meta["foto_recebida"] = True
-                            logger.info(
-                                "👁️ [SNIFFER] Foto já presente no histórico (lead=%s) — evita pedir de novo.",
-                                lead.id,
-                            )
-                            break
-
-                _RE_CONTATO_JA_SALVO = re.compile(
-                    r"(?i)\b(já|ja)\s+(salvei|salbei|guardei|adicionei|botei)\b|"
-                    r"\b(salvei|salbei|guardei)\s+(o\s+)?(seu\s+)?(contato|número|numero|telefone)\b|"
-                    r"\b(contato|número|numero)\s+(salvo|guardado|já\s+está|ja\s+esta)\b|"
-                    r"\b(salvei|salbei)\s+ddu\b|"
-                    r"\bpronto[,]?\s*(já|ja)\s+salvei\b|"
-                    r"\bjá\s+deixei\s+seu\s+número\b|"
-                    r"\b(salvei|salbei)\s+(teu|seu|o)\s+contato\b"
-                )
-                if not meta.get("lead_contato_salvo_declarado"):
-                    if _RE_CONTATO_JA_SALVO.search(texto_sniff):
-                        meta["lead_contato_salvo_declarado"] = True
+                for ev in sniffer_aplicar_fase1_flags(
+                    meta,
+                    tipo_mensagem=tipo_msg,
+                    texto_sniff=texto_sniff,
+                    historico=ctx.historico,
+                ):
+                    if ev == "foto_atual":
+                        logger.info("👁️ [SNIFFER] Foto interceptada antecipadamente para o lead %s.", lead.id)
+                    elif ev == "foto_historico":
+                        logger.info(
+                            "👁️ [SNIFFER] Foto já presente no histórico (lead=%s) — evita pedir de novo.",
+                            lead.id,
+                        )
+                    elif ev == "contato_atual":
                         logger.info("📇 [SNIFFER] Lead declarou contato salvo (atual) lead=%s.", lead.id)
-                    else:
-                        for hm in ctx.historico or []:
-                            if getattr(hm, "remetente", "") != "user":
-                                continue
-                            txh = str(getattr(hm, "texto", "") or "")
-                            if _RE_CONTATO_JA_SALVO.search(txh):
-                                meta["lead_contato_salvo_declarado"] = True
-                                logger.info("📇 [SNIFFER] Contato salvo declarado no histórico lead=%s.", lead.id)
-                                break
-
-                _RE_INTENCAO_CONSULTA_CURTA = re.compile(
-                    r"(?i)\b(quero\s+saber|gostaria\s+de\s+saber|preciso\s+saber|"
-                    r"será\s+que|sera\s+que|vai\s+voltar|volta\s+comigo|volta\s+pra\s+mim|"
-                    r"minha\s+ex|meu\s+ex|ela\s+volta|ele\s+volta|me\s+ama|"
-                    r"namora|namorad|casamento|casar\s+com)\b"
-                )
-                if not meta.get("desabafo_recebido"):
-                    gatilhos_sniffer = (
-                        "traição", "traicao", "marido", "esposa", "ex", "dor", "sofre", "ajuda",
-                        "dinheiro", "urgente", "desespero", "choro", "angústia", "angustia", "medo",
-                        "traiu", "separou", "voltar",
-                    )
-                    marcou = len(palavras_msg) > 8 and any(g in msg_lower for g in gatilhos_sniffer)
-                    if not marcou and len(palavras_msg) >= 4 and _RE_INTENCAO_CONSULTA_CURTA.search(msg_lower):
-                        marcou = True
-                    if marcou:
-                        meta["desabafo_recebido"] = True
-                        blob = texto_sniff[:1500]
-                        prev = (meta.get("desabafo_original") or "").strip()
-                        meta["desabafo_original"] = f"{prev} {blob}".strip() if prev else blob
+                    elif ev == "contato_historico":
+                        logger.info("📇 [SNIFFER] Contato salvo declarado no histórico lead=%s.", lead.id)
+                    elif ev == "desabafo":
                         logger.info("👂 [SNIFFER] Desabafo interceptado antecipadamente para o lead %s.", lead.id)
 
                 ctx.metadata = meta
@@ -444,8 +405,6 @@ class Engine:
                 ctx.metadata = meta
 
                 try:
-                    from flows.funnel_gates import snapshot_fase1_coleta
-
                     _nm_snap = (
                         (getattr(ctx, "nome_lead", None) or meta.get("nome_lead") or "")
                     ).strip()
