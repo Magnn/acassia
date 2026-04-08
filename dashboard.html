@@ -1971,6 +1971,83 @@
             margin-top: 14px;
             flex-wrap: wrap;
         }
+        .flow-sim-lead-card .flow-sim-persona-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .flow-sim-lead-card .flow-sim-persona-row label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+        }
+        .flow-sim-lead-card select.input-field {
+            cursor: pointer;
+        }
+        .flow-sim-custom-vars {
+            margin: 10px 0 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px;
+            background: #f8fafc;
+        }
+        .flow-sim-var-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .flow-sim-var-row:last-child {
+            margin-bottom: 0;
+        }
+        .flow-sim-var-row input {
+            font-size: 11px;
+            padding: 6px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            flex: 1;
+            min-width: 0;
+        }
+        .flow-sim-var-row .flow-sim-var-key {
+            flex: 0 0 38%;
+            max-width: 140px;
+        }
+        .flow-sim-var-row .flow-sim-var-val {
+            flex: 1;
+        }
+        .flow-sim-var-row button {
+            flex-shrink: 0;
+            padding: 4px 8px;
+            font-size: 10px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #64748b;
+            cursor: pointer;
+        }
+        .flow-sim-var-row button:hover {
+            background: #fef2f2;
+            color: #b91c1c;
+            border-color: #fecaca;
+        }
+        .flow-sim-lead-card .flow-sim-btn-add-var {
+            font-size: 11px;
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            border: 1px dashed #cbd5e1;
+            background: #fff;
+            color: #475569;
+            cursor: pointer;
+            width: 100%;
+        }
+        .flow-sim-lead-card .flow-sim-btn-add-var:hover {
+            border-color: #94a3b8;
+            background: #f8fafc;
+        }
         .flow-simulator-chat {
             position: fixed;
             top: 72px;
@@ -3870,13 +3947,27 @@
 
             <!-- Missão 3.3 — simulador local (lead + chat) -->
             <div id="flow-sim-lead-modal" class="flow-sim-lead-modal hidden" aria-hidden="true" onclick="if(event.target===this) flowSimLeadCancel()">
-                <div class="flow-sim-lead-card" onclick="event.stopPropagation()">
+                <div class="flow-sim-lead-card" onclick="event.stopPropagation()" style="width:min(440px,92vw)">
                     <h3>Perfil de teste (lead)</h3>
-                    <p>Preenche para substituir <code>{{nome}}</code>, <code>{{telefone}}</code>, <code>{{lead.nome}}</code> no texto dos blocos.</p>
+                    <p>Personas guardadas neste browser. Usa <code>{{chave}}</code> nos blocos — ex.: <code>{{nome}}</code>, <code>{{cargo}}</code>, <code>{{lead.plano}}</code>.</p>
+                    <div class="flow-sim-persona-row">
+                        <label for="flow-sim-persona-select">Selecionar persona</label>
+                        <select id="flow-sim-persona-select" class="input-field" onchange="flowSimOnPersonaSelect()">
+                            <option value="">— Personalizado (sem persona salva) —</option>
+                        </select>
+                    </div>
                     <label class="kpi-label" style="display:block;margin-bottom:4px">Nome</label>
-                    <input type="text" id="flow-sim-lead-nome" class="input-field" placeholder="ex.: Maria" autocomplete="given-name" />
+                    <input type="text" id="flow-sim-lead-nome" class="input-field" placeholder="ex.: Maria" autocomplete="given-name" oninput="flowSimSyncLeadFromModalDebounced()" />
                     <label class="kpi-label" style="display:block;margin-bottom:4px;margin-top:8px">Telefone</label>
-                    <input type="text" id="flow-sim-lead-tel" class="input-field" placeholder="ex.: +351 912 345 678" autocomplete="tel" />
+                    <input type="text" id="flow-sim-lead-tel" class="input-field" placeholder="ex.: +351 912 345 678" autocomplete="tel" oninput="flowSimSyncLeadFromModalDebounced()" />
+                    <p class="kpi-label" style="margin:12px 0 6px;font-weight:600;color:#475569">Variáveis extra</p>
+                    <button type="button" class="flow-sim-btn-add-var" onclick="flowSimAddVarRow()"><i class="fas fa-plus"></i> Adicionar variável (chave / valor)</button>
+                    <div id="flow-sim-custom-vars" class="flow-sim-custom-vars"></div>
+                    <div class="flow-sim-lead-actions" style="justify-content:space-between;margin-top:10px">
+                        <button type="button" class="btn btn-ghost" style="font-size:11px" onclick="flowSimSaveLeadAsPersona()" title="Guarda nome, telefone e variáveis extra">
+                            <i class="fas fa-user-plus"></i> Salvar lead atual como persona
+                        </button>
+                    </div>
                     <div class="flow-sim-lead-actions">
                         <button type="button" class="btn btn-ghost" onclick="flowSimLeadCancel()">Cancelar</button>
                         <button type="button" class="btn btn-primary" onclick="flowSimLeadStart()"><i class="fas fa-play"></i> Iniciar simulação</button>
@@ -8049,7 +8140,10 @@ const _flowSimState = {
     currentNodeId: null,
     lead: { nome: '', telefone: '' },
     context: { lastAnswer: '' },
+    selectedPersonaId: null,
 };
+const FLOWSIM_PERSONAS_LS_KEY = 'flowSimTestPersonas_v1';
+let _flowSimLeadModalSyncTimer = null;
 let _flowSimLineResolver = null;
 let _flowSimStepWaitResolve = null;
 let _flowSimActiveNodeId = null;
@@ -8167,19 +8261,189 @@ function flowSimSubstituteVars(text, lead) {
     if (text == null) return '';
     let s = String(text);
     const L = lead || _flowSimState.lead || {};
-    const map = {
-        nome: L.nome || '',
-        telefone: L.telefone || '',
-        'lead.nome': L.nome || '',
-        'lead.telefone': L.telefone || '',
-    };
-    s = s.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, raw) => {
-        const key = String(raw).trim();
+    const getVal = (rawKey) => {
+        const key = String(rawKey).trim();
         if (key === 'resposta') return _flowSimState.context.lastAnswer || '';
-        if (map[key] !== undefined) return map[key];
+        if (key === 'lead.nome') return L.nome != null ? String(L.nome) : '';
+        if (key === 'lead.telefone') return L.telefone != null ? String(L.telefone) : '';
+        if (key.indexOf('lead.') === 0) {
+            const sub = key.slice(5);
+            if (sub && Object.prototype.hasOwnProperty.call(L, sub)) {
+                const v = L[sub];
+                return v != null ? String(v) : '';
+            }
+        }
+        if (Object.prototype.hasOwnProperty.call(L, key)) {
+            const v = L[key];
+            return v != null ? String(v) : '';
+        }
         return '{{' + key + '}}';
-    });
+    };
+    s = s.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, raw) => getVal(raw));
     return s;
+}
+
+function flowSimPersonasLoad() {
+    try {
+        const raw = localStorage.getItem(FLOWSIM_PERSONAS_LS_KEY);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function flowSimPersonasSave(list) {
+    try {
+        localStorage.setItem(FLOWSIM_PERSONAS_LS_KEY, JSON.stringify(list));
+    } catch (e) {
+        console.warn('flowSimPersonasSave', e);
+        toast('Não foi possível guardar personas (armazenamento cheio ou bloqueado).', 'rose');
+    }
+}
+
+function flowSimPersonaNewId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+}
+
+function flowSimPersonaSelectRefresh() {
+    const sel = document.getElementById('flow-sim-persona-select');
+    if (!sel) return;
+    const cur = sel.value;
+    const list = flowSimPersonasLoad();
+    sel.innerHTML = '<option value="">— Personalizado (sem persona salva) —</option>';
+    list.forEach((p) => {
+        if (!p || !p.id) return;
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name || '(sem nome)';
+        sel.appendChild(opt);
+    });
+    if (cur && list.some((x) => x && String(x.id) === String(cur))) sel.value = cur;
+    else if (_flowSimState.selectedPersonaId && list.some((x) => x && String(x.id) === String(_flowSimState.selectedPersonaId))) {
+        sel.value = _flowSimState.selectedPersonaId;
+    }
+}
+
+function flowSimRenderCustomVarRows(vars) {
+    const box = document.getElementById('flow-sim-custom-vars');
+    if (!box) return;
+    box.innerHTML = '';
+    const skip = { nome: 1, telefone: 1 };
+    const obj = vars && typeof vars === 'object' ? vars : {};
+    Object.keys(obj).forEach((k) => {
+        if (skip[k]) return;
+        flowSimAddVarRow(k, obj[k] != null ? String(obj[k]) : '');
+    });
+}
+
+function flowSimAddVarRow(key, val) {
+    const box = document.getElementById('flow-sim-custom-vars');
+    if (!box) return;
+    const row = document.createElement('div');
+    row.className = 'flow-sim-var-row';
+    row.innerHTML =
+        '<input type="text" class="flow-sim-var-key" placeholder="chave (ex.: cargo)" value="' +
+        flowEsc(key || '') +
+        '" />' +
+        '<input type="text" class="flow-sim-var-val" placeholder="valor" value="' +
+        flowEsc(val != null ? String(val) : '') +
+        '" />' +
+        '<button type="button" onclick="this.parentElement.remove();flowSimSyncLeadFromModalDebounced();" title="Remover"><i class="fas fa-times"></i></button>';
+    box.appendChild(row);
+    const inputs = row.querySelectorAll('input');
+    inputs.forEach((inp) => inp.addEventListener('input', flowSimSyncLeadFromModalDebounced));
+}
+
+function flowSimCollectLeadFromModal() {
+    const nomeEl = document.getElementById('flow-sim-lead-nome');
+    const telEl = document.getElementById('flow-sim-lead-tel');
+    const lead = {
+        nome: nomeEl ? String(nomeEl.value || '').trim() : '',
+        telefone: telEl ? String(telEl.value || '').trim() : '',
+    };
+    document.querySelectorAll('#flow-sim-custom-vars .flow-sim-var-row').forEach((row) => {
+        const kInp = row.querySelector('.flow-sim-var-key');
+        const vInp = row.querySelector('.flow-sim-var-val');
+        const k = kInp ? String(kInp.value || '').trim() : '';
+        if (!k) return;
+        lead[k] = vInp ? String(vInp.value || '') : '';
+    });
+    return lead;
+}
+
+function flowSimApplyLeadObjectToModal(lead) {
+    const L = lead && typeof lead === 'object' ? lead : {};
+    const nome = document.getElementById('flow-sim-lead-nome');
+    const tel = document.getElementById('flow-sim-lead-tel');
+    if (nome) nome.value = L.nome != null ? String(L.nome) : '';
+    if (tel) tel.value = L.telefone != null ? String(L.telefone) : '';
+    const rest = { ...L };
+    delete rest.nome;
+    delete rest.telefone;
+    flowSimRenderCustomVarRows(rest);
+    _flowSimState.lead = flowSimCollectLeadFromModal();
+}
+
+function flowSimSyncLeadFromModalDebounced() {
+    clearTimeout(_flowSimLeadModalSyncTimer);
+    _flowSimLeadModalSyncTimer = setTimeout(() => {
+        _flowSimState.lead = flowSimCollectLeadFromModal();
+    }, 120);
+}
+
+function flowSimOnPersonaSelect() {
+    const sel = document.getElementById('flow-sim-persona-select');
+    if (!sel) return;
+    const id = String(sel.value || '').trim();
+    _flowSimState.selectedPersonaId = id || null;
+    if (!id) {
+        _flowSimState.lead = flowSimCollectLeadFromModal();
+        return;
+    }
+    const list = flowSimPersonasLoad();
+    const p = list.find((x) => x && String(x.id) === id);
+    if (!p || !p.vars || typeof p.vars !== 'object') {
+        toast('Persona inválida.', 'amber');
+        return;
+    }
+    flowSimApplyLeadObjectToModal(p.vars);
+}
+
+function flowSimSaveLeadAsPersona() {
+    const lead = flowSimCollectLeadFromModal();
+    const name = window.prompt('Nome da persona (ex.: Lead Qualificado)', '');
+    if (name == null) return;
+    const trimmed = String(name).trim();
+    if (!trimmed) {
+        toast('Indique um nome para a persona.', 'amber');
+        return;
+    }
+    const id = flowSimPersonaNewId();
+    const list = flowSimPersonasLoad();
+    list.push({
+        id,
+        name: trimmed,
+        vars: { ...lead },
+    });
+    flowSimPersonasSave(list);
+    flowSimPersonaSelectRefresh();
+    const sel = document.getElementById('flow-sim-persona-select');
+    if (sel) sel.value = id;
+    _flowSimState.selectedPersonaId = id;
+    toast('Persona guardada.', 'emerald');
+}
+
+/** Legendas padrão para divisão A/B quando a aresta não tem legenda: Ramo A, Ramo B, … */
+function flowSimDivisaoBranchLabels(nodeId) {
+    const edges = flowSimOutgoingEdges(nodeId);
+    const letters = 'ABCDEFGHIJ'.split('');
+    return edges.map((e, i) => {
+        const raw = String(e.label || '').trim();
+        return raw || 'Ramo ' + (letters[i] || String(i + 1));
+    });
 }
 
 function flowSimOutgoingEdges(fromId) {
@@ -8255,21 +8519,24 @@ function flowSimParseDivisaoWeights(weightsStr, edges) {
 function flowSimPickDivisaoEdge(nodeId, cfg) {
     const edges = flowSimOutgoingEdges(nodeId);
     if (!edges.length) return null;
-    let weights = flowSimParseDivisaoWeights(cfg.weights, edges);
+    const simLabels = flowSimDivisaoBranchLabels(nodeId);
+    const synthetic = edges.map((e, i) => ({ ...e, label: simLabels[i] }));
+    let weights = flowSimParseDivisaoWeights(cfg.weights, synthetic);
     if (!weights || weights.length !== edges.length) {
         weights = edges.map(() => 1);
     }
     const sum = weights.reduce((a, b) => a + b, 0);
     if (sum <= 0) {
         const pick = edges[Math.floor(Math.random() * edges.length)];
-        return pick;
+        return { edge: pick, branchLabel: simLabels[edges.indexOf(pick)] || 'Ramo' };
     }
     let r = Math.random() * sum;
     for (let i = 0; i < edges.length; i++) {
         r -= weights[i];
-        if (r < 0) return edges[i];
+        if (r < 0) return { edge: edges[i], branchLabel: simLabels[i] || 'Ramo' };
     }
-    return edges[edges.length - 1];
+    const last = edges.length - 1;
+    return { edge: edges[last], branchLabel: simLabels[last] || 'Ramo' };
 }
 
 function flowSimPickCondicaoBranch(nodeId, choiceSim) {
@@ -8428,12 +8695,11 @@ async function flowSimulateStep(nodeId) {
     if (type === 'divisao') {
         const edges = flowSimOutgoingEdges(nodeId);
         if (!edges.length) return null;
-        const pick = flowSimPickDivisaoEdge(nodeId, cfg);
-        if (!pick) return null;
-        const wdisp = String(cfg.weights || '').trim() || 'uniforme';
-        flowSimChatAppend('sys', 'A/B: ramo por pesos (' + wdisp + ')');
-        flowSimSetSimTrace(pick.id);
-        return pick.to;
+        const picked = flowSimPickDivisaoEdge(nodeId, cfg);
+        if (!picked || !picked.edge) return null;
+        flowSimChatAppend('sys', '🎲 Divisão: Seguindo caminho [' + picked.branchLabel + ']');
+        flowSimSetSimTrace(picked.edge.id);
+        return picked.edge.to;
     }
 
     if (type === 'anotacao') {
@@ -8497,11 +8763,18 @@ function flowLocalSimulatorOpen() {
         toast('Abra o Flow Builder para simular.', 'amber');
         return;
     }
+    flowSimPersonaSelectRefresh();
+    const sel = document.getElementById('flow-sim-persona-select');
+    const list = flowSimPersonasLoad();
+    if (sel) {
+        if (_flowSimState.selectedPersonaId && list.some((x) => x && String(x.id) === String(_flowSimState.selectedPersonaId))) {
+            sel.value = _flowSimState.selectedPersonaId;
+        } else {
+            sel.value = '';
+        }
+    }
+    flowSimApplyLeadObjectToModal(_flowSimState.lead);
     const modal = document.getElementById('flow-sim-lead-modal');
-    const nome = document.getElementById('flow-sim-lead-nome');
-    const tel = document.getElementById('flow-sim-lead-tel');
-    if (nome) nome.value = _flowSimState.lead.nome || '';
-    if (tel) tel.value = _flowSimState.lead.telefone || '';
     if (modal) {
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
@@ -8517,12 +8790,9 @@ function flowSimLeadCancel() {
 }
 
 function flowSimLeadStart() {
-    const nomeEl = document.getElementById('flow-sim-lead-nome');
-    const telEl = document.getElementById('flow-sim-lead-tel');
-    _flowSimState.lead = {
-        nome: nomeEl ? String(nomeEl.value || '').trim() : '',
-        telefone: telEl ? String(telEl.value || '').trim() : '',
-    };
+    const sel = document.getElementById('flow-sim-persona-select');
+    _flowSimState.selectedPersonaId = sel && sel.value ? String(sel.value) : null;
+    _flowSimState.lead = flowSimCollectLeadFromModal();
     _flowSimState.context = { lastAnswer: '' };
     syncFlowFormValuesIntoDom();
     const start = flowSimFindStartNodeId();
@@ -8541,7 +8811,12 @@ function flowSimLeadStart() {
     if (box) box.innerHTML = '';
     flowSimResetHard();
     _flowSimState.running = true;
-    flowSimChatAppend('sys', 'Lead: ' + (_flowSimState.lead.nome || '—') + ' · ' + (_flowSimState.lead.telefone || '—'));
+    let leadLine = (_flowSimState.lead.nome || '—') + ' · ' + (_flowSimState.lead.telefone || '—');
+    if (_flowSimState.selectedPersonaId) {
+        const p = flowSimPersonasLoad().find((x) => x && String(x.id) === String(_flowSimState.selectedPersonaId));
+        if (p && p.name) leadLine = '[' + p.name + '] ' + leadLine;
+    }
+    flowSimChatAppend('sys', 'Lead: ' + leadLine);
     flowSimAsyncRun(start);
 }
 
