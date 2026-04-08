@@ -205,6 +205,20 @@ def _extrair_tentativas_previas(texto: str) -> str:
     return ""
 
 
+def _upsert_dado_concreto(meta: dict, candidato: str) -> None:
+    novo = " ".join(str(candidato or "").split()).strip()
+    if not novo:
+        return
+    atual = " ".join(str(meta.get("node5_dado_concreto") or "").split()).strip()
+    if not atual:
+        meta["node5_dado_concreto"] = novo[:140]
+        return
+    novo_score = len(novo) + (40 if _RE_TENTATIVAS.search(novo) else 0)
+    atual_score = len(atual) + (40 if _RE_TENTATIVAS.search(atual) else 0)
+    if novo_score > atual_score + 10:
+        meta["node5_dado_concreto"] = novo[:140]
+
+
 def _normalizar_fragmento_ctx(s: str) -> str:
     t = " ".join((s or "").split()).strip()
     if not t:
@@ -354,8 +368,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         if ap_blob:
             meta["node5_tentativas_previas"] = ap_blob[:220]
             meta["node5_pediu_tentativas"] = False
-            if not meta.get("node5_dado_concreto"):
-                meta["node5_dado_concreto"] = ap_blob[:140]
+            _upsert_dado_concreto(meta, ap_blob)
             tentativas_salvas = str(meta.get("node5_tentativas_previas") or "").strip()
     if not tentativas_salvas:
         trecho_tentativa = _extrair_tentativas_previas(msg_lead) or _extrair_tentativas_previas(
@@ -364,8 +377,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         if trecho_tentativa:
             meta["node5_tentativas_previas"] = trecho_tentativa
             meta["node5_pediu_tentativas"] = False
-            if not meta.get("node5_dado_concreto"):
-                meta["node5_dado_concreto"] = trecho_tentativa[:140]
+            _upsert_dado_concreto(meta, trecho_tentativa)
         else:
             if not bool(meta.get("node5_pediu_tentativas")):
                 meta["node5_pediu_tentativas"] = True
