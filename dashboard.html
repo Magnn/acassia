@@ -1912,6 +1912,24 @@
             z-index: 45 !important;
             animation: flow-node-sim-pulse 1.4s ease-in-out infinite;
         }
+        @keyframes flow-node-error-pulse {
+            0%, 100% {
+                box-shadow:
+                    0 4px 6px -1px rgb(0 0 0 / 0.1),
+                    0 0 0 2px rgba(239, 68, 68, 0.55),
+                    0 0 22px rgba(239, 68, 68, 0.4);
+            }
+            50% {
+                box-shadow:
+                    0 4px 6px -1px rgb(0 0 0 / 0.1),
+                    0 0 0 4px rgba(248, 113, 113, 0.78),
+                    0 0 34px rgba(239, 68, 68, 0.58);
+            }
+        }
+        .flow-node.flow-node-error-critical {
+            z-index: 46 !important;
+            animation: flow-node-error-pulse 1.1s ease-in-out infinite;
+        }
         @media (prefers-reduced-motion: reduce) {
             .flow-node.flow-node-active-simulation {
                 animation: none;
@@ -2127,6 +2145,16 @@
             color: #475569;
             cursor: pointer;
             user-select: none;
+        }
+        .flow-sim-topbar .flow-sim-mode-badge {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+            background: #fff;
         }
         .flow-sim-typing {
             align-self: flex-start;
@@ -3981,9 +4009,11 @@
                 </div>
                 <div class="flow-sim-topbar">
                     <button type="button" onclick="flowSimRestart()" title="Parar e voltar ao formulário de teste">Reiniciar simulação</button>
+                    <button type="button" onclick="flowSimReplayOpenModal()" title="Carregar execução real do servidor">Carregar Log de Lead</button>
                     <label class="flow-sim-step-label" title="Pausa após cada bloco; use «Próximo» para continuar">
                         <input type="checkbox" id="flow-sim-step-toggle" /> Modo passo a passo
                     </label>
+                    <span id="flow-sim-mode-badge" class="flow-sim-mode-badge">Modo: simulação</span>
                 </div>
                 <div id="flow-sim-messages" class="flow-sim-messages" role="log" aria-live="polite"></div>
                 <div class="flow-sim-toolbar">
@@ -3992,6 +4022,25 @@
                 <div class="flow-sim-inputbar">
                     <input type="text" id="flow-sim-input" placeholder="Escreve uma mensagem…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();flowSimSendChat();}" />
                     <button type="button" onclick="flowSimSendChat()" title="Enviar"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+            <div id="flow-sim-replay-modal" class="flow-sim-lead-modal hidden" aria-hidden="true" onclick="if(event.target===this) flowSimReplayCloseModal()">
+                <div class="flow-sim-lead-card" onclick="event.stopPropagation()" style="width:min(520px,94vw)">
+                    <h3>Replay de execução real</h3>
+                    <p>Informe um ID de lead para buscar a run mais recente, ou escolha um lead/run da lista.</p>
+                    <label class="kpi-label" style="display:block;margin-bottom:4px">ID do Lead</label>
+                    <input type="number" id="flow-sim-replay-lead-id" class="input-field" min="1" step="1" placeholder="Ex.: 12345" />
+                    <div class="flow-sim-lead-actions" style="margin-top:6px;justify-content:flex-start">
+                        <button type="button" class="btn btn-ghost" onclick="flowSimReplayRefreshRecent()"><i class="fas fa-sync-alt"></i> Atualizar recentes</button>
+                    </div>
+                    <label class="kpi-label" style="display:block;margin:8px 0 4px">Lead recente</label>
+                    <select id="flow-sim-replay-lead-select" class="input-field"></select>
+                    <label class="kpi-label" style="display:block;margin:8px 0 4px">Run recente</label>
+                    <select id="flow-sim-replay-run-select" class="input-field"></select>
+                    <div class="flow-sim-lead-actions">
+                        <button type="button" class="btn btn-ghost" onclick="flowSimReplayCloseModal()">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="flowSimReplayStartFromModal()"><i class="fas fa-play"></i> Iniciar replay</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -8141,12 +8190,27 @@ const _flowSimState = {
     lead: { nome: '', telefone: '' },
     context: { lastAnswer: '' },
     selectedPersonaId: null,
+    mode: 'simulate',
+    replay: {
+        runId: null,
+        events: [],
+        leadId: null,
+        stopNodeId: null,
+    },
 };
 const FLOWSIM_PERSONAS_LS_KEY = 'flowSimTestPersonas_v1';
 let _flowSimLeadModalSyncTimer = null;
 let _flowSimLineResolver = null;
 let _flowSimStepWaitResolve = null;
 let _flowSimActiveNodeId = null;
+let _flowSimCriticalNodeId = null;
+
+function flowSimSetMode(mode) {
+    _flowSimState.mode = mode === 'replay' ? 'replay' : 'simulate';
+    const b = document.getElementById('flow-sim-mode-badge');
+    if (!b) return;
+    b.textContent = _flowSimState.mode === 'replay' ? 'Modo: replay diagnóstico' : 'Modo: simulação';
+}
 
 function flowSimDelay(ms) {
     return new Promise((r) => setTimeout(r, ms));
@@ -8474,6 +8538,246 @@ function flowSimClearActiveNode() {
     _flowSimState.currentNodeId = null;
 }
 
+function flowSimSetCriticalNode(nodeId) {
+    flowSimClearCriticalNode();
+    if (!nodeId) return;
+    const el = flowCanvasNodeById(nodeId);
+    if (!el) return;
+    _flowSimCriticalNodeId = String(nodeId);
+    el.classList.add('flow-node-error-critical');
+}
+
+function flowSimClearCriticalNode() {
+    document.querySelectorAll('#nodes-container .flow-node.flow-node-error-critical').forEach((n) => n.classList.remove('flow-node-error-critical'));
+    _flowSimCriticalNodeId = null;
+}
+
+function flowSimReplayOpenModal() {
+    const m = document.getElementById('flow-sim-replay-modal');
+    if (!m) return;
+    void flowSimReplayRefreshRecent();
+    m.classList.remove('hidden');
+    m.setAttribute('aria-hidden', 'false');
+}
+
+function flowSimReplayCloseModal() {
+    const m = document.getElementById('flow-sim-replay-modal');
+    if (!m) return;
+    m.classList.add('hidden');
+    m.setAttribute('aria-hidden', 'true');
+}
+
+function flowSimReplayResolveNodeIdFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') return null;
+    const keys = ['node_id', 'node', 'to_node_id', 'to_node', 'current_node', 'current_node_id', 'next_node_id', 'next_node'];
+    for (let i = 0; i < keys.length; i++) {
+        const v = payload[keys[i]];
+        if (v == null) continue;
+        const s = String(v).trim();
+        if (s && flowCanvasNodeById(s)) return s;
+    }
+    return null;
+}
+
+function flowSimReplayResolveChatFromEvent(evt) {
+    const payload = evt && evt.payload && typeof evt.payload === 'object' ? evt.payload : {};
+    const roleRaw = String(payload.role || payload.sender || payload.actor || '').toLowerCase();
+    const msg =
+        payload.message_text ||
+        payload.message ||
+        payload.text ||
+        payload.preview ||
+        payload.body ||
+        payload.content ||
+        payload.error ||
+        '';
+    if (!msg) return null;
+    const kind = /lead|user|cliente|humano/.test(roleRaw) ? 'user' : /sys|system|engine|motor/.test(roleRaw) ? 'sys' : 'bot';
+    return { kind, text: String(msg) };
+}
+
+function flowSimReplayIsCriticalEvent(evt) {
+    const t = String((evt && evt.event_type) || '').toLowerCase();
+    const p = evt && evt.payload && typeof evt.payload === 'object' ? evt.payload : {};
+    if (/erro|error|fail|exception|api/.test(t)) return true;
+    if (p.error || p.exception || p.failed || p.api_error) return true;
+    return false;
+}
+
+function flowSimReplayFindEdgeByNodes(fromId, toId) {
+    if (!fromId || !toId) return null;
+    return (_flowEdges || []).find((e) => e && String(e.from) === String(fromId) && String(e.to) === String(toId)) || null;
+}
+
+async function flowSimReplayResolveLeadData(leadId) {
+    if (!leadId) return;
+    try {
+        const qs = new URLSearchParams({ sort: 'priority' });
+        const res = await fetch(`${API}/api/leads?${qs.toString()}`);
+        if (!res.ok) return;
+        const list = await res.json();
+        if (!Array.isArray(list)) return;
+        const lead = list.find((x) => x && Number(x.id) === Number(leadId));
+        if (!lead) return;
+        _flowSimState.lead = {
+            nome: lead.nome || '',
+            telefone: lead.telefone || '',
+            cidade: lead.cidade || '',
+            plano: lead.plano || '',
+            ...((lead.metadata && typeof lead.metadata === 'object') ? lead.metadata : {}),
+        };
+    } catch (_) {}
+}
+
+async function flowSimReplayRefreshRecent() {
+    const runSel = document.getElementById('flow-sim-replay-run-select');
+    const leadSel = document.getElementById('flow-sim-replay-lead-select');
+    if (!runSel || !leadSel) return;
+    runSel.innerHTML = '<option value="">A carregar runs…</option>';
+    leadSel.innerHTML = '<option value="">A carregar leads…</option>';
+    try {
+        const [runsRes, leadsRes] = await Promise.all([
+            fetch(`${API}/api/flows/runs?limit=40`),
+            fetch(`${API}/api/leads?sort=priority`),
+        ]);
+        const runsJson = runsRes.ok ? await runsRes.json() : { ok: false };
+        const leadsJson = leadsRes.ok ? await leadsRes.json() : [];
+        const runs = Array.isArray(runsJson.runs) ? runsJson.runs : [];
+        const leads = Array.isArray(leadsJson) ? leadsJson : [];
+        runSel.innerHTML = '<option value="">— Escolha uma run —</option>';
+        runs.forEach((r) => {
+            const o = document.createElement('option');
+            o.value = String(r.id);
+            o.textContent = `Run #${r.id} · Lead ${r.lead_id ?? '—'} · ${r.status || 'unknown'}`;
+            runSel.appendChild(o);
+        });
+        leadSel.innerHTML = '<option value="">— Escolha um lead —</option>';
+        leads.slice(0, 120).forEach((l) => {
+            const o = document.createElement('option');
+            o.value = String(l.id);
+            o.textContent = `${l.nome || 'Lead'} (#${l.id})`;
+            leadSel.appendChild(o);
+        });
+    } catch (_) {
+        runSel.innerHTML = '<option value="">Falha ao carregar runs</option>';
+        leadSel.innerHTML = '<option value="">Falha ao carregar leads</option>';
+    }
+}
+
+async function flowSimReplayLoadByRunId(runId) {
+    const [runRes, evRes] = await Promise.all([
+        fetch(`${API}/api/flows/runs/${runId}`),
+        fetch(`${API}/api/flows/runs/${runId}/events`),
+    ]);
+    const runJson = await runRes.json();
+    const evJson = await evRes.json();
+    if (!runRes.ok || !runJson.ok) throw new Error(runJson.error || 'run_not_found');
+    if (!evRes.ok || !evJson.ok) throw new Error(evJson.error || 'run_events_not_found');
+    return {
+        run: runJson.run || {},
+        events: Array.isArray(evJson.events) ? evJson.events : [],
+    };
+}
+
+async function flowSimReplayRun(run, events) {
+    let prevNodeId = null;
+    let criticalNodeId = null;
+    for (let i = 0; i < events.length && _flowSimState.running; i++) {
+        const evt = events[i] || {};
+        const nodeId = flowSimReplayResolveNodeIdFromPayload(evt.payload);
+        if (nodeId) {
+            flowSimClearSimTraceImmediate();
+            flowSimSetActiveNode(nodeId);
+            const edge = flowSimReplayFindEdgeByNodes(prevNodeId, nodeId);
+            if (edge) flowSimSetSimTrace(edge.id);
+            prevNodeId = nodeId;
+        }
+        const msg = flowSimReplayResolveChatFromEvent(evt);
+        if (msg) {
+            flowSimChatAppend(msg.kind, flowSimSubstituteVars(msg.text, _flowSimState.lead));
+        } else {
+            const t = String(evt.event_type || '').trim();
+            if (t) flowSimChatAppend('sys', `[${t}]`);
+        }
+        if (flowSimReplayIsCriticalEvent(evt)) {
+            criticalNodeId = nodeId || prevNodeId;
+            break;
+        }
+        await flowSimDelay(1500);
+    }
+    if (!criticalNodeId) {
+        const st = String((run && run.status) || '').toLowerCase();
+        if (/erro|error|fail|stuck|trav/.test(st)) criticalNodeId = prevNodeId || _flowSimState.currentNodeId;
+        if (!criticalNodeId && prevNodeId && !flowSimOutgoingEdges(prevNodeId).length && !/done|ok|completed|success|final/.test(st)) {
+            criticalNodeId = prevNodeId;
+        }
+    }
+    if (criticalNodeId) {
+        flowSimSetCriticalNode(criticalNodeId);
+        flowSimChatAppend('sys', '🛑 O lead travou neste ponto');
+    }
+}
+
+async function flowSimReplayStart(runId, leadIdHint) {
+    flowSimResetHard();
+    flowSimSetMode('replay');
+    const chat = document.getElementById('flow-simulator-chat');
+    if (chat) {
+        chat.classList.remove('hidden');
+        chat.removeAttribute('hidden');
+        chat.setAttribute('aria-hidden', 'false');
+    }
+    const box = document.getElementById('flow-sim-messages');
+    if (box) box.innerHTML = '';
+    const payload = await flowSimReplayLoadByRunId(runId);
+    const run = payload.run || {};
+    const events = Array.isArray(payload.events) ? payload.events : [];
+    _flowSimState.replay = {
+        runId: Number(runId),
+        events,
+        leadId: run.lead_id || leadIdHint || null,
+        stopNodeId: null,
+    };
+    if (_flowSimState.replay.leadId) {
+        await flowSimReplayResolveLeadData(_flowSimState.replay.leadId);
+    }
+    _flowSimState.running = true;
+    flowSimChatAppend('sys', `Replay Run #${runId} · Lead ${_flowSimState.replay.leadId ?? '—'}`);
+    try {
+        await flowSimReplayRun(run, events);
+    } finally {
+        _flowSimState.running = false;
+        flowSimSetNextVisible(false);
+    }
+}
+
+async function flowSimReplayStartFromModal() {
+    const runSel = document.getElementById('flow-sim-replay-run-select');
+    const leadSel = document.getElementById('flow-sim-replay-lead-select');
+    const leadInp = document.getElementById('flow-sim-replay-lead-id');
+    const runId = runSel && runSel.value ? Number(runSel.value) : null;
+    const leadId = leadInp && leadInp.value ? Number(leadInp.value) : leadSel && leadSel.value ? Number(leadSel.value) : null;
+    try {
+        let runToUse = runId;
+        if (!runToUse && leadId) {
+            const res = await fetch(`${API}/api/flows/runs?limit=80`);
+            const j = await res.json();
+            const runs = Array.isArray(j.runs) ? j.runs : [];
+            const hit = runs.find((r) => r && Number(r.lead_id) === Number(leadId));
+            if (!hit) throw new Error('Nenhuma run encontrada para este lead.');
+            runToUse = Number(hit.id);
+        }
+        if (!runToUse) {
+            toast('Selecione uma run ou informe um ID de lead.', 'amber');
+            return;
+        }
+        flowSimReplayCloseModal();
+        await flowSimReplayStart(runToUse, leadId);
+    } catch (e) {
+        toast(e && e.message ? e.message : 'Falha ao iniciar replay.', 'rose');
+    }
+}
+
 function flowSimTakeFirstOutgoing(nodeId) {
     const edges = flowSimOutgoingEdges(nodeId);
     if (!edges.length) return null;
@@ -8577,6 +8881,10 @@ function flowSimWaitUserLine() {
 }
 
 function flowSimSendChat() {
+    if (_flowSimState.mode === 'replay') {
+        toast('Replay diagnóstico: entrada manual está desativada.', 'amber');
+        return;
+    }
     const inp = document.getElementById('flow-sim-input');
     if (!inp) return;
     const v = String(inp.value || '').trim();
@@ -8763,6 +9071,7 @@ function flowLocalSimulatorOpen() {
         toast('Abra o Flow Builder para simular.', 'amber');
         return;
     }
+    flowSimSetMode('simulate');
     flowSimPersonaSelectRefresh();
     const sel = document.getElementById('flow-sim-persona-select');
     const list = flowSimPersonasLoad();
@@ -8790,6 +9099,7 @@ function flowSimLeadCancel() {
 }
 
 function flowSimLeadStart() {
+    flowSimSetMode('simulate');
     const sel = document.getElementById('flow-sim-persona-select');
     _flowSimState.selectedPersonaId = sel && sel.value ? String(sel.value) : null;
     _flowSimState.lead = flowSimCollectLeadFromModal();
@@ -8840,6 +9150,8 @@ function flowSimResetHard() {
     flowSimSetNextVisible(false);
     flowSimClearActiveNode();
     flowSimClearSimTraceImmediate();
+    flowSimClearCriticalNode();
+    _flowSimState.replay = { runId: null, events: [], leadId: null, stopNodeId: null };
 }
 
 function flowSimReset() {
@@ -8851,6 +9163,7 @@ function flowSimReset() {
 
 function flowSimulatorClosePanel() {
     flowSimResetHard();
+    flowSimReplayCloseModal();
     const chat = document.getElementById('flow-simulator-chat');
     if (chat) {
         chat.classList.add('hidden');
