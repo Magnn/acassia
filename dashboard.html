@@ -1659,6 +1659,108 @@
         .flow-inspector-ai__switch input:checked + .flow-inspector-ai__switch-slider::before {
             transform: translateX(16px);
         }
+        /* Inspector — Condição / Rule Builder (Missão 5.2) */
+        .flow-inspector-cond {
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, #fafbfc 0%, #f4f4f5 100%);
+            padding: 10px 10px 8px;
+            margin: 0 0 10px;
+        }
+        .flow-inspector-cond__logic {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+        }
+        .flow-inspector-cond__logic label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #475569;
+        }
+        .flow-inspector-cond__logic select {
+            flex: 1;
+            min-width: 0;
+            padding: 6px 8px;
+            font-size: 11px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #0f172a;
+        }
+        .flow-inspector-cond__rules {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .flow-cond-rule-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 6px;
+            align-items: start;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #e8ecf1;
+            background: #fff;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+        }
+        .flow-cond-rule-row__grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(88px, 0.75fr) minmax(0, 1fr);
+            gap: 6px;
+            align-items: stretch;
+        }
+        @media (max-width: 520px) {
+            .flow-cond-rule-row__grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .flow-inspector-cond__op {
+            width: 100%;
+            padding: 6px 5px;
+            font-size: 10px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #334155;
+        }
+        .flow-cond-rule-row .flow-var-field-inner .input-field {
+            font-size: 10px;
+            padding: 6px 7px;
+        }
+        .flow-inspector-cond__btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .flow-inspector-cond__btn-row button {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 7px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #475569;
+            cursor: pointer;
+            transition: border-color 0.15s ease, color 0.15s ease;
+        }
+        .flow-inspector-cond__btn-row button:hover {
+            border-color: rgba(99, 102, 241, 0.45);
+            color: #4338ca;
+        }
+        .flow-inspector-cond__btn-row button.flow-inspector-cond__btn--danger:hover {
+            border-color: rgba(225, 29, 72, 0.45);
+            color: #be123c;
+        }
+        .flow-inspector-cond__legacy {
+            font-size: 9px;
+            color: #94a3b8;
+            margin: 6px 0 0;
+            line-height: 1.35;
+        }
         .flow-node-head[title] {
             cursor: grab;
         }
@@ -5440,6 +5542,17 @@ const FLOW_INSPECTOR_AI_MODELS = [
     { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
     { value: 'gemini-1.5-pro', label: 'Gemini Pro' },
 ];
+/** Operadores do Rule Builder — Condição (Missão 5.2) */
+const FLOW_COND_OPERATORS = [
+    { value: 'eq', label: 'Igual a' },
+    { value: 'ne', label: 'Diferente de' },
+    { value: 'contains', label: 'Contém' },
+    { value: 'not_contains', label: 'Não contém' },
+    { value: 'gt', label: 'Maior que' },
+    { value: 'lt', label: 'Menor que' },
+    { value: 'empty', label: 'Está vazio' },
+    { value: 'not_empty', label: 'Não está vazio' },
+];
 const FLOW_PERGUNTA_MODOS = [
     { value: 'texto_livre', label: 'Resposta em texto livre' },
     { value: 'lista_opcoes', label: 'Lista de opções (estilo WhatsApp)' },
@@ -7043,6 +7156,8 @@ function flowHumanizeInspectorKey(k) {
         ai_temperature: 'Temperatura (IA)',
         ai_output_var: 'Variável de saída (IA)',
         ai_memory: 'Memória curta (IA)',
+        rules: 'Regras (condição)',
+        logic: 'Lógica global (condição)',
     };
     const s = String(k || '');
     if (map[s]) return map[s];
@@ -7228,6 +7343,152 @@ function applyFlowInspectorAiBrain() {
     requestFlowAutoSave();
 }
 
+function flowInspectorCondRuleRowHtml(rule) {
+    const v = flowEsc(String(rule.var ?? ''));
+    const val = flowEsc(String(rule.val ?? ''));
+    const op = String(rule.op || 'eq');
+    const known = new Set(FLOW_COND_OPERATORS.map((x) => x.value));
+    let opHtml = flowOptsHtmlSelected(FLOW_COND_OPERATORS, 'value', 'label', op);
+    if (op && !known.has(op)) {
+        opHtml += `<option value="${flowEsc(op)}" selected>${flowEsc(op)} (legado)</option>`;
+    }
+    const valDisabled = op === 'empty' || op === 'not_empty';
+    return `
+        <div class="flow-cond-rule-row" data-flow-cond-rule="1">
+            <div class="flow-cond-rule-row__grid">
+                <input type="text" class="input-field flow-cond-rule-var" data-flow-cond-field="var" value="${v}" placeholder="Variável (ex: lead.nome)" autocomplete="off" />
+                <select class="flow-inspector-cond__op" data-flow-cond-field="op" autocomplete="off">${opHtml}</select>
+                <input type="text" class="input-field flow-cond-rule-val" data-flow-cond-field="val" value="${val}" placeholder="Valor" autocomplete="off"${valDisabled ? ' disabled' : ''} data-flow-var-skip="${valDisabled ? '1' : '0'}" />
+            </div>
+            <button type="button" class="flow-inspector-cond__btn--remove" onclick="flowInspectorCondRemoveRule(this)" title="Remover regra" aria-label="Remover regra" style="align-self:stretch;min-width:32px;padding:4px;border-radius:6px;border:1px solid #e8ecf1;background:#fafbfc;color:#64748b;cursor:pointer"><i class="fas fa-times"></i></button>
+        </div>`;
+}
+
+function flowInspectorCondBindOpListeners(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('[data-flow-cond-field="op"]').forEach((sel) => {
+        const sync = () => {
+            const row = sel.closest('[data-flow-cond-rule]');
+            const valInp = row && row.querySelector('[data-flow-cond-field="val"]');
+            if (!valInp) return;
+            const o = String(sel.value || '');
+            const hide = o === 'empty' || o === 'not_empty';
+            valInp.disabled = !!hide;
+            valInp.setAttribute('data-flow-var-skip', hide ? '1' : '0');
+            if (hide) valInp.value = '';
+        };
+        sel.addEventListener('change', sync);
+        sync();
+    });
+}
+
+function flowInspectorRenderCondicao(meta, cfg, bodyEl) {
+    const body = bodyEl || flowGetInspectorBodyEl();
+    if (!body) return;
+    const safeId = String(meta.id || 'n').replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
+    const logic = String(cfg.logic || 'AND').toUpperCase() === 'OR' ? 'OR' : 'AND';
+    let rules = Array.isArray(cfg.rules) ? cfg.rules.slice() : [];
+    if (!rules.length) rules = [{ var: '', op: 'eq', val: '' }];
+    const ruleHtml = rules.map((r) => flowInspectorCondRuleRowHtml(r)).join('');
+    const exprLegacy = String(cfg.expression || '').trim();
+    const legacyNote = exprLegacy
+        ? `<p class="flow-inspector-cond__legacy">Expressão legada no JSON conservada. Com <strong>regras</strong> preenchidas, o simulador usa o Rule Builder; sem regras, mantém o modo interativo (sim/não) sobre a expressão.</p>`
+        : '';
+    const tt = flowEsc(String(cfg.true_to ?? ''));
+    const ft = flowEsc(String(cfg.false_to ?? ''));
+    body.innerHTML = `
+        <div class="flow-inspector-meta"><span class="flow-inspector-kind">${flowEsc(meta.typ)}</span> · <code class="flow-tech-id">${flowEsc(meta.id)}</code> · entradas ${meta.incom} · saídas ${meta.outgo}</div>
+        <div class="flow-inspector-cond">
+            <div class="flow-inspector-cond__logic">
+                <label for="flow-cond-logic-${safeId}">Lógica global</label>
+                <select id="flow-cond-logic-${safeId}" data-flow-cond-logic="1" autocomplete="off">
+                    <option value="AND" ${logic === 'AND' ? 'selected' : ''}>AND (todas as regras)</option>
+                    <option value="OR" ${logic === 'OR' ? 'selected' : ''}>OR (qualquer regra)</option>
+                </select>
+            </div>
+            <div class="flow-inspector-cond__rules" id="flow-cond-rules-list">${ruleHtml}</div>
+            <div class="flow-inspector-cond__btn-row">
+                <button type="button" onclick="flowInspectorCondAddRule(this)"><i class="fas fa-plus"></i> Nova regra</button>
+            </div>
+            ${legacyNote}
+            <label class="kpi-label" style="margin-top:10px">Encaminhar para nó (opcional)</label>
+            <input type="text" class="input-field" data-flow-inspector-key="true_to" value="${tt}" placeholder="ID destino se VERDADEIRO" style="width:100%;padding:7px;font-size:11px;margin-bottom:6px" autocomplete="off" />
+            <input type="text" class="input-field" data-flow-inspector-key="false_to" value="${ft}" placeholder="ID destino se FALSO" style="width:100%;padding:7px;font-size:11px" autocomplete="off" />
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;padding-top:10px;border-top:1px solid var(--c-border)">
+            <button type="button" class="btn btn-primary" style="flex:1;font-size:11px;font-weight:600" onclick="applyFlowInspectorFormConfig()"><i class="fas fa-check"></i> Aplicar ao bloco</button>
+            <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px" onclick="openRawFlowInspectorJson()" title="Editar JSON cru"><i class="fas fa-code"></i></button>
+        </div>
+    `;
+    flowEnhanceInspectorVariableButtons(body);
+    flowInspectorCondBindOpListeners(body);
+}
+
+function flowInspectorCondAddRule(btn) {
+    const cond = btn && btn.closest('.flow-inspector-cond');
+    const list = cond ? cond.querySelector('#flow-cond-rules-list') : null;
+    if (!list) return;
+    list.insertAdjacentHTML('beforeend', flowInspectorCondRuleRowHtml({ var: '', op: 'eq', val: '' }));
+    const body = btn.closest('.flow-node-inspector-body');
+    flowEnhanceInspectorVariableButtons(body);
+    flowInspectorCondBindOpListeners(body);
+}
+
+function flowInspectorCondRemoveRule(btn) {
+    const row = btn && btn.closest('[data-flow-cond-rule]');
+    const list = row && row.parentElement;
+    if (!list || !row) return;
+    if (list.querySelectorAll('[data-flow-cond-rule]').length <= 1) {
+        toast('Mantenha pelo menos uma linha de regra.', 'amber');
+        return;
+    }
+    row.remove();
+}
+
+function applyFlowInspectorCondicao() {
+    const nodeId = _flowSelectedNodeId;
+    const node = nodeId ? flowCanvasNodeById(nodeId) : null;
+    if (!node || String(node.getAttribute('data-node-type') || '') !== 'condicao') return;
+    let obj = {};
+    try {
+        obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
+    } catch (_) {}
+    if (typeof obj !== 'object' || obj === null) obj = {};
+    const wrap = node.querySelector('.flow-node-inspector-body');
+    if (!wrap) return;
+    const logicEl = wrap.querySelector('[data-flow-cond-logic="1"]');
+    if (logicEl) obj.logic = String(logicEl.value || 'AND').toUpperCase() === 'OR' ? 'OR' : 'AND';
+    const rules = [];
+    wrap.querySelectorAll('[data-flow-cond-rule]').forEach((row) => {
+        const vr = row.querySelector('[data-flow-cond-field="var"]');
+        const op = row.querySelector('[data-flow-cond-field="op"]');
+        const vl = row.querySelector('[data-flow-cond-field="val"]');
+        if (!vr || !op) return;
+        rules.push({
+            var: String(vr.value || '').trim(),
+            op: String(op.value || 'eq'),
+            val: vl && !vl.disabled ? String(vl.value || '') : '',
+        });
+    });
+    obj.rules = rules;
+    wrap.querySelectorAll('[data-flow-inspector-key]').forEach((el) => {
+        const k = el.getAttribute('data-flow-inspector-key');
+        if (!k) return;
+        const raw = String(el.value || '').trim();
+        if (!raw) {
+            delete obj[k];
+            return;
+        }
+        obj[k] = raw;
+    });
+    try {
+        node.setAttribute('data-flow-config', JSON.stringify(obj));
+    } catch (_) {}
+    pushFlowHistory();
+    toast('Regras de condição guardadas.', 'emerald');
+    requestFlowAutoSave();
+}
+
 function applyFlowInspectorFormConfig() {
     if (_flowSelectedEdgeId) {
         const body = document.getElementById('flow-inspector-body');
@@ -7241,6 +7502,10 @@ function applyFlowInspectorFormConfig() {
     if (!node) return;
     if (String(node.getAttribute('data-node-type') || '') === 'gpt') {
         applyFlowInspectorAiBrain();
+        return;
+    }
+    if (String(node.getAttribute('data-node-type') || '') === 'condicao') {
+        applyFlowInspectorCondicao();
         return;
     }
     let obj = {};
@@ -7632,6 +7897,12 @@ async function openFlowInspector(nodeEl) {
     }
     if (typ === 'gpt') {
         flowInspectorRenderGpt({ typ, title, incom, outgo, id }, cfg, bodyEl);
+        redrawFlowEdges();
+        updateFlowMinimap();
+        return;
+    }
+    if (typ === 'condicao') {
+        flowInspectorRenderCondicao({ typ, title, incom, outgo, id }, cfg, bodyEl);
         redrawFlowEdges();
         updateFlowMinimap();
         return;
@@ -9281,6 +9552,61 @@ function flowSimPickDivisaoEdge(nodeId, cfg) {
     return { edge: edges[last], branchLabel: simLabels[last] || 'Ramo' };
 }
 
+function flowSimResolveCondOperand(raw, L) {
+    const s = String(raw ?? '').trim();
+    if (!s) return '';
+    const tpl = s.indexOf('{{') >= 0 ? s : '{{' + s + '}}';
+    return flowSimSubstituteVars(tpl, L);
+}
+
+function flowSimEvaluateCondOneRule(rule, L) {
+    const op = String(rule.op || 'eq');
+    const left = flowSimResolveCondOperand(rule.var, L);
+    const right = flowSimResolveCondOperand(rule.val, L);
+    switch (op) {
+        case 'eq':
+            return flowSimNormalize(left) === flowSimNormalize(right);
+        case 'ne':
+            return flowSimNormalize(left) !== flowSimNormalize(right);
+        case 'contains':
+            return flowSimNormalize(left).includes(flowSimNormalize(right));
+        case 'not_contains':
+            return !flowSimNormalize(left).includes(flowSimNormalize(right));
+        case 'gt': {
+            const a = parseFloat(String(left).replace(/\s/g, '').replace(',', '.'));
+            const b = parseFloat(String(right).replace(/\s/g, '').replace(',', '.'));
+            return Number.isFinite(a) && Number.isFinite(b) && a > b;
+        }
+        case 'lt': {
+            const a = parseFloat(String(left).replace(/\s/g, '').replace(',', '.'));
+            const b = parseFloat(String(right).replace(/\s/g, '').replace(',', '.'));
+            return Number.isFinite(a) && Number.isFinite(b) && a < b;
+        }
+        case 'empty':
+            return String(left).trim() === '';
+        case 'not_empty':
+            return String(left).trim() !== '';
+        default:
+            return false;
+    }
+}
+
+function flowSimEvaluateCondicaoRulesDetailed(cfg, L) {
+    const rulesAll = Array.isArray(cfg.rules) ? cfg.rules : [];
+    const rules = rulesAll.filter((r) => String(r && r.var != null ? r.var : '').trim() !== '');
+    if (!rules.length) return { hasRules: false, pass: false, logic: 'AND', parts: [] };
+    const logic = String(cfg.logic || 'AND').toUpperCase() === 'OR' ? 'OR' : 'AND';
+    const parts = rules.map((r) => ({
+        ok: flowSimEvaluateCondOneRule(r, L),
+        var: r.var,
+        op: r.op,
+    }));
+    let pass;
+    if (logic === 'OR') pass = parts.some((p) => p.ok);
+    else pass = parts.every((p) => p.ok);
+    return { hasRules: true, pass, logic, parts };
+}
+
 function flowSimPickCondicaoBranch(nodeId, choiceSim) {
     const el = flowCanvasNodeById(nodeId);
     const cfg = el ? flowSimReadNodeConfig(el) : {};
@@ -9384,6 +9710,16 @@ async function flowSimulateStep(nodeId) {
     }
 
     if (type === 'condicao') {
+        const ev = flowSimEvaluateCondicaoRulesDetailed(cfg, L);
+        if (ev.hasRules) {
+            const detail = ev.parts.map((p, i) => `${i + 1}:${p.ok ? '✓' : '✗'}`).join(' ');
+            flowSimChatAppend(
+                'sys',
+                `Rule Builder (${ev.logic}): ${ev.pass ? 'VERDADEIRO' : 'FALSO'}. ${detail}`,
+            );
+            await flowSimDelay(160);
+            return flowSimPickCondicaoBranch(nodeId, ev.pass);
+        }
         const exprDisp = flowSimSubstituteVars(cfg.expression || '', L);
         await flowSimAppendBotWithTyping(
             exprDisp ? 'Condição: ' + exprDisp : 'Condição (responda sim/não ou uma palavra que coincida com a legenda da aresta)',
@@ -12459,7 +12795,7 @@ function flowDefaultConfigByType(type) {
     if (t === 'pergunta') return { question: '', reply_mode: 'texto_livre' };
     if (t === 'acao') return { action_kind: 'mensagem_texto', payload: '' };
     if (t === 'delay') return { seconds: 3 };
-    if (t === 'condicao') return { expression: '' };
+    if (t === 'condicao') return { logic: 'AND', rules: [], expression: '', true_to: '', false_to: '' };
     if (t === 'expediente') return { timezone: 'America/Sao_Paulo', windows: '' };
     if (t === 'notificar') return { channel: 'log', message: '' };
     if (t === 'divisao') return { weights: 'A:50,B:50' };
@@ -12759,20 +13095,9 @@ function addSpecificNode(type, pos) {
             <textarea class="input-field" data-flow-cfg="question" placeholder="Texto da pergunta ou lista (uma linha por opção)" style="${ta};height:50px"></textarea>`;
     } else if (type === 'condicao') {
         bodyFields = `
-            ${fh('Branching (Zapier paths): variáveis do contexto; ligue dois fios no canvas para ramos sim/não.')}
+            ${fh('Regras lógicas (AND/OR), variáveis e operadores — configure no inspetor. Ligue duas arestas de saída (verdadeiro / falso).')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
-            <div class="flow-snippet-row">
-                <button type="button" onclick="flowCondicaoSnippet(this,'lead.')">lead.</button>
-                <button type="button" onclick="flowCondicaoSnippet(this,'resposta')">resposta</button>
-                <button type="button" onclick="flowCondicaoSnippet(this,'==')">==</button>
-                <button type="button" onclick="flowCondicaoSnippet(this,'!=')">!=</button>
-                <button type="button" onclick="flowCondicaoSnippet(this,'>')">&gt;</button>
-                <button type="button" onclick="flowCondicaoSnippet(this,'<')">&lt;</button>
-                <button type="button" onclick="flowCondicaoSnippet(this,'contem(')">contem(</button>
-            </div>
-            <textarea class="input-field" data-flow-cfg="expression" placeholder="Ex: lead.score &gt; 70  ·  resposta == &quot;sim&quot;" style="${ta};height:46px"></textarea>
-            <input type="text" data-flow-cfg="true_to" placeholder="ID nó se verdadeiro (opcional)" class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="false_to" placeholder="ID nó se falso (opcional)" class="input-field" style="${fs}">`;
+            <p style="font-size:10px;color:var(--c-muted);margin:0;line-height:1.45">Abra o inspetor para o <strong>Rule Builder</strong>: linhas de regra, operadores e lógica global. O JSON usa <code style="font-size:9px">rules</code> e <code style="font-size:9px">logic</code>.</p>`;
     } else if (type === 'divisao') {
         bodyFields = `
             ${fh('A/B (Optimizely): pesos; ligue um fio por variante a partir deste bloco.')}

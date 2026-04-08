@@ -101,7 +101,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Condição",
         "runtime": "branch",
         "required_config": (),
-        "optional_keys": ("expression", "true_to", "false_to"),
+        "optional_keys": ("expression", "true_to", "false_to", "rules", "logic"),
     },
     "expediente": {
         "label": "Expediente",
