@@ -467,6 +467,14 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     # 2. Decisão de Pista
     tem_bagagem = any(g in msg_lower for g in _GATILHOS_DINAMICOS)
     is_basic = not tem_bagagem and len(msg_lower.split()) <= 4
+    # Cenário objetivo: "já salvei" + "me chamo" no mesmo pacote.
+    # Não vale custo de IA; segue trilha curta/padrão para reduzir latência.
+    contexto_objetivo_contato_nome = bool(
+        texto_indica_contato_salvo(blob_sessao)
+        and re.search(r"(?i)\b(me\s+chamo|meu\s+nome\s+[eé]|sou\s+[oa])\b", blob_sessao)
+    )
+    if contexto_objetivo_contato_nome:
+        is_basic = True
     node1_baloes_enviados = int(meta.get("node1_baloes_enviados", 0) or 0)
     modo_curto_pos_node1 = node1_baloes_enviados >= 3
 
