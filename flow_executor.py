@@ -129,6 +129,9 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
                 ak = str(cfg.get("action_kind") or "").strip()
                 if ak:
                     meta["action_kind"] = ak
+                rm = str(cfg.get("reply_mode") or "").strip()
+                if rm:
+                    meta["reply_mode"] = rm
                 acoes.append(Acao(tipo="text", conteudo=body[:4000], metadata=meta))
             continue
 
@@ -184,7 +187,11 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
         if rk == "tts":
             script = str(cfg.get("script") or cfg.get("body") or cfg.get("step_name") or "").strip()
             if script:
-                acoes.append(Acao(tipo="tts", tts_template=script[:2000], metadata={"source": "flow_builder", "node_type": ntype}))
+                tmeta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype}
+                vp = str(cfg.get("voice_profile") or "").strip()
+                if vp:
+                    tmeta["voice_profile"] = vp[:64]
+                acoes.append(Acao(tipo="tts", tts_template=script[:2000], metadata=tmeta))
             continue
 
         if rk == "llm":
@@ -196,11 +203,16 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
                 or ""
             ).strip()
             if prompt:
+                lmeta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype, "runtime": "llm"}
+                for key in ("model", "temperature"):
+                    v = cfg.get(key)
+                    if v is not None and str(v).strip() != "":
+                        lmeta[key] = str(v).strip()[:64]
                 acoes.append(
                     Acao(
                         tipo="text",
                         conteudo=prompt[:4000],
-                        metadata={"source": "flow_builder", "node_type": ntype, "runtime": "llm"},
+                        metadata=lmeta,
                     )
                 )
             continue

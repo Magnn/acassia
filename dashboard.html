@@ -1068,6 +1068,32 @@
             font-size: 11px; color: var(--c-muted2);
             display: flex; align-items: center; gap: 6px;
         }
+        .flow-field-hint {
+            font-size: 9px;
+            color: var(--c-muted2);
+            line-height: 1.4;
+            margin: -2px 0 8px;
+        }
+        .flow-delay-presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 0 0 8px;
+        }
+        .flow-delay-presets button {
+            font-size: 9px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--c-border);
+            background: var(--c-surface2);
+            color: var(--c-muted);
+            cursor: pointer;
+        }
+        .flow-delay-presets button:hover {
+            border-color: var(--c-purple);
+            color: var(--c-text);
+        }
         .conn-dot {
             position: absolute; top: 50%; transform: translateY(-50%);
             width: 14px; height: 14px; border-radius: 50%;
@@ -3808,6 +3834,66 @@ const FLOW_ACTION_KIND_OPTIONS = [
     { value: 'personalizado', label: 'Personalizado (instrução livre)' },
 ];
 
+/** Padrões de mercado (n8n / Botpress / WhatsApp): canal, evento, canais de alerta, TZ, modelos */
+const FLOW_MARKET_INTEGRATIONS = [
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'web', label: 'Web / widget' },
+    { value: 'email', label: 'Email' },
+];
+const FLOW_TRIGGER_EVENTS = [
+    { value: 'mensagem_recebida', label: 'Mensagem recebida' },
+    { value: 'palavra_chave', label: 'Palavra-chave / gatilho' },
+    { value: 'primeiro_contato', label: 'Primeiro contacto' },
+    { value: 'clique_botao', label: 'Resposta a botão / lista' },
+    { value: 'status_entrega', label: 'Status de entrega (lido)' },
+    { value: 'webhook_externo', label: 'Webhook externo' },
+];
+const FLOW_WEBHOOK_METHODS = ['GET', 'POST', 'PUT', 'PATCH'];
+const FLOW_NOTIFY_CHANNELS = [
+    { value: 'log', label: 'Log / debug (consola)' },
+    { value: 'email', label: 'Email' },
+    { value: 'slack', label: 'Slack' },
+    { value: 'teams', label: 'Microsoft Teams' },
+    { value: 'webhook', label: 'Webhook HTTP' },
+];
+const FLOW_TIMEZONES = ['America/Sao_Paulo', 'America/Fortaleza', 'America/Manaus', 'America/Recife', 'Europe/Lisbon', 'UTC'];
+const FLOW_GPT_MODELS = [
+    { value: 'gpt-4o-mini', label: 'GPT-4o mini (rápido)' },
+    { value: 'gpt-4o', label: 'GPT-4o' },
+    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+];
+const FLOW_PERGUNTA_MODOS = [
+    { value: 'texto_livre', label: 'Resposta em texto livre' },
+    { value: 'lista_opcoes', label: 'Lista de opções (estilo WhatsApp)' },
+    { value: 'botoes', label: 'Botões rápidos' },
+];
+const FLOW_VOICE_PROFILES = [
+    { value: 'padrao', label: 'Voz padrão' },
+    { value: 'neutra', label: 'Neutra / institucional' },
+    { value: 'calorosa', label: 'Calorosa / próxima' },
+];
+
+function flowOptsHtml(items, valueKey, labelKey) {
+    return items.map((o) => `<option value="${String(o[valueKey]).replace(/"/g, '&quot;')}">${String(o[labelKey]).replace(/</g, '')}</option>`).join('');
+}
+
+/** Ajusta segundos no bloco Delay (presets tipo ManyChat / Dialogflow) */
+function flowDelayPresetClick(btn, seconds) {
+    const node = btn && btn.closest ? btn.closest('.flow-node') : null;
+    if (!node) return;
+    const inp = node.querySelector('[data-flow-cfg="seconds"]');
+    if (inp) {
+        inp.value = String(seconds);
+        try {
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+        } catch (_) {}
+    }
+    try {
+        pushFlowHistory();
+    } catch (_) {}
+}
+
 /** Ligações estruturadas + modo conectar (saída → entrada) */
 let _flowEdges = [];
 let _flowConnectSource = null;
@@ -5009,7 +5095,7 @@ function hydrateFlowNodeInputsFromConfig() {
             const k = inp.getAttribute('data-flow-cfg');
             if (!k || cfg[k] === undefined || cfg[k] === null) return;
             inp.value = String(cfg[k]);
-            if (inp.tagName === 'SELECT' && k === 'action_kind') {
+            if (inp.tagName === 'SELECT') {
                 const ok = Array.from(inp.options).some((o) => o.value === inp.value);
                 if (!ok && inp.value) {
                     const opt = document.createElement('option');
@@ -8119,21 +8205,21 @@ function closeNodeMenu() {
 function flowDefaultConfigByType(type) {
     const t = String(type || 'generic');
     if (t === 'trigger') return { integration: 'whatsapp', event: 'mensagem_recebida' };
-    if (t === 'webhook') return { path: '/webhook/entrada' };
+    if (t === 'webhook') return { path: '/webhook/entrada', method: 'POST' };
     if (t === 'engine' || t === 'nucleo_ia') return { body: '' };
     if (t === 'motor_ref') return { module_hint: '' };
     if (t === 'conteudo') return { body: '', contents: [] };
-    if (t === 'pergunta') return { question: '' };
+    if (t === 'pergunta') return { question: '', reply_mode: 'texto_livre' };
     if (t === 'acao') return { action_kind: 'mensagem_texto', payload: '' };
     if (t === 'delay') return { seconds: 3 };
     if (t === 'condicao') return { expression: '' };
     if (t === 'expediente') return { timezone: 'America/Sao_Paulo', windows: '' };
     if (t === 'notificar') return { channel: 'log', message: '' };
     if (t === 'divisao') return { weights: 'A:50,B:50' };
-    if (t === 'api') return { method: 'GET', url: '' };
-    if (t === 'gpt') return { prompt: '' };
-    if (t === 'agente_ia') return { instructions: '' };
-    if (t === 'voice_studio') return { script: '' };
+    if (t === 'api') return { method: 'GET', url: '', headers: '', body: '' };
+    if (t === 'gpt') return { prompt: '', model: 'gpt-4o-mini', temperature: '0.7' };
+    if (t === 'agente_ia') return { instructions: '', model: 'gpt-4o-mini', temperature: '0.5' };
+    if (t === 'voice_studio') return { script: '', voice_profile: 'padrao' };
     if (t === 'anotacao') return { note: '' };
     return {};
 }
@@ -8172,100 +8258,151 @@ function addSpecificNode(type) {
 
     const fs = 'width:100%;margin-bottom:8px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
     const ta = 'width:100%;resize:none;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
+    const fh = (t) => `<div class="flow-field-hint">${t}</div>`;
+    const integOpts = flowOptsHtml(FLOW_MARKET_INTEGRATIONS, 'value', 'label');
+    const evOpts = flowOptsHtml(FLOW_TRIGGER_EVENTS, 'value', 'label');
+    const whMethodOpts = FLOW_WEBHOOK_METHODS.map((m) => `<option value="${m}">${m}</option>`).join('');
+    const notifyOpts = flowOptsHtml(FLOW_NOTIFY_CHANNELS, 'value', 'label');
+    const tzOpts = FLOW_TIMEZONES.map((z) => `<option value="${z.replace(/"/g, '&quot;')}">${z}</option>`).join('');
+    const gptModelOpts = flowOptsHtml(FLOW_GPT_MODELS, 'value', 'label');
+    const perguntaModoOpts = flowOptsHtml(FLOW_PERGUNTA_MODOS, 'value', 'label');
+    const voiceProfOpts = flowOptsHtml(FLOW_VOICE_PROFILES, 'value', 'label');
     let bodyFields = '';
     if (type === 'trigger') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do gatilho..." class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="integration" placeholder="Integração (ex: whatsapp)" class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="event" placeholder="Evento (ex: mensagem_recebida)" class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="keyword" placeholder="Palavra-chave (opcional)" class="input-field" style="${fs}">`;
+            ${fh('Mercado: um único ponto de entrada por canal (WhatsApp, web, etc.). Ligue o ● direito ao próximo bloco.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome interno do gatilho…" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Canal</label>
+            <select data-flow-cfg="integration" class="input-field" style="${fs}">${integOpts}</select>
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Tipo de evento</label>
+            <select data-flow-cfg="event" class="input-field" style="${fs}">${evOpts}</select>
+            <input type="text" data-flow-cfg="keyword" placeholder="Palavra-chave (se evento = palavra-chave)" class="input-field" style="${fs}">`;
     } else if (type === 'webhook') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do webhook..." class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="path" placeholder="/webhook/entrada" class="input-field" style="${fs}">`;
+            ${fh('Padrão Zapier/n8n: caminho relativo exposto pela API; método HTTP explícito.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do webhook…" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="path" placeholder="/webhook/entrada" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Método</label>
+            <select data-flow-cfg="method" class="input-field" style="${fs}">${whMethodOpts}</select>`;
     } else if (type === 'engine' || type === 'nucleo_ia') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo..." class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="body" placeholder="Descrição do passo de sistema" style="${ta};height:44px"></textarea>`;
+            ${fh(type === 'engine' ? 'Fila, coalescing e encaminhamento — alinhar com o motor em produção.' : 'Núcleo de IA: contexto e políticas; integração real depende do backend.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Descrição / notas de sistema" style="${ta};height:44px"></textarea>`;
     } else if (type === 'motor_ref') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo..." class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="module_hint" placeholder="flows/fase_X/arquivo.py" class="input-field" style="${fs}">`;
+            ${fh('Referência ao código Python em flows/ — deve coincidir com ficheiros listados no resumo do motor.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="module_hint" placeholder="flows/fase_X/node_*.py" class="input-field" style="${fs}">`;
     } else if (type === 'conteudo') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="body" placeholder="Texto base (fallback)" style="${ta};height:48px"></textarea>
-            <div class="flow-tag" style="font-size:10px">Dica: duplo clique neste bloco para montar Texto/Imagem/Áudio/Vídeo/Documento/Delay.</div>`;
+            ${fh('Mercado: mensagens ricas (texto, mídia, botões). Duplo clique abre o editor de passos (conteúdos).')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Texto base ou fallback" style="${ta};height:48px"></textarea>
+            <div class="flow-tag" style="font-size:10px"><i class="fas fa-magic" style="color:var(--c-purple)"></i> Duplo clique no bloco: Texto / Imagem / Áudio / Vídeo / Doc / Delay</div>`;
     } else if (type === 'delay') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <input type="number" min="0" max="86400" step="1" data-flow-cfg="seconds" placeholder="Segundos de espera" class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="body" placeholder="Nota (opcional)" style="${ta};height:40px"></textarea>`;
+            ${fh('Espera entre mensagens (ManyChat/Dialogflow): use presets ou segundos exatos.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <div class="flow-delay-presets">
+                <button type="button" onclick="flowDelayPresetClick(this,3)">3s</button>
+                <button type="button" onclick="flowDelayPresetClick(this,10)">10s</button>
+                <button type="button" onclick="flowDelayPresetClick(this,30)">30s</button>
+                <button type="button" onclick="flowDelayPresetClick(this,60)">1m</button>
+                <button type="button" onclick="flowDelayPresetClick(this,300)">5m</button>
+            </div>
+            <input type="number" min="0" max="86400" step="1" data-flow-cfg="seconds" placeholder="Segundos" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Nota (opcional)" style="${ta};height:36px"></textarea>`;
     } else if (type === 'acao') {
         const actOpts = FLOW_ACTION_KIND_OPTIONS.map(
             (o) => `<option value="${o.value.replace(/"/g, '&quot;')}">${String(o.label).replace(/</g, '')}</option>`
         ).join('');
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            ${fh('Automations (HubSpot, Salesforce): ação nomeada + payload. O tipo guia integrações futuras (metadata.action_kind).')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
             <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Tipo de ação</label>
             <select data-flow-cfg="action_kind" class="input-field" style="${fs}">${actOpts}</select>
-            <textarea class="input-field" data-flow-cfg="payload" placeholder="Texto / instrução / payload" style="${ta};height:50px"></textarea>`;
+            <textarea class="input-field" data-flow-cfg="payload" placeholder="Texto, JSON ou instrução" style="${ta};height:50px"></textarea>`;
     } else if (type === 'api') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="url" placeholder="https://..." class="input-field" style="${fs}">
+            ${fh('HTTP Request (n8n): URL + método + corpo. Chamadas reais no servidor exigem FLOW_BLUEPRINT_ALLOW_HTTP=1.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="url" placeholder="https://…" class="input-field" style="${fs}">
             <select data-flow-cfg="method" class="input-field" style="${fs}">
                 <option value="GET">GET</option><option value="POST">POST</option><option value="PUT">PUT</option><option value="PATCH">PATCH</option><option value="DELETE">DELETE</option>
             </select>
-            <textarea class="input-field" data-flow-cfg="body" placeholder="Corpo (opcional)" style="${ta};height:44px"></textarea>`;
+            <textarea class="input-field" data-flow-cfg="headers" placeholder='Cabeçalhos (JSON), ex: {"Authorization":"Bearer …"}' style="${ta};height:36px"></textarea>
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Corpo JSON (opcional)" style="${ta};height:40px"></textarea>`;
     } else if (type === 'notificar') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="channel" placeholder="Canal (ex: log)" class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="message" placeholder="Mensagem" style="${ta};height:50px"></textarea>`;
+            ${fh('Alertas a equipa (Slack/Teams/email): escolha o canal e a mensagem.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Canal</label>
+            <select data-flow-cfg="channel" class="input-field" style="${fs}">${notifyOpts}</select>
+            <textarea class="input-field" data-flow-cfg="message" placeholder="Mensagem para o canal" style="${ta};height:50px"></textarea>`;
     } else if (type === 'anotacao') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            ${fh('Nota só para equipa — não é enviada ao cliente (como sticky no Miro).')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
             <textarea class="input-field" data-flow-cfg="note" placeholder="Anotação interna" style="${ta};height:50px"></textarea>`;
     } else if (type === 'gpt') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="prompt" placeholder="Prompt GPT" style="${ta};height:50px"></textarea>`;
+            ${fh('LLM (Langflow): modelo + temperatura + prompt — execução real depende do motor.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Modelo</label>
+            <select data-flow-cfg="model" class="input-field" style="${fs}">${gptModelOpts}</select>
+            <input type="text" data-flow-cfg="temperature" placeholder="Temperatura 0–2 (ex: 0.7)" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="prompt" placeholder="Prompt do sistema / utilizador" style="${ta};height:50px"></textarea>`;
     } else if (type === 'agente_ia') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="instructions" placeholder="Instruções do agente" style="${ta};height:50px"></textarea>`;
+            ${fh('Agente com instruções estáveis (Botpress-style); modelo e temperatura para futura API.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Modelo</label>
+            <select data-flow-cfg="model" class="input-field" style="${fs}">${gptModelOpts}</select>
+            <input type="text" data-flow-cfg="temperature" placeholder="Temperatura (ex: 0.5)" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="instructions" placeholder="Instruções do agente (persona, ferramentas, limites)" style="${ta};height:56px"></textarea>`;
     } else if (type === 'voice_studio') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            ${fh('TTS: roteiro falado: alinhar com vozes disponíveis no motor.')}
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Perfil de voz</label>
+            <select data-flow-cfg="voice_profile" class="input-field" style="${fs}">${voiceProfOpts}</select>
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
             <textarea class="input-field" data-flow-cfg="script" placeholder="Roteiro / texto para voz" style="${ta};height:50px"></textarea>`;
     } else if (type === 'pergunta') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="question" placeholder="Texto da pergunta" style="${ta};height:50px"></textarea>`;
+            ${fh('Mercado WhatsApp: lista, botões ou texto livre — desenhe o ramo seguinte ligando os blocos.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Modo de resposta</label>
+            <select data-flow-cfg="reply_mode" class="input-field" style="${fs}">${perguntaModoOpts}</select>
+            <textarea class="input-field" data-flow-cfg="question" placeholder="Texto da pergunta ou lista (uma linha por opção)" style="${ta};height:50px"></textarea>`;
     } else if (type === 'condicao') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="expression" placeholder="Expressão da condição (ex: lead.score > 70)" style="${ta};height:46px"></textarea>
-            <input type="text" data-flow-cfg="true_to" placeholder="ID do nó quando verdadeiro (opcional)" class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="false_to" placeholder="ID do nó quando falso (opcional)" class="input-field" style="${fs}">`;
+            ${fh('Branching: expressão sobre variáveis (ex. lead.etiqueta, resposta). Ramos reais = ligações no canvas + IDs opcionais.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="expression" placeholder="Ex: lead.score &gt; 70  ·  resposta == &quot;sim&quot;" style="${ta};height:46px"></textarea>
+            <input type="text" data-flow-cfg="true_to" placeholder="ID nó se verdadeiro (opcional)" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="false_to" placeholder="ID nó se falso (opcional)" class="input-field" style="${fs}">`;
     } else if (type === 'divisao') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="weights" placeholder="Pesos A/B (ex: A:50,B:50)" class="input-field" style="${fs}">`;
+            ${fh('A/B test: pesos percentuais; no mercado liga-se um fio para cada variante a partir deste bloco.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="weights" placeholder="A:50,B:50 (percentagens)" class="input-field" style="${fs}">`;
     } else if (type === 'expediente') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="timezone" placeholder="Timezone (ex: America/Sao_Paulo)" class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="windows" placeholder="Janelas de atendimento (ex: seg-sex 09:00-18:00)" style="${ta};height:44px"></textarea>`;
+            ${fh('Horário comercial (timezone IANA) + janelas — fora do horário pode ligar a outro ramo.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Fuso horário</label>
+            <select data-flow-cfg="timezone" class="input-field" style="${fs}">${tzOpts}</select>
+            <textarea class="input-field" data-flow-cfg="windows" placeholder="Ex: seg–sex 09:00–18:00; sáb 09:00–13:00" style="${ta};height:44px"></textarea>`;
     } else if (type === 'end') {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo final..." class="input-field" style="${fs}">
-            <div class="flow-tag" style="font-size:10px">Este bloco encerra o fluxo.</div>`;
+            ${fh('Terminal: encerra o fluxo neste ramo (fim de conversa / handoff concluído).')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo final…" class="input-field" style="${fs}">
+            <div class="flow-tag" style="font-size:10px"><i class="fas fa-flag-checkered"></i> Fim do fluxo — sem saída obrigatória</div>`;
     } else {
         bodyFields = `
-            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="body" placeholder="Detalhes / texto / corpo..." style="${ta};height:50px"></textarea>`;
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Detalhes / texto / corpo…" style="${ta};height:50px"></textarea>`;
     }
 
     node.innerHTML = `

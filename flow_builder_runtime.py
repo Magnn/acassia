@@ -53,7 +53,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Webhook",
         "runtime": "entry",
         "required_config": [],
-        "optional_keys": ("path",),
+        "optional_keys": ("path", "method"),
     },
     "engine": {
         "label": "Engine",
@@ -83,7 +83,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Pergunta",
         "runtime": "message",
         "required_config": (),
-        "optional_keys": ("body", "question"),
+        "optional_keys": ("body", "question", "reply_mode"),
     },
     "acao": {
         "label": "Ação",
@@ -137,13 +137,13 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Agente IA",
         "runtime": "llm",
         "required_config": (),
-        "optional_keys": ("instructions",),
+        "optional_keys": ("instructions", "model", "temperature"),
     },
     "voice_studio": {
         "label": "Voice",
         "runtime": "tts",
         "required_config": (),
-        "optional_keys": ("script",),
+        "optional_keys": ("script", "voice_profile"),
     },
     "anotacao": {
         "label": "Anotação",
