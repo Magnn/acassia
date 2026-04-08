@@ -35,6 +35,7 @@ _MAX_CHARS_BALAO_NODE1 = 210
 _MAX_CHARS_BALAO_A = 180
 _MAX_CHARS_BALAO_B = 170
 _MAX_CHARS_BALAO_CTA = 140
+_MAX_BALOES_NODE1 = 3
 
 # Sinais emocionais: espelhar em D/extra só se aparecerem na mensagem do lead
 _RE_DOR_OU_SOFRIMENTO = re.compile(
@@ -275,6 +276,11 @@ def _extrair_primeiro_nome(msg_lead: str) -> Optional[str]:
     m = re.search(r"\bnome\s+[eé]\s+([a-zà-ú]{2,24})\b", msg_lead, re.IGNORECASE)
     if m:
         return m.group(1).capitalize()
+    m = re.search(r"\bnome\s+([a-zà-ú]{2,24})\b", msg_lead, re.IGNORECASE)
+    if m:
+        tok = m.group(1).lower()
+        if tok not in ("é", "e", "meu", "seu", "dele", "dela"):
+            return m.group(1).capitalize()
     return None
 
 
@@ -374,7 +380,7 @@ def _sanear_baloes_saida_node1(baloes: List[str]) -> List[str]:
             continue
         vistos.add(chave)
         out.append(t)
-    return out[:4]
+    return out[:_MAX_BALOES_NODE1]
 
 
 def _aplicar_cap_hierarquico_node1(
@@ -398,7 +404,7 @@ def _aplicar_cap_hierarquico_node1(
         else:
             t = _encurtar_balao_node1(t, _MAX_CHARS_BALAO_CTA)
         out.append(_garantir_pontuacao_final(t))
-    return out[:4]
+    return out[:_MAX_BALOES_NODE1]
 
 
 def _parece_eco_semantico(a: str, b: str) -> bool:
@@ -435,7 +441,7 @@ def _ajustar_abertura_curta_node1(baloes: List[str], nome: str) -> List[str]:
             out.append("Me diz como você se chama, meu bem? Assim eu te falo direito.")
     out = _sanear_baloes_saida_node1(out)
     out = _aplicar_cap_hierarquico_node1(out, nome)
-    return out[:3]
+    return out[:_MAX_BALOES_NODE1]
 
 
 def _parece_truncado_apresentacao(s: str) -> bool:
@@ -592,7 +598,7 @@ def _montar_baloes_do_json(
             blocos = blocos[1:]
         out = _sanear_baloes_saida_node1(blocos[:5])
         out = _aplicar_cap_hierarquico_node1(out, nome)
-        return _deduplicar_baloes_node1(out)
+        return _deduplicar_baloes_node1(out)[:_MAX_BALOES_NODE1]
 
     texto_antes_d = " ".join(blocos)
     ja_vaga = _ja_mencionou_vaga_ou_consulta(texto_antes_d)
@@ -620,7 +626,7 @@ def _montar_baloes_do_json(
         blocos = blocos[1:]
     out = _sanear_baloes_saida_node1(blocos[:5])
     out = _aplicar_cap_hierarquico_node1(out, nome)
-    return _deduplicar_baloes_node1(out)
+    return _deduplicar_baloes_node1(out)[:_MAX_BALOES_NODE1]
 
 
 def _deduplicar_baloes_node1(baloes: List[str]) -> List[str]:
@@ -657,7 +663,7 @@ def _deduplicar_baloes_node1(baloes: List[str]) -> List[str]:
             viu_vaga = True
         out.append(b)
 
-    return out[:4]
+    return out[:_MAX_BALOES_NODE1]
 
 
 def _delay_digitacao(texto: str) -> int:
@@ -818,13 +824,14 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                             "Me diz como você se chama, meu bem? Assim eu te falo direito. 👇"
                         )
 
-                acoes = [Acao(tipo="delay", segundos=random.randint(3, 6))]
-                for b in baloes_limpos[:4]:
-                    acoes.append(Acao(tipo="delay", segundos=_delay_digitacao(b)))
+                baloes_saida = list(baloes_limpos[:_MAX_BALOES_NODE1])
+                acoes = [Acao(tipo="delay", segundos=random.randint(2, 4))]
+                for b in baloes_saida:
+                    acoes.append(Acao(tipo="delay", segundos=max(3, _delay_digitacao(b) - 1)))
                     acoes.append(Acao(tipo="text", conteudo=b))
                 if not hasattr(ctx, "metadata") or ctx.metadata is None:
                     ctx.metadata = {}
-                ctx.metadata["node1_baloes_enviados"] = int(min(len(baloes_limpos[:4]), 4))
+                ctx.metadata["node1_baloes_enviados"] = int(min(len(baloes_saida), _MAX_BALOES_NODE1))
                 ctx.estado_coleta = "node1_recepcao_ia"
                 if _pode_ir_direto_coleta_sem_node2(ctx, nome, blob_ctx):
                     ctx.metadata["node1_pulou_para_coleta"] = True

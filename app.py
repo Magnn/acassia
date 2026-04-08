@@ -171,6 +171,10 @@ class LeadInboxManager:
             r"n[aã]o\s+deu\s+tempo|n[aã]o\s+deu\s+pra\s+ver)\b",
             re.I,
         )
+        self._re_intencao_midia = re.compile(
+            r"\b(foto|imagem|palma|m[aã]o|mao|print|selfie|enviei\s+foto|mandei\s+foto)\b",
+            re.I,
+        )
 
     @staticmethod
     def _merge_payload(base: dict, extra: dict) -> dict:
@@ -231,6 +235,8 @@ class LeadInboxManager:
             return False
         if payload.get("imagem_url"):
             return False
+        if payload.get("media_url"):
+            return False
         tipo = str(payload.get("tipo_mensagem") or "text").lower()
         if tipo in ("image", "video", "audio"):
             return False
@@ -243,6 +249,9 @@ class LeadInboxManager:
         if len(palavras) <= 8 and self._re_confirmacao_curta.search(tx):
             return False
         if len(tx) < self.after_text_grace_min_chars:
+            return False
+        # Grace só faz sentido quando há chance real de mídia chegar no webhook seguinte.
+        if not self._re_intencao_midia.search(tx):
             return False
         return True
 
