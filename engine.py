@@ -877,6 +877,13 @@ class Engine:
         Fatiamento resiliente para WhatsApp:
         preserva sentenças, corta excesso e evita explosão de balões.
         """
+        def _emoji_ou_pontuacao_somente(s: str) -> bool:
+            t = str(s or "").strip()
+            if not t:
+                return False
+            # Somente símbolos/emoji/pontuação (sem letras/dígitos) -> não enviar como balão isolado.
+            return re.fullmatch(r"[\W_]+", t, flags=re.UNICODE) is not None
+
         base = self._quebrar_baloes(texto or "")
         out: list[str] = []
         for parte in base:
@@ -887,7 +894,17 @@ class Engine:
             )
             for ch in chunks:
                 out.extend(quebrar_por_linhas_max(ch, MOBILE_MAX_LINHAS_BALO))
-        return [x for x in out if str(x or "").strip()][:6]
+        limpos = [str(x or "").strip() for x in out if str(x or "").strip()]
+
+        # Regra UX: emoji isolado deve ficar junto do balão anterior.
+        merged: list[str] = []
+        for p in limpos:
+            if _emoji_ou_pontuacao_somente(p) and merged:
+                merged[-1] = f"{merged[-1]} {p}".strip()
+            else:
+                merged.append(p)
+
+        return merged[:6]
 
     @staticmethod
     def _normalizar_para_dedup(txt: str) -> str:
