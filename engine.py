@@ -59,10 +59,12 @@ from flows.funnel_gates import (
 from schema import Acao, ContextoConversa
 from copy_sanitizer import (
     BALAO_IA_REGEX_CORTE_FINAL,
+    MOBILE_CHARS_POR_LINHA,
     MOBILE_MAX_LINHAS_BALO,
     preparar_texto_envio,
     delay_entre_baloes,
     delay_escuta_pos_audio,
+    fatiar_texto_ritmo_celular,
     quebrar_por_linhas_max,
     aplicar_gancho_na_lista_acoes,
     normalizar_enxerto_dor_sem_contexto,
@@ -740,9 +742,7 @@ class Engine:
                     time.sleep(max(0.5, acao.segundos + random.uniform(-jitter, jitter)))
 
                 elif acao.tipo == "text":
-                    fatiados: list[str] = []
-                    for parte in self._quebrar_baloes(acao.conteudo):
-                        fatiados.extend(quebrar_por_linhas_max(parte, MOBILE_MAX_LINHAS_BALO))
+                    fatiados = self._fatiar_texto_envio_seguro(acao.conteudo)
                     for balao in fatiados:
                         balao_limpo = self._blindar_texto_final_anti_corte(balao)
                         if not balao_limpo:
@@ -871,6 +871,23 @@ class Engine:
         if "[BALAO]" in texto:
             return [b.strip() for b in texto.split("[BALAO]") if b.strip()]
         return [p.strip() for p in texto.split("\n\n") if p.strip()]
+
+    def _fatiar_texto_envio_seguro(self, texto: str) -> list[str]:
+        """
+        Fatiamento resiliente para WhatsApp:
+        preserva sentenças, corta excesso e evita explosão de balões.
+        """
+        base = self._quebrar_baloes(texto or "")
+        out: list[str] = []
+        for parte in base:
+            chunks = fatiar_texto_ritmo_celular(
+                parte,
+                max_linhas_visuais=MOBILE_MAX_LINHAS_BALO,
+                chars_por_linha=MOBILE_CHARS_POR_LINHA,
+            )
+            for ch in chunks:
+                out.extend(quebrar_por_linhas_max(ch, MOBILE_MAX_LINHAS_BALO))
+        return [x for x in out if str(x or "").strip()][:6]
 
     @staticmethod
     def _normalizar_para_dedup(txt: str) -> str:
