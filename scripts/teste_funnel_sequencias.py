@@ -21,6 +21,8 @@ def main() -> int:
         "tests.test_funnel_gates",
         "tests.test_funnel_sniffer_writes",
         "tests.test_sqlite_lead_metadata_e2e",
+        "tests.test_fase_1_preflight",
+        "tests.test_engine_processar_sniffer_e2e",
     ):
         suite.addTests(loader.loadTestsFromName(name))
     runner = unittest.TextTestRunner(verbosity=2)

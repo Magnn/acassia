@@ -41,7 +41,7 @@ from ai.stage_intelligence import enriquecer_contexto_stage
 from analytics.funnel_audit import registrar_node_transition, registrar_silent_ack
 from tts.audio_engine import AudioEngine
 from config_cliente import CONFIG_CLIENTE
-from flows.fase_1_saudacao.sniffer_fase1 import (
+from flows.fase_1_preflight import (
     concat_texto_usuario,
     promover_burst_fase1_meta,
     resolver_avanco_node_fase1,
@@ -49,6 +49,7 @@ from flows.fase_1_saudacao.sniffer_fase1 import (
 )
 from flows.funnel_gates import (
     nome_eh_placeholder,
+    sanear_lead_contato_sem_evento_sniffer,
     snapshot_fase1_coleta,
     sniffer_aplicar_fase1_flags,
     VOCATIVO_SEM_NOME,
@@ -96,7 +97,7 @@ MAX_RETRY          = 3
 CIRCUIT_THRESHOLD  = 5
 CIRCUIT_RESET_TIME = 60    # segundos
 ZOMBIE_TIMEOUT_SEG = 90    # 1,5 minuto (evita bloquear turnos reais por tempo excessivo)
-# Pré-nó fase 1 (Instagram, burst, avanço de nó): flows/fase_1_saudacao/sniffer_fase1.py
+# Pré-nó fase 1 (Instagram, burst, avanço): flows/fase_1_preflight.py
 
 # ══════════════════════════════════════════════════════════════════════
 # DISJUNTOR DE CIRCUITO (CIRCUIT BREAKER)
@@ -376,12 +377,14 @@ class Engine:
                 if not texto_sniff and meta.get("caption"):
                     texto_sniff = str(meta.get("caption") or "").strip()
 
-                for ev in sniffer_aplicar_fase1_flags(
+                _tinha_contato_decl = bool(meta.get("lead_contato_salvo_declarado"))
+                _ev_sniffer = sniffer_aplicar_fase1_flags(
                     meta,
                     tipo_mensagem=tipo_msg,
                     texto_sniff=texto_sniff,
                     historico=ctx.historico,
-                ):
+                )
+                for ev in _ev_sniffer:
                     if ev == "foto_atual":
                         logger.info("👁️ [SNIFFER] Foto interceptada antecipadamente para o lead %s.", lead.id)
                     elif ev == "foto_historico":
@@ -395,6 +398,17 @@ class Engine:
                         logger.info("📇 [SNIFFER] Contato salvo declarado no histórico lead=%s.", lead.id)
                     elif ev == "desabafo":
                         logger.info("👂 [SNIFFER] Desabafo interceptado antecipadamente para o lead %s.", lead.id)
+
+                if sanear_lead_contato_sem_evento_sniffer(
+                    meta,
+                    tinha_antes=_tinha_contato_decl,
+                    eventos_sniffer=_ev_sniffer,
+                ):
+                    logger.warning(
+                        "event=funnel_guardrail_contato_revertido lead=%s "
+                        "(lead_contato_salvo_declarado sem evento contato_* do sniffer)",
+                        lead.id,
+                    )
 
                 ctx.metadata = meta
 

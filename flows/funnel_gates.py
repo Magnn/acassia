@@ -1,9 +1,10 @@
 """
 flows/funnel_gates.py — predicados centrais da fase 1 (nome, contato, foto, desabafo).
 
-Objetivo: uma única fonte de verdade para regras da fase 1. Leitura (burst, pendências)
-e *escritas* do sniffer global (`sniffer_aplicar_*`) vivem aqui; o `engine` só orquestra
-e regista logs.
+Objetivo: uma única fonte de verdade para regras da fase 1. Leitura (burst, pendências),
+*escritas* do sniffer global (`sniffer_aplicar_*`), bypass controlado no node 3
+(`meta_node3_forcar_camada1_completa`) e guardrail de contato (`sanear_lead_contato_*`).
+O pré-flight (Instagram, burst longo, avanço de nó) está em `flows/fase_1_preflight.py`.
 
 Ver também: docs/FUNIL_MATRIZ_OBRIGATORIOS.md
 """
@@ -40,6 +41,11 @@ def meta_declarou_contato_salvo(meta: Optional[Mapping[str, Any]]) -> bool:
     return bool((meta or {}).get("lead_contato_salvo_declarado"))
 
 
+def meta_node2_vcard_despachado(meta: Optional[Mapping[str, Any]]) -> bool:
+    """True se o ritual do node 2 já enviou o cartão (equivalente a contato tratado)."""
+    return bool((meta or {}).get("node2_vcard_despachado"))
+
+
 def texto_declara_contato_salvo(blob_texto_usuario: str) -> bool:
     """Delega para o mesmo detector do node 2 (evita divergência de regex)."""
     from flows.fase_1_saudacao.node_2_salvar_contato import texto_indica_contato_salvo
@@ -51,7 +57,15 @@ def contato_salvo_ou_declarado(
     meta: Optional[Mapping[str, Any]],
     blob_texto_usuario: str,
 ) -> bool:
-    return meta_declarou_contato_salvo(meta) or texto_declara_contato_salvo(blob_texto_usuario)
+    """
+    Contato OK para burst / checklist: declarado em texto, flag do sniffer, ou vCard já enviado.
+    Alinhado a `promover_burst_fase1_meta` e `primeiro_node_pendente_fase1`.
+    """
+    return (
+        meta_declarou_contato_salvo(meta)
+        or meta_node2_vcard_despachado(meta)
+        or texto_declara_contato_salvo(blob_texto_usuario)
+    )
 
 
 def pode_burst_coleta_sem_node2(
@@ -256,3 +270,51 @@ def sniffer_aplicar_fase1_flags(
     if ev:
         out.append(ev)
     return out
+
+
+# ── Node 3: bypass de camada 1 (tentativas esgotadas) ───────────────────────
+
+
+def meta_node3_forcar_camada1_completa(
+    meta: MutableMapping[str, Any],
+    *,
+    msg_fallback: str,
+    falta_foto: bool,
+    falta_desabafo: bool,
+) -> None:
+    """
+    Quando o node 3 desbloqueia o funil por limite de tentativas na camada 1.
+    Centraliza escritas que antes estavam só no node.
+    """
+    if falta_foto:
+        meta["foto_recebida"] = True
+    if falta_desabafo:
+        meta["desabafo_recebido"] = True
+        meta["desabafo_original"] = (
+            (meta.get("desabafo_original") or msg_fallback or "relato em poucas palavras").strip()
+        )
+
+
+# ── Guardrail: nada de `lead_contato_salvo_declarado` “mágico” sem sniffer ──
+
+
+def sanear_lead_contato_sem_evento_sniffer(
+    meta: MutableMapping[str, Any],
+    *,
+    tinha_antes: bool,
+    eventos_sniffer: Sequence[str],
+) -> bool:
+    """
+    Se `lead_contato_salvo_declarado` passou a True neste turno sem evento contato_* do sniffer,
+    reverte (defesa contra regressões / NLU escrevendo metadata antes do sniffer).
+
+    Retorna True se reverteu.
+    """
+    if tinha_antes:
+        return False
+    if meta.get("lead_contato_salvo_declarado") is not True:
+        return False
+    if any(e in ("contato_atual", "contato_historico") for e in eventos_sniffer):
+        return False
+    meta["lead_contato_salvo_declarado"] = False
+    return True

@@ -38,7 +38,11 @@ from copy_sanitizer import (
     genero_hint_para_prompt,
     nome_lead_para_exibicao,
 )
-from flows.funnel_gates import nome_eh_placeholder, VOCATIVO_SEM_NOME
+from flows.funnel_gates import (
+    meta_node3_forcar_camada1_completa,
+    nome_eh_placeholder,
+    VOCATIVO_SEM_NOME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -805,11 +809,12 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     "event=node3_camada1_bypass tentativas=%s (avanço automático; desbloqueio de funil)",
                     t1,
                 )
-                if not tem_foto:
-                    meta["foto_recebida"] = True
-                if not tem_dor:
-                    meta["desabafo_recebido"] = True
-                    meta["desabafo_original"] = (meta.get("desabafo_original") or msg_lead or "relato em poucas palavras").strip()
+                meta_node3_forcar_camada1_completa(
+                    meta,
+                    msg_fallback=msg_lead,
+                    falta_foto=not tem_foto,
+                    falta_desabafo=not tem_dor,
+                )
 
         if meta.get("foto_recebida") and meta.get("desabafo_recebido"):
             desabafo = meta.get("desabafo_original", "")

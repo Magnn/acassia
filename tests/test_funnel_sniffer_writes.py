@@ -73,5 +73,50 @@ class TestSnifferFase1Flags(unittest.TestCase):
         self.assertIn("desabafo", evs)
 
 
+class TestNode3CoerceCamada1(unittest.TestCase):
+    def test_forca_foto_e_desabafo(self):
+        from flows.funnel_gates import meta_node3_forcar_camada1_completa
+
+        meta: dict = {}
+        meta_node3_forcar_camada1_completa(
+            meta, msg_fallback="só isso", falta_foto=True, falta_desabafo=True
+        )
+        self.assertTrue(meta.get("foto_recebida"))
+        self.assertTrue(meta.get("desabafo_recebido"))
+        self.assertTrue((meta.get("desabafo_original") or "").strip())
+
+
+class TestGuardrailContato(unittest.TestCase):
+    def test_sanear_reverte_flip_sem_evento_sniffer(self):
+        from flows.funnel_gates import sanear_lead_contato_sem_evento_sniffer
+
+        meta: dict = {"lead_contato_salvo_declarado": True}
+        self.assertTrue(
+            sanear_lead_contato_sem_evento_sniffer(
+                meta, tinha_antes=False, eventos_sniffer=["foto_atual"]
+            )
+        )
+        self.assertFalse(meta.get("lead_contato_salvo_declarado"))
+
+    def test_sanear_nao_mexe_se_sniffer_mandou_contato(self):
+        from flows.funnel_gates import sanear_lead_contato_sem_evento_sniffer
+
+        meta: dict = {"lead_contato_salvo_declarado": True}
+        self.assertFalse(
+            sanear_lead_contato_sem_evento_sniffer(
+                meta, tinha_antes=False, eventos_sniffer=["contato_atual"]
+            )
+        )
+        self.assertTrue(meta.get("lead_contato_salvo_declarado"))
+
+    def test_sanear_nao_mexe_se_ja_tinha_antes(self):
+        from flows.funnel_gates import sanear_lead_contato_sem_evento_sniffer
+
+        meta: dict = {"lead_contato_salvo_declarado": True}
+        self.assertFalse(
+            sanear_lead_contato_sem_evento_sniffer(meta, tinha_antes=True, eventos_sniffer=[])
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

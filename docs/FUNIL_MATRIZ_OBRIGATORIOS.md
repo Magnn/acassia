@@ -14,7 +14,7 @@ Documento vivo: alinhado ao código em `flows/funnel_gates.py` e ao sniffer em `
 | Predicado | Chave(s) em `metadata` / texto | Função |
 |-----------|--------------------------------|--------|
 | Nome útil | `nome_lead` / `ctx.nome_lead` fora de `PLACEHOLDER_NOMES` | `nome_eh_placeholder()` → False |
-| Contato | `lead_contato_salvo_declarado` OU texto com padrão node 2 | `contato_salvo_ou_declarado()` |
+| Contato | `lead_contato_salvo_declarado` **ou** `node2_vcard_despachado` **ou** texto com padrão node 2 | `contato_salvo_ou_declarado()` (alinhado ao burst em `fase_1_preflight`) |
 | Foto | `foto_recebida` | `meta_tem_foto()` |
 | Desabafo | `desabafo_recebido` | `meta_tem_desabafo()` |
 
@@ -26,19 +26,23 @@ Documento vivo: alinhado ao código em `flows/funnel_gates.py` e ao sniffer em `
 ## Onde isto entra no código hoje
 
 - **Engine (sniffer):** chama `sniffer_aplicar_fase1_flags()` em `flows/funnel_gates.py`, que preenche `foto_recebida`, `desabafo_recebido`, `lead_contato_salvo_declarado`, etc., antes do node (logs continuam no `engine`).
+- **Guardrail pós-sniffer:** `sanear_lead_contato_sem_evento_sniffer()` — se `lead_contato_salvo_declarado` passar a `True` **sem** evento `contato_atual` / `contato_historico` do sniffer neste turno, reverte (defesa contra metadata “mágica” antes de evidência).
+- **Pré-flight fase 1 (`flows/fase_1_preflight.py`):** após o sniffer, o `engine` junta texto (`concat_texto_usuario`), marca Instagram (`sniffer_instagram_meta`), burst longo (`promover_burst_fase1_meta`) e avanço só para frente (`resolver_avanco_node_fase1`). `flows/fase_1_saudacao/sniffer_fase1.py` só reexporta símbolos para compatibilidade.
 - **Node 1:** burst para `3_coleta_profunda` chama `pode_burst_coleta_sem_node2()` (mesma lógica que antes, centralizada).
 - **Node 2:** confirmação + vcard quando o funil exige o passo explícito.
-- **Node 3:** camadas de coleta assumem as flags acima; visão Gemini valida mão quando chega imagem no turno.
+- **Node 3:** bypass por tentativas na camada 1 usa `meta_node3_forcar_camada1_completa()` em `funnel_gates` (escrita única).
 
 ## Camadas que ainda podem “lutar” com isto
 
 - **`copy_sanitizer.motivo_redundancia_texto` + engine:** podem remover balões; regex deve ser **estreita** para não cortar perguntas legítimas (ex.: “Conseguiu salvar, meu bem?”).
-- **NLU:** “sim” genérico não deve substituir `lead_contato_salvo_declarado` sem evidência.
+- **NLU / outros escritores de metadata:** “sim” sozinho **não** liga `lead_contato_salvo_declarado` via sniffer; o guardrail acima impede que essa flag apareça “do nada” sem evento de contato do sniffer no turno.
 
 ## Testes
 
 - `tests/test_funnel_gates.py` — predicados e burst.
-- `tests/test_funnel_sniffer_writes.py` — escritas do sniffer (`sniffer_aplicar_*`).
+- `tests/test_funnel_sniffer_writes.py` — sniffer, guardrail de contato, `meta_node3_forcar_camada1_completa`.
 - `tests/test_sqlite_lead_metadata_e2e.py` — SQLite em memória + `Lead.metadata_json` após sniffer.
-- `scripts/teste_funnel_sequencias.py` — corre a suíte `test_funnel_gates` (e pode crescer com cenários integrados).
+- `tests/test_fase_1_preflight.py` — checklist, avanço de nó, burst longo.
+- `tests/test_engine_processar_sniffer_e2e.py` — `Engine.processar_mensagem` com DB em memória e dependências mockadas.
+- `scripts/teste_funnel_sequencias.py` — corre a suíte agregada dos módulos acima.
 - `scripts/teste_node1_guardrails.py` — limites de balões no node 1 (fallback).
