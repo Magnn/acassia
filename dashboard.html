@@ -1921,9 +1921,9 @@
             }
         }
         #svg-connections path.conn-path--sim-trace {
-            stroke: #22d3ee !important;
-            stroke-width: 3px !important;
-            filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.65));
+            stroke: #38bdf8 !important;
+            stroke-width: 4px !important;
+            filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.85));
         }
         .flow-sim-lead-modal {
             position: fixed;
@@ -2015,6 +2015,58 @@
         }
         .flow-sim-header button:hover {
             background: rgba(255, 255, 255, 0.12);
+        }
+        .flow-sim-topbar {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 8px 10px;
+            background: #f0f2f5;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .flow-sim-topbar button {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            cursor: pointer;
+        }
+        .flow-sim-topbar button:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+        }
+        .flow-sim-topbar .flow-sim-step-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            user-select: none;
+        }
+        .flow-sim-typing {
+            align-self: flex-start;
+            font-size: 11px;
+            color: #64748b;
+            font-style: italic;
+            padding: 4px 8px;
+            animation: flow-sim-typing-fade 1s ease-in-out infinite;
+        }
+        @keyframes flow-sim-typing-fade {
+            0%,
+            100% {
+                opacity: 0.55;
+            }
+            50% {
+                opacity: 1;
+            }
         }
         .flow-sim-messages {
             flex: 1;
@@ -3836,17 +3888,15 @@
                     <span><i class="fab fa-whatsapp" style="margin-right:8px;opacity:0.95"></i> Simulação local</span>
                     <button type="button" onclick="flowSimulatorClosePanel()" title="Fechar painel">×</button>
                 </div>
-                <div id="flow-sim-messages" class="flow-sim-messages" role="log" aria-live="polite"></div>
-                <div id="flow-sim-choice-wrap" class="flow-sim-choice-wrap hidden" aria-hidden="true">
-                    <button type="button" onclick="flowSimResolveChoice(true)">Sim</button>
-                    <button type="button" onclick="flowSimResolveChoice(false)">Não</button>
-                </div>
-                <div class="flow-sim-toolbar">
-                    <label title="Pausa após cada bloco; use «Próximo» para continuar">
-                        <input type="checkbox" id="flow-sim-step-toggle" /> Passo a passo
+                <div class="flow-sim-topbar">
+                    <button type="button" onclick="flowSimRestart()" title="Parar e voltar ao formulário de teste">Reiniciar simulação</button>
+                    <label class="flow-sim-step-label" title="Pausa após cada bloco; use «Próximo» para continuar">
+                        <input type="checkbox" id="flow-sim-step-toggle" /> Modo passo a passo
                     </label>
-                    <button type="button" id="flow-sim-btn-next" class="hidden" onclick="flowSimClickNextStep()">Próximo</button>
-                    <button type="button" onclick="flowSimReset()" title="Parar e limpar o chat"><i class="fas fa-undo"></i> Reset</button>
+                </div>
+                <div id="flow-sim-messages" class="flow-sim-messages" role="log" aria-live="polite"></div>
+                <div class="flow-sim-toolbar">
+                    <button type="button" id="flow-sim-btn-next" class="hidden" onclick="flowSimClickNextStep()">Próximo passo</button>
                 </div>
                 <div class="flow-sim-inputbar">
                     <input type="text" id="flow-sim-input" placeholder="Escreve uma mensagem…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();flowSimSendChat();}" />
@@ -6902,8 +6952,8 @@ function redrawFlowEdges() {
             <marker id="flow-arrow-sel" viewBox="0 0 12 12" refX="10.2" refY="6" markerWidth="10" markerHeight="10" orient="auto" markerUnits="userSpaceOnUse">
                 <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="#3b82f6"/>
             </marker>
-            <marker id="flow-arrow-sim" viewBox="0 0 12 12" refX="10.2" refY="6" markerWidth="10" markerHeight="10" orient="auto" markerUnits="userSpaceOnUse">
-                <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="#22d3ee"/>
+            <marker id="flow-arrow-sim" viewBox="0 0 12 12" refX="10.2" refY="6" markerWidth="11" markerHeight="11" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="#38bdf8"/>
             </marker>
             <filter id="flow-edge-label-shadow" x="-35%" y="-35%" width="170%" height="170%">
                 <feDropShadow dx="0" dy="1" stdDeviation="1.4" flood-opacity="0.12" flood-color="#0f172a"/>
@@ -6928,8 +6978,8 @@ function redrawFlowEdges() {
         if (simTr) {
             cls = 'conn-path conn-path--sim-trace';
             mk = 'url(#flow-arrow-sim)';
-            sw = '3';
-            sc = '#22d3ee';
+            sw = '4';
+            sc = '#38bdf8';
         } else if (sel) {
             cls = 'conn-path conn-path-selected';
             mk = 'url(#flow-arrow-sel)';
@@ -7994,16 +8044,106 @@ async function simulateFlowDraft() {
 }
 
 /** ── Missão 3.3 — Simulador local (interpretador do grafo no browser) ── */
-let _flowSimRunning = false;
-let _flowSimLead = { nome: '', telefone: '' };
-let _flowSimContext = { lastAnswer: '' };
+const _flowSimState = {
+    running: false,
+    currentNodeId: null,
+    lead: { nome: '', telefone: '' },
+    context: { lastAnswer: '' },
+};
 let _flowSimLineResolver = null;
-let _flowSimChoiceResolver = null;
 let _flowSimStepWaitResolve = null;
 let _flowSimActiveNodeId = null;
 
 function flowSimDelay(ms) {
     return new Promise((r) => setTimeout(r, ms));
+}
+
+function flowSimClearSimTraceImmediate() {
+    clearTimeout(_flowSimTraceTimer);
+    _flowSimTraceTimer = null;
+    _flowSimTraceEdgeId = null;
+    redrawFlowEdges();
+}
+
+/** Destaca a aresta percorrida; o destaque é limpo no passo seguinte (flowSimClearSimTraceImmediate). */
+function flowSimSetSimTrace(edgeId) {
+    clearTimeout(_flowSimTraceTimer);
+    _flowSimTraceTimer = null;
+    _flowSimTraceEdgeId = edgeId || null;
+    redrawFlowEdges();
+}
+
+function flowSimNormalize(s) {
+    return String(s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function flowSimUserTextIsSim(raw) {
+    const u = flowSimNormalize(raw);
+    if (!u) return null;
+    if (/^(sim|s|yes|y|1|true|verdadeiro|certo|ok|isso|positivo)$/i.test(u)) return true;
+    if (/^(não|nao|n|no|0|false|falso|negativo)$/i.test(u)) return false;
+    return null;
+}
+
+/**
+ * Escolhe o nó seguinte com base no texto do utilizador (legendas das arestas ou sim/não em condição).
+ */
+function flowSimResolveOutgoingFromText(nodeId, userText) {
+    const edges = flowSimOutgoingEdges(nodeId);
+    if (!edges.length) return null;
+    const el = flowCanvasNodeById(nodeId);
+    const type = String(el && (el.getAttribute('data-node-type') || el.getAttribute('data-flow-block')) || '').toLowerCase();
+    const utRaw = String(userText || '').trim();
+
+    if (type === 'condicao') {
+        const tri = flowSimUserTextIsSim(utRaw);
+        if (tri !== null) {
+            return flowSimPickCondicaoBranch(nodeId, tri);
+        }
+    }
+
+    const ut = flowSimNormalize(utRaw);
+    let best = null;
+    let bestLen = 0;
+    for (let i = 0; i < edges.length; i++) {
+        const lab = flowSimNormalize(edges[i].label || '');
+        if (!lab) continue;
+        if (ut === lab || ut.includes(lab)) {
+            if (lab.length > bestLen) {
+                bestLen = lab.length;
+                best = edges[i];
+            }
+        }
+    }
+    if (best) {
+        flowSimSetSimTrace(best.id);
+        return best.to;
+    }
+
+    const first = edges[0];
+    flowSimSetSimTrace(first.id);
+    return first.to;
+}
+
+async function flowSimAppendBotWithTyping(text) {
+    const box = document.getElementById('flow-sim-messages');
+    if (!box) {
+        flowSimChatAppend('bot', text);
+        return;
+    }
+    const typing = document.createElement('div');
+    typing.className = 'flow-sim-typing';
+    typing.textContent = '… a escrever';
+    box.appendChild(typing);
+    box.scrollTop = box.scrollHeight;
+    await flowSimDelay(1000);
+    typing.remove();
+    flowSimChatAppend('bot', text);
 }
 
 function flowSimReadNodeConfig(el) {
@@ -8026,7 +8166,7 @@ function flowSimReadNodeConfig(el) {
 function flowSimSubstituteVars(text, lead) {
     if (text == null) return '';
     let s = String(text);
-    const L = lead || _flowSimLead || {};
+    const L = lead || _flowSimState.lead || {};
     const map = {
         nome: L.nome || '',
         telefone: L.telefone || '',
@@ -8035,7 +8175,7 @@ function flowSimSubstituteVars(text, lead) {
     };
     s = s.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, raw) => {
         const key = String(raw).trim();
-        if (key === 'resposta') return _flowSimContext.lastAnswer || '';
+        if (key === 'resposta') return _flowSimState.context.lastAnswer || '';
         if (map[key] !== undefined) return map[key];
         return '{{' + key + '}}';
     });
@@ -8046,31 +8186,20 @@ function flowSimOutgoingEdges(fromId) {
     return (_flowEdges || []).filter((e) => e && String(e.from) === String(fromId));
 }
 
+/** Ponto de partida obrigatório: apenas Gatilho ou Webhook (sem fallback). */
 function flowSimFindStartNodeId() {
     const nodes = document.querySelectorAll('#nodes-container .flow-node');
     for (let i = 0; i < nodes.length; i++) {
         const t = (nodes[i].getAttribute('data-node-type') || '').toLowerCase();
         if (t === 'trigger' || t === 'webhook') return nodes[i].getAttribute('data-flow-id');
     }
-    const ids = [];
-    nodes.forEach((n) => {
-        const id = n.getAttribute('data-flow-id');
-        if (id) ids.push(id);
-    });
-    const indeg = Object.fromEntries(ids.map((id) => [id, 0]));
-    (_flowEdges || []).forEach((e) => {
-        if (e && e.to && indeg[e.to] !== undefined) indeg[e.to]++;
-    });
-    for (let i = 0; i < nodes.length; i++) {
-        const id = nodes[i].getAttribute('data-flow-id');
-        if (id && (indeg[id] === 0 || indeg[id] === undefined)) return id;
-    }
-    return nodes[0] ? nodes[0].getAttribute('data-flow-id') : null;
+    return null;
 }
 
 function flowSimSetActiveNode(nodeId) {
     document.querySelectorAll('#nodes-container .flow-node.flow-node-active-simulation').forEach((n) => n.classList.remove('flow-node-active-simulation'));
     _flowSimActiveNodeId = nodeId || null;
+    _flowSimState.currentNodeId = nodeId || null;
     const el = nodeId ? flowCanvasNodeById(nodeId) : null;
     if (el) el.classList.add('flow-node-active-simulation');
 }
@@ -8078,24 +8207,14 @@ function flowSimSetActiveNode(nodeId) {
 function flowSimClearActiveNode() {
     document.querySelectorAll('#nodes-container .flow-node.flow-node-active-simulation').forEach((n) => n.classList.remove('flow-node-active-simulation'));
     _flowSimActiveNodeId = null;
-}
-
-function flowSimEdgeHighlight(edgeId) {
-    clearTimeout(_flowSimTraceTimer);
-    _flowSimTraceEdgeId = edgeId || null;
-    redrawFlowEdges();
-    if (!edgeId) return;
-    _flowSimTraceTimer = setTimeout(() => {
-        _flowSimTraceEdgeId = null;
-        redrawFlowEdges();
-    }, 900);
+    _flowSimState.currentNodeId = null;
 }
 
 function flowSimTakeFirstOutgoing(nodeId) {
     const edges = flowSimOutgoingEdges(nodeId);
     if (!edges.length) return null;
     const e = edges[0];
-    flowSimEdgeHighlight(e.id);
+    flowSimSetSimTrace(e.id);
     return e.to;
 }
 
@@ -8162,14 +8281,14 @@ function flowSimPickCondicaoBranch(nodeId, choiceSim) {
     if (want && flowCanvasNodeById(want)) {
         const hit = edges.find((x) => String(x.to) === want);
         if (hit) {
-            flowSimEdgeHighlight(hit.id);
+            flowSimSetSimTrace(hit.id);
             return hit.to;
         }
     }
     const labSim = edges.find((x) => /sim|yes|true|v\b/i.test(String(x.label || '')));
     const labNao = edges.find((x) => /não|nao|no|false|f\b/i.test(String(x.label || '')));
     const pick = choiceSim ? labSim || edges[0] : labNao || edges[1] || edges[0];
-    flowSimEdgeHighlight(pick.id);
+    flowSimSetSimTrace(pick.id);
     return pick.to;
 }
 
@@ -8184,33 +8303,6 @@ function flowSimChatAppend(kind, text) {
     box.scrollTop = box.scrollHeight;
 }
 
-function flowSimShowChoiceBar(show) {
-    const w = document.getElementById('flow-sim-choice-wrap');
-    if (!w) return;
-    if (show) {
-        w.classList.remove('hidden');
-        w.setAttribute('aria-hidden', 'false');
-    } else {
-        w.classList.add('hidden');
-        w.setAttribute('aria-hidden', 'true');
-    }
-}
-
-function flowSimResolveChoice(sim) {
-    flowSimShowChoiceBar(false);
-    if (_flowSimChoiceResolver) {
-        _flowSimChoiceResolver(!!sim);
-        _flowSimChoiceResolver = null;
-    }
-}
-
-function flowSimPromptSimNao() {
-    return new Promise((resolve) => {
-        _flowSimChoiceResolver = resolve;
-        flowSimShowChoiceBar(true);
-    });
-}
-
 function flowSimWaitUserLine() {
     return new Promise((resolve) => {
         _flowSimLineResolver = resolve;
@@ -8223,7 +8315,7 @@ function flowSimSendChat() {
     const v = String(inp.value || '').trim();
     inp.value = '';
     if (!v) return;
-    _flowSimContext.lastAnswer = v;
+    _flowSimState.context.lastAnswer = v;
     flowSimChatAppend('user', v);
     if (_flowSimLineResolver) {
         _flowSimLineResolver();
@@ -8248,7 +8340,7 @@ function flowSimClickNextStep() {
 
 function flowSimWaitAfterStepIfNeeded() {
     const stepOn = document.getElementById('flow-sim-step-toggle') && document.getElementById('flow-sim-step-toggle').checked;
-    if (!stepOn || !_flowSimRunning) return Promise.resolve();
+    if (!stepOn || !_flowSimState.running) return Promise.resolve();
     flowSimSetNextVisible(true);
     return new Promise((res) => {
         _flowSimStepWaitResolve = res;
@@ -8257,10 +8349,12 @@ function flowSimWaitAfterStepIfNeeded() {
 
 /**
  * Executa um nó e devolve o id do nó seguinte (ou null se fim).
- * Interpretador local: só lê DOM + _flowEdges.
+ * Interpretador local: syncFlowFormValuesIntoDom + DOM + _flowEdges (texto sempre atual do canvas).
  */
 async function flowSimulateStep(nodeId) {
-    if (!_flowSimRunning || !nodeId) return null;
+    if (!_flowSimState.running || !nodeId) return null;
+    syncFlowFormValuesIntoDom();
+    flowSimClearSimTraceImmediate();
     const el = flowCanvasNodeById(nodeId);
     if (!el) {
         flowSimChatAppend('sys', 'Bloco não encontrado: ' + nodeId);
@@ -8269,6 +8363,7 @@ async function flowSimulateStep(nodeId) {
     flowSimSetActiveNode(nodeId);
     const type = String(el.getAttribute('data-node-type') || el.getAttribute('data-flow-block') || '').toLowerCase();
     const cfg = flowSimReadNodeConfig(el);
+    const L = _flowSimState.lead;
 
     if (type === 'end') {
         flowSimChatAppend('bot', '— Fim do fluxo —');
@@ -8276,12 +8371,13 @@ async function flowSimulateStep(nodeId) {
     }
 
     if (type === 'condicao') {
-        const exprDisp = flowSimSubstituteVars(cfg.expression || '', _flowSimLead);
-        flowSimChatAppend('bot', exprDisp ? 'Condição: ' + exprDisp : 'Condição (avalie Sim/Não)');
-        const ok = await flowSimPromptSimNao();
-        _flowSimContext.lastAnswer = ok ? 'sim' : 'não';
-        const next = flowSimPickCondicaoBranch(nodeId, ok);
-        return next;
+        const exprDisp = flowSimSubstituteVars(cfg.expression || '', L);
+        await flowSimAppendBotWithTyping(
+            exprDisp ? 'Condição: ' + exprDisp : 'Condição (responda sim/não ou uma palavra que coincida com a legenda da aresta)',
+        );
+        await flowSimWaitUserLine();
+        const ans = _flowSimState.context.lastAnswer || '';
+        return flowSimResolveOutgoingFromText(nodeId, ans);
     }
 
     if (type === 'gpt' || type === 'agente_ia' || type === 'voice_studio') {
@@ -8291,7 +8387,7 @@ async function flowSimulateStep(nodeId) {
                 : type === 'gpt'
                   ? cfg.prompt || ''
                   : cfg.instructions || '';
-        const preview = flowSimSubstituteVars(raw, _flowSimLead);
+        const preview = flowSimSubstituteVars(raw, L);
         flowSimChatAppend('sys', 'A gerar resposta (simulado)…');
         await flowSimDelay(450);
         const fake =
@@ -8304,16 +8400,17 @@ async function flowSimulateStep(nodeId) {
     }
 
     if (type === 'conteudo') {
-        const t = flowSimSubstituteVars(cfg.body || '', _flowSimLead);
-        flowSimChatAppend('bot', t || '(mensagem vazia)');
+        const t = flowSimSubstituteVars(cfg.body || '', L);
+        await flowSimAppendBotWithTyping(t || '(mensagem vazia)');
         return flowSimTakeFirstOutgoing(nodeId);
     }
 
     if (type === 'pergunta') {
-        const q = flowSimSubstituteVars(cfg.question || '', _flowSimLead);
-        flowSimChatAppend('bot', q || '(pergunta vazia)');
+        const q = flowSimSubstituteVars(cfg.question || '', L);
+        await flowSimAppendBotWithTyping(q || '(pergunta vazia)');
         await flowSimWaitUserLine();
-        return flowSimTakeFirstOutgoing(nodeId);
+        const ans = _flowSimState.context.lastAnswer || '';
+        return flowSimResolveOutgoingFromText(nodeId, ans);
     }
 
     if (type === 'delay') {
@@ -8335,12 +8432,12 @@ async function flowSimulateStep(nodeId) {
         if (!pick) return null;
         const wdisp = String(cfg.weights || '').trim() || 'uniforme';
         flowSimChatAppend('sys', 'A/B: ramo por pesos (' + wdisp + ')');
-        flowSimEdgeHighlight(pick.id);
+        flowSimSetSimTrace(pick.id);
         return pick.to;
     }
 
     if (type === 'anotacao') {
-        const note = flowSimSubstituteVars(cfg.note || '', _flowSimLead);
+        const note = flowSimSubstituteVars(cfg.note || '', L);
         flowSimChatAppend('sys', 'Nota interna: ' + (note || '(vazia)'));
         return flowSimTakeFirstOutgoing(nodeId);
     }
@@ -8351,31 +8448,31 @@ async function flowSimulateStep(nodeId) {
     }
 
     if (type === 'acao' || type === 'notificar' || type === 'api') {
-        const bits = flowSimSubstituteVars(cfg.payload || cfg.message || cfg.body || cfg.url || '', _flowSimLead);
+        const bits = flowSimSubstituteVars(cfg.payload || cfg.message || cfg.body || cfg.url || '', L);
         if (bits) flowSimChatAppend('sys', '[' + type + '] ' + bits.slice(0, 200));
         else flowSimChatAppend('sys', 'Passo: ' + type);
         return flowSimTakeFirstOutgoing(nodeId);
     }
 
-    const fallback = flowSimSubstituteVars(cfg.body || cfg.step_name || '', _flowSimLead);
+    const fallback = flowSimSubstituteVars(cfg.body || cfg.step_name || '', L);
     if (fallback) flowSimChatAppend('bot', fallback);
     return flowSimTakeFirstOutgoing(nodeId);
 }
 
 async function flowSimRunner(startId) {
     let nid = startId;
-    while (nid && _flowSimRunning) {
+    while (nid && _flowSimState.running) {
         const next = await flowSimulateStep(nid);
         flowSimSetNextVisible(false);
-        if (!_flowSimRunning) break;
+        if (!_flowSimState.running) break;
         if (next == null) break;
         await flowSimWaitAfterStepIfNeeded();
-        if (!_flowSimRunning) break;
+        if (!_flowSimState.running) break;
         nid = next;
     }
     flowSimClearActiveNode();
-    flowSimEdgeHighlight(null);
-    if (_flowSimRunning) flowSimChatAppend('sys', '— Simulação terminada —');
+    flowSimClearSimTraceImmediate();
+    if (_flowSimState.running) flowSimChatAppend('sys', '— Simulação terminada —');
 }
 
 function flowSimAsyncRun(startId) {
@@ -8386,9 +8483,10 @@ function flowSimAsyncRun(startId) {
             console.warn('flowSimRunner', err);
             flowSimChatAppend('sys', 'Erro: ' + (err && err.message ? err.message : String(err)));
         } finally {
-            _flowSimRunning = false;
+            _flowSimState.running = false;
             flowSimSetNextVisible(false);
             flowSimClearActiveNode();
+            flowSimClearSimTraceImmediate();
         }
     })();
 }
@@ -8402,8 +8500,8 @@ function flowLocalSimulatorOpen() {
     const modal = document.getElementById('flow-sim-lead-modal');
     const nome = document.getElementById('flow-sim-lead-nome');
     const tel = document.getElementById('flow-sim-lead-tel');
-    if (nome) nome.value = _flowSimLead.nome || '';
-    if (tel) tel.value = _flowSimLead.telefone || '';
+    if (nome) nome.value = _flowSimState.lead.nome || '';
+    if (tel) tel.value = _flowSimState.lead.telefone || '';
     if (modal) {
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
@@ -8421,11 +8519,17 @@ function flowSimLeadCancel() {
 function flowSimLeadStart() {
     const nomeEl = document.getElementById('flow-sim-lead-nome');
     const telEl = document.getElementById('flow-sim-lead-tel');
-    _flowSimLead = {
+    _flowSimState.lead = {
         nome: nomeEl ? String(nomeEl.value || '').trim() : '',
         telefone: telEl ? String(telEl.value || '').trim() : '',
     };
-    _flowSimContext = { lastAnswer: '' };
+    _flowSimState.context = { lastAnswer: '' };
+    syncFlowFormValuesIntoDom();
+    const start = flowSimFindStartNodeId();
+    if (!start) {
+        toast('Adicione um bloco Gatilho ou Webhook ao canvas — a simulação inicia sempre aí.', 'rose');
+        return;
+    }
     flowSimLeadCancel();
     const chat = document.getElementById('flow-simulator-chat');
     if (chat) {
@@ -8435,46 +8539,39 @@ function flowSimLeadStart() {
     }
     const box = document.getElementById('flow-sim-messages');
     if (box) box.innerHTML = '';
-    flowSimShowChoiceBar(false);
-    syncFlowFormValuesIntoDom();
-    const start = flowSimFindStartNodeId();
-    if (!start) {
-        flowSimChatAppend('sys', 'Adicione blocos ao canvas para simular.');
-        return;
-    }
     flowSimResetHard();
-    _flowSimRunning = true;
-    flowSimChatAppend('sys', 'Lead: ' + (_flowSimLead.nome || '—') + ' · ' + (_flowSimLead.telefone || '—'));
+    _flowSimState.running = true;
+    flowSimChatAppend('sys', 'Lead: ' + (_flowSimState.lead.nome || '—') + ' · ' + (_flowSimState.lead.telefone || '—'));
     flowSimAsyncRun(start);
 }
 
+function flowSimRestart() {
+    flowSimResetHard();
+    const box = document.getElementById('flow-sim-messages');
+    if (box) box.innerHTML = '';
+    flowLocalSimulatorOpen();
+}
+
 function flowSimResetHard() {
-    _flowSimRunning = false;
+    _flowSimState.running = false;
     if (_flowSimLineResolver) {
         _flowSimLineResolver();
         _flowSimLineResolver = null;
-    }
-    if (_flowSimChoiceResolver) {
-        _flowSimChoiceResolver(false);
-        _flowSimChoiceResolver = null;
     }
     if (_flowSimStepWaitResolve) {
         _flowSimStepWaitResolve();
         _flowSimStepWaitResolve = null;
     }
-    flowSimShowChoiceBar(false);
     flowSimSetNextVisible(false);
     flowSimClearActiveNode();
-    _flowSimTraceEdgeId = null;
-    clearTimeout(_flowSimTraceTimer);
-    redrawFlowEdges();
+    flowSimClearSimTraceImmediate();
 }
 
 function flowSimReset() {
     flowSimResetHard();
     const box = document.getElementById('flow-sim-messages');
     if (box) box.innerHTML = '';
-    flowSimChatAppend('sys', 'Simulação reposta. Abra «Sim. canvas» para novo teste.');
+    flowSimChatAppend('sys', 'Simulação reposta. Use «Reiniciar simulação» ou «Sim. canvas» para novo teste.');
 }
 
 function flowSimulatorClosePanel() {
