@@ -77,7 +77,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Conteúdo",
         "runtime": "message",
         "required_config": (),
-        "optional_keys": ("body", "media_type"),
+        "optional_keys": ("step_name", "body", "media_type", "contents"),
     },
     "pergunta": {
         "label": "Pergunta",
@@ -89,7 +89,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Ação",
         "runtime": "action",
         "required_config": (),
-        "optional_keys": ("action_kind", "payload"),
+        "optional_keys": ("step_name", "action_kind", "payload", "body"),
     },
     "delay": {
         "label": "Delay",

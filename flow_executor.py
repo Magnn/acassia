@@ -177,13 +177,79 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
             )
             continue
 
-        # branch, split, llm, system, schedule — ignorar no envio direto (documentar no audit)
-        logger.info(
-            "flow_executor skip runtime=%s type=%s node_id=%s",
-            rk,
-            ntype,
-            st.get("node_id"),
-        )
+        if rk == "tts":
+            script = str(cfg.get("script") or cfg.get("body") or cfg.get("step_name") or "").strip()
+            if script:
+                acoes.append(Acao(tipo="tts", tts_template=script[:2000], metadata={"source": "flow_builder", "node_type": ntype}))
+            continue
+
+        if rk == "llm":
+            prompt = str(
+                cfg.get("prompt")
+                or cfg.get("instructions")
+                or cfg.get("body")
+                or cfg.get("step_name")
+                or ""
+            ).strip()
+            if prompt:
+                acoes.append(
+                    Acao(
+                        tipo="text",
+                        conteudo=prompt[:4000],
+                        metadata={"source": "flow_builder", "node_type": ntype, "runtime": "llm"},
+                    )
+                )
+            continue
+
+        if rk == "branch":
+            expr = str(cfg.get("expression") or "").strip()
+            if expr:
+                acoes.append(
+                    Acao(
+                        tipo="text",
+                        conteudo=f"🔀 Condição: {expr}"[:900],
+                        metadata={"source": "flow_builder", "runtime": "branch"},
+                    )
+                )
+            continue
+
+        if rk == "split":
+            weights = str(cfg.get("weights") or "").strip()
+            if weights:
+                acoes.append(
+                    Acao(
+                        tipo="text",
+                        conteudo=f"🧪 Divisão A/B: {weights}"[:900],
+                        metadata={"source": "flow_builder", "runtime": "split"},
+                    )
+                )
+            continue
+
+        if rk == "schedule":
+            tz = str(cfg.get("timezone") or "").strip()
+            if tz:
+                acoes.append(
+                    Acao(
+                        tipo="text",
+                        conteudo=f"🕒 Expediente ({tz}) configurado."[:900],
+                        metadata={"source": "flow_builder", "runtime": "schedule"},
+                    )
+                )
+            continue
+
+        if rk == "system":
+            hint = str(cfg.get("body") or cfg.get("module_hint") or cfg.get("step_name") or "").strip()
+            if hint:
+                acoes.append(
+                    Acao(
+                        tipo="text",
+                        conteudo=f"⚙️ Sistema: {hint}"[:900],
+                        metadata={"source": "flow_builder", "runtime": "system"},
+                    )
+                )
+            continue
+
+        logger.info("flow_executor skip runtime=%s type=%s node_id=%s", rk, ntype, st.get("node_id"))
 
     return acoes
 

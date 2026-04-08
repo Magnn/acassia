@@ -6633,11 +6633,39 @@ function addSpecificNode(type) {
     const fs = 'width:100%;margin-bottom:8px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
     const ta = 'width:100%;resize:none;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
     let bodyFields = '';
-    if (type === 'delay') {
+    if (type === 'trigger') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do gatilho..." class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="integration" placeholder="Integração (ex: whatsapp)" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="event" placeholder="Evento (ex: mensagem_recebida)" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="keyword" placeholder="Palavra-chave (opcional)" class="input-field" style="${fs}">`;
+    } else if (type === 'webhook') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do webhook..." class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="path" placeholder="/webhook/entrada" class="input-field" style="${fs}">`;
+    } else if (type === 'engine' || type === 'nucleo_ia') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Descrição do passo de sistema" style="${ta};height:44px"></textarea>`;
+    } else if (type === 'motor_ref') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo..." class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="module_hint" placeholder="flows/fase_X/arquivo.py" class="input-field" style="${fs}">`;
+    } else if (type === 'conteudo') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Texto base (fallback)" style="${ta};height:48px"></textarea>
+            <div class="flow-tag" style="font-size:10px">Dica: duplo clique neste bloco para montar Texto/Imagem/Áudio/Vídeo/Documento/Delay.</div>`;
+    } else if (type === 'delay') {
         bodyFields = `
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
             <input type="number" min="0" max="86400" step="1" data-flow-cfg="seconds" placeholder="Segundos de espera" class="input-field" style="${fs}">
             <textarea class="input-field" data-flow-cfg="body" placeholder="Nota (opcional)" style="${ta};height:40px"></textarea>`;
+    } else if (type === 'acao') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="action_kind" placeholder="Tipo da ação (opcional)" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="payload" placeholder="Payload / instrução da ação" style="${ta};height:50px"></textarea>`;
     } else if (type === 'api') {
         bodyFields = `
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
@@ -6671,6 +6699,25 @@ function addSpecificNode(type) {
         bodyFields = `
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
             <textarea class="input-field" data-flow-cfg="question" placeholder="Texto da pergunta" style="${ta};height:50px"></textarea>`;
+    } else if (type === 'condicao') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="expression" placeholder="Expressão da condição (ex: lead.score > 70)" style="${ta};height:46px"></textarea>
+            <input type="text" data-flow-cfg="true_to" placeholder="ID do nó quando verdadeiro (opcional)" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="false_to" placeholder="ID do nó quando falso (opcional)" class="input-field" style="${fs}">`;
+    } else if (type === 'divisao') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="weights" placeholder="Pesos A/B (ex: A:50,B:50)" class="input-field" style="${fs}">`;
+    } else if (type === 'expediente') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="timezone" placeholder="Timezone (ex: America/Sao_Paulo)" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="windows" placeholder="Janelas de atendimento (ex: seg-sex 09:00-18:00)" style="${ta};height:44px"></textarea>`;
+    } else if (type === 'end') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo final..." class="input-field" style="${fs}">
+            <div class="flow-tag" style="font-size:10px">Este bloco encerra o fluxo.</div>`;
     } else {
         bodyFields = `
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
