@@ -82,6 +82,12 @@ Objetivo: impedir que atualizacoes futuras apaguem comportamentos vitais ja esta
 - Regra de bloco deve exigir uso de dado concreto no diagnostico (blocos centrais).
 - Deve manter xeque-mate no bloco final com pergunta.
 - Deve tratar relato de entrega quebrada com reparo curto e retomada do node.
+- Deve manter os 5 pontos lógicos (Filemon) na progressão narrativa:
+  - reconhecimento do peso real,
+  - causa-raiz ativa,
+  - custo de permanecer igual,
+  - caminho/mecanismo com coerência no caso,
+  - pergunta final de compromisso (terminando com `?`).
 
 ### `flows/fase_2_leitura/node_7_interesse_desejo.py`
 
@@ -89,6 +95,12 @@ Objetivo: impedir que atualizacoes futuras apaguem comportamentos vitais ja esta
   - `_reacao_curta_ao_input`.
 - Deve ter fallback que nao ignora confirmacao/duvida do lead.
 - Deve tratar relato de entrega quebrada com reparo curto e retomada do node.
+- Deve preservar os 5 pontos lógicos (Filemon) em versão curta:
+  - validação do que foi dito pelo lead,
+  - explicitação da causa que sustenta o ciclo,
+  - consequência de inação,
+  - ponte para mecanismo coerente com o desejo declarado,
+  - pergunta final de permissão/compromisso (`?`).
 
 ### `flows/fase_3_oferta/node_8_oferta_principal.py`
 
