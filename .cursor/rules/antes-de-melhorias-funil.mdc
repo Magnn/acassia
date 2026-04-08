@@ -9,15 +9,16 @@ Este repositório acumulou **muitas melhorias acopladas** (nodes, `engine.py`, `
 
 ## Antes de mudar código (obrigatório)
 
-1. **Contratos e checklist** — Ler ou rever `docs/CONTRATOS_NAO_REGREDIR_FUNIL.md` e `flows/CHECKLIST_ETAPAS.md` para o nó ou camada afetada (motor, personalizer, recovery).
-2. **Camadas globais** — Se o fluxo envolve texto ao lead, verificar **`copy_sanitizer.py`** (`extrair_evidencias_conversa`, `motivo_redundancia_texto`) e **`engine.py`** (`_filtrar_acoes_redundantes_por_contexto`). Muitas “falhas de node” são **supressão de balão** ou evidência mal calibrada.
-3. **Sniffer e metadata** — Alterações em `engine.py` (sniffer fase 1) ou `sniffer_fase1.py` afetam **vários nodes** (1→3, Instagram, `aprofundamento_texto`, `foto_recebida`). Grep por chaves de `metadata` que o nó usa antes de renomear ou duplicar lógica.
-4. **O próprio nó** — Ler cabeçalho e comentários do `node_*.py`; buscar no ficheiro por `TODO`, `FIX`, `event=`, guardrails e fast-track. Não reintroduzir caminhos que já foram substituídos por uma versão mais nova.
-5. **Evitar duplicação** — Antes de adicionar regex, cooldown ou novo flag em metadata, **grep** no repo por palavras-chave do problema (ex.: `conseguiu salvar`, `tentativas_previas`, `aprofundamento`). Preferir **estreitar** regra existente a criar segunda regra conflituosa.
+1. **Contratos e checklist** — Ler ou rever `docs/CONTRATOS_NAO_REGREDIR_FUNIL.md`, `docs/FUNIL_MATRIZ_OBRIGATORIOS.md` e `flows/CHECKLIST_ETAPAS.md` para o nó ou camada afetada (motor, personalizer, recovery).
+2. **Predicados fase 1** — Nome/contato/foto/desabafo/burst: `flows/funnel_gates.py` (evitar duplicar a mesma regra no sniffer vs node sem atualizar os dois).
+3. **Camadas globais** — Se o fluxo envolve texto ao lead, verificar **`copy_sanitizer.py`** (`extrair_evidencias_conversa`, `motivo_redundancia_texto`) e **`engine.py`** (`_filtrar_acoes_redundantes_por_contexto`). Muitas “falhas de node” são **supressão de balão** ou evidência mal calibrada.
+4. **Sniffer e metadata** — Alterações em `engine.py` (sniffer fase 1) ou `sniffer_fase1.py` afetam **vários nodes** (1→3, Instagram, `aprofundamento_texto`, `foto_recebida`). Grep por chaves de `metadata` que o nó usa antes de renomear ou duplicar lógica.
+5. **O próprio nó** — Ler cabeçalho e comentários do `node_*.py`; buscar no ficheiro por `TODO`, `FIX`, `event=`, guardrails e fast-track. Não reintroduzir caminhos que já foram substituídos por uma versão mais nova.
+6. **Evitar duplicação** — Antes de adicionar regex, cooldown ou novo flag em metadata, **grep** no repo por palavras-chave do problema (ex.: `conseguiu salvar`, `tentativas_previas`, `aprofundamento`). Preferir **estreitar** regra existente a criar segunda regra conflituosa.
 
 ## Depois de mudar (mínimo)
 
-- Correr `python scripts/teste_node1_guardrails.py`, `teste_node2`, `teste_node3` quando tocar fase 1; `python scripts/simular_funil_e2e.py` para impacto transversal.
+- Correr `python scripts/teste_node1_guardrails.py`, `teste_node2`, `teste_node3` quando tocar fase 1; `python scripts/teste_funnel_sequencias.py` (predicados `funnel_gates`); `python scripts/simular_funil_e2e.py` para impacto transversal.
 - Se tocou redundância/supressão: cenário mental **“lead disse sim/ok”** + **“bot pergunta contato/foto/tentativas”** — não suprimir pergunta legítima por regex largo demais.
 
 ## Regressões recentes (memória de equipa)

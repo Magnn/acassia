@@ -62,6 +62,7 @@ Objetivo: impedir que atualizacoes futuras apaguem comportamentos vitais ja esta
 - Deve manter limite e saneamento final de baloes no inicio.
 - Deve evitar repeticao de instituicao/vaga no mesmo turno.
 - Deve manter pergunta final quando nome ainda nao estiver claro.
+- Burst para coleta sem node 2 deve seguir `flows/funnel_gates.pode_burst_coleta_sem_node2` (ver `docs/FUNIL_MATRIZ_OBRIGATORIOS.md`).
 
 ### `flows/fase_1_saudacao/node_2_salvar_contato.py`
 

@@ -47,6 +47,7 @@ from flows.fase_1_saudacao.sniffer_fase1 import (
     resolver_avanco_node_fase1,
     sniffer_instagram_meta,
 )
+from flows.funnel_gates import nome_eh_placeholder
 
 # 🚨 IMPORTAÇÃO DAS DATACLASSES CENTRALIZADAS (Resolve o ImportError)
 from schema import Acao, ContextoConversa
@@ -352,10 +353,9 @@ class Engine:
                 # evita nodes usarem a primeira palavra da mensagem atual ("mandei", "foto") quando o JSON não tem nome_lead.
                 nm_db = (getattr(lead, "nome", None) or "").strip()
                 nm_meta = (ctx.metadata.get("nome_lead") or "").strip()
-                _ph = frozenset({"meu bem", "meu anjo", "minha estrela"})
 
                 def _nome_ok(n: str) -> bool:
-                    return bool(n) and n.lower() not in _ph
+                    return not nome_eh_placeholder(n)
 
                 if _nome_ok(nm_db):
                     ctx.metadata["nome_lead"] = nm_db
@@ -441,6 +441,22 @@ class Engine:
                 promover_burst_fase1_meta(meta, _tf_fase1, lead.id, lead)
                 resolver_avanco_node_fase1(lead, ctx, meta)
                 ctx.metadata = meta
+
+                try:
+                    from flows.funnel_gates import snapshot_fase1_coleta
+
+                    _nm_snap = (
+                        (getattr(ctx, "nome_lead", None) or meta.get("nome_lead") or "")
+                    ).strip()
+                    _snap = snapshot_fase1_coleta(meta, _nm_snap, texto_sniff or "")
+                    logger.info(
+                        "event=funnel_snapshot_fase1 lead=%s node=%s snap=%s",
+                        lead.id,
+                        getattr(ctx, "node_atual", ""),
+                        _snap,
+                    )
+                except Exception:
+                    pass
 
                 # Enriquecimento IA (com curto-circuito para alta escala)
                 if self._pular_nlu_ia(ctx.texto_recebido, tipo_msg):

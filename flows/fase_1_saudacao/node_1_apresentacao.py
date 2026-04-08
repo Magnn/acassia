@@ -16,7 +16,11 @@ from typing import Dict, List, Optional, Tuple
 
 from copy_sanitizer import preparar_texto_envio
 from schema import Acao, slice_historico_para_ia
-from flows.fase_1_saudacao.node_2_salvar_contato import texto_indica_contato_salvo
+from flows.funnel_gates import (
+    nome_eh_placeholder,
+    pode_burst_coleta_sem_node2,
+    VOCATIVO_SEM_NOME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +227,7 @@ def _briefing_comportamental(
             "[AMOR] Há tema afetivo. Acolha sem prometer milagre; leitura vem nas etapas seguintes. Ecoar leve em D se couber."
         )
 
-    if nome == "meu bem":
+    if nome_eh_placeholder(nome):
         linhas.append(
             "[NOME] Nome desconhecido: C_nome deve ser pergunta calorosa (não null), "
             "ex.: «Me diz como você se chama, meu bem? Assim eu te falo direito.»; D_confirmacao = null."
@@ -278,17 +282,10 @@ def _pode_ir_direto_coleta_sem_node2(ctx, nome: str, blob_ctx: str) -> bool:
     """
     Burst inicial já trouxe foto + desabafo/intenção + nome + 'salvei contato' —
     evita repetir o ritual do node 2 na mesma entrada.
+    (Regra canónica: `flows.funnel_gates.pode_burst_coleta_sem_node2`.)
     """
     meta = getattr(ctx, "metadata", {}) or {}
-    if nome == "meu bem":
-        return False
-    if not (meta.get("lead_contato_salvo_declarado") or texto_indica_contato_salvo(blob_ctx)):
-        return False
-    if not meta.get("foto_recebida"):
-        return False
-    if not meta.get("desabafo_recebido"):
-        return False
-    return True
+    return pode_burst_coleta_sem_node2(meta, nome, blob_ctx)
 
 
 def _blob_user_para_extrair_nome(ctx, msg_raw: str) -> str:
@@ -432,7 +429,7 @@ def _ajustar_abertura_curta_node1(baloes: List[str], nome: str) -> List[str]:
             out[0] = "Entendi o que você trouxe. Vamos tratar isso com calma e firmeza desde o início."
     texto_total = " ".join(out)
     if "?" not in texto_total and "👇" not in texto_total:
-        if nome != "meu bem":
+        if not nome_eh_placeholder(nome):
             out.append(f"{nome}, posso te guiar no próximo passo? 👇")
         else:
             out.append("Me diz como você se chama, meu bem? Assim eu te falo direito.")
@@ -482,7 +479,7 @@ def _fallback_d_confirmacao(
     vs = _node1_vaga_settings(metadata)
     vaga_on = bool(vs.get("ativo", True))
 
-    if nome == "meu bem":
+    if nome_eh_placeholder(nome):
         return "Quando me disser teu nome, eu te puxo pro próximo passo com calma. Como você prefere que eu te chame? 👇"
 
     # Tom de leitura: não repetir vaga/consulta se já foi dita em extra/A/B (evita "ridículo" duplicado).
@@ -582,7 +579,7 @@ def _montar_baloes_do_json(
     blocos.append(_garantir_pontuacao_final(a))
     blocos.append(_garantir_pontuacao_final(b))
 
-    if nome == "meu bem":
+    if nome_eh_placeholder(nome):
         c_txt = ""
         if c_raw is not None and str(c_raw).strip().lower() not in ("null", "none", ""):
             c_txt = str(c_raw).strip()
@@ -703,7 +700,7 @@ def _gerar_fallback(
     if vaga_txt:
         acoes.append(Acao(tipo="delay", segundos=random.randint(4, 8)))
         acoes.append(Acao(tipo="text", conteudo=vaga_txt))
-    if nome == "meu bem":
+    if nome_eh_placeholder(nome):
         acoes.append(Acao(tipo="delay", segundos=random.randint(6, 10)))
         acoes.append(
             Acao(
@@ -755,7 +752,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     is_basic = not tem_gatilho and any(msg_limpa == r for r in _RUIDO_INICIAL) and len(msg_limpa.split()) <= 6
 
     # ── 2. Name Lock ──
-    nome = "meu bem"
+    nome = VOCATIVO_SEM_NOME
     nome_extraido = _extrair_primeiro_nome(blob_ctx)
     if nome_extraido:
         nome = nome_extraido
@@ -806,7 +803,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 texto_total = " ".join(baloes_limpos)
                 if "?" not in texto_total and "👇" not in texto_total:
                     logger.info("🔧 [NODE 1] Hook Assurance (D sem pergunta).")
-                    if nome != "meu bem":
+                    if not nome_eh_placeholder(nome):
                         baloes_limpos.append(
                             f"{nome}, posso seguir contigo no próximo passo? 👇"
                         )

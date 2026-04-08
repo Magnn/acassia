@@ -24,6 +24,7 @@ from copy_sanitizer import (
     limpar_colagem_primeira_msg_whatsapp_em_texto,
 )
 from conversation_policy import lead_reportou_problema_entrega
+from flows.funnel_gates import VOCATIVO_SEM_NOME, nome_eh_placeholder
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,6 @@ REGRAS:
 # 🚨 FIX APLICADO: Regex sincronizado com o Node 1
 _REGEX_CORTE_FATAL = r"([,;:\-]|\b(?:a|ao|as|e|é|eh|éh|foi|o|os|se|à|em|mas|ou|um|uma|que|de|do|da|com|por|para|sem|são|tão|tbm|também|esse|essa|isso|isto|nele|nela|nisso|nisto))\s*$"
 
-_PLACEHOLDER_NOMES = frozenset({"meu bem", "meu anjo", "minha estrela"})
 _MAX_CHARS_BALAO_NODE2 = 210
 _MAX_CHARS_NODE2_EXPLICA = 160
 _MAX_CHARS_NODE2_CONFIRMA = 120
@@ -86,7 +86,7 @@ _RE_OBJECAO_CARD = re.compile(
 
 def _nome_valido_guardado(n: str) -> bool:
     s = (n or "").strip()
-    return bool(s) and s.lower() not in _PLACEHOLDER_NOMES
+    return bool(s) and not nome_eh_placeholder(s)
 
 
 def _nome_ja_conhecido(meta: dict, ctx) -> str:
@@ -100,7 +100,7 @@ def _nome_ja_conhecido(meta: dict, ctx) -> str:
 def _limpar_nome(texto: str) -> str:
     """Extrai nome apenas com apresentação explícita; caso contrário, mantém vocativo neutro."""
     if not texto:
-        return "meu bem"
+        return VOCATIVO_SEM_NOME
 
     texto_limpo = re.sub(r"[^\w\s]", "", texto)
     entrada_original = texto.strip()
@@ -134,7 +134,7 @@ def _limpar_nome(texto: str) -> str:
         if (
             2 <= len(cand_me) <= 24
             and cl not in palavras_lixo
-            and cl not in _PLACEHOLDER_NOMES
+            and not nome_eh_placeholder(cl)
         ):
             return cand_me.capitalize()
 
@@ -146,12 +146,12 @@ def _limpar_nome(texto: str) -> str:
         if (
             2 <= len(cand) <= 24
             and cand_l not in palavras_lixo
-            and cand_l not in _PLACEHOLDER_NOMES
+            and not nome_eh_placeholder(cand_l)
         ):
             return cand.capitalize()
 
     # Sem padrão explícito de apresentação, não tenta adivinhar nome.
-    return "meu bem"
+    return VOCATIVO_SEM_NOME
 
 def _delay_digitacao(texto: str) -> int:
     """Simula o tempo de digitação humana."""
@@ -312,7 +312,7 @@ def _executar_fast_track_para_coleta(
     meta["lead_contato_salvo_declarado"] = True
     meta["node2_contato_ja_reconhecido"] = True
     meta["node2_fast_track_usado"] = True
-    voc = nome if _nome_valido_guardado(nome) else "meu bem"
+    voc = nome if _nome_valido_guardado(nome) else VOCATIVO_SEM_NOME
     acoes: List[Acao] = []
     linha_extra = ""
     if _lead_pergunta_preco(ctx, msg_lead):
@@ -362,7 +362,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     msg_lower = msg_lead.lower()
 
     if lead_reportou_problema_entrega(msg_lead):
-        nome_curto = (ctx.nome_lead or meta.get("nome_lead") or "meu bem").strip() or "meu bem"
+        nome_curto = (ctx.nome_lead or meta.get("nome_lead") or VOCATIVO_SEM_NOME).strip() or VOCATIVO_SEM_NOME
         acoes_reparo = [
             Acao(tipo="delay", segundos=random.randint(3, 5)),
             Acao(
@@ -384,7 +384,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             logger.warning("⏱️ [NODE 2] Reparo de entrega lento: %.2fs", elapsed)
         return acoes_reparo, "2_salvar_contato"
     if _RE_OBJECAO_CARD.search(msg_lead):
-        nome_curto = (ctx.nome_lead or meta.get("nome_lead") or "meu bem").strip() or "meu bem"
+        nome_curto = (ctx.nome_lead or meta.get("nome_lead") or VOCATIVO_SEM_NOME).strip() or VOCATIVO_SEM_NOME
         acoes_card = [
             Acao(tipo="delay", segundos=random.randint(3, 5)),
             Acao(

@@ -24,6 +24,7 @@ from copy_sanitizer import (
     tentar_salvar_balao_ia_cortado,
 )
 from conversation_policy import lead_reportou_problema_entrega
+from flows.funnel_gates import nome_eh_placeholder
 import flows.fase_2_leitura.node_5_processa_leitura as maestro
 
 logger = logging.getLogger(__name__)
@@ -187,7 +188,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 handle = _handle_instagram_para_fallback(link_ig)
                 voc = (
                     nome_fmt
-                    if nome_fmt and str(nome_fmt).strip().lower() not in ("meu bem", "meu anjo")
+                    if nome_fmt and not nome_eh_placeholder(str(nome_fmt))
                     else "você"
                 )
                 if handle:

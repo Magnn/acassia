@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from db.models import Lead, Mensagem
+from flows.funnel_gates import nome_eh_placeholder
 
 _RE_WORD = re.compile(r"[a-zà-ú]{3,}", re.I)
 _STOPWORDS = {
@@ -196,7 +197,7 @@ def score_lead_personalizacao(lead: Lead, mensagens: List[Mensagem]) -> Dict[str
     evento_gatilho = str(meta.get("evento_gatilho", "") or "").strip()
 
     # 1) Vocativo / com quem fala
-    nome_ok = bool(nome) and nome.lower() not in {"meu bem", "meu anjo", "minha estrela"}
+    nome_ok = bool(nome) and not nome_eh_placeholder(nome)
     nome_mencoes = 0
     if nome_ok:
         alvo = nome.split()[0].lower()
