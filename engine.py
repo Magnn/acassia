@@ -346,6 +346,32 @@ class Engine:
                     with self._lock_proc:
                         self._leads_em_processamento.pop(lead.id, None)
                     return {"status": "paused"}
+                if self._lead_ja_passou_funil_ou_comprou(lead):
+                    # Cliente já convertido/pós-funil não reentra no funil automático.
+                    if not bool(getattr(lead, "bot_pausado", False)):
+                        lead.bot_pausado = True
+                    try:
+                        db.add(
+                            EventoAudit(
+                                lead_id=lead.id,
+                                evento="handoff_silencioso_pos_funil",
+                                dados={
+                                    "node_atual": str(getattr(lead, "node_atual", "") or ""),
+                                    "convertido": bool(getattr(lead, "convertido", False)),
+                                    "produto_comprado": str(getattr(lead, "produto_comprado", "") or "")[:120],
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
+                    logger.info(
+                        "⏸️ [HANDOFF] Lead pós-funil/comprador (%s) desviado para atendimento silencioso.",
+                        telefone,
+                    )
+                    db.commit()
+                    with self._lock_proc:
+                        self._leads_em_processamento.pop(lead.id, None)
+                    return {"status": "paused_pos_funil"}
 
                 # INJEÇÃO DA CONFIGURAÇÃO CENTRALIZADA
                 ctx.metadata["__config__"] = CONFIG_CLIENTE
@@ -1042,6 +1068,21 @@ class Engine:
             if s and not nome_eh_placeholder(s):
                 return s.split()[0].strip().capitalize()
         return VOCATIVO_SEM_NOME
+
+    @staticmethod
+    def _lead_ja_passou_funil_ou_comprou(lead) -> bool:
+        if bool(getattr(lead, "convertido", False)):
+            return True
+        if str(getattr(lead, "produto_comprado", "") or "").strip():
+            return True
+        meta = getattr(lead, "metadata_json", None) or {}
+        if not isinstance(meta, dict):
+            return False
+        return bool(
+            meta.get("ja_passou_funil")
+            or meta.get("cliente_existente")
+            or meta.get("atendimento_pos_funil")
+        )
 
     def _rotear_state_machine(self, db, lead, ctx: ContextoConversa) -> list[Acao]:
         if self._lead_reportou_problema_entrega(ctx.texto_recebido or ""):
