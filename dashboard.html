@@ -965,6 +965,15 @@
             .flow-node:hover { transform: none; }
         }
         .flow-node:active { cursor: grabbing; z-index: 50; }
+        .flow-node.flow-node--dragging {
+            z-index: 70 !important;
+            cursor: grabbing !important;
+            transform: none !important;
+            transition: none !important;
+            box-shadow:
+                0 8px 16px -4px rgb(0 0 0 / 0.12),
+                0 4px 8px -4px rgb(0 0 0 / 0.08);
+        }
         .flow-node:hover {
             box-shadow:
                 0 12px 20px -6px rgb(0 0 0 / 0.1),
@@ -5488,6 +5497,8 @@ let _flowZoom = 1;
 /** Pan em px (espaço do #flow-canvas-viewport, antes do scale) — não altera posições JSON dos blocos */
 let _flowPanX = 0;
 let _flowPanY = 0;
+/** Redesenho de arestas durante arrasto (1x por frame) */
+let _flowEdgeRedrawRaf = null;
 let _flowHistory = [];
 let _flowHistPointer = -1;
 let _flowHistoryRestoring = false;
@@ -6092,33 +6103,49 @@ function applyFlowEdgeInspectorConfig() {
 }
 
 /**
+ * Centro visual de um ● (conn-dot) em coordenadas de mundo — inclui transform CSS (ex.: translateY(-50%)).
+ */
+function flowHandleWorldCenter(dotEl) {
+    if (!dotEl) return { x: 0, y: 0 };
+    const r = dotEl.getBoundingClientRect();
+    return flowViewportClientToWorld(r.left + r.width / 2, r.top + r.height / 2);
+}
+
+function flowNodeEdgeFallbackWorld(fromEl, toEl) {
+    const fr = fromEl.getBoundingClientRect();
+    const tr = toEl.getBoundingClientRect();
+    const o = flowViewportClientToWorld(fr.right, fr.top + fr.height / 2);
+    const i = flowViewportClientToWorld(tr.left, tr.top + tr.height / 2);
+    return { x1: o.x, y1: o.y, x2: i.x, y2: i.y };
+}
+
+/**
  * Ancoragem em coordenadas de mundo (px no #flow-viewport), independentes de pan/zoom visual.
  */
 function flowGetEdgeAnchorWorldPoints(fromEl, toEl) {
     const out = fromEl.querySelector('.conn-right');
     const inn = toEl.querySelector('.conn-left');
-    const fl = parseFloat(fromEl.style.left) || 0;
-    const ft = parseFloat(fromEl.style.top) || 0;
-    const tl = parseFloat(toEl.style.left) || 0;
-    const tt = parseFloat(toEl.style.top) || 0;
     if (out && inn) {
-        return {
-            x1: fl + out.offsetLeft + out.offsetWidth,
-            y1: ft + out.offsetTop + out.offsetHeight / 2,
-            x2: tl + inn.offsetLeft,
-            y2: tt + inn.offsetTop + inn.offsetHeight / 2,
-        };
+        const p1 = flowHandleWorldCenter(out);
+        const p2 = flowHandleWorldCenter(inn);
+        return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
     }
-    const fw = fromEl.offsetWidth || 268;
-    const fh = fromEl.offsetHeight || 120;
-    const tw = toEl.offsetWidth || 268;
-    const th = toEl.offsetHeight || 120;
-    return {
-        x1: fl + fw - 6,
-        y1: ft + fh / 2,
-        x2: tl + 6,
-        y2: tt + th / 2,
-    };
+    return flowNodeEdgeFallbackWorld(fromEl, toEl);
+}
+
+function flowCancelScheduledEdgeRedraw() {
+    if (_flowEdgeRedrawRaf != null) {
+        cancelAnimationFrame(_flowEdgeRedrawRaf);
+        _flowEdgeRedrawRaf = null;
+    }
+}
+
+function scheduleRedrawFlowEdges() {
+    if (_flowEdgeRedrawRaf != null) return;
+    _flowEdgeRedrawRaf = requestAnimationFrame(() => {
+        _flowEdgeRedrawRaf = null;
+        redrawFlowEdges();
+    });
 }
 
 function flowFlowWorldExtent() {
@@ -6278,13 +6305,10 @@ function flowWireMove(e) {
     if (!fromEl) return;
     const out = fromEl.querySelector('.conn-right');
     if (!out) return;
-    const fl = parseFloat(fromEl.style.left) || 0;
-    const ft = parseFloat(fromEl.style.top) || 0;
-    const x1 = fl + out.offsetLeft + out.offsetWidth;
-    const y1 = ft + out.offsetTop + out.offsetHeight / 2;
+    const p1 = flowHandleWorldCenter(out);
     const w = flowViewportClientToWorld(e.clientX, e.clientY);
     const path = document.getElementById('flow-temp-wire-path');
-    if (path) path.setAttribute('d', flowSmoothBezierPathD(x1, y1, w.x, w.y));
+    if (path) path.setAttribute('d', flowSmoothBezierPathD(p1.x, p1.y, w.x, w.y));
 }
 
 function flowWireUp(e) {
@@ -11779,6 +11803,7 @@ function initDragAndDrop() {
         head.onmousedown = function (e) {
             if (e.button !== 0) return;
             draggedNode = this.parentElement;
+            if (draggedNode) draggedNode.classList.add('flow-node--dragging');
             _flowDragMoved = false;
             const z = parseFloat(String(_flowZoom || 1)) || 1;
             _flowDragStart = {
@@ -11814,16 +11839,20 @@ function dragNode(e) {
     }
     draggedNode.style.left = Math.max(0, nx) + 'px';
     draggedNode.style.top = Math.max(0, ny) + 'px';
+    scheduleRedrawFlowEdges();
 }
 
 function stopDrag() {
     const moved = _flowDragMoved;
-    if (draggedNode && moved) pushFlowHistory();
+    const nodeEl = draggedNode;
+    if (nodeEl) nodeEl.classList.remove('flow-node--dragging');
+    if (nodeEl && moved) pushFlowHistory();
     draggedNode = null;
     _flowDragStart = null;
     _flowDragMoved = false;
     document.onmousemove = null;
     document.onmouseup = null;
+    flowCancelScheduledEdgeRedraw();
     redrawFlowEdges();
     updateFlowMinimap();
     if (moved) requestFlowAutoSave();
