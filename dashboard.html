@@ -1106,6 +1106,49 @@
         .toast-emerald { border-left: 3px solid var(--c-emerald); }
         .toast-rose    { border-left: 3px solid var(--c-rose); }
         .toast-purple  { border-left: 3px solid var(--c-purple); }
+        .toast-amber   { border-left: 3px solid var(--c-amber); }
+
+        kbd {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--c-surface2);
+            border: 1px solid var(--c-border);
+            color: var(--c-text);
+        }
+
+        button:focus-visible,
+        a:focus-visible,
+        .nav-item:focus-visible,
+        .sub-item:focus-visible,
+        .icon-btn:focus-visible {
+            outline: 2px solid var(--c-purple2);
+            outline-offset: 2px;
+        }
+
+        #app-busy-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 14px;
+            background: rgba(15, 23, 42, 0.38);
+            backdrop-filter: blur(3px);
+        }
+        #app-busy-overlay.app-busy-on { display: flex; }
+        .app-busy-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255, 255, 255, 0.25);
+            border-top-color: var(--c-purple2);
+            border-radius: 50%;
+            animation: appSpin 0.75s linear infinite;
+        }
+        @keyframes appSpin { to { transform: rotate(360deg); } }
 
         /* ── STATUS DOT ──────────────────────────────────────────── */
         .status-dot {
@@ -1200,7 +1243,12 @@
 <body>
 
 <!-- TOAST CONTAINER -->
-<div id="toast-container"></div>
+<div id="toast-container" role="status" aria-live="polite" aria-relevant="additions"></div>
+
+<div id="app-busy-overlay" aria-busy="false" aria-hidden="true">
+    <div class="app-busy-spinner" aria-hidden="true"></div>
+    <span id="app-busy-label" style="color:#fff;font-size:13px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,0.35)">A processar…</span>
+</div>
 
 <!-- MODAL NOVO FLUXO (FORMULÁRIO) -->
 <div id="modal-new-flow" class="fixed inset-0 bg-black/60 z-[60] hidden flex items-center justify-center backdrop-blur-sm modal-overlay">
@@ -1496,8 +1544,8 @@
             </div>
         </div>
         <div style="display:flex;gap:8px">
-            <button class="btn btn-ghost" style="font-size:12px"><i class="fas fa-bell"></i></button>
-            <button class="btn btn-ghost" style="font-size:12px"><i class="fas fa-question-circle"></i></button>
+            <button type="button" class="btn btn-ghost" style="font-size:12px" title="Notificações (em breve)" disabled aria-disabled="true"><i class="fas fa-bell"></i></button>
+            <button type="button" class="btn btn-ghost" style="font-size:12px" title="Ajuda e ligação API" onclick="openAppHelpModal()"><i class="fas fa-question-circle"></i></button>
         </div>
     </header>
 
@@ -2092,6 +2140,16 @@
             <h1 class="cfg-h1"><i class="fas fa-cog" style="color:var(--c-purple2)"></i> Configurações</h1>
             <p class="cfg-sub">Preferências do workspace e da conta. Isto não é a página de integrações com terceiros — use o menu <strong>Integrações</strong> para webhooks e gateways.</p>
             <div class="cfg-list">
+                <div class="card" style="flex-direction:column;align-items:stretch;gap:10px">
+                    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-start">
+                        <div>
+                            <div style="font-weight:700;font-size:13px;color:var(--c-text)">Tenant (API)</div>
+                            <div style="font-size:11px;color:var(--c-muted);margin-top:2px">Valor enviado em todas as requisições <code style="font-size:10px">X-Acassia-Tenant</code> (multi-tenant / isolamento no backend).</div>
+                        </div>
+                        <button type="button" class="btn btn-primary" style="font-size:11px;flex-shrink:0" onclick="saveTenantSetting()"><i class="fas fa-save"></i> Guardar</button>
+                    </div>
+                    <input id="cfg-tenant-input" type="text" class="input-field" style="max-width:100%;font-size:12px;padding:10px 12px" placeholder="default" autocomplete="off" aria-label="Identificador do tenant">
+                </div>
                 <div class="card">
                     <div>
                         <div style="font-weight:700;font-size:13px;color:var(--c-text)">Dispositivos WhatsApp</div>
@@ -2568,6 +2626,24 @@
         </div>
     </div>
 
+    <div id="modal-app-help" class="modal-overlay hidden fixed inset-0 z-[85] bg-black/50 flex items-center justify-center p-4" onclick="if(event.target===this) closeAppHelpModal()">
+        <div class="modal-content card" style="width:500px;max-width:96vw;padding:18px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;box-shadow:var(--shadow)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:12px">
+                <div>
+                    <strong style="font-family:var(--f-display);font-size:15px;color:var(--c-text)">Ajuda rápida — AcassIA</strong>
+                    <div style="font-size:10px;color:var(--c-muted);margin-top:4px">Ligação, tenant e atalhos do construtor</div>
+                </div>
+                <button type="button" class="icon-btn" onclick="closeAppHelpModal()" title="Fechar (Esc)"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="font-size:11px;color:var(--c-muted);line-height:1.75">
+                <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Estado do servidor</strong> — O indicador verde no cabeçalho confirma <code style="font-size:10px">GET /api/health</code>. Vermelho: servidor parado, rede ou URL errada.</p>
+                <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Tenant</strong> — Em <strong>Configurações</strong> (ícone de roda) defina o tenant. Todas as chamadas <code style="font-size:10px">/api/*</code> enviam o cabeçalho <code style="font-size:10px">X-Acassia-Tenant</code>.</p>
+                <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Flow Builder</strong> — <kbd>Ctrl</kbd>+roda para zoom; <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Shift+Z</kbd> histórico; <kbd>?</kbd> atalhos do canvas; <kbd>Esc</kbd> fecha painéis.</p>
+                <p style="margin:0"><strong style="color:var(--c-text)">Pedidos API</strong> — Timeout automático (~30s) em chamadas à API local para evitar ecrãs presos.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- ================================================================ -->
     <!-- VIEW: VOICE STUDIO                                              -->
     <!-- ================================================================ -->
@@ -2866,6 +2942,7 @@ const API = window.location.origin;
 
 (function () {
     const _f = window.fetch.bind(window);
+    const API_TIMEOUT_MS = 30000;
     window.fetch = function (input, init) {
         try {
             const u = typeof input === 'string' ? input : (input && input.url) || '';
@@ -2876,6 +2953,12 @@ const API = window.location.origin;
                     h.set('X-Acassia-Tenant', (localStorage.getItem('acassia_tenant') || 'default').trim() || 'default');
                 }
                 init.headers = h;
+                if (!init.signal) {
+                    const ac = new AbortController();
+                    const tid = setTimeout(() => ac.abort(), API_TIMEOUT_MS);
+                    init.signal = ac.signal;
+                    return _f(input, init).finally(() => clearTimeout(tid));
+                }
                 return _f(input, init);
             }
         } catch (_) {}
@@ -2923,10 +3006,115 @@ function isToday(dateString) {
 function toast(msg, type = 'purple') {
     const t = document.createElement('div');
     t.className = `toast toast-${type}`;
-    const icons = { purple:'fas fa-info-circle', emerald:'fas fa-check-circle', rose:'fas fa-times-circle' };
-    t.innerHTML = `<i class="${icons[type]||icons.purple}" style="color:var(--c-${type})"></i> ${msg}`;
-    document.getElementById('toast-container').appendChild(t);
+    t.setAttribute('role', 'status');
+    const icons = {
+        purple: 'fas fa-info-circle',
+        emerald: 'fas fa-check-circle',
+        rose: 'fas fa-times-circle',
+        amber: 'fas fa-exclamation-circle',
+    };
+    const col = type === 'amber' ? 'var(--c-amber)' : `var(--c-${type})`;
+    const ic = document.createElement('i');
+    ic.className = icons[type] || icons.purple;
+    ic.style.color = col;
+    const span = document.createElement('span');
+    span.textContent = String(msg);
+    t.appendChild(ic);
+    t.appendChild(span);
+    const c = document.getElementById('toast-container');
+    if (c) c.appendChild(t);
     setTimeout(() => t.remove(), 3500);
+}
+
+let _healthPollTimer = null;
+let _lastUnhandledToast = 0;
+
+function setHeaderConnectionStatus(ok, detail) {
+    const dot = document.querySelector('#global-header .header-meta .status-dot');
+    const span = document.getElementById('header-status');
+    if (dot) {
+        dot.classList.toggle('dot-online', !!ok);
+        dot.classList.toggle('dot-paused', !ok);
+    }
+    if (span) {
+        span.textContent = ok ? 'Sistema online' : 'Sem ligação ao servidor';
+        span.style.color = ok ? 'var(--c-emerald)' : 'var(--c-rose)';
+        if (detail && ok) span.setAttribute('title', detail);
+        else if (!ok) span.setAttribute('title', 'Verifique se o Flask está a correr e a porta.');
+        else span.removeAttribute('title');
+    }
+}
+
+async function pollApiHealth() {
+    const ac = new AbortController();
+    const tid = setTimeout(() => ac.abort(), 6000);
+    try {
+        const r = await fetch(`${API}/api/health`, { method: 'GET', cache: 'no-store', signal: ac.signal });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j && j.ok) {
+            const u = typeof j.uptime_s === 'number' ? ` uptime ${j.uptime_s}s` : '';
+            setHeaderConnectionStatus(true, (j.service || 'cigana') + u);
+        } else {
+            setHeaderConnectionStatus(false);
+        }
+    } catch (_) {
+        setHeaderConnectionStatus(false);
+    } finally {
+        clearTimeout(tid);
+    }
+}
+
+function startApiHealthMonitor() {
+    pollApiHealth();
+    if (_healthPollTimer) clearInterval(_healthPollTimer);
+    _healthPollTimer = setInterval(pollApiHealth, 45000);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') pollApiHealth();
+    });
+}
+
+function setAppBusy(busy, label) {
+    const el = document.getElementById('app-busy-overlay');
+    const lb = document.getElementById('app-busy-label');
+    if (!el) return;
+    const on = !!busy;
+    el.setAttribute('aria-busy', on ? 'true' : 'false');
+    el.setAttribute('aria-hidden', on ? 'false' : 'true');
+    el.classList.toggle('app-busy-on', on);
+    if (lb && label) lb.textContent = label;
+    else if (lb) lb.textContent = 'A processar…';
+}
+
+function openAppHelpModal() {
+    const m = document.getElementById('modal-app-help');
+    if (m) m.classList.remove('hidden');
+}
+
+function closeAppHelpModal() {
+    const m = document.getElementById('modal-app-help');
+    if (m) m.classList.add('hidden');
+}
+
+function syncTenantFieldFromStorage() {
+    const el = document.getElementById('cfg-tenant-input');
+    if (!el) return;
+    try {
+        el.value = localStorage.getItem('acassia_tenant') || 'default';
+    } catch (_) {
+        el.value = 'default';
+    }
+}
+
+function saveTenantSetting() {
+    const el = document.getElementById('cfg-tenant-input');
+    const v = (el && el.value.trim()) || 'default';
+    try {
+        localStorage.setItem('acassia_tenant', v);
+    } catch (_) {
+        toast('Não foi possível guardar no browser.', 'rose');
+        return;
+    }
+    toast('Tenant guardado. Novas chamadas API usam este valor.', 'emerald');
 }
 
 // Lógica Sidebar Collapse
@@ -3177,6 +3365,12 @@ function go(name, contextTitle = null) {
     }
 
     _lastNavName = name;
+    try {
+        sessionStorage.setItem('acassia_last_view', name);
+    } catch (_) {}
+    if (name === 'configuracoes') {
+        syncTenantFieldFromStorage();
+    }
     if (name === 'chat') { loadLeads(); }
     if (name === 'contatos') { loadContacts(); }
     if (name === 'integracoes') { loadIntegrationsView(); }
@@ -4664,6 +4858,7 @@ async function saveFlowBlueprintServer() {
         toast('Corrija erros de validação antes de guardar no servidor.', 'rose');
         return;
     }
+    setAppBusy(true, 'A guardar fluxo…');
     try {
         const slug = _flowSlug(doc.title);
         const payload = { title: doc.title, slug, body: doc };
@@ -4691,6 +4886,8 @@ async function saveFlowBlueprintServer() {
         refreshFlowPublishStatus();
     } catch (_) {
         toast('Falha ao guardar no servidor (slug duplicado?).', 'rose');
+    } finally {
+        setAppBusy(false);
     }
 }
 
@@ -4718,6 +4915,7 @@ async function publishFlowBlueprintServer() {
         toast('Guarde primeiro no servidor (Servidor).', 'amber');
         return;
     }
+    setAppBusy(true, 'A publicar blueprint…');
     try {
         const res = await fetch(`${API}/api/flows/publish`, {
             method: 'POST',
@@ -4730,6 +4928,8 @@ async function publishFlowBlueprintServer() {
         refreshFlowPublishStatus();
     } catch (e) {
         toast(String(e.message || e), 'rose');
+    } finally {
+        setAppBusy(false);
     }
 }
 
@@ -4745,6 +4945,7 @@ async function executeFlowBlueprintOnLead() {
         toast('ID inválido.', 'rose');
         return;
     }
+    setAppBusy(true, 'A enfileirar ações…');
     try {
         const res = await fetch(`${API}/api/flows/blueprints/${_currentFlowBlueprintId}/execute`, {
             method: 'POST',
@@ -4759,10 +4960,13 @@ async function executeFlowBlueprintOnLead() {
         toast(`Fila: ${j.queued_actions} ação(ões) para lead ${j.lead_id}.`, 'emerald');
     } catch (e) {
         toast(String(e.message || e), 'rose');
+    } finally {
+        setAppBusy(false);
     }
 }
 
 async function loadFlowBlueprintPicker() {
+    setAppBusy(true, 'A carregar lista de fluxos…');
     try {
         const res = await fetch(`${API}/api/flows/blueprints`);
         const j = await res.json();
@@ -4771,10 +4975,12 @@ async function loadFlowBlueprintPicker() {
             return;
         }
         const lines = j.blueprints.map((b) => `${b.id} — ${b.title}`).join('\n');
+        setAppBusy(false);
         const idStr = window.prompt('ID do fluxo a abrir (número):\n\n' + lines);
         if (!idStr) return;
         const bid = parseInt(idStr, 10);
         if (!bid) return;
+        setAppBusy(true, 'A abrir fluxo…');
         const r2 = await fetch(`${API}/api/flows/blueprints/${bid}`);
         const d = await r2.json();
         if (!r2.ok || !d.ok || !d.blueprint || !d.blueprint.body) {
@@ -4796,6 +5002,8 @@ async function loadFlowBlueprintPicker() {
         refreshFlowPublishStatus();
     } catch (_) {
         toast('Falha ao listar/carregar fluxos.', 'rose');
+    } finally {
+        setAppBusy(false);
     }
 }
 
@@ -6078,7 +6286,7 @@ async function publishStudioVersion(agentId, versionId) {
 const _avatarColors = ['#7c5af5','#10b981','#f59e0b','#3b82f6','#f43f5e','#06b6d4'];
 
 async function loadLeads() {
-    try {
+    const run = async () => {
         const q = (document.getElementById('search-input')?.value || '').trim();
         const qs = new URLSearchParams({ status: _chatTab, sort: 'priority' });
         if (q) qs.set('q', q);
@@ -6089,14 +6297,24 @@ async function loadLeads() {
         const res = await fetch(`${API}/api/leads?${qs.toString()}`);
         if (!res.ok) throw new Error('API down');
         _leads = await res.json();
-        
         renderLeadsList(_leads);
         checkCriticalLeadAlert(_leads);
-        updateDashboardStats(_leads); 
-        fetchSystemStats(); 
-
-    } catch (e) {
-        document.getElementById('leads-list').innerHTML = '<div style="padding:32px 16px;text-align:center;color:var(--c-rose);font-size:12px"><i class="fas fa-plug" style="display:block;font-size:24px;margin-bottom:8px"></i>Ligação API falhou</div>';
+        updateDashboardStats(_leads);
+        fetchSystemStats();
+    };
+    try {
+        await run();
+    } catch (e1) {
+        try {
+            await new Promise((r) => setTimeout(r, 450));
+            await run();
+        } catch (e2) {
+            const el = document.getElementById('leads-list');
+            if (el) {
+                el.innerHTML =
+                    '<div style="padding:32px 16px;text-align:center;color:var(--c-rose);font-size:12px"><i class="fas fa-plug" style="display:block;font-size:24px;margin-bottom:8px"></i>Ligação API falhou</div>';
+            }
+        }
     }
 }
 
@@ -7599,13 +7817,23 @@ function switchAITab(step) {
 /* ── ARRANQUE DO CÉREBRO ──────────────────────────────────────── */
 go('dashboard');
 setMetaDays(7);
+startApiHealthMonitor();
 try { _currentOperator = localStorage.getItem('chat_operator_current') || ''; } catch (_) { _currentOperator = ''; }
 loadLeads();
 loadOperators();
 loadAgentProfile();
 loadAgentStudioList();
-_leadsInterval = setInterval(loadLeads, 5000); 
+_leadsInterval = setInterval(loadLeads, 5000);
 setTimeout(renderChart, 300);
+window.addEventListener('unhandledrejection', (ev) => {
+    try {
+        console.error(ev.reason);
+    } catch (_) {}
+    const now = Date.now();
+    if (now - _lastUnhandledToast < 10000) return;
+    _lastUnhandledToast = now;
+    toast('Operação falhou em segundo plano. Verifique rede ou consola.', 'rose');
+});
 document.addEventListener('click', (ev) => {
     const t = ev.target;
     if (!(t instanceof Element)) return;
@@ -7614,7 +7842,10 @@ document.addEventListener('click', (ev) => {
     }
 });
 document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') closeContactPanel();
+    if (ev.key === 'Escape') {
+        closeContactPanel();
+        closeAppHelpModal();
+    }
 });
 </script>
 </body>
