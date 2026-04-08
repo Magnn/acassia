@@ -155,8 +155,7 @@ def _frase_vaga_curta_fallback(metadata: Optional[dict]) -> str:
     if override:
         return override if len(override) < 400 else override[:397] + "..."
     return (
-        "Você conseguiu garantir a última vaga gratuita pra consulta inicial, pra gente ver as tuas linhas. "
-        "Vamos aproveitar com calma."
+        "Você conseguiu garantir a última vaga gratuita pra consulta inicial, pra gente ver as tuas linhas."
     )
 
 
@@ -359,8 +358,9 @@ def _encurtar_balao_node1(texto: str, max_chars: int = _MAX_CHARS_BALAO_NODE1) -
         total += extra
     if out:
         return " ".join(out).strip()
-    curto = t[: max_chars - 1].rsplit(" ", 1)[0].strip()
-    return (curto or t[: max_chars - 1]).strip() + "…"
+    # Se não houver frase completa dentro do limite, não corta no meio.
+    # O engine fatiará com segurança na camada de envio.
+    return t
 
 
 def _sanear_baloes_saida_node1(baloes: List[str]) -> List[str]:
