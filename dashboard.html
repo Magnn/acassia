@@ -938,6 +938,11 @@
         }
         .flow-node:active { cursor: grabbing; z-index: 50; }
         .flow-node:hover { border-color: var(--c-purple); box-shadow: 0 0 24px var(--c-purple-glow); }
+        .flow-node.flow-node--selected {
+            border-color: var(--c-purple);
+            box-shadow: 0 0 0 2px rgba(124, 90, 245, 0.35), 0 8px 28px var(--c-purple-glow);
+            z-index: 22;
+        }
         
         .flow-node-head {
             padding: 10px 12px;
@@ -2492,7 +2497,7 @@
                 <i class="fas fa-plus"></i>
             </button>
             <!-- Inspetor de nó + ligações -->
-            <div id="flow-inspector" style="display:none;position:absolute;top:72px;right:16px;width:min(340px,92vw);max-height:calc(100% - 100px);overflow:auto;z-index:45;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;box-shadow:var(--shadow);padding:12px;font-size:11px">
+            <div id="flow-inspector" class="flow-inspector-panel" style="display:none;position:absolute;top:72px;right:16px;width:min(360px,92vw);max-height:calc(100% - 100px);overflow:auto;z-index:45;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;box-shadow:var(--shadow);padding:12px;font-size:11px">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                     <strong style="font-family:var(--f-display);font-size:12px">Bloco selecionado</strong>
                     <button type="button" class="icon-btn" style="width:28px;height:28px" onclick="closeFlowInspector()" title="Fechar"><i class="fas fa-times"></i></button>
@@ -3692,10 +3697,31 @@ function flowCanvasNodeById(fid) {
     return document.querySelector('#nodes-container .flow-node[data-flow-id="' + String(fid).replace(/"/g, '\\"') + '"]');
 }
 
-function flowEditNode(btn) {
+function flowSetSelectedNode(nodeEl) {
+    document.querySelectorAll('#nodes-container .flow-node.flow-node--selected').forEach((n) => n.classList.remove('flow-node--selected'));
+    if (nodeEl) nodeEl.classList.add('flow-node--selected');
+}
+
+function flowInspectorIsOpen() {
+    const p = document.getElementById('flow-inspector');
+    return !!(p && p.style.display !== 'none');
+}
+
+async function flowEditNode(btn) {
     const node = btn && btn.closest ? btn.closest('.flow-node') : null;
     if (!node) return;
-    openFlowInspector(node);
+    await openFlowInspector(node);
+}
+
+function flowRemoveNodeEl(node) {
+    if (!node) return;
+    const id = node.getAttribute('data-flow-id') || '';
+    if (id === _flowSelectedNodeId) closeFlowInspector();
+    node.remove();
+    if (id) {
+        _flowEdges = (_flowEdges || []).filter((e) => e.from !== id && e.to !== id);
+        redrawFlowEdges();
+    }
 }
 
 function flowDuplicateNode(btn) {
@@ -3716,19 +3742,13 @@ function flowDuplicateNode(btn) {
     }
     initDragAndDrop();
     redrawFlowEdges();
+    flowSetSelectedNode(clone);
     toast('Bloco duplicado.', 'emerald');
 }
 
 function flowRemoveNode(btn) {
     const node = btn && btn.closest ? btn.closest('.flow-node') : null;
-    if (!node) return;
-    const id = node.getAttribute('data-flow-id') || '';
-    node.remove();
-    if (id) {
-        _flowEdges = (_flowEdges || []).filter((e) => e.from !== id && e.to !== id);
-        redrawFlowEdges();
-    }
-    closeFlowInspector();
+    flowRemoveNodeEl(node);
 }
 
 function flowEnsureNodeActionButtons() {
@@ -3743,11 +3763,64 @@ function flowEnsureNodeActionButtons() {
         bar.style.gap = '6px';
         bar.style.marginTop = '4px';
         bar.innerHTML = `
-            <button type="button" class="icon-btn" style="width:24px;height:24px" title="Editar bloco" onclick="flowEditNode(this)"><i class="fas fa-pen text-xs" style="color:var(--c-purple2)"></i></button>
-            <button type="button" class="icon-btn" style="width:24px;height:24px" title="Duplicar bloco" onclick="flowDuplicateNode(this)"><i class="fas fa-copy text-xs" style="color:var(--c-emerald)"></i></button>
-            <button type="button" class="icon-btn" style="width:24px;height:24px" title="Excluir bloco" onclick="flowRemoveNode(this)"><i class="fas fa-trash text-xs" style="color:var(--c-rose)"></i></button>
+            <button type="button" class="icon-btn" style="width:28px;height:28px" title="Editar bloco" aria-label="Editar bloco" onclick="event.stopPropagation(); flowEditNode(this)"><i class="fas fa-pen text-xs" style="color:var(--c-purple2)"></i></button>
+            <button type="button" class="icon-btn" style="width:28px;height:28px" title="Duplicar bloco" aria-label="Duplicar bloco" onclick="event.stopPropagation(); flowDuplicateNode(this)"><i class="fas fa-copy text-xs" style="color:var(--c-emerald)"></i></button>
+            <button type="button" class="icon-btn" style="width:28px;height:28px" title="Excluir bloco" aria-label="Excluir bloco" onclick="event.stopPropagation(); flowRemoveNode(this)"><i class="fas fa-trash text-xs" style="color:var(--c-rose)"></i></button>
         `;
         body.appendChild(bar);
+    });
+}
+
+function initFlowNodeSelection() {
+    const area = document.getElementById('flow-canvas-area');
+    if (!area || area.getAttribute('data-flow-select-bound') === '1') return;
+    area.setAttribute('data-flow-select-bound', '1');
+    area.addEventListener('click', (e) => {
+        const vb = document.getElementById('view-builder');
+        if (!vb || vb.style.display === 'none') return;
+        if (e.target.closest('[data-flow-node-actions="1"]')) return;
+        if (e.target.closest('input, textarea, select')) return;
+        const node = e.target.closest('#nodes-container .flow-node');
+        if (!node) {
+            flowSetSelectedNode(null);
+            return;
+        }
+        if (e.target.closest('.conn-dot')) return;
+        flowSetSelectedNode(node);
+    });
+}
+
+function initFlowBuilderGlobalHandlers() {
+    if (document.body.getAttribute('data-flow-global-handlers') === '1') return;
+    document.body.setAttribute('data-flow-global-handlers', '1');
+    document.addEventListener('keydown', (e) => {
+        const vb = document.getElementById('view-builder');
+        if (!vb || vb.style.display === 'none') return;
+        if (e.key === 'Escape') {
+            if (flowInspectorIsOpen()) closeFlowInspector();
+            return;
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (e.target.closest('input, textarea, select')) return;
+            const sel = document.querySelector('#nodes-container .flow-node.flow-node--selected');
+            if (!sel) return;
+            e.preventDefault();
+            flowRemoveNodeEl(sel);
+        }
+    });
+    document.addEventListener('mousedown', (e) => {
+        if (!flowInspectorIsOpen()) return;
+        const panel = document.getElementById('flow-inspector');
+        if (!panel) return;
+        if (panel.contains(e.target)) return;
+        const hitNode = e.target.closest('#nodes-container .flow-node');
+        if (hitNode) {
+            const nid = hitNode.getAttribute('data-flow-id') || '';
+            if (nid && nid !== _flowSelectedNodeId) closeFlowInspector();
+            return;
+        }
+        const area = document.getElementById('flow-canvas-area');
+        if (area && area.contains(e.target)) closeFlowInspector();
     });
 }
 
@@ -3820,6 +3893,7 @@ async function openFlowInspector(nodeEl) {
     if (!panel || !body || !nodeEl) return;
     const id = nodeEl.getAttribute('data-flow-id') || '';
     _flowSelectedNodeId = id;
+    flowSetSelectedNode(nodeEl);
     const typ = nodeEl.getAttribute('data-node-type') || 'generic';
     const head = nodeEl.querySelector('.flow-node-head');
     const title = head ? String(head.innerText || '').trim() : typ;
@@ -3847,6 +3921,9 @@ async function openFlowInspector(nodeEl) {
 function closeFlowInspector() {
     const panel = document.getElementById('flow-inspector');
     if (panel) panel.style.display = 'none';
+    _flowSelectedNodeId = null;
+    flowSetSelectedNode(null);
+    try { delete window._flowConteudo; } catch (_) { window._flowConteudo = null; }
 }
 
 function applyFlowInspectorConfig() {
@@ -6477,6 +6554,8 @@ function initDragAndDrop() {
         }
     });
     flowEnsureNodeActionButtons();
+    initFlowNodeSelection();
+    initFlowBuilderGlobalHandlers();
     wireFlowCanvasConnections();
     redrawFlowEdges();
 }
