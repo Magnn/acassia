@@ -8099,6 +8099,60 @@ function flowSimTakeFirstOutgoing(nodeId) {
     return e.to;
 }
 
+/** Pesos A:50,B:50 ou lista numérica; alinha ao n.º de arestas de saída. */
+function flowSimParseDivisaoWeights(weightsStr, edges) {
+    const n = edges.length;
+    if (!n) return null;
+    const raw = String(weightsStr || '').trim();
+    if (!raw) return null;
+    const pairs = [];
+    const re = /([A-Za-z0-9_]+)\s*:\s*(\d+(?:\.\d+)?)/g;
+    let m;
+    while ((m = re.exec(raw)) !== null) {
+        pairs.push({ key: String(m[1]).toUpperCase(), w: Math.max(0, parseFloat(m[2]) || 0) });
+    }
+    if (pairs.length) {
+        const byKey = Object.fromEntries(pairs.map((p) => [p.key, p.w]));
+        const letters = 'ABCDEFGHIJ'.split('');
+        return edges.map((e, i) => {
+            const lab = String(e.label || '')
+                .trim()
+                .toUpperCase();
+            if (lab && byKey[lab] != null) return byKey[lab];
+            const L = letters[i];
+            if (L && byKey[L] != null) return byKey[L];
+            return 1;
+        });
+    }
+    const nums = raw
+        .split(/[,;]/)
+        .map((x) => parseFloat(String(x).trim()))
+        .filter((x) => Number.isFinite(x) && x >= 0);
+    if (nums.length >= n) return nums.slice(0, n);
+    if (nums.length === 2 && n === 2) return nums;
+    return null;
+}
+
+function flowSimPickDivisaoEdge(nodeId, cfg) {
+    const edges = flowSimOutgoingEdges(nodeId);
+    if (!edges.length) return null;
+    let weights = flowSimParseDivisaoWeights(cfg.weights, edges);
+    if (!weights || weights.length !== edges.length) {
+        weights = edges.map(() => 1);
+    }
+    const sum = weights.reduce((a, b) => a + b, 0);
+    if (sum <= 0) {
+        const pick = edges[Math.floor(Math.random() * edges.length)];
+        return pick;
+    }
+    let r = Math.random() * sum;
+    for (let i = 0; i < edges.length; i++) {
+        r -= weights[i];
+        if (r < 0) return edges[i];
+    }
+    return edges[edges.length - 1];
+}
+
 function flowSimPickCondicaoBranch(nodeId, choiceSim) {
     const el = flowCanvasNodeById(nodeId);
     const cfg = el ? flowSimReadNodeConfig(el) : {};
@@ -8277,8 +8331,10 @@ async function flowSimulateStep(nodeId) {
     if (type === 'divisao') {
         const edges = flowSimOutgoingEdges(nodeId);
         if (!edges.length) return null;
-        const pick = edges[Math.floor(Math.random() * edges.length)];
-        flowSimChatAppend('sys', 'A/B: ramo aleatório');
+        const pick = flowSimPickDivisaoEdge(nodeId, cfg);
+        if (!pick) return null;
+        const wdisp = String(cfg.weights || '').trim() || 'uniforme';
+        flowSimChatAppend('sys', 'A/B: ramo por pesos (' + wdisp + ')');
         flowSimEdgeHighlight(pick.id);
         return pick.to;
     }
