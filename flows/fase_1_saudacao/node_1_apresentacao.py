@@ -746,7 +746,10 @@ def _montar_baloes_contrato_node1(periodo: str, nome: str, metadata: Optional[di
     ]
     vaga_txt = _frase_vaga_curta_fallback(metadata)
     if vaga_txt:
-        baloes.append(vaga_txt)
+        if not nome_eh_placeholder(nome):
+            baloes.append(f"{nome}, {vaga_txt[:1].lower() + vaga_txt[1:]}" if len(vaga_txt) > 1 else f"{nome}, {vaga_txt}")
+        else:
+            baloes.append(vaga_txt)
     if nome_eh_placeholder(nome):
         baloes.append("Me diz como você se chama, meu bem? Assim eu te falo direito.")
     baloes.append("Vamos aproveitar com calma, podemos iniciar?")
