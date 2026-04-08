@@ -11,7 +11,7 @@ import logging
 import re
 from typing import Any, Dict, List, Tuple
 
-from flows.funnel_gates import PLACEHOLDER_NOMES
+from flows.funnel_gates import nome_util_para_checklist_fase1
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +21,6 @@ FASE1_ORDEM: Tuple[str, ...] = (
     "3_coleta_profunda",
     "4_instagram",
     "5_processa_leitura",
-)
-
-_NOMES_CHECKLIST_LIXO = PLACEHOLDER_NOMES | frozenset(
-    {
-        "estou", "sim", "ok", "quero", "vou",
-        "salvei", "pronto", "ola", "oi", "ta", "tá", "ja", "já", "blz",
-    }
 )
 
 _RE_VISITA_INSTA = re.compile(
@@ -70,11 +63,9 @@ def concat_texto_usuario(ctx: Any, texto_atual: str) -> str:
 
 
 def nome_valido_checklist_fase1(lead: Any, meta: Dict[str, Any]) -> bool:
-    """True se há nome utilizável (DB ou metadata), fora de lixo/placeholder."""
+    """True se há nome utilizável (DB ou metadata) — mesma regra que `nome_util_para_checklist_fase1`."""
     for cand in ((getattr(lead, "nome", None) or "").strip(), (meta.get("nome_lead") or "").strip()):
-        if not cand or cand.lower() in _NOMES_CHECKLIST_LIXO:
-            continue
-        if len(cand) >= 2:
+        if nome_util_para_checklist_fase1(cand):
             return True
     return False
 

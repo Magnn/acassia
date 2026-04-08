@@ -13,7 +13,7 @@ Documento vivo: alinhado ao código em `flows/funnel_gates.py` e ao sniffer em `
 
 | Predicado | Chave(s) em `metadata` / texto | Função |
 |-----------|--------------------------------|--------|
-| Nome útil | `nome_lead` / `ctx.nome_lead` fora de `PLACEHOLDER_NOMES` | `nome_eh_placeholder()` → False |
+| Nome útil | `nome_lead` / `ctx.nome_lead` fora de placeholders e ruído (`sim`, `ok`, …) | `nome_util_para_checklist_fase1()` (pré-flight + anti-redundância); burst node 1 continua com `nome_eh_placeholder()` |
 | Contato | `lead_contato_salvo_declarado` **ou** `node2_vcard_despachado` **ou** texto com padrão node 2 | `contato_salvo_ou_declarado()` (alinhado ao burst em `fase_1_preflight`) |
 | Foto | `foto_recebida` | `meta_tem_foto()` |
 | Desabafo | `desabafo_recebido` | `meta_tem_desabafo()` |
@@ -32,9 +32,18 @@ Documento vivo: alinhado ao código em `flows/funnel_gates.py` e ao sniffer em `
 - **Node 2:** confirmação + vcard quando o funil exige o passo explícito.
 - **Node 3:** bypass por tentativas na camada 1 usa `meta_node3_forcar_camada1_completa()` em `funnel_gates` (escrita única).
 
+## API (suporte / dashboard)
+
+- **`GET /api/leads/<lead_id>/funnel-snapshot`** — devolve `snapshot` (`snapshot_fase1_coleta`) e `pendencias` (`pendencias_fase1`). Query opcional: **`texto_turno`** (texto da última mensagem do user para o mesmo critério de contato no texto que o motor usa no turno).
+
+## CI local / GitHub Actions
+
+- **`python scripts/verificar_funil_ci.py`** — unittest + guardrails + `teste_funnel_sequencias` + `simular_funil_e2e`.
+- Workflow **`.github/workflows/funil-ci.yml`** (push/PR em `main`/`master`).
+
 ## Camadas que ainda podem “lutar” com isto
 
-- **`copy_sanitizer.motivo_redundancia_texto` + engine:** podem remover balões; regex deve ser **estreita** para não cortar perguntas legítimas (ex.: “Conseguiu salvar, meu bem?”).
+- **`copy_sanitizer.motivo_redundancia_texto` + engine:** `extrair_evidencias_conversa` inclui **`contato_ritual_ok`** (`contato_salvo_ou_declarado`, alinhado ao funil, com vCard). Regex de supressão deve ser **estreita** para não cortar perguntas legítimas (ex.: “Conseguiu salvar, meu bem?”).
 - **NLU / outros escritores de metadata:** “sim” sozinho **não** liga `lead_contato_salvo_declarado` via sniffer; o guardrail acima impede que essa flag apareça “do nada” sem evento de contato do sniffer no turno.
 
 ## Testes
@@ -46,3 +55,4 @@ Documento vivo: alinhado ao código em `flows/funnel_gates.py` e ao sniffer em `
 - `tests/test_engine_processar_sniffer_e2e.py` — `Engine.processar_mensagem` com DB em memória e dependências mockadas.
 - `scripts/teste_funnel_sequencias.py` — corre a suíte agregada dos módulos acima.
 - `scripts/teste_node1_guardrails.py` — limites de balões no node 1 (fallback).
+- `scripts/verificar_funil_ci.py` — agregado para CI (local ou GitHub Actions).

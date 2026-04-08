@@ -14,7 +14,12 @@ import random
 import re
 from typing import List, Literal, Optional, Dict, Any, Mapping
 
-from flows.funnel_gates import nome_eh_placeholder, VOCATIVO_SEM_NOME
+from flows.funnel_gates import (
+    contato_salvo_ou_declarado,
+    nome_eh_placeholder,
+    nome_util_para_checklist_fase1,
+    VOCATIVO_SEM_NOME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -368,7 +373,8 @@ def extrair_evidencias_conversa(
     m = dict(metadata or {})
     txt = (texto_atual or "").strip().lower()
     tp_atual = (tipo_mensagem_atual or "").strip().lower()
-    nome_ok = bool((nome_lead or "").strip()) and not nome_eh_placeholder(nome_lead)
+    nome_ok = nome_util_para_checklist_fase1(nome_lead or "")
+    contato_ritual_ok = contato_salvo_ou_declarado(m, texto_atual or "")
     confirmou_agora = bool(
         re.search(r"\b(ok|sim|pronto|feito|salvei|t[áa]\s+salvo|já\s+salvei|ja\s+salvei|isso\s+mesmo)\b", txt, re.I)
     )
@@ -400,6 +406,7 @@ def extrair_evidencias_conversa(
 
     return {
         "nome_ok": nome_ok,
+        "contato_ritual_ok": bool(contato_ritual_ok),
         "tem_foto": bool(tem_foto),
         "tem_desabafo": bool(tem_desabafo),
         "tem_desejo": bool(tem_desejo),
@@ -423,6 +430,15 @@ def motivo_redundancia_texto(texto_balao: str, evidencias: Mapping[str, bool]) -
         re.I,
     ):
         return "nome_ja_conhecido"
+    # Contato já coberto (declaração, vCard ou texto atual) — alinhado a funnel_gates.contato_salvo_ou_declarado.
+    if evidencias.get("contato_ritual_ok") and re.search(
+        r"\b(salvar\s+(?:o\s+)?(?:seu\s+|teu\s+)?(?:contato|número|numero)|"
+        r"salva\s+(?:na\s+)?(?:sua\s+)?agenda|adiciona\s+na\s+agenda|"
+        r"guarda\s+(?:o\s+)?(?:meu\s+)?número|meu\s+cart[aã]o\s+de\s+contato)\b",
+        low,
+        re.I,
+    ):
+        return "contato_ja_tratado"
     if evidencias.get("tem_foto") and re.search(r"\b(foto|imagem)\b", low, re.I) and re.search(r"\b(palma|m[ãa]o)\b", low, re.I):
         if re.search(r"\b(manda|envia|enviar|preciso|pode\s+mandar|pode\s+enviar)\b", low, re.I):
             return "foto_ja_recebida"

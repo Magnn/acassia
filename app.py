@@ -2494,6 +2494,51 @@ def get_messages(lead_id):
     finally:
         db.close()
 
+
+@app.route("/api/leads/<int:lead_id>/funnel-snapshot", methods=["GET"])
+def get_lead_funnel_snapshot(lead_id):
+    """
+    Snapshot da fase 1 (checklist / burst) para suporte e debug — mesma lógica que `flows.funnel_gates`.
+    Query: texto_turno — texto da última mensagem do user neste turno (opcional; default vazio).
+    """
+    db = SessionLocal()
+    try:
+        lead = db.get(models.Lead, lead_id)
+        if not lead:
+            return jsonify({"error": "Lead não encontrado", "code": "not_found"}), 404
+        if str(getattr(lead, "tenant_id", "default") or "default") != get_request_tenant_id():
+            return jsonify({"error": "Lead não encontrado", "code": "not_found"}), 404
+
+        meta_raw = _lead_metadata_as_dict(lead.metadata_json)
+        meta = dict(meta_raw or {})
+        nome = (getattr(lead, "nome", None) or meta.get("nome_lead") or "").strip()
+        texto_turno = (request.args.get("texto_turno", default="", type=str) or "").strip()
+
+        from flows.funnel_gates import pendencias_fase1, snapshot_fase1_coleta
+
+        snap = snapshot_fase1_coleta(meta, nome, texto_turno)
+        pend = pendencias_fase1(meta, nome, texto_turno)
+
+        return jsonify(
+            _json_safe_for_api(
+                {
+                    "lead_id": lead_id,
+                    "telefone": getattr(lead, "telefone", None),
+                    "node_atual": getattr(lead, "node_atual", None),
+                    "nome_lead_engine": nome,
+                    "texto_turno_usado": texto_turno,
+                    "snapshot": snap,
+                    "pendencias": pend,
+                }
+            )
+        ), 200
+    except Exception as e:
+        logger.error("🚨 [API] Erro /api/leads/%s/funnel-snapshot: %s", lead_id, e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
 @app.route("/api/leads/<int:lead_id>/pause", methods=["POST"])
 def toggle_pause(lead_id):
     """Ativa ou desativa o atendimento manual (Handoff)."""

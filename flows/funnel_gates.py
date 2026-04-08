@@ -17,6 +17,14 @@ from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence
 # Alinhado a copy_sanitizer.extrair_evidencias_conversa (nome_ok) e node_1.
 PLACEHOLDER_NOMES = frozenset({"meu bem", "meu anjo", "minha estrela"})
 
+# Tokens que não contam como “primeiro nome” no checklist do pré-flight (além de PLACEHOLDER_NOMES).
+NOMES_LIXO_CHECKLIST_FASE1 = PLACEHOLDER_NOMES | frozenset(
+    {
+        "estou", "sim", "ok", "quero", "vou",
+        "salvei", "pronto", "ola", "oi", "ta", "tá", "ja", "já", "blz",
+    }
+)
+
 # Valor default do vocativo quando o primeiro nome ainda não foi extraído (copy).
 VOCATIVO_SEM_NOME = "meu bem"
 
@@ -27,6 +35,17 @@ def nome_eh_placeholder(nome: str) -> bool:
     if not n:
         return True
     return n in PLACEHOLDER_NOMES
+
+
+def nome_util_para_checklist_fase1(nome: str) -> bool:
+    """
+    Nome utilizável no checklist da fase 1 (pré-flight e anti-redundância alinhada ao funil).
+    Exclui vazio, <2 chars, placeholders e ruído tipo «sim», «ok».
+    """
+    n = (nome or "").strip()
+    if len(n) < 2:
+        return False
+    return n.lower() not in NOMES_LIXO_CHECKLIST_FASE1
 
 
 def meta_tem_foto(meta: Optional[Mapping[str, Any]]) -> bool:

@@ -2,11 +2,22 @@ import unittest
 
 from flows.funnel_gates import (
     nome_eh_placeholder,
+    nome_util_para_checklist_fase1,
     pendencias_fase1,
     pode_burst_coleta_sem_node2,
     snapshot_fase1_coleta,
     VOCATIVO_SEM_NOME,
 )
+
+
+class TestNomeUtilChecklist(unittest.TestCase):
+    def test_sim_nao_e_nome_util(self):
+        self.assertFalse(nome_util_para_checklist_fase1("sim"))
+        self.assertFalse(nome_util_para_checklist_fase1("ok"))
+
+    def test_nome_real_e_util(self):
+        self.assertTrue(nome_util_para_checklist_fase1("Ana"))
+        self.assertTrue(nome_util_para_checklist_fase1("João"))
 
 
 class TestNomePlaceholder(unittest.TestCase):
