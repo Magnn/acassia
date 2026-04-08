@@ -17,6 +17,8 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 from schema import Acao, slice_historico_para_ia
 from copy_sanitizer import (
+    MOBILE_CHARS_POR_LINHA,
+    MOBILE_MAX_LINHAS_BALO,
     aplicar_substituicoes_proibidas,
     contexto_lead_para_nodes,
     fatiar_texto_ritmo_celular,
@@ -385,7 +387,11 @@ def executar_v2(ctx) -> tuple:
             continue
         
         num_bloco = i + 1
-        pedacos = fatiar_texto_ritmo_celular(conteudo_str, max_linhas_visuais=4, chars_por_linha=38)
+        pedacos = fatiar_texto_ritmo_celular(
+            conteudo_str,
+            max_linhas_visuais=MOBILE_MAX_LINHAS_BALO,
+            chars_por_linha=MOBILE_CHARS_POR_LINHA,
+        )
         eh_audio = (
             (num_bloco in _INDICES_AUDIO)
             and tts_ativo

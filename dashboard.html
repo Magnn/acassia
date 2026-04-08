@@ -953,7 +953,8 @@
             position: absolute; top: 50%; transform: translateY(-50%);
             width: 10px; height: 10px; border-radius: 50%;
             background: var(--c-surface); border: 2px solid var(--c-border2);
-            z-index: 20; cursor: crosshair;
+            z-index: 25; cursor: crosshair;
+            pointer-events: auto;
         }
         .conn-left { left: -5px; }
         .conn-right { right: -5px; border-color: var(--c-purple); }
@@ -1922,6 +1923,13 @@
                         <div id="radar-node" class="badge badge-purple" style="font-size:11px;padding:5px 10px;display:block;text-align:center;word-break:break-all">—</div>
                     </div>
 
+                    <div id="radar-funnel-wrap">
+                        <div class="kpi-label" style="margin-bottom:6px;color:var(--c-purple2)"><i class="fas fa-layer-group" style="margin-right:4px;opacity:.85"></i> Checklist fase 1 (motor)</div>
+                        <div id="radar-funnel-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px"></div>
+                        <div id="radar-funnel-burst" style="margin-top:8px;text-align:center"></div>
+                        <div id="radar-funnel-err" style="display:none;margin-top:6px;font-size:10px;color:var(--c-rose)"></div>
+                    </div>
+
                     <div>
                         <div class="kpi-label" style="margin-bottom:6px">Sentimento Predominante</div>
                         <div id="radar-sent" class="badge badge-gray" style="font-size:11px;padding:5px 10px;display:block;text-align:center">PADRÃO</div>
@@ -2409,6 +2417,7 @@
             </div>
             <div>
                 <div id="builder-title" style="font-family:var(--f-display);font-weight:700;font-size:14px;text-align:center;display:flex;align-items:center;gap:8px;justify-content:center"><i class="fab fa-whatsapp" style="color:var(--c-emerald)"></i> AcassIA CRM</div>
+                <div id="flow-publish-status" style="font-size:10px;color:var(--c-muted);text-align:center;margin-top:2px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">Publicado: —</div>
                 <div style="display:flex;background:var(--c-surface2);border:1px solid var(--c-border);border-radius:8px;overflow:hidden;margin-top:4px">
                     <button style="padding:4px 14px;font-size:10px;font-weight:700;color:var(--c-muted);background:none;border:none;cursor:pointer">Logs</button>
                     <button style="padding:4px 14px;font-size:10px;font-weight:700;background:var(--c-purple);color:white;border:none;cursor:pointer">Automação</button>
@@ -2417,6 +2426,13 @@
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center;max-width:min(100%,520px)">
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Guardar estado do canvas neste browser" onclick="saveFlowDraftToStorage(true)"><i class="fas fa-save"></i> Rascunho</button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Validar estrutura do fluxo" onclick="validateFlowDraft()"><i class="fas fa-check-circle"></i> Validar</button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Compilar plano (ordem de execução)" onclick="compileFlowDraft()"><i class="fas fa-cogs"></i> Compilar</button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Simular dry-run (sem WhatsApp)" onclick="simulateFlowDraft()"><i class="fas fa-flask"></i> Simular</button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Guardar no servidor" onclick="saveFlowBlueprintServer()"><i class="fas fa-cloud-upload-alt"></i> Servidor</button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Definir este blueprint como publicado (metadados no motor)" onclick="publishFlowBlueprintServer()"><i class="fas fa-bullhorn"></i> Publicar</button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Enviar ações compiladas pela fila WhatsApp (teste)" onclick="executeFlowBlueprintOnLead()"><i class="fab fa-whatsapp"></i> Executar lead</button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Abrir fluxo guardado no servidor" onclick="loadFlowBlueprintPicker()"><i class="fas fa-cloud-download-alt"></i> Abrir</button>
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Descarregar JSON" onclick="exportFlowCanvasToFile()"><i class="fas fa-file-export"></i> Exportar</button>
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Carregar JSON" onclick="openFluxImportFromDisk()"><i class="fas fa-file-import"></i> Importar</button>
                 <button class="icon-btn" style="background:var(--c-surface2);border:1px solid var(--c-border)" title="Configurar dispositivos" onclick="openDeviceModal()"><i class="fas fa-mobile-screen-button text-lg" style="color:var(--c-purple2)"></i></button>
@@ -2427,7 +2443,7 @@
             </div>
         </header>
 
-        <div class="flow-canvas" style="flex:1;position:relative;overflow:auto" id="flow-canvas-area">
+        <div class="flow-canvas" style="flex:1;position:relative;overflow:auto" id="flow-canvas-area" onclick="if(event.target===this) cancelFlowWire()">
             <!-- SVG de conexões estáticas (para visualização no base flow) -->
             <svg id="svg-connections" style="position:absolute;top:0;left:0;width:1800px;height:800px;pointer-events:none;z-index:0">
                 <defs>
@@ -2455,6 +2471,14 @@
             <button class="fab" style="position:absolute;bottom:24px;right:24px;z-index:50" onclick="openNodeMenu()" title="Adicionar Bloco">
                 <i class="fas fa-plus"></i>
             </button>
+            <!-- Inspetor de nó + ligações -->
+            <div id="flow-inspector" style="display:none;position:absolute;top:72px;right:16px;width:min(340px,92vw);max-height:calc(100% - 100px);overflow:auto;z-index:45;background:var(--c-surface);border:1px solid var(--c-border);border-radius:12px;box-shadow:var(--shadow);padding:12px;font-size:11px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <strong style="font-family:var(--f-display);font-size:12px">Bloco selecionado</strong>
+                    <button type="button" class="icon-btn" style="width:28px;height:28px" onclick="closeFlowInspector()" title="Fechar"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="flow-inspector-body" style="color:var(--c-muted);line-height:1.45"></div>
+            </div>
         </div>
     </div>
 
@@ -3083,7 +3107,15 @@ function go(name, contextTitle = null) {
         if (contextTitle) {
             document.getElementById('builder-title').innerHTML = `<i class="fab fa-whatsapp" style="color:var(--c-emerald)"></i> ${contextTitle}`;
         }
+        try {
+            const sid = localStorage.getItem('acassia_flow_blueprint_id');
+            const parsed = sid ? parseInt(sid, 10) : NaN;
+            _currentFlowBlueprintId = !isNaN(parsed) && parsed > 0 ? parsed : null;
+        } catch (_) {
+            _currentFlowBlueprintId = null;
+        }
         loadOrRenderBuilderCanvas(contextTitle);
+        refreshFlowPublishStatus();
     }
 }
 
@@ -3306,6 +3338,145 @@ function writeFlowStore(obj) {
     localStorage.setItem(_FLOW_STORE_KEY, JSON.stringify(obj));
 }
 
+/** Ligações estruturadas + modo conectar (saída → entrada) */
+let _flowEdges = [];
+let _flowConnectSource = null;
+let _flowSelectedNodeId = null;
+let _currentFlowBlueprintId = null;
+
+function cancelFlowWire() {
+    _flowConnectSource = null;
+}
+
+function flowCanvasNodeById(fid) {
+    if (!fid) return null;
+    return document.querySelector('#nodes-container .flow-node[data-flow-id="' + String(fid).replace(/"/g, '\\"') + '"]');
+}
+
+function redrawFlowEdges() {
+    const svg = document.getElementById('svg-connections');
+    const area = document.getElementById('flow-canvas-area');
+    if (!svg || !area) return;
+    const markerDef = `
+        <defs>
+            <marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="var(--c-border2)"/>
+            </marker>
+        </defs>`;
+    const paths = [];
+    const ar = area.getBoundingClientRect();
+    const scrollLeft = area.scrollLeft || 0;
+    const scrollTop = area.scrollTop || 0;
+    (_flowEdges || []).forEach((e) => {
+        const fromEl = flowCanvasNodeById(e.from);
+        const toEl = flowCanvasNodeById(e.to);
+        if (!fromEl || !toEl) return;
+        const fr = fromEl.getBoundingClientRect();
+        const tr = toEl.getBoundingClientRect();
+        const x1 = fr.right - ar.left + scrollLeft - 8;
+        const y1 = fr.top - ar.top + scrollTop + fr.height / 2;
+        const x2 = tr.left - ar.left + scrollLeft + 8;
+        const y2 = tr.top - ar.top + scrollTop + tr.height / 2;
+        const mx = (x1 + x2) / 2;
+        paths.push(`<path class="conn-path" d="M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="var(--c-border2)" stroke-width="2.5" stroke-linecap="round" marker-end="url(#flow-arrow)"/>`);
+    });
+    svg.style.width = Math.max(1800, area.scrollWidth) + 'px';
+    svg.style.height = Math.max(800, area.scrollHeight) + 'px';
+    svg.innerHTML = markerDef + paths.join('');
+}
+
+function wireFlowCanvasConnections() {
+    const container = document.getElementById('nodes-container');
+    if (!container || container.getAttribute('data-flow-wire-bound') === '1') return;
+    container.setAttribute('data-flow-wire-bound', '1');
+    container.addEventListener('click', (e) => {
+        const out = e.target.closest('.conn-right');
+        const inn = e.target.closest('.conn-left');
+        if (out) {
+            e.stopPropagation();
+            const node = out.closest('.flow-node');
+            if (!node) return;
+            _flowConnectSource = node.getAttribute('data-flow-id');
+            toast('Modo ligação: clique na entrada (● esquerda) do nó destino.', 'purple');
+            return;
+        }
+        if (inn) {
+            e.stopPropagation();
+            const node = inn.closest('.flow-node');
+            if (!node) return;
+            const toId = node.getAttribute('data-flow-id');
+            if (!_flowConnectSource || _flowConnectSource === toId) {
+                cancelFlowWire();
+                return;
+            }
+            const dup = (_flowEdges || []).some((x) => x.from === _flowConnectSource && x.to === toId);
+            if (dup) {
+                toast('Esta ligação já existe.', 'amber');
+                cancelFlowWire();
+                return;
+            }
+            const id = 'e-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+            _flowEdges.push({ id, from: _flowConnectSource, to: toId });
+            cancelFlowWire();
+            redrawFlowEdges();
+            toast('Conexão criada.', 'emerald');
+        }
+    });
+    container.addEventListener('dblclick', (e) => {
+        const node = e.target.closest('.flow-node');
+        if (node && !e.target.closest('.conn-dot')) openFlowInspector(node);
+    });
+}
+
+function openFlowInspector(nodeEl) {
+    const panel = document.getElementById('flow-inspector');
+    const body = document.getElementById('flow-inspector-body');
+    if (!panel || !body || !nodeEl) return;
+    const id = nodeEl.getAttribute('data-flow-id') || '';
+    _flowSelectedNodeId = id;
+    const typ = nodeEl.getAttribute('data-node-type') || 'generic';
+    const head = nodeEl.querySelector('.flow-node-head');
+    const title = head ? String(head.innerText || '').trim() : typ;
+    let cfg = {};
+    try {
+        const raw = nodeEl.getAttribute('data-flow-config');
+        if (raw) cfg = JSON.parse(raw);
+    } catch (_) {}
+    const incom = (_flowEdges || []).filter((e) => e.to === id).length;
+    const outgo = (_flowEdges || []).filter((e) => e.from === id).length;
+    body.innerHTML = `
+        <div style="margin-bottom:8px"><span class="badge badge-purple" style="font-size:9px">${typ}</span></div>
+        <div style="margin-bottom:6px"><strong style="color:var(--c-text)">${title.replace(/</g,'')}</strong></div>
+        <div style="font-size:10px;margin-bottom:8px">ID: <code style="font-size:9px">${id.replace(/</g,'')}</code><br>Entradas: ${incom} · Saídas: ${outgo}</div>
+        <label class="kpi-label">Config JSON (opcional)</label>
+        <textarea id="flow-inspector-cfg" class="input-field" style="width:100%;min-height:120px;font-size:10px;font-family:monospace;margin-top:4px">${JSON.stringify(cfg, null, 2)}</textarea>
+        <button type="button" class="btn btn-primary" style="width:100%;margin-top:8px;font-size:11px" onclick="applyFlowInspectorConfig()"><i class="fas fa-save"></i> Aplicar config</button>
+    `;
+    panel.style.display = 'block';
+}
+
+function closeFlowInspector() {
+    const panel = document.getElementById('flow-inspector');
+    if (panel) panel.style.display = 'none';
+}
+
+function applyFlowInspectorConfig() {
+    const nodeId = _flowSelectedNodeId;
+    const ta = document.getElementById('flow-inspector-cfg');
+    const node = nodeId ? document.querySelector('#nodes-container .flow-node[data-flow-id="' + nodeId.replace(/"/g, '\\"') + '"]') : null;
+    if (!ta || !node) return;
+    let obj = {};
+    try {
+        obj = JSON.parse(ta.value || '{}');
+        if (typeof obj !== 'object' || obj === null) throw new Error('not_object');
+    } catch (_) {
+        toast('JSON inválido no config.', 'rose');
+        return;
+    }
+    node.setAttribute('data-flow-config', JSON.stringify(obj));
+    toast('Config aplicada ao bloco.', 'emerald');
+}
+
 function syncFlowFormValuesIntoDom() {
     document.querySelectorAll('#nodes-container input').forEach((i) => {
         i.setAttribute('value', i.value);
@@ -3313,6 +3484,48 @@ function syncFlowFormValuesIntoDom() {
     document.querySelectorAll('#nodes-container textarea').forEach((t) => {
         t.textContent = t.value;
     });
+    document.querySelectorAll('#nodes-container select').forEach((s) => {
+        const v = s.value;
+        Array.from(s.options).forEach((o) => {
+            o.removeAttribute('selected');
+            if (o.value === v) o.setAttribute('selected', 'selected');
+        });
+    });
+}
+
+function extractFlowGraphFromDom() {
+    const nodes = [];
+    document.querySelectorAll('#nodes-container .flow-node').forEach((el) => {
+        const id = String(el.getAttribute('data-flow-id') || '').trim();
+        const type = String(el.getAttribute('data-node-type') || 'generic').trim();
+        const head = el.querySelector('.flow-node-head');
+        const label = head ? String(head.innerText || '').trim() : type;
+        const x = Number.parseFloat(el.style.left || '0') || 0;
+        const y = Number.parseFloat(el.style.top || '0') || 0;
+        if (!id) return;
+        let config = {};
+        try {
+            const raw = el.getAttribute('data-flow-config');
+            if (raw) config = JSON.parse(raw);
+        } catch (_) {}
+        el.querySelectorAll('[data-flow-cfg]').forEach((inp) => {
+            const k = inp.getAttribute('data-flow-cfg');
+            if (k) config[k] = inp.value;
+        });
+        nodes.push({ id, type, label, x, y, config });
+    });
+    let edges = Array.isArray(_flowEdges) ? _flowEdges.map((e) => ({ id: e.id, from: e.from, to: e.to })) : [];
+    if (!edges.length) {
+        const connPaths = document.querySelectorAll('#svg-connections path.conn-path');
+        const sorted = [...nodes].sort((a, b) => a.x - b.x || a.y - b.y);
+        if (connPaths.length > 0 && sorted.length > 1) {
+            const steps = Math.min(connPaths.length, sorted.length - 1);
+            for (let i = 0; i < steps; i++) {
+                edges.push({ id: null, from: sorted[i].id, to: sorted[i + 1].id });
+            }
+        }
+    }
+    return { nodes, edges };
 }
 
 function serializeFlowCanvas() {
@@ -3327,15 +3540,53 @@ function serializeFlowCanvas() {
         updatedAt: new Date().toISOString(),
         svgInner: svg ? svg.innerHTML : '',
         nodesInnerHTML: nodes ? nodes.innerHTML : '',
+        graph: extractFlowGraphFromDom(),
     };
+}
+
+function hydrateFlowNodeInputsFromConfig() {
+    document.querySelectorAll('#nodes-container .flow-node').forEach((el) => {
+        let cfg = {};
+        try {
+            const raw = el.getAttribute('data-flow-config');
+            if (raw) cfg = JSON.parse(raw);
+        } catch (_) {
+            return;
+        }
+        el.querySelectorAll('[data-flow-cfg]').forEach((inp) => {
+            const k = inp.getAttribute('data-flow-cfg');
+            if (!k || cfg[k] === undefined || cfg[k] === null) return;
+            inp.value = String(cfg[k]);
+        });
+    });
 }
 
 function deserializeFlowCanvas(doc) {
     if (!doc || doc.format !== 'acassia-flow') return false;
+    _flowEdges = [];
+    cancelFlowWire();
     const svg = document.getElementById('svg-connections');
     const nodes = document.getElementById('nodes-container');
     if (doc.nodesInnerHTML != null && nodes) nodes.innerHTML = doc.nodesInnerHTML;
     if (doc.svgInner != null && svg) svg.innerHTML = doc.svgInner;
+    if (doc.graph && Array.isArray(doc.graph.edges)) {
+        _flowEdges = doc.graph.edges.map((e) => ({
+            id: e.id || ('e-' + Math.random().toString(16).slice(2)),
+            from: e.from,
+            to: e.to,
+        }));
+    }
+    if (doc.graph && Array.isArray(doc.graph.nodes)) {
+        doc.graph.nodes.forEach((n) => {
+            const el = flowCanvasNodeById(n.id);
+            if (el && n.config && typeof n.config === 'object') {
+                try {
+                    el.setAttribute('data-flow-config', JSON.stringify(n.config));
+                } catch (_) {}
+            }
+        });
+    }
+    hydrateFlowNodeInputsFromConfig();
     initDragAndDrop();
     return true;
 }
@@ -3371,8 +3622,218 @@ function loadOrRenderBuilderCanvas(contextTitle) {
 }
 
 function deployFlowSave() {
-    saveFlowDraftToStorage(false);
-    toast('Deploy local: rascunho guardado. O motor em produção continua em flows/ (Python).', 'emerald');
+    validateFlowDraft({ forDeploy: true });
+}
+
+async function validateFlowDraft(opts = {}) {
+    const forDeploy = !!opts.forDeploy;
+    const silent = !!opts.silent;
+    const doc = serializeFlowCanvas();
+    try {
+        const res = await fetch(`${API}/api/flows/validate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(doc),
+        });
+        const j = await res.json();
+        if (!res.ok && !j) throw new Error('validate_failed');
+        const errors = Array.isArray(j.errors) ? j.errors : [];
+        const warnings = Array.isArray(j.warnings) ? j.warnings : [];
+        if (errors.length) {
+            const msg = errors.slice(0, 2).map((e) => `• ${e.message}`).join(' ');
+            if (!silent) toast(`Fluxo inválido: ${msg}`, 'rose');
+            return false;
+        }
+        if (!silent) {
+            if (warnings.length) {
+                const msg = warnings.slice(0, 2).map((w) => `• ${w.message}`).join(' ');
+                toast(`Validação com alertas: ${msg}`, 'amber');
+            } else {
+                toast('Validação OK.', 'emerald');
+            }
+        }
+        if (forDeploy) {
+            saveFlowDraftToStorage(false);
+            if (!silent) toast('Deploy local: rascunho validado e guardado. Motor em produção segue em flows/ (Python).', 'emerald');
+        }
+        return true;
+    } catch (_) {
+        if (!silent) toast('Falha ao validar fluxo na API.', 'rose');
+        return false;
+    }
+}
+
+async function compileFlowDraft() {
+    const doc = serializeFlowCanvas();
+    try {
+        const res = await fetch(`${API}/api/flows/compile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(doc),
+        });
+        const j = await res.json();
+        const steps = j.plan && j.plan.steps ? j.plan.steps : [];
+        const n = steps.length;
+        toast(`Compilação: ${n} passo(s). ${j.ok ? 'OK' : 'Com avisos — veja consola (F12).'}`, j.ok ? 'emerald' : 'amber');
+        console.log('[flow compile]', j);
+    } catch (_) {
+        toast('Falha ao compilar fluxo.', 'rose');
+    }
+}
+
+async function simulateFlowDraft() {
+    const doc = serializeFlowCanvas();
+    try {
+        const res = await fetch(`${API}/api/flows/simulate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(doc),
+        });
+        const j = await res.json();
+        const trace = j.simulation && j.simulation.trace ? j.simulation.trace : [];
+        toast(`Simulação: ${trace.length} passo(s). Detalhe na consola (F12).`, 'purple');
+        console.log('[flow simulate]', j);
+    } catch (_) {
+        toast('Falha na simulação.', 'rose');
+    }
+}
+
+async function saveFlowBlueprintServer() {
+    const doc = serializeFlowCanvas();
+    const okVal = await validateFlowDraft({ silent: true });
+    if (!okVal) {
+        toast('Corrija erros de validação antes de guardar no servidor.', 'rose');
+        return;
+    }
+    try {
+        const slug = _flowSlug(doc.title);
+        const payload = { title: doc.title, slug, body: doc };
+        let res;
+        if (_currentFlowBlueprintId) {
+            res = await fetch(`${API}/api/flows/blueprints/${_currentFlowBlueprintId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ body: doc }),
+            });
+        } else {
+            res = await fetch(`${API}/api/flows/blueprints`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        }
+        const out = await res.json();
+        if (!res.ok || !out.ok) throw new Error(out.error || 'save_failed');
+        if (out.blueprint && out.blueprint.id) {
+            _currentFlowBlueprintId = out.blueprint.id;
+            try { localStorage.setItem('acassia_flow_blueprint_id', String(_currentFlowBlueprintId)); } catch (_) {}
+        }
+        toast('Fluxo guardado no servidor.', 'emerald');
+        refreshFlowPublishStatus();
+    } catch (_) {
+        toast('Falha ao guardar no servidor (slug duplicado?).', 'rose');
+    }
+}
+
+async function refreshFlowPublishStatus() {
+    const el = document.getElementById('flow-publish-status');
+    if (!el) return;
+    try {
+        const res = await fetch(`${API}/api/flows/publish/status`);
+        const j = await res.json();
+        if (!j.ok || !j.published) {
+            el.textContent = 'Publicado: nenhum';
+            el.title = '';
+            return;
+        }
+        const t = (j.published.title || '').trim();
+        el.textContent = `Publicado: #${j.published.blueprint_id}${t ? ' — ' + t.slice(0, 48) : ''}`;
+        el.title = j.published.slug || '';
+    } catch (_) {
+        el.textContent = 'Publicado: (erro ao ler)';
+    }
+}
+
+async function publishFlowBlueprintServer() {
+    if (!_currentFlowBlueprintId) {
+        toast('Guarde primeiro no servidor (Servidor).', 'amber');
+        return;
+    }
+    try {
+        const res = await fetch(`${API}/api/flows/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ blueprint_id: _currentFlowBlueprintId }),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.ok) throw new Error(j.error || 'publish_failed');
+        toast(`Blueprint #${j.published_blueprint_id} publicado para este tenant.`, 'emerald');
+        refreshFlowPublishStatus();
+    } catch (e) {
+        toast(String(e.message || e), 'rose');
+    }
+}
+
+async function executeFlowBlueprintOnLead() {
+    if (!_currentFlowBlueprintId) {
+        toast('Guarde primeiro no servidor (Servidor).', 'amber');
+        return;
+    }
+    const lidStr = window.prompt('ID do lead (número) para enviar o fluxo pela fila WhatsApp:');
+    if (!lidStr) return;
+    const lid = parseInt(lidStr, 10);
+    if (!lidStr || isNaN(lid) || lid <= 0) {
+        toast('ID inválido.', 'rose');
+        return;
+    }
+    try {
+        const res = await fetch(`${API}/api/flows/blueprints/${_currentFlowBlueprintId}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lead_id: lid }),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.ok) {
+            const hint = j.hint ? ` (${j.hint})` : '';
+            throw new Error((j.error || 'execute_failed') + hint);
+        }
+        toast(`Fila: ${j.queued_actions} ação(ões) para lead ${j.lead_id}.`, 'emerald');
+    } catch (e) {
+        toast(String(e.message || e), 'rose');
+    }
+}
+
+async function loadFlowBlueprintPicker() {
+    try {
+        const res = await fetch(`${API}/api/flows/blueprints`);
+        const j = await res.json();
+        if (!j.ok || !Array.isArray(j.blueprints) || !j.blueprints.length) {
+            toast('Nenhum fluxo guardado no servidor para este tenant.', 'amber');
+            return;
+        }
+        const lines = j.blueprints.map((b) => `${b.id} — ${b.title}`).join('\n');
+        const idStr = window.prompt('ID do fluxo a abrir (número):\n\n' + lines);
+        if (!idStr) return;
+        const bid = parseInt(idStr, 10);
+        if (!bid) return;
+        const r2 = await fetch(`${API}/api/flows/blueprints/${bid}`);
+        const d = await r2.json();
+        if (!r2.ok || !d.ok || !d.blueprint || !d.blueprint.body) {
+            toast('Não foi possível carregar o fluxo.', 'rose');
+            return;
+        }
+        const body = d.blueprint.body;
+        _currentFlowBlueprintId = bid;
+        try { localStorage.setItem('acassia_flow_blueprint_id', String(bid)); } catch (_) {}
+        if (body.title) {
+            document.getElementById('builder-title').innerHTML = `<i class="fab fa-whatsapp" style="color:var(--c-emerald)"></i> ${String(body.title).replace(/</g, '')}`;
+        }
+        deserializeFlowCanvas(body);
+        toast('Fluxo carregado do servidor.', 'emerald');
+        refreshFlowPublishStatus();
+    } catch (_) {
+        toast('Falha ao listar/carregar fluxos.', 'rose');
+    }
 }
 
 function exportFlowCanvasToFile() {
@@ -5026,6 +5487,7 @@ function selectLead(lead) {
     const hintLm = document.getElementById('active-last-msg-hint');
     if (hintLm) hintLm.textContent = '';
 
+    clearFunnelRadarPanel();
     updatePauseBtn(lead.bot_pausado);
     
     loadMsgs();
@@ -5064,6 +5526,82 @@ async function togglePause() {
     }
 }
 
+/* ── Snapshot funil fase 1 (API /api/leads/:id/funnel-snapshot) ── */
+function clearFunnelRadarPanel() {
+    const grid = document.getElementById('radar-funnel-grid');
+    const burstEl = document.getElementById('radar-funnel-burst');
+    const errEl = document.getElementById('radar-funnel-err');
+    if (grid) grid.innerHTML = '';
+    if (burstEl) burstEl.innerHTML = '';
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+}
+
+function _ultimaMensagemUserTexto(messages) {
+    if (!Array.isArray(messages)) return '';
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i];
+        if (m && m.remetente === 'user') {
+            const t = String(m.texto || '').trim();
+            if (t) return t;
+        }
+    }
+    return '';
+}
+
+function renderFunnelSnapshotPayload(j) {
+    const grid = document.getElementById('radar-funnel-grid');
+    const burstEl = document.getElementById('radar-funnel-burst');
+    const errEl = document.getElementById('radar-funnel-err');
+    if (!grid || !burstEl) return;
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    const snap = j.snapshot || {};
+    const pend = j.pendencias || {};
+    const rows = [
+        ['Nome', !pend.falta_nome],
+        ['Contato', !pend.falta_contato_salvo],
+        ['Foto', !pend.falta_foto],
+        ['Desabafo', !pend.falta_desabafo],
+    ];
+    grid.innerHTML = rows.map(([label, ok]) =>
+        `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--c-surface2);border:1px solid var(--c-border);border-radius:6px;padding:6px 8px">
+            <span style="color:var(--c-muted);white-space:nowrap">${label}</span>
+            <span class="badge ${ok ? 'badge-emerald' : 'badge-amber'}" style="font-size:9px;padding:3px 6px;flex-shrink:0">${ok ? 'OK' : 'Falta'}</span>
+        </div>`
+    ).join('');
+    const burst = !!snap.burst_elegivel;
+    burstEl.innerHTML = burst
+        ? '<span class="badge badge-emerald" style="font-size:9px;padding:4px 8px">Burst inicial → coleta: elegível</span>'
+        : '<span class="badge badge-gray" style="font-size:9px;padding:4px 8px">Burst inicial → coleta: não elegível</span>';
+}
+
+async function refreshFunnelSnapshotFromMessages(messages) {
+    if (!_currentLead) return;
+    const textoTurno = _ultimaMensagemUserTexto(messages);
+    const q = new URLSearchParams();
+    if (textoTurno) q.set('texto_turno', textoTurno.slice(0, 2000));
+    const errEl = document.getElementById('radar-funnel-err');
+    try {
+        const url = `${API}/api/leads/${_currentLead.id}/funnel-snapshot${q.toString() ? '?' + q.toString() : ''}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+            clearFunnelRadarPanel();
+            if (errEl) {
+                errEl.style.display = 'block';
+                errEl.textContent = res.status === 404 ? 'Snapshot indisponível (lead).' : 'Snapshot indisponível (API).';
+            }
+            return;
+        }
+        const j = await res.json();
+        renderFunnelSnapshotPayload(j);
+    } catch (e) {
+        clearFunnelRadarPanel();
+        if (errEl) {
+            errEl.style.display = 'block';
+            errEl.textContent = 'Snapshot: erro de rede.';
+        }
+    }
+}
+
 /* ── RENDERIZAÇÃO COMPLEXA DE MENSAGENS (TEXTO, ÁUDIO, IMAGEM) ── */
 async function loadMsgs() {
     if (!_currentLead) return;
@@ -5078,11 +5616,14 @@ async function loadMsgs() {
             const wb = document.getElementById('whatsapp-window-bar');
             if (wb) wb.style.display = 'none';
             document.getElementById('radar-panel').classList.remove('show');
+            clearFunnelRadarPanel();
             loadLeads();
             return;
         }
         if (!res.ok) throw new Error('messages_failed');
         const data = await res.json();
+
+        refreshFunnelSnapshotFromMessages(data.messages || []);
 
         const bar = document.getElementById('whatsapp-window-bar');
         if (bar) {
@@ -5546,6 +6087,8 @@ function initDragAndDrop() {
             document.onmouseup = stopDrag;
         }
     });
+    wireFlowCanvasConnections();
+    redrawFlowEdges();
 }
 
 function dragNode(e) {
@@ -5560,9 +6103,12 @@ function stopDrag() {
     draggedNode = null;
     document.onmousemove = null;
     document.onmouseup = null;
+    redrawFlowEdges();
 }
 
 function renderRecoveryFlowPreview() {
+    _flowEdges = [];
+    cancelFlowWire();
     const container = document.getElementById('nodes-container');
     const svg = document.getElementById('svg-connections');
     const a = newFlowNodeId();
@@ -5593,6 +6139,8 @@ function renderRecoveryFlowPreview() {
 }
 
 function renderBaseFlow() {
+    _flowEdges = [];
+    cancelFlowWire();
     const container = document.getElementById('nodes-container');
     const n1 = newFlowNodeId();
     const n2 = newFlowNodeId();
@@ -5791,6 +6339,23 @@ function saveNewFlow() {
         updatedAt: new Date().toISOString(),
         svgInner: '',
         nodesInnerHTML,
+        graph: {
+            nodes: [
+                {
+                    id: trigId,
+                    type: 'trigger',
+                    label: `Gatilho: ${integName}`,
+                    x: 80,
+                    y: 150,
+                    config: {
+                        event: eventName,
+                        integration: integName || '',
+                        ...(keyword ? { keyword } : {}),
+                    },
+                },
+            ],
+            edges: [],
+        },
     };
     writeFlowStore(st);
 
@@ -5813,6 +6378,7 @@ function addSpecificNode(type) {
     node.className = 'flow-node';
     node.setAttribute('data-flow-id', newFlowNodeId());
     node.setAttribute('data-node-type', type || 'generic');
+    node.setAttribute('data-flow-config', '{}');
     
     node.style.left = (350 + Math.random() * 50) + 'px';
     node.style.top = (250 + Math.random() * 50) + 'px';
@@ -5833,12 +6399,58 @@ function addSpecificNode(type) {
     else if(type === 'anotacao') { headerBg = 'linear-gradient(135deg,#0f766e,#0d9488)'; icon = 'fas fa-sticky-note'; title = 'Anotação'; }
     else { headerBg = 'linear-gradient(135deg,#3b82f6,#2563eb)'; icon = 'fas fa-cube'; title = 'Nova Ação'; }
 
+    const fs = 'width:100%;margin-bottom:8px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
+    const ta = 'width:100%;resize:none;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
+    let bodyFields = '';
+    if (type === 'delay') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <input type="number" min="0" max="86400" step="1" data-flow-cfg="seconds" placeholder="Segundos de espera" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Nota (opcional)" style="${ta};height:40px"></textarea>`;
+    } else if (type === 'api') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="url" placeholder="https://..." class="input-field" style="${fs}">
+            <select data-flow-cfg="method" class="input-field" style="${fs}">
+                <option value="GET">GET</option><option value="POST">POST</option><option value="PUT">PUT</option><option value="PATCH">PATCH</option><option value="DELETE">DELETE</option>
+            </select>
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Corpo (opcional)" style="${ta};height:44px"></textarea>`;
+    } else if (type === 'notificar') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="channel" placeholder="Canal (ex: log)" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="message" placeholder="Mensagem" style="${ta};height:50px"></textarea>`;
+    } else if (type === 'anotacao') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="note" placeholder="Anotação interna" style="${ta};height:50px"></textarea>`;
+    } else if (type === 'gpt') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="prompt" placeholder="Prompt GPT" style="${ta};height:50px"></textarea>`;
+    } else if (type === 'agente_ia') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="instructions" placeholder="Instruções do agente" style="${ta};height:50px"></textarea>`;
+    } else if (type === 'voice_studio') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="script" placeholder="Roteiro / texto para voz" style="${ta};height:50px"></textarea>`;
+    } else if (type === 'pergunta') {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="question" placeholder="Texto da pergunta" style="${ta};height:50px"></textarea>`;
+    } else {
+        bodyFields = `
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Detalhes / texto / corpo..." style="${ta};height:50px"></textarea>`;
+    }
+
     node.innerHTML = `
         <div class="conn-dot conn-left"></div>
         <div class="flow-node-head" style="background:${headerBg}"><i class="${icon}"></i> ${title}</div>
         <div class="flow-node-body">
-            <input type="text" placeholder="Nome do Passo..." class="input-field" style="width:100%;margin-bottom:8px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border)">
-            <textarea class="input-field" placeholder="Detalhes..." style="width:100%;resize:none;height:50px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border)"></textarea>
+            ${bodyFields}
             <div style="display:flex;justify-content:flex-end;margin-top:4px">
                 <button class="icon-btn" style="width:24px;height:24px" onclick="this.parentElement.parentElement.parentElement.remove()"><i class="fas fa-trash text-rose-500 text-xs"></i></button>
             </div>

@@ -880,6 +880,326 @@ def api_flows_catalog():
     }), 200
 
 
+@app.route("/api/flows/validate", methods=["POST"])
+def api_flows_validate():
+    """Validação de documento do construtor visual (acassia-flow v1)."""
+    try:
+        from flow_builder_runtime import validate_flow_document
+
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"ok": False, "error": "payload inválido"}), 400
+        report = validate_flow_document(body)
+        status = 200 if report.get("ok") else 422
+        return jsonify(_json_safe_for_api(report)), status
+    except Exception as e:
+        logger.error("🚨 [API] /api/flows/validate: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/flows/schema", methods=["GET"])
+def api_flows_schema():
+    """Catálogo de blocos e campos (para o construtor)."""
+    try:
+        from flow_builder_runtime import public_node_catalog
+
+        return jsonify({"ok": True, **_json_safe_for_api(public_node_catalog())}), 200
+    except Exception as e:
+        logger.error("🚨 [API] /api/flows/schema: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/flows/compile", methods=["POST"])
+def api_flows_compile():
+    """Compila documento validado num plano linear (ordem de execução)."""
+    try:
+        from flow_builder_runtime import compile_flow_plan, validate_flow_document
+
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"ok": False, "error": "payload inválido"}), 400
+        rep = validate_flow_document(body)
+        plan = compile_flow_plan(rep.get("normalized") or body)
+        out = {"ok": bool(rep.get("ok")), "validation": rep, "plan": plan}
+        return jsonify(_json_safe_for_api(out)), 200 if rep.get("ok") else 422
+    except Exception as e:
+        logger.error("🚨 [API] /api/flows/compile: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/flows/simulate", methods=["POST"])
+def api_flows_simulate():
+    """Simulação dry-run (trace legível) — não envia WhatsApp."""
+    try:
+        from flow_builder_runtime import simulate_flow, validate_flow_document
+
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"ok": False, "error": "payload inválido"}), 400
+        rep = validate_flow_document(body)
+        doc = rep.get("normalized") or body
+        sim = simulate_flow(doc, max_steps=int(body.get("max_steps") or 40))
+        return jsonify(_json_safe_for_api({"ok": True, "validation": rep, "simulation": sim})), 200
+    except Exception as e:
+        logger.error("🚨 [API] /api/flows/simulate: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+def _serialize_flow_blueprint_row(row: models.FlowBlueprint) -> dict:
+    return {
+        "id": row.id,
+        "slug": row.slug,
+        "title": row.title,
+        "updated_at": row.atualizado_em.isoformat() if row.atualizado_em else "",
+        "created_at": row.criado_em.isoformat() if row.criado_em else "",
+    }
+
+
+@app.route("/api/flows/blueprints", methods=["GET", "POST"])
+def api_flows_blueprints():
+    """Lista ou cria fluxos persistidos no servidor (tenant)."""
+    tid = get_request_tenant_id()
+    db = SessionLocal()
+    try:
+        if request.method == "GET":
+            rows = (
+                db.query(models.FlowBlueprint)
+                .filter(models.FlowBlueprint.tenant_id == tid)
+                .order_by(models.FlowBlueprint.atualizado_em.desc())
+                .all()
+            )
+            return jsonify({"ok": True, "blueprints": [_serialize_flow_blueprint_row(r) for r in rows]}), 200
+        body = request.get_json(silent=True) or {}
+        title = (body.get("title") or "").strip()
+        slug = (body.get("slug") or "").strip().lower()
+        if not title:
+            return jsonify({"ok": False, "error": "title obrigatório"}), 400
+        if not slug:
+            slug = re.sub(r"[^a-z0-9_]+", "_", title.lower()).strip("_")[:120] or "fluxo"
+        existing = db.query(models.FlowBlueprint).filter_by(tenant_id=tid, slug=slug).first()
+        if existing:
+            return jsonify({"ok": False, "error": "slug já existe neste tenant"}), 409
+        doc = body.get("body") if isinstance(body.get("body"), dict) else {}
+        row = models.FlowBlueprint(tenant_id=tid, slug=slug[:128], title=title[:300], body_json=doc)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return jsonify({"ok": True, "blueprint": _serialize_flow_blueprint_row(row)}), 201
+    except Exception as e:
+        logger.error("🚨 [API] /api/flows/blueprints: %s", e)
+        db.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/flows/blueprints/<int:bid>", methods=["GET", "PATCH", "DELETE"])
+def api_flows_blueprint_one(bid: int):
+    tid = get_request_tenant_id()
+    db = SessionLocal()
+    try:
+        row = db.query(models.FlowBlueprint).filter_by(id=bid, tenant_id=tid).first()
+        if not row:
+            return jsonify({"ok": False, "error": "fluxo não encontrado"}), 404
+        if request.method == "GET":
+            body = row.body_json if isinstance(row.body_json, dict) else {}
+            return jsonify({"ok": True, "blueprint": {**_serialize_flow_blueprint_row(row), "body": body}}), 200
+        if request.method == "DELETE":
+            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            if pub and pub.published_blueprint_id == bid:
+                pub.published_blueprint_id = None
+            db.delete(row)
+            db.commit()
+            return jsonify({"ok": True}), 200
+        payload = request.get_json(silent=True) or {}
+        if "title" in payload:
+            t = str(payload.get("title") or "").strip()
+            if t:
+                row.title = t[:300]
+        if "slug" in payload:
+            ns = str(payload.get("slug") or "").strip().lower()[:128]
+            if ns:
+                clash = (
+                    db.query(models.FlowBlueprint)
+                    .filter(
+                        models.FlowBlueprint.tenant_id == tid,
+                        models.FlowBlueprint.slug == ns,
+                        models.FlowBlueprint.id != bid,
+                    )
+                    .first()
+                )
+                if clash:
+                    return jsonify({"ok": False, "error": "slug já em uso"}), 409
+                row.slug = ns
+        if "body" in payload and isinstance(payload.get("body"), dict):
+            row.body_json = payload["body"]
+        db.commit()
+        db.refresh(row)
+        return jsonify({"ok": True, "blueprint": _serialize_flow_blueprint_row(row)}), 200
+    except Exception as e:
+        logger.error("🚨 [API] blueprint %s: %s", bid, e)
+        db.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        db.close()
+
+
+def _ensure_flow_publish_row(db, tenant_id: str) -> models.FlowPublish:
+    tid = (tenant_id or "default").strip() or "default"
+    row = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+    if row is None:
+        row = models.FlowPublish(tenant_id=tid, published_blueprint_id=None)
+        db.add(row)
+        db.flush()
+    return row
+
+
+@app.route("/api/flows/publish", methods=["POST"])
+def api_flows_publish_blueprint():
+    """Define o blueprint publicado do construtor para este tenant (metadados + executor)."""
+    tid = get_request_tenant_id()
+    body = request.get_json(silent=True) or {}
+    bid = body.get("blueprint_id")
+    if bid is None:
+        return jsonify({"ok": False, "error": "blueprint_id obrigatório"}), 400
+    try:
+        bid = int(bid)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "blueprint_id inválido"}), 400
+    db = SessionLocal()
+    try:
+        bp = db.query(models.FlowBlueprint).filter_by(id=bid, tenant_id=tid).first()
+        if not bp:
+            return jsonify({"ok": False, "error": "blueprint não encontrado neste tenant"}), 404
+        pub = _ensure_flow_publish_row(db, tid)
+        pub.published_blueprint_id = bid
+        db.commit()
+        return jsonify({"ok": True, "published_blueprint_id": bid}), 200
+    except Exception as e:
+        logger.error("🚨 [API] /api/flows/publish: %s", e)
+        db.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/flows/publish/status", methods=["GET"])
+def api_flows_publish_blueprint_status():
+    tid = get_request_tenant_id()
+    db = SessionLocal()
+    try:
+        pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+        if not pub or not pub.published_blueprint_id:
+            return jsonify({"ok": True, "published": None}), 200
+        bp = db.query(models.FlowBlueprint).filter_by(id=pub.published_blueprint_id, tenant_id=tid).first()
+        return jsonify(
+            {
+                "ok": True,
+                "published": {
+                    "blueprint_id": pub.published_blueprint_id,
+                    "slug": bp.slug if bp else "",
+                    "title": bp.title if bp else "",
+                },
+            }
+        ), 200
+    except Exception as e:
+        logger.error("🚨 [API] /api/flows/publish/status: %s", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/flows/blueprints/<int:bid>/execute", methods=["POST"])
+def api_flows_blueprint_execute(bid: int):
+    """
+    Executa o fluxo compilado no motor real: gera Acao(s) e envia pela mesma fila WhatsApp.
+    Body JSON: { "lead_id": number }
+    """
+    tid = get_request_tenant_id()
+    body = request.get_json(silent=True) or {}
+    lid = body.get("lead_id")
+    try:
+        lid = int(lid)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "lead_id obrigatório (inteiro)"}), 400
+
+    if str(getattr(motor, "tenant_id", "default") or "default") != tid:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "motor_tenant_mismatch",
+                "hint": "ACASSIA_TENANT_ID do processo deve coincidir com X-Acassia-Tenant.",
+            }
+        ), 503
+
+    db = SessionLocal()
+    try:
+        bp = db.query(models.FlowBlueprint).filter_by(id=bid, tenant_id=tid).first()
+        if not bp:
+            return jsonify({"ok": False, "error": "blueprint não encontrado"}), 404
+        lead = db.get(models.Lead, lid)
+        if not lead or str(getattr(lead, "tenant_id", "default") or "default") != tid:
+            return jsonify({"ok": False, "error": "lead não encontrado neste tenant"}), 404
+
+        from flow_executor import document_to_acoes
+        from schema import ContextoConversa
+
+        doc = bp.body_json if isinstance(bp.body_json, dict) else {}
+        try:
+            acoes = document_to_acoes(doc)
+        except ValueError as ve:
+            return jsonify({"ok": False, "error": str(ve)}), 422
+        if not acoes:
+            return jsonify({"ok": False, "error": "nenhuma ação gerada (revise blocos message/delay)"}), 422
+
+        ctx = ContextoConversa(
+            lead_id=lead.id,
+            telefone=lead.telefone,
+            node_atual=lead.node_atual or "1_apresentacao",
+            historico=motor._buscar_historico(db, lead.id, 20),
+            texto_recebido="[FLOW_BLUEPRINT_EXECUTE]",
+            tipo_mensagem="system",
+            personalizer=motor.personalizer,
+        )
+        ctx.metadata["__config__"] = CONFIG_CLIENTE
+        ctx.metadata["flow_blueprint_execute"] = {"blueprint_id": bid, "actions": len(acoes)}
+        try:
+            from studio_runtime import inject_published_studio_into_metadata
+
+            inject_published_studio_into_metadata(ctx.metadata, tenant_id=tid)
+        except Exception:
+            pass
+        try:
+            from flow_executor import inject_published_flow_metadata
+
+            inject_published_flow_metadata(ctx.metadata, tid)
+        except Exception:
+            pass
+
+        db.add(
+            models.EventoAudit(
+                lead_id=lead.id,
+                evento="flow_blueprint_execute",
+                dados={"blueprint_id": bid, "actions": len(acoes)},
+            )
+        )
+        db.commit()
+
+        threading.Thread(
+            target=motor._processar_fila,
+            args=(lead.id, ctx, acoes),
+            daemon=True,
+            name=f"flow-bp-{bid}",
+        ).start()
+        return jsonify({"ok": True, "queued_actions": len(acoes), "lead_id": lead.id}), 200
+    except Exception as e:
+        logger.error("🚨 [API] blueprint execute %s: %s", bid, e)
+        db.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        db.close()
+
+
 @app.route("/api/stats", methods=["GET"])
 def api_stats():
     """KPIs para o dashboard + campos extras para evolução da UI."""
@@ -2929,9 +3249,25 @@ def webhook_cakto():
 # UTILITÁRIOS: DOWNLOAD, STT E MANUTENÇÃO
 # ─────────────────────────────────────────────────────────────────────
 
+def _is_simulator_graph_media_id(media_id) -> bool:
+    """True para IDs do `simulador_fantasmas.py` — não existem na Graph API."""
+    if media_id is None:
+        return False
+    s = str(media_id).strip()
+    return s in ("ID_IMAGEM_TESTE", "ID_AUDIO_TESTE") or (
+        s.startswith("ID_") and "TESTE" in s.upper()
+    )
+
+
 def _baixar_midia(media_id):
     """Descarrega mídia da Meta via Graph API."""
     try:
+        if _is_simulator_graph_media_id(media_id):
+            logger.info(
+                "🧪 [DOWNLOAD] Ignorado (media_id de simulador local, sem objeto na Meta): %s",
+                media_id,
+            )
+            return None, None
         headers = {"Authorization": f"Bearer {WEBAPP_TOKEN}"}
         # 1. Obtém URL temporária de download
         r1 = requests.get(f"https://graph.facebook.com/v19.0/{media_id}", headers=headers, timeout=12)

@@ -59,6 +59,7 @@ from flows.funnel_gates import (
 from schema import Acao, ContextoConversa
 from copy_sanitizer import (
     BALAO_IA_REGEX_CORTE_FINAL,
+    MOBILE_MAX_LINHAS_BALO,
     preparar_texto_envio,
     delay_entre_baloes,
     delay_escuta_pos_audio,
@@ -355,6 +356,12 @@ class Engine:
                     inject_published_studio_into_metadata(ctx.metadata, tenant_id=self.tenant_id)
                 except Exception:
                     pass
+                try:
+                    from flow_executor import inject_published_flow_metadata
+
+                    inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
+                except Exception:
+                    pass
 
                 # Nome do lead: coluna `lead.nome` é fonte de verdade quando preenchida;
                 # evita nodes usarem a primeira palavra da mensagem atual ("mandei", "foto") quando o JSON não tem nome_lead.
@@ -634,6 +641,12 @@ class Engine:
                 inject_published_studio_into_metadata(ctx.metadata, tenant_id=self.tenant_id)
             except Exception:
                 pass
+            try:
+                from flow_executor import inject_published_flow_metadata
+
+                inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
+            except Exception:
+                pass
             acoes = self._executar_node("14_confirmacao_entrega", ctx, db, lead)
             self._processar_fila(lead.id, ctx, acoes)
         finally:
@@ -662,6 +675,12 @@ class Engine:
                 from studio_runtime import inject_published_studio_into_metadata
 
                 inject_published_studio_into_metadata(ctx.metadata, tenant_id=self.tenant_id)
+            except Exception:
+                pass
+            try:
+                from flow_executor import inject_published_flow_metadata
+
+                inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
             except Exception:
                 pass
             self._processar_fila(lead.id, ctx, acoes)
@@ -723,7 +742,7 @@ class Engine:
                 elif acao.tipo == "text":
                     fatiados: list[str] = []
                     for parte in self._quebrar_baloes(acao.conteudo):
-                        fatiados.extend(quebrar_por_linhas_max(parte, 4))
+                        fatiados.extend(quebrar_por_linhas_max(parte, MOBILE_MAX_LINHAS_BALO))
                     for balao in fatiados:
                         balao_limpo = self._blindar_texto_final_anti_corte(balao)
                         if not balao_limpo:

@@ -170,3 +170,36 @@ class StudioPublish(Base):
         nullable=True,
         index=True,
     )
+
+
+class FlowBlueprint(Base):
+    """
+    Fluxo desenhado no Flow Builder (documento acassia-flow v1).
+    Persistência servidor por tenant + slug estável.
+    """
+
+    __tablename__ = "flow_blueprints"
+    __table_args__ = (UniqueConstraint("tenant_id", "slug", name="uq_flow_blueprint_tenant_slug"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    slug = Column(String(128), nullable=False, index=True)
+    title = Column(String(300), nullable=False, default="")
+    body_json = Column(JSON, default=dict)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+    atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
+
+
+class FlowPublish(Base):
+    """Blueprint publicado por tenant (referência para executor / metadados no motor)."""
+
+    __tablename__ = "flow_publish"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(64), nullable=False, unique=True, index=True, default="default")
+    published_blueprint_id = Column(
+        Integer,
+        ForeignKey("flow_blueprints.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )

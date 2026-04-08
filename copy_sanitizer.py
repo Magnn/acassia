@@ -23,6 +23,10 @@ from flows.funnel_gates import (
 
 logger = logging.getLogger(__name__)
 
+# Mobile-first: maioria dos leads lê no celular; manter balões enxutos.
+MOBILE_MAX_LINHAS_BALO = 3
+MOBILE_CHARS_POR_LINHA = 34
+
 # Lista única de primeiros nomes masculinos comuns (PT) — inferência de vocativo antes do Node 5
 NOMES_MASCULINOS_COMUNS: frozenset[str] = frozenset({
     "magno", "joão", "joao", "jose", "josé", "carlos", "pedro", "paulo", "marcos",
@@ -1073,7 +1077,7 @@ def parse_blocos_leitura_ia(
     return out
 
 
-def quebrar_por_linhas_max(texto: str, max_linhas: int = 4) -> List[str]:
+def quebrar_por_linhas_max(texto: str, max_linhas: int = MOBILE_MAX_LINHAS_BALO) -> List[str]:
     """Fatiar por parágrafos; se um parágrafos tiver mais de `max_linhas` linhas com texto, fatia em blocos."""
     if not texto or not texto.strip():
         return []
@@ -1106,8 +1110,8 @@ def quebrar_por_linhas_max(texto: str, max_linhas: int = 4) -> List[str]:
 def fatiar_texto_ritmo_celular(
     texto: str,
     *,
-    max_linhas_visuais: int = 4,
-    chars_por_linha: int = 38,
+    max_linhas_visuais: int = MOBILE_MAX_LINHAS_BALO,
+    chars_por_linha: int = MOBILE_CHARS_POR_LINHA,
 ) -> List[str]:
     """
     Divide um texto longo em vários balões curtos (ritmo WhatsApp no celular).
