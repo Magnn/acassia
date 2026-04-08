@@ -24,7 +24,13 @@ from copy_sanitizer import (
     limpar_colagem_primeira_msg_whatsapp_em_texto,
 )
 from conversation_policy import lead_reportou_problema_entrega
-from flows.funnel_gates import VOCATIVO_SEM_NOME, nome_eh_placeholder
+from flows.funnel_gates import (
+    VOCATIVO_SEM_NOME,
+    nome_eh_placeholder,
+    meta_tem_foto,
+    meta_tem_desabafo,
+    nome_util_para_checklist_fase1,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -431,6 +437,13 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     blob_sessao = blob_sessao_usuario(ctx, msg_lead)
     if meta.get("lead_contato_salvo_declarado") or texto_indica_contato_salvo(blob_sessao):
         meta["lead_contato_salvo_declarado"] = True
+    # Se o lead já chegou completo na fase 1, não precisa repetir nada no node2.
+    nome_ok = nome_util_para_checklist_fase1(str(meta.get("nome_lead") or ctx.nome_lead or ""))
+    if nome_ok and bool(meta.get("lead_contato_salvo_declarado")) and meta_tem_foto(meta) and meta_tem_desabafo(meta):
+        meta["node2_bypass_contexto_completo"] = True
+        ctx.estado_coleta = "node2_bypass_para_node3"
+        ctx.metadata = meta
+        return [], "3_coleta_profunda"
 
     # 2. Decisão de Pista
     tem_bagagem = any(g in msg_lower for g in _GATILHOS_DINAMICOS)

@@ -772,8 +772,18 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         ctx.metadata["nome_lead"] = nome
         ctx.nome_lead = nome
 
-    # ── 3. Resposta IA (JSON hierárquico: extra → A → B → C? → D) — sempre que houver personalizer (incl. "oi" só)
-    if ctx.personalizer:
+    # ── 3. Resposta IA (apenas fora do caminho padrão) ──
+    # Caminho padrão: saudação curta, nome claro, contato/foto/desabafo em regra.
+    # IA entra quando o lead sai do trilho (dúvida/objeção/dor densa/mensagem extensa).
+    use_ia_node1 = bool(
+        ctx.personalizer
+        and (
+            tem_gatilho
+            or len(msg_limpa.split()) > 8
+            or _RE_DOR_OU_SOFRIMENTO.search(msg_lead)
+        )
+    )
+    if use_ia_node1:
         logger.info(
             f"🧠 [NODE 1 v20] JSON + briefing + anti-repetição + vaga para {nome}"
             f"{' (msg curta)' if is_basic else ''}."
@@ -812,17 +822,12 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
             if baloes_limpos:
                 texto_total = " ".join(baloes_limpos)
-                if "?" not in texto_total and "👇" not in texto_total:
+                if nome_eh_placeholder(nome) and "?" not in texto_total and "👇" not in texto_total:
                     logger.info("🔧 [NODE 1] Hook Assurance (D sem pergunta).")
-                    if not nome_eh_placeholder(nome):
-                        baloes_limpos.append(
-                            f"{nome}, posso seguir contigo no próximo passo? 👇"
-                        )
-                    else:
-                        # Sem nome ainda: não pedir "próximo passo" genérico (contrato + anti-redundância com node 2/3).
-                        baloes_limpos.append(
-                            "Me diz como você se chama, meu bem? Assim eu te falo direito. 👇"
-                        )
+                    # Sem nome ainda: pedir nome. Com nome, não forçar CTA extra para avançar.
+                    baloes_limpos.append(
+                        "Me diz como você se chama, meu bem? Assim eu te falo direito. 👇"
+                    )
 
                 baloes_saida = list(baloes_limpos[:_MAX_BALOES_NODE1])
                 acoes = [Acao(tipo="delay", segundos=random.randint(2, 4))]
