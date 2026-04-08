@@ -3136,6 +3136,7 @@ function go(name, contextTitle = null) {
         }
         loadOrRenderBuilderCanvas(contextTitle);
         refreshFlowPublishStatus();
+        ensureFlowSchemaCatalog();
     }
 }
 
@@ -3364,6 +3365,7 @@ let _flowConnectSource = null;
 let _flowWireDrag = null;
 let _flowSelectedNodeId = null;
 let _currentFlowBlueprintId = null;
+let _flowSchemaCatalog = null;
 
 function cancelFlowWire() {
     _flowConnectSource = null;
@@ -3579,6 +3581,112 @@ function flowConteudoSave() {
     toast('Conteúdos guardados no bloco.', 'emerald');
 }
 
+async function ensureFlowSchemaCatalog() {
+    if (_flowSchemaCatalog && typeof _flowSchemaCatalog === 'object') return _flowSchemaCatalog;
+    try {
+        const res = await fetch(`${API}/api/flows/schema`);
+        const j = await res.json();
+        if (res.ok && j && j.ok && j.node_types) {
+            _flowSchemaCatalog = j.node_types;
+            return _flowSchemaCatalog;
+        }
+    } catch (_) {}
+    _flowSchemaCatalog = {};
+    return _flowSchemaCatalog;
+}
+
+function flowInspectorInputTypeForKey(k) {
+    const key = String(k || '').toLowerCase();
+    if (key === 'seconds' || key === 'temperature') return 'number';
+    if (key === 'method') return 'select_method';
+    if (key === 'url' || key === 'path' || key === 'timezone') return 'text';
+    if (key === 'windows' || key === 'prompt' || key === 'instructions' || key === 'payload' || key === 'body' || key === 'question' || key === 'expression' || key === 'message' || key === 'note' || key === 'script') return 'textarea';
+    return 'text';
+}
+
+function flowInspectorRenderGeneric(meta, cfg, spec) {
+    const body = document.getElementById('flow-inspector-body');
+    if (!body) return;
+    const keys = Array.from(new Set([...(spec.required_config || []), ...(spec.optional_keys || []), 'step_name']));
+    const fields = keys.map((k) => {
+        const t = flowInspectorInputTypeForKey(k);
+        const v = cfg[k] == null ? '' : String(cfg[k]);
+        const req = (spec.required_config || []).includes(k) ? ' *' : '';
+        if (t === 'textarea') {
+            return `
+                <label class="kpi-label" style="margin-top:6px">${flowEsc(k)}${req}</label>
+                <textarea class="input-field" data-flow-inspector-key="${flowEsc(k)}" style="width:100%;min-height:54px;font-size:11px">${flowEsc(v)}</textarea>`;
+        }
+        if (t === 'select_method') {
+            const meth = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+            return `
+                <label class="kpi-label" style="margin-top:6px">${flowEsc(k)}${req}</label>
+                <select class="input-field" data-flow-inspector-key="${flowEsc(k)}" style="width:100%;padding:7px;font-size:11px">
+                    ${meth.map((m) => `<option value="${m}" ${String(v || 'GET').toUpperCase() === m ? 'selected' : ''}>${m}</option>`).join('')}
+                </select>`;
+        }
+        const extra = t === 'number' ? 'type="number" step="any"' : 'type="text"';
+        return `
+            <label class="kpi-label" style="margin-top:6px">${flowEsc(k)}${req}</label>
+            <input ${extra} class="input-field" data-flow-inspector-key="${flowEsc(k)}" value="${flowEsc(v)}" style="width:100%;padding:7px;font-size:11px">`;
+    }).join('');
+
+    body.innerHTML = `
+        <div style="margin-bottom:8px"><span class="badge badge-purple" style="font-size:9px">${flowEsc(meta.typ)}</span></div>
+        <div style="margin-bottom:6px"><strong style="color:var(--c-text)">${flowEsc(meta.title)}</strong></div>
+        <div style="font-size:10px;margin-bottom:8px">ID: <code style="font-size:9px">${flowEsc(meta.id)}</code><br>Entradas: ${meta.incom} · Saídas: ${meta.outgo}</div>
+        ${fields || '<div style="font-size:11px;color:var(--c-muted)">Sem campos configuráveis para este bloco.</div>'}
+        <div style="display:flex;gap:6px;margin-top:10px">
+            <button type="button" class="btn btn-primary" style="flex:1;font-size:11px" onclick="applyFlowInspectorFormConfig()"><i class="fas fa-save"></i> Salvar campos</button>
+            <button type="button" class="btn btn-ghost" style="font-size:11px" onclick="openRawFlowInspectorJson()"><i class="fas fa-code"></i> JSON</button>
+        </div>
+    `;
+}
+
+function applyFlowInspectorFormConfig() {
+    const nodeId = _flowSelectedNodeId;
+    const node = nodeId ? flowCanvasNodeById(nodeId) : null;
+    if (!node) return;
+    let obj = {};
+    try {
+        obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
+    } catch (_) {}
+    if (typeof obj !== 'object' || obj === null) obj = {};
+    document.querySelectorAll('#flow-inspector-body [data-flow-inspector-key]').forEach((el) => {
+        const k = el.getAttribute('data-flow-inspector-key');
+        if (!k) return;
+        const raw = (el.value || '').trim();
+        if (!raw) {
+            delete obj[k];
+            return;
+        }
+        if (el.type === 'number') {
+            const n = Number(raw);
+            obj[k] = Number.isFinite(n) ? n : raw;
+        } else {
+            obj[k] = raw;
+        }
+    });
+    node.setAttribute('data-flow-config', JSON.stringify(obj));
+    toast('Campos do bloco salvos.', 'emerald');
+}
+
+function openRawFlowInspectorJson() {
+    const nodeId = _flowSelectedNodeId;
+    const node = nodeId ? flowCanvasNodeById(nodeId) : null;
+    const body = document.getElementById('flow-inspector-body');
+    if (!node || !body) return;
+    let cfg = {};
+    try {
+        cfg = JSON.parse(node.getAttribute('data-flow-config') || '{}');
+    } catch (_) {}
+    body.innerHTML = `
+        <label class="kpi-label">Config JSON (modo avançado)</label>
+        <textarea id="flow-inspector-cfg" class="input-field" style="width:100%;min-height:140px;font-size:10px;font-family:monospace;margin-top:4px">${JSON.stringify(cfg, null, 2)}</textarea>
+        <button type="button" class="btn btn-primary" style="width:100%;margin-top:8px;font-size:11px" onclick="applyFlowInspectorConfig()"><i class="fas fa-save"></i> Aplicar config</button>
+    `;
+}
+
 function flowCanvasNodeById(fid) {
     if (!fid) return null;
     return document.querySelector('#nodes-container .flow-node[data-flow-id="' + String(fid).replace(/"/g, '\\"') + '"]');
@@ -3651,7 +3759,7 @@ function wireFlowCanvasConnections() {
     initFlowWireDrag();
 }
 
-function openFlowInspector(nodeEl) {
+async function openFlowInspector(nodeEl) {
     const panel = document.getElementById('flow-inspector');
     const body = document.getElementById('flow-inspector-body');
     if (!panel || !body || !nodeEl) return;
@@ -3675,14 +3783,9 @@ function openFlowInspector(nodeEl) {
         panel.style.display = 'block';
         return;
     }
-    body.innerHTML = `
-        <div style="margin-bottom:8px"><span class="badge badge-purple" style="font-size:9px">${typ}</span></div>
-        <div style="margin-bottom:6px"><strong style="color:var(--c-text)">${title.replace(/</g,'')}</strong></div>
-        <div style="font-size:10px;margin-bottom:8px">ID: <code style="font-size:9px">${id.replace(/</g,'')}</code><br>Entradas: ${incom} · Saídas: ${outgo}</div>
-        <label class="kpi-label">Config JSON (opcional)</label>
-        <textarea id="flow-inspector-cfg" class="input-field" style="width:100%;min-height:120px;font-size:10px;font-family:monospace;margin-top:4px">${JSON.stringify(cfg, null, 2)}</textarea>
-        <button type="button" class="btn btn-primary" style="width:100%;margin-top:8px;font-size:11px" onclick="applyFlowInspectorConfig()"><i class="fas fa-save"></i> Aplicar config</button>
-    `;
+    const catalog = await ensureFlowSchemaCatalog();
+    const spec = (catalog && catalog[typ]) || { required_config: [], optional_keys: [] };
+    flowInspectorRenderGeneric({ typ, title, incom, outgo, id }, cfg, spec);
     panel.style.display = 'block';
 }
 
@@ -6602,6 +6705,28 @@ function closeNodeMenu() {
     document.getElementById('node-options-menu').classList.add('-translate-x-full');
 }
 
+function flowDefaultConfigByType(type) {
+    const t = String(type || 'generic');
+    if (t === 'trigger') return { integration: 'whatsapp', event: 'mensagem_recebida' };
+    if (t === 'webhook') return { path: '/webhook/entrada' };
+    if (t === 'engine' || t === 'nucleo_ia') return { body: '' };
+    if (t === 'motor_ref') return { module_hint: '' };
+    if (t === 'conteudo') return { body: '', contents: [] };
+    if (t === 'pergunta') return { question: '' };
+    if (t === 'acao') return { action_kind: '', payload: '' };
+    if (t === 'delay') return { seconds: 3 };
+    if (t === 'condicao') return { expression: '' };
+    if (t === 'expediente') return { timezone: 'America/Sao_Paulo', windows: '' };
+    if (t === 'notificar') return { channel: 'log', message: '' };
+    if (t === 'divisao') return { weights: 'A:50,B:50' };
+    if (t === 'api') return { method: 'GET', url: '' };
+    if (t === 'gpt') return { prompt: '' };
+    if (t === 'agente_ia') return { instructions: '' };
+    if (t === 'voice_studio') return { script: '' };
+    if (t === 'anotacao') return { note: '' };
+    return {};
+}
+
 function addSpecificNode(type) {
     closeNodeMenu();
     const container = document.getElementById('nodes-container');
@@ -6609,7 +6734,11 @@ function addSpecificNode(type) {
     node.className = 'flow-node';
     node.setAttribute('data-flow-id', newFlowNodeId());
     node.setAttribute('data-node-type', type || 'generic');
-    node.setAttribute('data-flow-config', '{}');
+    try {
+        node.setAttribute('data-flow-config', JSON.stringify(flowDefaultConfigByType(type)));
+    } catch (_) {
+        node.setAttribute('data-flow-config', '{}');
+    }
     
     node.style.left = (350 + Math.random() * 50) + 'px';
     node.style.top = (250 + Math.random() * 50) + 'px';
