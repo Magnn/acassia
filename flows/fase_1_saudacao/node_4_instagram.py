@@ -123,10 +123,39 @@ def _normalizar_link_ig(link_raw: str) -> str:
     return _IG_CANONICO_CIGANA
 
 
+_RE_URL_HTTP = re.compile(r"https?://\S+", re.I)
+
+
 def _encurtar_balao_node4(texto: str, limite: int = 170) -> str:
+    """
+    Encurta texto do balão sem rasgar URL: o corte por último '.' da janela
+    quebrava links (ex.: \"https://www.instagram.\" antes de .com).
+    """
     t = re.sub(r"\s+", " ", str(texto or "")).strip()
     if len(t) <= limite:
         return t
+    urls = _RE_URL_HTTP.findall(t)
+    if urls:
+        sem_url = _RE_URL_HTTP.sub(" ", t)
+        sem_url = re.sub(r"\s+", " ", sem_url).strip()
+        bloco_urls = " ".join(urls)
+        sep = " " if sem_url and bloco_urls else ""
+        overhead = len(sep)
+        budget = limite - len(bloco_urls) - overhead
+        if budget <= 0:
+            return bloco_urls if len(bloco_urls) <= limite else bloco_urls[:limite]
+        if len(sem_url) <= budget:
+            return f"{sem_url}{sep}{bloco_urls}".strip()
+        corte = sem_url[:budget]
+        ult = max(corte.rfind("."), corte.rfind("?"), corte.rfind("!"))
+        if ult >= min(50, budget // 3):
+            corte = corte[: ult + 1]
+        else:
+            ws = corte.rfind(" ")
+            if ws >= min(40, budget // 4):
+                corte = corte[:ws].rstrip(" ,;:-")
+            corte = corte.rstrip() + "..."
+        return f"{corte.strip()}{sep}{bloco_urls}".strip()
     corte = t[:limite]
     ult = max(corte.rfind("."), corte.rfind("?"), corte.rfind("!"))
     if ult >= 50:
