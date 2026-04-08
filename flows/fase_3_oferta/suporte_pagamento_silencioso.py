@@ -57,10 +57,15 @@ def link_efetivo_para_node(node_atual: str, config: dict) -> str:
 
 
 def _link_eh_configurado(link: str) -> bool:
-    s = (link or "").strip()
+    s = re.sub(r"\s+", "", str(link or "")).strip()
     if not s or s.startswith("["):
         return False
-    return s.lower().startswith("http://") or s.lower().startswith("https://")
+    if any(tok in s for tok in ("[", "]", "{", "}", "<", ">")):
+        return False
+    low = s.lower()
+    if "nao_configurado" in low or "não_configurado" in low:
+        return False
+    return low.startswith("http://") or low.startswith("https://")
 
 
 def montar_acoes_suporte_checkout(

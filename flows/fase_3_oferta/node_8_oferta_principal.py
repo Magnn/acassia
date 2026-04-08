@@ -130,6 +130,18 @@ def _normalizar_link_checkout(link: str) -> str:
     return norm or "[LINK_NÃO_CONFIGURADO]"
 
 
+def _link_checkout_valido(link: str) -> bool:
+    s = re.sub(r"\s+", "", str(link or "")).strip()
+    if not s:
+        return False
+    if "[" in s or "]" in s or "{" in s or "}" in s or "<" in s or ">" in s:
+        return False
+    low = s.lower()
+    if "nao_configurado" in low or "não_configurado" in low:
+        return False
+    return low.startswith("https://") or low.startswith("http://")
+
+
 def _cakto_client_from_config(config: dict) -> Optional[CaktoAPIClient]:
     ck = (config or {}).get("cakto") or {}
     if not isinstance(ck, dict):
@@ -542,11 +554,31 @@ def executar_v2(ctx) -> tuple:
         if _lead_pediu_link(msg_lead):
             ticket_envio = int(meta.get("node8_ticket_atual", ticket_inicial) or ticket_inicial)
             link_resolvido = _resolver_link_ticket(meta, config, link, ticket_envio)
-            link_final = compactar_url_https_monolitica(link_resolvido) or compactar_url_https_monolitica(
-                re.sub(r"\s+", "", link_resolvido)
+            link_candidato = compactar_url_https_monolitica(link_resolvido) or compactar_url_https_monolitica(
+                re.sub(r"\s+", "", str(link_resolvido or ""))
             )
-            if not link_final.startswith("http"):
-                link_final = link if link.startswith("http") else f"https://{link}"
+            link_final = (link_candidato or "").strip()
+            if not _link_checkout_valido(link_final):
+                fallback = _normalizar_link_checkout(str(config.get("link_pagamento") or ""))
+                if _link_checkout_valido(fallback):
+                    link_final = fallback
+                else:
+                    logger.warning("event=node8_link_invalido lead=%s ticket=%s", nome_fmt, ticket_envio)
+                    ctx.metadata = meta
+                    return (
+                        [
+                            Acao(tipo="delay", segundos=random.randint(3, 6)),
+                            Acao(
+                                tipo="text",
+                                conteudo=(
+                                    "Eu não vou te enviar link quebrado, meu bem. "
+                                    "Me responde *LINK* que eu te envio um checkout válido na sequência."
+                                ),
+                                metadata={"skip_gancho_final": True},
+                            ),
+                        ],
+                        "8_oferta_principal",
+                    )
 
             meta["node8_fase"] = "concluido"
             ctx.estado_coleta = "node8_link_enviado"
