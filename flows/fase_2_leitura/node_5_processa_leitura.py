@@ -59,6 +59,10 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
+_RE_FEEDBACK_EXPERIENCIA = re.compile(
+    r"(?i)(transi[cç][aã]o|humaniz|humani[sz]|rob[oô]|mais\s+natural|"
+    r"soou\s+(?:a\s+)?sper|ficou\s+(?:meio\s+)?(?:frio|seco))"
+)
 
 # ── PROMPTS DE IA ──
 _SYSTEM_PROFILER = """Você é o analista silencioso que prepara a leitura para Esmeralda Ácassia (Cigana Esmeralda), quiromancia no WhatsApp.
@@ -322,7 +326,17 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     # 2. COLETA DE TENTATIVAS PRÉVIAS (evita presunção no node 6/7)
     tentativas_salvas = str(meta.get("node5_tentativas_previas") or "").strip()
     if not tentativas_salvas:
-        trecho_tentativa = _extrair_tentativas_previas(msg_lead or texto_completo)
+        ap_blob = str(meta.get("aprofundamento_texto") or "").strip()
+        if ap_blob:
+            meta["node5_tentativas_previas"] = ap_blob[:220]
+            meta["node5_pediu_tentativas"] = False
+            if not meta.get("node5_dado_concreto"):
+                meta["node5_dado_concreto"] = ap_blob[:140]
+            tentativas_salvas = str(meta.get("node5_tentativas_previas") or "").strip()
+    if not tentativas_salvas:
+        trecho_tentativa = _extrair_tentativas_previas(msg_lead) or _extrair_tentativas_previas(
+            texto_completo
+        )
         if trecho_tentativa:
             meta["node5_tentativas_previas"] = trecho_tentativa
             meta["node5_pediu_tentativas"] = False
@@ -444,5 +458,21 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     ctx.estado_coleta = "node5_perfil_completo"
     meta["contexto_extra_final"] = ""
     logger.info(f"✅ [NODE 5 v22] Hive Mind mapeado. Handoff para Node 6.")
-    
-    return [Acao(tipo="delay", segundos=random.randint(4, 8))], "6_atencao_dinamica"
+
+    acoes_handoff: List[Acao] = []
+    if len(msg_lead) > 14 and _RE_FEEDBACK_EXPERIENCIA.search(msg_lead):
+        acoes_handoff.extend(
+            [
+                Acao(tipo="delay", segundos=random.randint(3, 6)),
+                Acao(
+                    tipo="text",
+                    conteudo=(
+                        f"Obrigada pelo toque, {nome_fmt}. "
+                        "Eu levo isso contigo — e agora fecho o retrato que as tuas linhas pedem com calma."
+                    ),
+                    metadata={"skip_gancho_final": True},
+                ),
+            ]
+        )
+    acoes_handoff.append(Acao(tipo="delay", segundos=random.randint(4, 8)))
+    return acoes_handoff, "6_atencao_dinamica"

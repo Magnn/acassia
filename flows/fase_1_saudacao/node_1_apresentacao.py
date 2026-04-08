@@ -821,8 +821,14 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     logger.info("⚡ [NODE 1] Burst completo (foto+desabafo+contato) → coleta (pula node 2).")
                     return acoes, "3_coleta_profunda"
                 elapsed = time.time() - t0_node
-                if elapsed > 3.5:
-                    logger.warning("⏱️ [NODE 1] Tempo de abertura alto: %.2fs", elapsed)
+                _cfg = (ctx.metadata or {}).get("__config__") or {}
+                _sla_n1 = float(_cfg.get("node_exec_sla_warn_seconds") or 6.0)
+                if elapsed > _sla_n1:
+                    logger.warning(
+                        "⏱️ [NODE 1] Tempo de abertura alto: %.2fs (sla_warn=%.2fs)",
+                        elapsed,
+                        _sla_n1,
+                    )
                 return acoes, "2_salvar_contato"
             raise ValueError("JSON vazio ou sem balões.")
 

@@ -80,7 +80,8 @@ SILENCIO_MIN_POR_NODE = {
     "aguardando_pagamento": 30,
 }
 SILENCIO_MIN_DESDE_ULTIMO_USER = 8
-COOLDOWN_MIDIA_USER_MIN = 15
+# Ligeiramente < 15 para não perder ciclo do monitor (2min) quando dá ~14.94min desde a mídia.
+COOLDOWN_MIDIA_USER_MIN = 14.9
 JANELA_SENSIVEL_NODE3_MIN = 12
 MAX_LEADS_POR_CICLO = int(CONFIG_CLIENTE.get("recovery_max_leads_por_ciclo", 120) or 120)
 

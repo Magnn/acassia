@@ -430,9 +430,12 @@ def motivo_redundancia_texto(texto_balao: str, evidencias: Mapping[str, bool]) -
             return "foto_ja_recebida"
     if evidencias.get("confirmou_agora") and re.search(r"\bmanda\s+um\s+(\*?ok\*?|sim)\b", low, re.I):
         return "confirmacao_ja_recebida"
-    # Não usar \bsalvou\b solto: casa em "você já salvou" (agradecimento), não só em pergunta.
+    # "Conseguiu salvar, meu bem?" (node 3) contém "conseguiu salvar" mas é pergunta legítima — só suprimir
+    # repetições que citam contato/número/agenda ou pedido explícito de sim após confirmação.
     if evidencias.get("confirmou_agora") and re.search(
-        r"\b(conseguiu\s+salvar|manda\s+um\s+sim)\b", low, re.I
+        r"\b(conseguiu\s+salvar\s+(?:o\s+)?(?:contato|número|numero|celular|na\s+agenda)|manda\s+um\s+sim)\b",
+        low,
+        re.I,
     ):
         return "confirmacao_ja_recebida"
     if evidencias.get("confirmou_agora") and re.search(

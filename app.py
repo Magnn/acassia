@@ -2971,7 +2971,9 @@ if __name__ == "__main__":
     # Inicia tarefa de limpeza de mídias em thread separada
     threading.Thread(target=_limpeza_automatica, daemon=True, name="CleanupThread").start()
 
-    logger.info("🚀 [SYSTEM] Cigana Esmeralda SUPREME v8.7 Inicializada.")
+    logger.info(
+        "🚀 [SYSTEM] AcassIA v8.7 — plataforma de funil (ex.: fluxo Cigana Esmeralda no motor de nós)."
+    )
     logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
     
     # Execução com suporte a multithreading nativo do Flask para melhor performance

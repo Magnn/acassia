@@ -191,6 +191,12 @@ def carregar() -> dict:
         except ValueError:
             return default
 
+    def _float_seguro(key: str, default: float) -> float:
+        try:
+            return float(_obter_limpo(key, None, str(default)) or str(default))
+        except ValueError:
+            return default
+
     compliance = {
         "respeitar_opt_out": True,
         "limite_recovery_ciclos_sugerido": _int_seguro("COMPLIANCE_MAX_RECOVERY_CICLOS", 3),
@@ -215,6 +221,11 @@ def carregar() -> dict:
         # Após o lote principal: espera extra só para texto longo (imagem costuma chegar em webhook separado).
         "inbox_after_text_grace_seconds": max(0, min(_int_seguro("INBOX_AFTER_TEXT_GRACE_SECONDS", 20), 60)),
         "inbox_after_text_grace_min_chars": max(20, min(_int_seguro("INBOX_AFTER_TEXT_GRACE_MIN_CHARS", 40), 2000)),
+        # Log de "node lento" no engine (nodes com Gemini costumam 4–10s; default 3.5 gerava ruído)
+        "node_exec_sla_warn_seconds": max(
+            2.0,
+            min(_float_seguro("NODE_EXEC_SLA_WARN_SECONDS", 6.0), 60.0),
+        ),
         # Identidade
         "numero_whatsapp": _obter_limpo("CLIENTE_NUMERO_WHATSAPP", None, "+55 92 8497-9419"),
 

@@ -760,7 +760,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             return _normalizar_acoes_texto_node3(_graceful_exit(ctx, nome_fmt, msg_lead)), proximo_node
 
         if tipo_msg in ("image", "video"):
-            if not _validar_foto_mao_com_gemini(ctx):
+            img_u = str((meta.get("imagem_url") or getattr(ctx, "imagem_url", None) or "")).strip()
+            if img_u and meta.get("node3_foto_validacao_ok_url") == img_u:
+                meta["foto_recebida"] = True
+            elif not _validar_foto_mao_com_gemini(ctx):
                 # Mantém exigência de mão visível para seguir no funil.
                 meta["foto_recebida"] = False
                 voc = vocativo_cigana(nome_db, genero, meta)
@@ -771,7 +774,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     Acao(tipo="delay", segundos=8),
                     Acao(tipo="text", conteudo="Me envia outra foto mostrando a mão, que eu sigo com a leitura na hora. ✋"),
                 ], proximo_node
-            meta["foto_recebida"] = True
+            else:
+                meta["foto_recebida"] = True
+                if img_u:
+                    meta["node3_foto_validacao_ok_url"] = img_u
 
         if _tem_substancia_dor(msg_lead):
             meta["desabafo_recebido"] = True

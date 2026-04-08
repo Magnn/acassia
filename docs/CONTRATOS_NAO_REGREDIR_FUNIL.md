@@ -41,7 +41,7 @@ Objetivo: impedir que atualizacoes futuras apaguem comportamentos vitais ja esta
   - pausa antes de `image/video` apos texto.
 - Deve registrar telemetria de execucao de cada node:
   - evento `node_exec_timing` com `node`, `elapsed_s`, `acoes`, `prox`;
-  - warning de SLA quando `elapsed_s` ultrapassa `node_exec_sla_warn_seconds` (default 3.5s).
+  - warning de SLA quando `elapsed_s` ultrapassa `node_exec_sla_warn_seconds` (default 6s em `CONFIG_CLIENTE`, override `NODE_EXEC_SLA_WARN_SECONDS`; engine fallback 3.5s se chave ausente).
 - Deve injetar `node_atual_exec` em `ctx.metadata` antes de executar node para roteamento de economia de IA.
 
 ### `personalizer.py` (controle de custo)

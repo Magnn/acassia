@@ -23,6 +23,7 @@ import random
 import threading
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Any, Optional, List, Set
@@ -451,11 +452,35 @@ class Engine:
                     ctx.sentimento = "padrao"
                     ctx.score_engajamento = 0.5
                 else:
-                    ctx.intencao = self.intent_classifier.classificar(
-                        ctx.texto_recebido, ctx.historico, ctx.node_atual, lead_id=lead.id
-                    )
-                    sent = self.sentiment_analyzer.analisar(ctx.texto_recebido, ctx.historico)
-                    ctx.sentimento        = sent.get("sentimento", "padrao")
+                    try:
+                        with ThreadPoolExecutor(max_workers=2) as pool:
+                            fut_i = pool.submit(
+                                self.intent_classifier.classificar,
+                                ctx.texto_recebido,
+                                ctx.historico,
+                                ctx.node_atual,
+                                lead.id,
+                            )
+                            fut_s = pool.submit(
+                                self.sentiment_analyzer.analisar,
+                                ctx.texto_recebido,
+                                ctx.historico,
+                            )
+                            ctx.intencao = fut_i.result()
+                            sent = fut_s.result()
+                    except Exception as exc:
+                        logger.warning(
+                            "⚠️ [ENGINE] NLU paralelo falhou (%s); a cair para sequencial.",
+                            exc,
+                        )
+                        ctx.intencao = self.intent_classifier.classificar(
+                            ctx.texto_recebido,
+                            ctx.historico,
+                            ctx.node_atual,
+                            lead_id=lead.id,
+                        )
+                        sent = self.sentiment_analyzer.analisar(ctx.texto_recebido, ctx.historico)
+                    ctx.sentimento = sent.get("sentimento", "padrao")
                     ctx.score_engajamento = sent.get("score", 0.5)
 
                 # Inteligência por etapa (copy / funil — não altera FSM)
