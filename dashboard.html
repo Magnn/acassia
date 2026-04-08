@@ -1929,6 +1929,250 @@
             padding-top: 0;
             margin-top: 0;
         }
+        /* Inspector — Conteúdo rico / WhatsApp (Missão 5.4) */
+        .flow-inspector-conteudo {
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(165deg, #fafbfc 0%, #f4f4f5 55%, #eef2ff 100%);
+            padding: 10px 10px 8px;
+            margin: 0 0 10px;
+        }
+        .flow-inspector-conteudo__head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .flow-inspector-conteudo__head-ico {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #6d28d9, #6366f1);
+            color: #fff;
+            font-size: 12px;
+        }
+        .flow-inspector-conteudo__title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .flow-inspector-conteudo__sub {
+            font-size: 9px;
+            color: #64748b;
+            margin-top: 2px;
+            line-height: 1.35;
+        }
+        .flow-inspector-conteudo__field {
+            margin-bottom: 10px;
+        }
+        .flow-inspector-conteudo__label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 4px;
+        }
+        .flow-inspector-conteudo__label i {
+            color: #6366f1;
+            width: 14px;
+            text-align: center;
+            font-size: 10px;
+        }
+        .flow-inspector-conteudo__select,
+        .flow-inspector-conteudo__input {
+            width: 100%;
+            padding: 7px 9px;
+            font-size: 11px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+        }
+        .flow-inspector-conteudo__textarea {
+            width: 100%;
+            min-height: 88px;
+            max-height: min(38vh, 260px);
+            padding: 8px 10px;
+            font-size: 11px;
+            line-height: 1.45;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            resize: vertical;
+        }
+        .flow-inspector-conteudo__toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #e8ecf1;
+            background: rgba(255, 255, 255, 0.85);
+        }
+        .flow-inspector-conteudo__toggle span {
+            font-size: 10px;
+            font-weight: 600;
+            color: #334155;
+        }
+        .flow-inspector-conteudo__switch {
+            position: relative;
+            width: 38px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+        .flow-inspector-conteudo__switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+        .flow-inspector-conteudo__switch-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #cbd5e1;
+            border-radius: 999px;
+            transition: background 0.2s ease;
+        }
+        .flow-inspector-conteudo__switch-slider::before {
+            content: '';
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+            transition: transform 0.2s ease;
+        }
+        .flow-inspector-conteudo__switch input:checked + .flow-inspector-conteudo__switch-slider {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+        }
+        .flow-inspector-conteudo__switch input:checked + .flow-inspector-conteudo__switch-slider::before {
+            transform: translateX(16px);
+        }
+        .flow-inspector-conteudo__table-wrap {
+            border: 1px solid #e8ecf1;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .flow-inspector-conteudo__table-head {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            background: #f8fafc;
+            padding: 6px 8px;
+            border-bottom: 1px solid #e8ecf1;
+        }
+        .flow-inspector-conteudo__row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 6px;
+            align-items: center;
+            padding: 6px 8px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .flow-inspector-conteudo__row:last-child {
+            border-bottom: none;
+        }
+        .flow-inspector-conteudo__row input {
+            width: 100%;
+            padding: 6px 8px;
+            font-size: 10px;
+            border-radius: 6px;
+            border: 1px solid #e8ecf1;
+            background: #fafbfc;
+        }
+        .flow-inspector-conteudo__row-remove {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border-radius: 6px;
+            border: 1px solid #e8ecf1;
+            background: #fafafa;
+            color: #94a3b8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .flow-inspector-conteudo__row-remove:hover {
+            border-color: rgba(225, 29, 72, 0.35);
+            color: #be123c;
+        }
+        .flow-inspector-conteudo__btn-add {
+            margin-top: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 7px;
+            border: 1px dashed #cbd5e1;
+            background: rgba(255, 255, 255, 0.7);
+            color: #475569;
+            cursor: pointer;
+        }
+        .flow-inspector-conteudo__btn-add:hover {
+            border-color: rgba(99, 102, 241, 0.45);
+            color: #4338ca;
+        }
+        .flow-sim-conteudo-pack {
+            max-width: 100%;
+        }
+        .flow-sim-conteudo-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .flow-sim-conteudo-caption {
+            font-size: 12px;
+            line-height: 1.45;
+            color: #0f172a;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .flow-sim-conteudo-thumb {
+            max-height: 104px;
+            width: auto;
+            border-radius: 8px;
+            margin-top: 6px;
+            display: block;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .flow-sim-quick-replies {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .flow-sim-quick-replies button {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, #fff, #f8fafc);
+            color: #4338ca;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        }
+        .flow-sim-quick-replies button:hover {
+            border-color: rgba(99, 102, 241, 0.45);
+            background: #eef2ff;
+        }
         .flow-node-head[title] {
             cursor: grab;
         }
@@ -5722,6 +5966,13 @@ const FLOW_COND_OPERATORS = [
     { value: 'not_empty', label: 'Não está vazio' },
 ];
 const FLOW_API_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const FLOW_CONTEUDO_MEDIA_KINDS = [
+    { value: 'text', label: 'Texto' },
+    { value: 'image', label: 'Imagem' },
+    { value: 'video', label: 'Vídeo' },
+    { value: 'audio', label: 'Áudio' },
+    { value: 'document', label: 'Documento' },
+];
 const FLOW_PERGUNTA_MODOS = [
     { value: 'texto_livre', label: 'Resposta em texto livre' },
     { value: 'lista_opcoes', label: 'Lista de opções (estilo WhatsApp)' },
@@ -7109,124 +7360,154 @@ function flowStripInlineInspectorFromClone(el) {
     el.querySelectorAll('[data-flow-node-inspector="1"]').forEach((h) => h.remove());
 }
 
-function flowConteudoDefaultItem(kind) {
-    switch (kind) {
-        case 'image': return { type: 'image', url: '', caption: '' };
-        case 'audio': return { type: 'audio', url: '' };
-        case 'video': return { type: 'video', url: '', caption: '' };
-        case 'document': return { type: 'document', url: '', filename: '' };
-        case 'delay': return { type: 'delay', seconds: 3 };
-        default: return { type: 'text', body: '' };
+function flowConteudoResolvedBrain(cfg) {
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    const allowed = new Set(FLOW_CONTEUDO_MEDIA_KINDS.map((x) => x.value));
+    let kind = String(c.content_media_kind || c.media_type || 'text').toLowerCase();
+    if (!allowed.has(kind)) kind = 'text';
+    let url = c.content_media_url != null ? String(c.content_media_url) : '';
+    let text = c.content_text != null ? String(c.content_text) : String(c.body || '');
+    const hasNew = !!(c.content_media_kind || (c.content_text != null && c.content_text !== '') || c.content_media_url);
+    if (!hasNew && Array.isArray(c.contents) && c.contents.length) {
+        const first = c.contents.find((x) => x && (x.type || 'text') !== 'delay') || c.contents[0];
+        const t0 = first && first.type ? String(first.type).toLowerCase() : 'text';
+        if (allowed.has(t0)) kind = t0;
+        if (first && first.url) url = String(first.url);
+        if (first && first.body) text = text || String(first.body);
+        if (first && first.caption) text = text || String(first.caption);
     }
+    let delaySec = parseFloat(String(c.content_delay_sec != null ? c.content_delay_sec : '0'));
+    if (!Number.isFinite(delaySec)) delaySec = 0;
+    delaySec = Math.max(0, Math.min(86400, delaySec));
+    const typing = c.content_typing === true || c.content_typing === 'true' || c.content_typing === 1;
+    let buttons = Array.isArray(c.api_buttons)
+        ? c.api_buttons.map((b) => ({ label: String((b && b.label) || ''), value: String((b && b.value) || '') }))
+        : [];
+    return { kind, url, text, delaySec, typing, buttons };
 }
 
-function flowConteudoRenderInspector(meta) {
-    const body = flowGetInspectorBodyEl();
-    if (!body || !window._flowConteudo) return;
-    const st = window._flowConteudo;
-    const { typ, title, incom, outgo, id } = meta;
-    const contents = st.contents || [];
-    const empty = !contents.length;
-    const addBtn = (k, icon, color, lab) =>
-        `<button type="button" class="flow-cont-add-btn" onclick="flowConteudoAdd('${k}')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 6px;border:1px solid var(--c-border);border-radius:8px;background:var(--c-surface2);cursor:pointer;font-size:9px;color:var(--c-text)">
-            <span style="font-size:16px;color:${color}"><i class="${icon}"></i></span>${lab}</button>`;
-    let listHtml = '';
-    contents.forEach((it, idx) => {
-        const t = it.type || 'text';
-        let fields = '';
-        if (t === 'text') {
-            fields = `<textarea class="input-field" style="width:100%;min-height:52px;font-size:11px;margin-top:6px" oninput="flowConteudoPatch(${idx},'body',this.value)">${flowEsc(it.body || '')}</textarea>`;
-        } else if (t === 'delay') {
-            const sec = Number.isFinite(Number(it.seconds)) ? Number(it.seconds) : 3;
-            fields = `<input type="number" min="0" max="86400" class="input-field" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${sec}" oninput="flowConteudoPatch(${idx},'seconds',this.value)"/>`;
-        } else if (t === 'image' || t === 'video') {
-            fields = `
-                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px">
-                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="event.stopPropagation();void flowConteudoUploadFile(${idx},'${t}')"><i class="fas fa-cloud-upload-alt"></i> Carregar ficheiro</button>
-                    <span style="font-size:9px;color:var(--c-muted2)">ou indique uma URL pública</span>
-                </div>
-                <input type="text" class="input-field" placeholder="https://… ou /media/… (após upload)" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>
-                <input type="text" class="input-field" placeholder="Legenda (opcional)" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.caption || '')}" oninput="flowConteudoPatch(${idx},'caption',this.value)"/>`;
-        } else if (t === 'audio') {
-            fields = `
-                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px">
-                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="event.stopPropagation();void flowConteudoUploadFile(${idx},'audio')"><i class="fas fa-cloud-upload-alt"></i> Carregar áudio</button>
-                    <span style="font-size:9px;color:var(--c-muted2)">ou URL</span>
-                </div>
-                <input type="text" class="input-field" placeholder="https://… ou /media/…" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>`;
-        } else if (t === 'document') {
-            fields = `
-                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px">
-                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="event.stopPropagation();void flowConteudoUploadFile(${idx},'document')"><i class="fas fa-cloud-upload-alt"></i> Carregar documento</button>
-                    <span style="font-size:9px;color:var(--c-muted2)">ou URL</span>
-                </div>
-                <input type="text" class="input-field" placeholder="https://… ou /media/…" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>
-                <input type="text" class="input-field" placeholder="Nome visível (opcional)" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.filename || '')}" oninput="flowConteudoPatch(${idx},'filename',this.value)"/>`;
-        }
-        listHtml += `
-            <div style="border:1px solid var(--c-border);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--c-surface2)">
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                    <span class="badge badge-purple" style="font-size:9px">${flowEsc(t)}</span>
-                    <button type="button" class="icon-btn" style="width:26px;height:26px" onclick="flowConteudoRemove(${idx})" title="Remover"><i class="fas fa-times text-rose-500" style="font-size:11px"></i></button>
-                </div>
-                ${fields}
-            </div>`;
-    });
-    body.innerHTML = `
-        <div style="margin-bottom:8px"><span class="badge badge-purple" style="font-size:9px">${flowEsc(typ)}</span></div>
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--c-border)">
-            <strong style="color:var(--c-text);font-family:var(--f-display);font-size:13px">Conteúdo</strong>
-            <span class="icon-btn" style="width:32px;height:32px;background:var(--c-purple-glow);border-color:rgba(124,90,245,.35)" title="Bloco de mensagens"><i class="fas fa-pen" style="color:var(--c-purple)"></i></span>
-        </div>
-        <div style="font-size:10px;margin-bottom:8px;color:var(--c-muted)">ID: <code style="font-size:9px">${flowEsc(id)}</code> · Entradas: ${incom} · Saídas: ${outgo}</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">
-            ${addBtn('text', 'fas fa-font', '#2563eb', 'Texto')}
-            ${addBtn('image', 'fas fa-image', '#ea580c', 'Imagem')}
-            ${addBtn('audio', 'fas fa-microphone', '#9333ea', 'Áudio')}
-            ${addBtn('video', 'fas fa-play-circle', '#16a34a', 'Vídeo')}
-            ${addBtn('document', 'fas fa-file-alt', '#4f46e5', 'Documento')}
-            ${addBtn('delay', 'far fa-clock', '#e11d48', 'Delay')}
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;margin:10px 0;color:var(--c-muted);font-size:10px">
-            <span style="flex:1;height:1px;background:var(--c-border)"></span>
-            <span>Conteúdos</span>
-            <span style="flex:1;height:1px;background:var(--c-border)"></span>
-        </div>
-        ${empty ? `<div style="text-align:center;padding:14px;border-radius:10px;background:rgba(124,90,245,.08);border:1px dashed rgba(124,90,245,.35);color:var(--c-purple2);font-size:11px">Nenhum conteúdo foi adicionado.</div>` : listHtml}
-        <button type="button" class="btn btn-emerald" style="width:100%;margin-top:12px;font-size:12px;font-weight:700;border:none" onclick="flowConteudoSave()"><i class="fas fa-check"></i> Salvar Dados</button>
-    `;
+function flowConteudoBrainButtonRowHtml(row) {
+    return `
+        <div class="flow-inspector-conteudo__row" data-flow-ct-btn="1">
+            <input type="text" class="input-field" data-flow-ct-btn-label placeholder="Texto do botão" value="${flowEsc(row.label || '')}" autocomplete="off" />
+            <input type="text" class="input-field" data-flow-ct-btn-value placeholder="Valor da resposta" value="${flowEsc(row.value || '')}" autocomplete="off" />
+            <button type="button" class="flow-inspector-conteudo__row-remove" onclick="flowConteudoBrainRemoveButton(this)" title="Remover" aria-label="Remover"><i class="fas fa-times"></i></button>
+        </div>`;
+}
+
+function flowConteudoBrainToggleUrlRow(sel) {
+    const host = sel && sel.closest('.flow-inspector-conteudo');
+    const wrap = host && host.querySelector('[data-flow-ct-url-wrap="1"]');
+    if (!wrap || !sel) return;
+    wrap.style.display = sel.value === 'text' ? 'none' : 'block';
+}
+
+function flowConteudoBrainAddButton(btn) {
+    const wrap = btn && btn.closest('.flow-inspector-conteudo');
+    const tw = wrap && wrap.querySelector('[data-flow-ct-buttons-table]');
+    if (!tw) return;
+    tw.insertAdjacentHTML('beforeend', flowConteudoBrainButtonRowHtml({ label: '', value: '' }));
+    const body = btn.closest('.flow-node-inspector-body');
     flowEnhanceInspectorVariableButtons(body);
 }
 
-function flowConteudoAdd(kind) {
-    const st = window._flowConteudo;
-    if (!st) return;
-    st.contents.push(flowConteudoDefaultItem(kind));
-    flowConteudoRenderInspector(st._meta);
-}
-
-function flowConteudoRemove(index) {
-    const st = window._flowConteudo;
-    if (!st || !st.contents) return;
-    st.contents.splice(index, 1);
-    flowConteudoRenderInspector(st._meta);
-}
-
-function flowConteudoPatch(index, field, value) {
-    const st = window._flowConteudo;
-    if (!st || !st.contents[index]) return;
-    const it = st.contents[index];
-    if (field === 'seconds') {
-        const n = parseFloat(value);
-        it.seconds = Number.isFinite(n) ? n : 0;
-    } else {
-        it[field] = value;
+function flowConteudoBrainRemoveButton(btn) {
+    const row = btn && btn.closest('[data-flow-ct-btn="1"]');
+    const tw = row && row.parentElement;
+    if (!tw || !row) return;
+    if (tw.querySelectorAll('[data-flow-ct-btn="1"]').length <= 1) {
+        const l = row.querySelector('[data-flow-ct-btn-label]');
+        const v = row.querySelector('[data-flow-ct-btn-value]');
+        if (l) l.value = '';
+        if (v) v.value = '';
+        return;
     }
+    row.remove();
 }
 
-async function flowConteudoUploadFile(idx, mediaType) {
+function flowConteudoBrainRenderInspector(meta) {
+    const body = flowGetInspectorBodyEl();
+    if (!body || !window._flowConteudo) return;
     const st = window._flowConteudo;
-    if (!st || !st.contents[idx]) return;
+    const node = flowCanvasNodeById(st.nodeId);
+    if (!node) return;
+    let cfg = {};
+    try {
+        cfg = JSON.parse(node.getAttribute('data-flow-config') || '{}');
+    } catch (_) {}
+    const r = flowConteudoResolvedBrain(cfg);
+    const { typ, incom, outgo, id } = meta;
+    const safeId = String(id || 'n').replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
+    const kindOpts = FLOW_CONTEUDO_MEDIA_KINDS.map((o) => {
+        const sel = r.kind === o.value ? ' selected' : '';
+        return `<option value="${o.value}"${sel}>${String(o.label).replace(/</g, '')}</option>`;
+    }).join('');
+    const urlDisplay = r.kind === 'text' ? 'none' : 'block';
+    const btnRows = (r.buttons.length ? r.buttons : [{ label: '', value: '' }]).map((b) => flowConteudoBrainButtonRowHtml(b)).join('');
+    body.innerHTML = `
+        <div class="flow-inspector-meta"><span class="flow-inspector-kind">${flowEsc(typ)}</span> · <code class="flow-tech-id">${flowEsc(id)}</code> · entradas ${incom} · saídas ${outgo}</div>
+        <div class="flow-inspector-conteudo">
+            <div class="flow-inspector-conteudo__head">
+                <div class="flow-inspector-conteudo__head-ico" aria-hidden="true"><i class="fab fa-whatsapp"></i></div>
+                <div>
+                    <div class="flow-inspector-conteudo__title">Cérebro de Conteúdo</div>
+                    <div class="flow-inspector-conteudo__sub">Mídia, mensagem, ritmo humano e botões de resposta rápida (WhatsApp).</div>
+                </div>
+            </div>
+            <div class="flow-inspector-conteudo__field">
+                <label class="flow-inspector-conteudo__label" for="flow-ct-kind-${safeId}"><i class="fas fa-photo-video"></i> Tipo de mídia</label>
+                <select id="flow-ct-kind-${safeId}" class="flow-inspector-conteudo__select input-field" data-flow-ct-field="kind" autocomplete="off" onchange="flowConteudoBrainToggleUrlRow(this)">${kindOpts}</select>
+            </div>
+            <div class="flow-inspector-conteudo__field" data-flow-ct-url-wrap="1" style="display:${urlDisplay}">
+                <label class="flow-inspector-conteudo__label" for="flow-ct-url-${safeId}"><i class="fas fa-link"></i> URL da mídia</label>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                    <input id="flow-ct-url-${safeId}" type="text" class="input-field flow-inspector-conteudo__input" data-flow-ct-field="url" value="${flowEsc(r.url)}" placeholder="https://… ou /media/…" style="flex:1;min-width:0" autocomplete="off" />
+                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:6px 10px;white-space:nowrap" onclick="event.stopPropagation();void flowConteudoBrainUpload(this)"><i class="fas fa-cloud-upload-alt"></i> Upload</button>
+                </div>
+            </div>
+            <div class="flow-inspector-conteudo__field">
+                <label class="flow-inspector-conteudo__label" for="flow-ct-text-${safeId}"><i class="fas fa-align-left"></i> Legenda / mensagem</label>
+                <textarea id="flow-ct-text-${safeId}" class="input-field flow-inspector-conteudo__textarea" data-flow-ct-field="text" placeholder="Mensagem principal ao lead…">${flowEsc(r.text)}</textarea>
+            </div>
+            <div class="flow-inspector-conteudo__section-title" style="font-size:10px;font-weight:700;color:#334155;margin:12px 0 6px;padding-top:8px;border-top:1px solid rgba(148,163,184,0.25)">Humanização</div>
+            <div class="flow-inspector-conteudo__field">
+                <label class="flow-inspector-conteudo__label" for="flow-ct-delay-${safeId}"><i class="fas fa-hourglass-half"></i> Tempo de espera (segundos)</label>
+                <input id="flow-ct-delay-${safeId}" type="number" min="0" max="86400" step="1" class="input-field flow-inspector-conteudo__input" data-flow-ct-field="delay" value="${flowEsc(String(r.delaySec))}" placeholder="0" />
+            </div>
+            <div class="flow-inspector-conteudo__field">
+                <div class="flow-inspector-conteudo__toggle">
+                    <span>Mostrar indicador de digitando…</span>
+                    <label class="flow-inspector-conteudo__switch" title="Durante o atraso, simula digitação">
+                        <input type="checkbox" data-flow-ct-field="typing" ${r.typing ? 'checked' : ''} />
+                        <span class="flow-inspector-conteudo__switch-slider" aria-hidden="true"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="flow-inspector-conteudo__section-title" style="font-size:10px;font-weight:700;color:#334155;margin:12px 0 6px;padding-top:8px;border-top:1px solid rgba(148,163,184,0.25)">Botões de resposta rápida</div>
+            <div class="flow-inspector-conteudo__table-wrap">
+                <div class="flow-inspector-conteudo__table-head"><span>Texto do botão</span><span>Valor da resposta</span><span></span></div>
+                <div data-flow-ct-buttons-table>${btnRows}</div>
+            </div>
+            <button type="button" class="flow-inspector-conteudo__btn-add" onclick="flowConteudoBrainAddButton(this)"><i class="fas fa-plus"></i> Adicionar botão</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;padding-top:10px;border-top:1px solid var(--c-border)">
+            <button type="button" class="btn btn-primary" style="flex:1;font-size:11px;font-weight:600" onclick="flowConteudoBrainSave()"><i class="fas fa-check"></i> Aplicar ao bloco</button>
+            <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px" onclick="openRawFlowInspectorJson()" title="Editar JSON cru"><i class="fas fa-code"></i></button>
+        </div>
+    `;
+    flowEnhanceInspectorVariableButtons(body);
+    const ks = body.querySelector('#flow-ct-kind-' + safeId);
+    if (ks) flowConteudoBrainToggleUrlRow(ks);
+}
+
+function flowConteudoRenderInspector(meta) {
+    flowConteudoBrainRenderInspector(meta);
+}
+
+async function flowConteudoBrainUpload(btn) {
+    const body = flowGetInspectorBodyEl();
+    const kindEl = body && body.querySelector('[data-flow-ct-field="kind"]');
+    const kind = kindEl ? String(kindEl.value || 'image') : 'image';
     const inp = document.createElement('input');
     inp.type = 'file';
     const acceptMap = {
@@ -7235,7 +7516,7 @@ async function flowConteudoUploadFile(idx, mediaType) {
         audio: 'audio/ogg,audio/mpeg,audio/mp4,audio/wav,.mp3,.m4a,.ogg',
         document: '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
-    inp.accept = acceptMap[mediaType] || '*/*';
+    inp.accept = acceptMap[kind] || '*/*';
     inp.onchange = async () => {
         const file = inp.files && inp.files[0];
         if (!file) return;
@@ -7246,12 +7527,9 @@ async function flowConteudoUploadFile(idx, mediaType) {
             const res = await fetch(`${API}/api/media/upload`, { method: 'POST', body: fd });
             const j = await res.json();
             if (!res.ok || !j.ok) throw new Error(j.error || 'Falha no upload');
-            st.contents[idx].url = j.url || '';
-            if (mediaType === 'document' && j.original_filename) {
-                st.contents[idx].filename = j.original_filename;
-            }
-            flowConteudoRenderInspector(st._meta);
-            toast('Ficheiro guardado no servidor. URL preenchida automaticamente.', 'emerald');
+            const urlInp = body && body.querySelector('[data-flow-ct-field="url"]');
+            if (urlInp) urlInp.value = j.url || '';
+            toast('Ficheiro enviado; URL preenchida.', 'emerald');
         } catch (e) {
             toast(String(e.message || e), 'rose');
         } finally {
@@ -7261,20 +7539,49 @@ async function flowConteudoUploadFile(idx, mediaType) {
     inp.click();
 }
 
-function flowConteudoSave() {
+function flowConteudoBrainSave() {
     const st = window._flowConteudo;
     if (!st) return;
     const node = flowCanvasNodeById(st.nodeId);
-    if (!node) return;
+    const wrap = node && node.querySelector('.flow-node-inspector-body');
+    if (!node || !wrap) return;
     let base = {};
     try {
         base = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
     if (typeof base !== 'object' || base === null) base = {};
-    base.contents = st.contents;
-    node.setAttribute('data-flow-config', JSON.stringify(base));
+    const kindEl = wrap.querySelector('[data-flow-ct-field="kind"]');
+    if (kindEl) base.content_media_kind = String(kindEl.value || 'text');
+    const urlEl = wrap.querySelector('[data-flow-ct-field="url"]');
+    if (urlEl) base.content_media_url = String(urlEl.value || '');
+    const ta = wrap.querySelector('[data-flow-ct-field="text"]');
+    if (ta) {
+        base.content_text = String(ta.value || '');
+        base.body = base.content_text;
+    }
+    const dEl = wrap.querySelector('[data-flow-ct-field="delay"]');
+    if (dEl) {
+        const n = parseFloat(String(dEl.value || '0'));
+        base.content_delay_sec = Number.isFinite(n) ? Math.max(0, Math.min(86400, n)) : 0;
+    }
+    const typChk = wrap.querySelector('[data-flow-ct-field="typing"]');
+    if (typChk) base.content_typing = !!typChk.checked;
+    const btns = [];
+    wrap.querySelectorAll('[data-flow-ct-btn="1"]').forEach((row) => {
+        const l = row.querySelector('[data-flow-ct-btn-label]');
+        const v = row.querySelector('[data-flow-ct-btn-value]');
+        if (!l) return;
+        const lab = String(l.value || '').trim();
+        const val = v ? String(v.value || '').trim() : '';
+        if (lab || val) btns.push({ label: lab, value: val });
+    });
+    base.api_buttons = btns;
+    try {
+        node.setAttribute('data-flow-config', JSON.stringify(base));
+    } catch (_) {}
     pushFlowHistory();
-    toast('Conteúdos guardados no bloco.', 'emerald');
+    toast('Conteúdo guardado no bloco.', 'emerald');
+    requestFlowAutoSave();
 }
 
 async function ensureFlowSchemaCatalog() {
@@ -7332,6 +7639,12 @@ function flowHumanizeInspectorKey(k) {
         api_headers: 'Cabeçalhos (API)',
         api_body: 'Corpo (API)',
         api_mapping: 'Mapeamento resposta (API)',
+        content_media_kind: 'Tipo de mídia',
+        content_media_url: 'URL da mídia',
+        content_text: 'Mensagem / legenda',
+        content_delay_sec: 'Espera (s)',
+        content_typing: 'Indicador a digitar',
+        api_buttons: 'Botões rápidos',
     };
     const s = String(k || '');
     if (map[s]) return map[s];
@@ -8278,9 +8591,8 @@ async function openFlowInspector(nodeEl) {
     const incom = (_flowEdges || []).filter((e) => e.to === id).length;
     const outgo = (_flowEdges || []).filter((e) => e.from === id).length;
     if (typ === 'conteudo') {
-        const contents = Array.isArray(cfg.contents) ? cfg.contents.map((x) => (typeof x === 'object' && x ? { ...x } : {})) : [];
         const meta = { typ, title, incom, outgo, id };
-        window._flowConteudo = { nodeId: id, contents, _meta: meta };
+        window._flowConteudo = { nodeId: id, _meta: meta };
         flowConteudoRenderInspector(meta);
         redrawFlowEdges();
         updateFlowMinimap();
@@ -8352,6 +8664,14 @@ function applyFlowInspectorConfig() {
     }
     if (String(node.getAttribute('data-node-type') || '') === 'api') {
         flowApiSyncLegacyKeysFromApi(obj);
+    }
+    if (String(node.getAttribute('data-node-type') || '') === 'conteudo') {
+        if (obj.content_text != null && String(obj.content_text) !== '') {
+            obj.body = obj.content_text;
+        } else if (obj.body != null && (obj.content_text === undefined || obj.content_text === '')) {
+            obj.content_text = obj.body;
+        }
+        if (!Array.isArray(obj.api_buttons)) obj.api_buttons = [];
     }
     node.setAttribute('data-flow-config', JSON.stringify(obj));
     pushFlowHistory();
@@ -9408,6 +9728,122 @@ async function flowSimAppendBotWithTyping(text) {
     flowSimChatAppend('bot', text);
 }
 
+/** Atraso do bloco Conteúdo na simulação (segundos reais → ms, limitado para não bloquear o teste). */
+function flowSimConteudoDelayMs(sec) {
+    const s = Number(sec);
+    const n = Number.isFinite(s) ? Math.max(0, Math.min(86400, s)) : 0;
+    return Math.min(12000, Math.round(n * 380));
+}
+
+/**
+ * Simula envio rico (mídia + legenda + botões). Botões disparam o mesmo resolver que o input de texto.
+ */
+async function flowSimPlayConteudo(nodeId, cfg, L) {
+    const r = flowConteudoResolvedBrain(cfg);
+    const box = document.getElementById('flow-sim-messages');
+    const delayMs = flowSimConteudoDelayMs(r.delaySec);
+    if (delayMs > 0) {
+        let typingEl = null;
+        if (r.typing && box) {
+            typingEl = document.createElement('div');
+            typingEl.className = 'flow-sim-typing';
+            typingEl.textContent = '… está digitando';
+            box.appendChild(typingEl);
+            box.scrollTop = box.scrollHeight;
+        }
+        await flowSimDelay(delayMs);
+        if (typingEl && typingEl.parentNode) typingEl.remove();
+    }
+    const urlDisp = flowSimSubstituteVars(r.url, L);
+    const cap = flowSimSubstituteVars(r.text, L);
+    const kind = r.kind;
+    const kindMeta = FLOW_CONTEUDO_MEDIA_KINDS.find((x) => x.value === kind);
+    const kindLabel = kindMeta ? kindMeta.label : kind;
+    const wrap = document.createElement('div');
+    wrap.className = 'flow-sim-bubble flow-sim-bubble--bot flow-sim-conteudo-pack';
+    if (kind !== 'text') {
+        const chip = document.createElement('div');
+        chip.className = 'flow-sim-conteudo-chip';
+        const icon = document.createElement('i');
+        icon.setAttribute('aria-hidden', 'true');
+        icon.className =
+            kind === 'image'
+                ? 'fas fa-image'
+                : kind === 'video'
+                  ? 'fas fa-video'
+                  : kind === 'audio'
+                    ? 'fas fa-microphone'
+                    : 'fas fa-file-alt';
+        icon.style.color = '#6366f1';
+        chip.appendChild(icon);
+        const lab = document.createElement('span');
+        const shortUrl = urlDisp
+            ? urlDisp.length > 96
+                ? urlDisp.slice(0, 96) + '…'
+                : urlDisp
+            : '';
+        lab.textContent = shortUrl ? kindLabel + ': ' + shortUrl : kindLabel + (urlDisp === '' ? ' (sem URL)' : '');
+        chip.appendChild(lab);
+        wrap.appendChild(chip);
+        if (kind === 'image' && /^https?:\/\//i.test(urlDisp)) {
+            const im = document.createElement('img');
+            im.className = 'flow-sim-conteudo-thumb';
+            im.alt = '';
+            im.loading = 'lazy';
+            im.src = urlDisp;
+            im.onerror = function () {
+                this.style.display = 'none';
+            };
+            wrap.appendChild(im);
+        }
+    }
+    if (kind === 'text' || cap) {
+        const p = document.createElement('div');
+        p.className = 'flow-sim-conteudo-caption';
+        p.textContent = cap || '(mensagem vazia)';
+        wrap.appendChild(p);
+    }
+    const btnList = (r.buttons || []).filter(
+        (b) => b && (String(b.label || '').trim() || String(b.value != null ? b.value : '').trim()),
+    );
+    if (btnList.length) {
+        const br = document.createElement('div');
+        br.className = 'flow-sim-quick-replies';
+        btnList.forEach((b) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            const lab = String((b && b.label) || '').trim();
+            const val = b && b.value != null ? String(b.value).trim() : '';
+            btn.textContent = lab || val || '—';
+            btn.onclick = function () {
+                const send = val !== '' ? val : lab;
+                if (!_flowSimState.context) _flowSimState.context = {};
+                _flowSimState.context.lastAnswer = send;
+                flowSimChatAppend('user', send);
+                Array.from(br.querySelectorAll('button')).forEach((x) => {
+                    x.disabled = true;
+                });
+                if (_flowSimLineResolver) {
+                    _flowSimLineResolver();
+                    _flowSimLineResolver = null;
+                }
+            };
+            br.appendChild(btn);
+        });
+        wrap.appendChild(br);
+    }
+    if (box) {
+        box.appendChild(wrap);
+        box.scrollTop = box.scrollHeight;
+    }
+    if (btnList.length) {
+        await flowSimWaitUserLine();
+        const ans = (_flowSimState.context && _flowSimState.context.lastAnswer) || '';
+        return flowSimResolveOutgoingFromText(nodeId, ans);
+    }
+    return flowSimTakeFirstOutgoing(nodeId);
+}
+
 function flowSimReadNodeConfig(el) {
     if (!el) return {};
     let cfg = {};
@@ -10277,9 +10713,7 @@ async function flowSimulateStep(nodeId) {
     }
 
     if (type === 'conteudo') {
-        const t = flowSimSubstituteVars(cfg.body || '', L);
-        await flowSimAppendBotWithTyping(t || '(mensagem vazia)');
-        return flowSimTakeFirstOutgoing(nodeId);
+        return flowSimPlayConteudo(nodeId, cfg, L);
     }
 
     if (type === 'pergunta') {
@@ -13314,7 +13748,18 @@ function flowDefaultConfigByType(type) {
     if (t === 'webhook') return { path: '/webhook/entrada', method: 'POST' };
     if (t === 'engine' || t === 'nucleo_ia') return { body: '' };
     if (t === 'motor_ref') return { module_hint: '' };
-    if (t === 'conteudo') return { body: '', contents: [] };
+    if (t === 'conteudo') {
+        return {
+            body: '',
+            contents: [],
+            content_media_kind: 'text',
+            content_media_url: '',
+            content_text: '',
+            content_delay_sec: 0,
+            content_typing: false,
+            api_buttons: [],
+        };
+    }
     if (t === 'pergunta') return { question: '', reply_mode: 'texto_livre' };
     if (t === 'acao') return { action_kind: 'mensagem_texto', payload: '' };
     if (t === 'delay') return { seconds: 3 };
@@ -13546,10 +13991,10 @@ function addSpecificNode(type, pos) {
             <input type="text" data-flow-cfg="module_hint" placeholder="flows/fase_X/node_*.py" class="input-field" style="${fs}">`;
     } else if (type === 'conteudo') {
         bodyFields = `
-            ${fh('Mercado: mensagens ricas (texto, mídia, botões). Duplo clique abre o editor de passos (conteúdos).')}
+            ${fh('Cérebro de Conteúdo: mídia, legenda, delay, digitação e botões rápidos. Duplo clique abre o inspetor completo.')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="body" placeholder="Texto base ou fallback" style="${ta};height:48px"></textarea>
-            <div class="flow-tag" style="font-size:10px"><i class="fas fa-magic" style="color:var(--c-purple)"></i> Duplo clique no bloco: Texto / Imagem / Áudio / Vídeo / Doc / Delay</div>`;
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Legenda / texto (sincroniza com o inspetor)" style="${ta};height:48px"></textarea>
+            <div class="flow-tag" style="font-size:10px"><i class="fas fa-magic" style="color:var(--c-purple)"></i> Duplo clique: tipo de mídia, URL, humanização e <code style="font-size:9px">api_buttons</code></div>`;
     } else if (type === 'delay') {
         bodyFields = `
             ${fh('Espera entre mensagens (ManyChat/Dialogflow): use presets ou segundos exatos.')}
