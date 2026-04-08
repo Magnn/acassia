@@ -35,7 +35,7 @@ _MAX_CHARS_BALAO_NODE1 = 210
 _MAX_CHARS_BALAO_A = 180
 _MAX_CHARS_BALAO_B = 170
 _MAX_CHARS_BALAO_CTA = 140
-_MAX_BALOES_NODE1 = 3
+_MAX_BALOES_NODE1 = 4
 
 # Sinais emocionais: espelhar em D/extra só se aparecerem na mensagem do lead
 _RE_DOR_OU_SOFRIMENTO = re.compile(
@@ -714,22 +714,6 @@ def _gerar_fallback(
                 conteudo="Me diz como você se chama, meu bem? Assim eu te falo direito.",
             )
         )
-        # Fecha no pedido do nome — sem quinto balão de "me responde um sim" (evita tom de robô).
-        return acoes
-
-    cta = _fallback_d_confirmacao(
-        nome,
-        msg_raw,
-        msg_lead or (msg_raw or "").lower(),
-        metadata,
-        ja_mencionou_vaga_no_turno=bool(vaga_txt),
-    )
-    acoes.extend(
-        [
-            Acao(tipo="delay", segundos=random.randint(7, 11)),
-            Acao(tipo="text", conteudo=cta),
-        ]
-    )
     # Sanitiza textos do fallback para manter o mesmo contrato da saída IA.
     textos = [a.conteudo for a in acoes if a.tipo == "text"]
     textos = _sanear_baloes_saida_node1(textos)
@@ -742,6 +726,34 @@ def _gerar_fallback(
     return acoes
 
 
+def _montar_baloes_contrato_node1(periodo: str, nome: str, metadata: Optional[dict]) -> List[str]:
+    """
+    Contrato fixo do node1:
+    1) saudação
+    2) apresentação
+    3) última consulta grátis
+    4) pergunta de nome (somente se nome ausente)
+    """
+    baloes: List[str] = [
+        (
+            f"{periodo}! É um prazer te receber no nosso instituto de luz chamado Meu Mistério. "
+            "Seja muito bem-vindo. ✨"
+        ),
+        (
+            "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, "
+            "respeito e presença de verdade."
+        ),
+    ]
+    vaga_txt = _frase_vaga_curta_fallback(metadata)
+    if vaga_txt:
+        baloes.append(vaga_txt)
+    if nome_eh_placeholder(nome):
+        baloes.append("Me diz como você se chama, meu bem? Assim eu te falo direito.")
+    out = _sanear_baloes_saida_node1(baloes)
+    out = _aplicar_cap_hierarquico_node1(out, nome)
+    return _deduplicar_baloes_node1(out)[:_MAX_BALOES_NODE1]
+
+
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     """Executa o nó de apresentação blindado contra cortes."""
     t0_node = time.time()
@@ -752,10 +764,6 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     blob_ctx = _blob_user_para_extrair_nome(ctx, msg_raw)
     msg_lead = blob_ctx.lower()
     msg_limpa = re.sub(r"[^\w\s]", "", msg_lead)
-
-    tem_gatilho = any(g in msg_lead for g in _GATILHOS_DINAMICOS)
-    # Saudações curtas ("oi", "boa noite") antes eram só fallback e ficavam abaixo do tom desejado; com IA o modelo segue o TOM DE OURO.
-    is_basic = not tem_gatilho and any(msg_limpa == r for r in _RUIDO_INICIAL) and len(msg_limpa.split()) <= 6
 
     # ── 2. Name Lock ──
     nome = VOCATIVO_SEM_NOME
@@ -772,113 +780,24 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         ctx.metadata["nome_lead"] = nome
         ctx.nome_lead = nome
 
-    # ── 3. Resposta IA (apenas fora do caminho padrão) ──
-    # Caminho padrão: saudação curta, nome claro, contato/foto/desabafo em regra.
-    # IA entra quando o lead sai do trilho (dúvida/objeção/dor densa/mensagem extensa).
-    use_ia_node1 = bool(
-        ctx.personalizer
-        and (
-            tem_gatilho
-            or len(msg_limpa.split()) > 8
-            or _RE_DOR_OU_SOFRIMENTO.search(msg_lead)
-        )
-    )
-    if use_ia_node1:
-        logger.info(
-            f"🧠 [NODE 1 v20] JSON + briefing + anti-repetição + vaga para {nome}"
-            f"{' (msg curta)' if is_basic else ''}."
-        )
-        try:
-            md = ctx.metadata if hasattr(ctx, "metadata") and ctx.metadata else {}
-            instrucao_vaga = _montar_instrucao_vaga_system(md)
-            prompt_ia = _SYSTEM_NODE1_JSON.format(
-                periodo=periodo,
-                instrucao_vaga=instrucao_vaga,
-            )
-            briefing = _briefing_comportamental(blob_ctx, msg_lead, nome, md)
-            if not hasattr(ctx, "metadata") or ctx.metadata is None:
-                ctx.metadata = {}
-            vs = _node1_vaga_settings(md)
-            ctx.metadata["node1_briefing"] = {
-                "tem_dor": bool(_RE_DOR_OU_SOFRIMENTO.search(blob_ctx.lower())),
-                "vaga_gratis_ativa": bool(vs.get("ativo", True)),
-                "briefing_texto": briefing[:500],
-            }
-
-            payload = ctx.personalizer.gerar_node1_json(
-                system_prompt=prompt_ia,
-                historico_lista=slice_historico_para_ia(ctx),
-                mensagem_lead=(
-                    f"Mensagem do lead (pode ser vários balões fundidos): {blob_ctx!r}\n\n{briefing}\n\n"
-                    f"Período: {periodo}."
-                ),
-                metadata=ctx.metadata,
-            )
-            baloes_limpos = _montar_baloes_do_json(
-                payload, nome, periodo, blob_ctx, msg_lead, md
-            )
-            if is_basic:
-                baloes_limpos = _ajustar_abertura_curta_node1(baloes_limpos, nome)
-
-            if baloes_limpos:
-                texto_total = " ".join(baloes_limpos)
-                if nome_eh_placeholder(nome) and "?" not in texto_total and "👇" not in texto_total:
-                    logger.info("🔧 [NODE 1] Hook Assurance (D sem pergunta).")
-                    # Sem nome ainda: pedir nome. Com nome, não forçar CTA extra para avançar.
-                    baloes_limpos.append(
-                        "Me diz como você se chama, meu bem? Assim eu te falo direito. 👇"
-                    )
-
-                baloes_saida = list(baloes_limpos[:_MAX_BALOES_NODE1])
-                acoes = [Acao(tipo="delay", segundos=random.randint(2, 4))]
-                for b in baloes_saida:
-                    acoes.append(Acao(tipo="delay", segundos=max(3, _delay_digitacao(b) - 1)))
-                    acoes.append(Acao(tipo="text", conteudo=b))
-                if not hasattr(ctx, "metadata") or ctx.metadata is None:
-                    ctx.metadata = {}
-                ctx.metadata["node1_baloes_enviados"] = int(min(len(baloes_saida), _MAX_BALOES_NODE1))
-                ctx.estado_coleta = "node1_recepcao_ia"
-                if _pode_ir_direto_coleta_sem_node2(ctx, nome, blob_ctx):
-                    ctx.metadata["node1_pulou_para_coleta"] = True
-                    ctx.metadata["node2_contato_ja_reconhecido"] = True
-                    logger.info("⚡ [NODE 1] Burst completo (foto+desabafo+contato) → coleta (pula node 2).")
-                    return acoes, "3_coleta_profunda"
-                elapsed = time.time() - t0_node
-                _cfg = (ctx.metadata or {}).get("__config__") or {}
-                _sla_n1 = float(_cfg.get("node_exec_sla_warn_seconds") or 6.0)
-                if elapsed > _sla_n1:
-                    logger.warning(
-                        "⏱️ [NODE 1] Tempo de abertura alto: %.2fs (sla_warn=%.2fs)",
-                        elapsed,
-                        _sla_n1,
-                    )
-                return acoes, "2_salvar_contato"
-            raise ValueError("JSON vazio ou sem balões.")
-
-        except Exception as e:
-            logger.error(f"🚨 [NODE 1] Falha na IA: {e}. Fallback disparado.")
-
-    # ── 4. Fallback ──
+    # ── 3. Contrato determinístico do node1 ──
     if not hasattr(ctx, "metadata") or ctx.metadata is None:
         ctx.metadata = {}
-    ctx.estado_coleta = "node1_recepcao_fallback"
-    acoes_fb = _gerar_fallback(periodo, nome, blob_ctx, msg_lead, ctx.metadata)
-    if is_basic:
-        textos_fb = [a.conteudo for a in acoes_fb if getattr(a, "tipo", "") == "text"]
-        textos_fb = _ajustar_abertura_curta_node1(textos_fb, nome)
-        if textos_fb:
-            novas_fb: List[Acao] = [Acao(tipo="delay", segundos=random.randint(3, 6))]
-            for t in textos_fb:
-                novas_fb.append(Acao(tipo="delay", segundos=_delay_digitacao(t)))
-                novas_fb.append(Acao(tipo="text", conteudo=t))
-            acoes_fb = novas_fb
-    ctx.metadata["node1_baloes_enviados"] = int(
-        len([a for a in acoes_fb if getattr(a, "tipo", "") == "text"])
-    )
+    textos_node1 = _montar_baloes_contrato_node1(periodo, nome, ctx.metadata)
+    if not textos_node1:
+        textos_node1 = [f"{periodo}! É bom te receber por aqui. ✨"]
+        if nome_eh_placeholder(nome):
+            textos_node1.append("Me diz como você se chama, meu bem? Assim eu te falo direito.")
+    acoes_fb: List[Acao] = [Acao(tipo="delay", segundos=random.randint(2, 4))]
+    for t in textos_node1:
+        acoes_fb.append(Acao(tipo="delay", segundos=max(3, _delay_digitacao(t) - 1)))
+        acoes_fb.append(Acao(tipo="text", conteudo=t))
+    ctx.estado_coleta = "node1_recepcao_contrato"
+    ctx.metadata["node1_baloes_enviados"] = int(len(textos_node1))
     if _pode_ir_direto_coleta_sem_node2(ctx, nome, blob_ctx):
         ctx.metadata["node1_pulou_para_coleta"] = True
         ctx.metadata["node2_contato_ja_reconhecido"] = True
-        logger.info("⚡ [NODE 1] Fallback: burst completo → coleta (pula node 2).")
+        logger.info("⚡ [NODE 1] Contrato: burst completo → coleta (pula node 2).")
         return acoes_fb, "3_coleta_profunda"
     elapsed = time.time() - t0_node
     _cfg_fb = (ctx.metadata or {}).get("__config__") or {}

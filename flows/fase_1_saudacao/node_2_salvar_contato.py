@@ -462,11 +462,14 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     modo_curto_pos_node1 = node1_baloes_enviados >= 3
 
     if meta.get("lead_contato_salvo_declarado"):
-        out = _executar_fast_track_para_coleta(ctx, meta, nome, numero_whatsapp, msg_lead)
+        # Regra contextual: se contato já foi declarado/sniffado, node2 não responde.
+        meta["node2_bypass_contato_ja_ok"] = True
+        ctx.estado_coleta = "node2_bypass_contato_ok"
+        ctx.metadata = meta
         elapsed = time.time() - t0_node
         if elapsed > 3.5:
-            logger.warning("⏱️ [NODE 2] Fast-track lento: %.2fs", elapsed)
-        return out
+            logger.warning("⏱️ [NODE 2] Bypass de contato lento: %.2fs", elapsed)
+        return [], "3_coleta_profunda"
 
     acoes: List[Acao] = []
     proximo_node = "3_coleta_profunda"
