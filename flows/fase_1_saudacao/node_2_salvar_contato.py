@@ -88,6 +88,9 @@ _RE_OBJECAO_CARD = re.compile(
     r"n[aã]o\s+veio\s+o\s+card|n[aã]o\s+apareceu\s+o\s+contato|"
     r"sumiu\s+o\s+contato|n[aã]o\s+salvou)"
 )
+_RE_CONFIRMACAO_CURTA = re.compile(
+    r"(?i)\b(ok|pronto|feito|sim|show|blz|beleza|confirm|salvei|salvo)\b"
+)
 
 
 def _nome_valido_guardado(n: str) -> bool:
@@ -449,7 +452,13 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         meta["lead_contato_salvo_declarado"] = True
     # Se o lead já chegou completo na fase 1, não precisa repetir nada no node2.
     nome_ok = nome_util_para_checklist_fase1(str(meta.get("nome_lead") or ctx.nome_lead or ""))
-    if nome_ok and bool(meta.get("lead_contato_salvo_declarado")) and meta_tem_foto(meta) and meta_tem_desabafo(meta):
+    if (
+        nome_ok
+        and bool(meta.get("lead_contato_salvo_declarado"))
+        and bool(meta.get("node2_vcard_despachado"))
+        and meta_tem_foto(meta)
+        and meta_tem_desabafo(meta)
+    ):
         meta["node2_bypass_contexto_completo"] = True
         ctx.estado_coleta = "node2_bypass_para_node3"
         ctx.metadata = meta
@@ -461,15 +470,16 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     node1_baloes_enviados = int(meta.get("node1_baloes_enviados", 0) or 0)
     modo_curto_pos_node1 = node1_baloes_enviados >= 3
 
-    if meta.get("lead_contato_salvo_declarado"):
-        # Regra contextual: se contato já foi declarado/sniffado, node2 não responde.
-        meta["node2_bypass_contato_ja_ok"] = True
-        ctx.estado_coleta = "node2_bypass_contato_ok"
-        ctx.metadata = meta
-        elapsed = time.time() - t0_node
-        if elapsed > 3.5:
-            logger.warning("⏱️ [NODE 2] Bypass de contato lento: %.2fs", elapsed)
-        return [], "3_coleta_profunda"
+    if meta.get("lead_contato_salvo_declarado") and meta.get("node2_vcard_despachado"):
+        # Só bypass silencioso após já termos enviado o cartão e recebido confirmação curta.
+        if _RE_CONFIRMACAO_CURTA.search(msg_lower):
+            meta["node2_bypass_contato_ja_ok"] = True
+            ctx.estado_coleta = "node2_bypass_contato_ok"
+            ctx.metadata = meta
+            elapsed = time.time() - t0_node
+            if elapsed > 3.5:
+                logger.warning("⏱️ [NODE 2] Bypass de contato lento: %.2fs", elapsed)
+            return [], "3_coleta_profunda"
 
     acoes: List[Acao] = []
     proximo_node = "3_coleta_profunda"
