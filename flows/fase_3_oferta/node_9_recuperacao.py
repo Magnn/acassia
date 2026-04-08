@@ -74,6 +74,25 @@ def _link_checkout_valido(link: str) -> bool:
     return low.startswith("https://") or low.startswith("http://")
 
 
+def _resolver_link_checkout_recuperacao(metadata: dict, config: dict) -> str:
+    ticket = int(metadata.get("node8_ticket_atual", metadata.get("node8_ticket_inicial", 0)) or 0)
+    candidatos = []
+    if ticket > 0:
+        candidatos.append(str(metadata.get(f"node8_checkout_link_{ticket}") or "").strip())
+    candidatos.extend(
+        [
+            str(metadata.get("node8_checkout_link") or "").strip(),
+            str(metadata.get("link_pagamento") or "").strip(),
+            str(config.get("link_pagamento") or "").strip(),
+        ]
+    )
+    for c in candidatos:
+        norm = normalizar_link_para_envio(c, instagram_mode=False) or c
+        if _link_checkout_valido(norm):
+            return norm
+    return ""
+
+
 def executar_v2(ctx, tentativa: int = 1) -> tuple:
     # 1. Resgate de Inteligência (Dados do Maestro - Node 5)
     metadata = getattr(ctx, "metadata", {}) or {}
@@ -94,8 +113,7 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
     # Configurações Dinâmicas
     config = metadata.get("__config__", {})
     preco_mat = config.get("preco_materiais", "60")
-    link_bruto = str(metadata.get("link_pagamento", config.get("link_pagamento", "[LINK]")) or "").strip()
-    link_pagamento = normalizar_link_para_envio(link_bruto, instagram_mode=False) or link_bruto
+    link_pagamento = _resolver_link_checkout_recuperacao(metadata, config)
     link_ok = _link_checkout_valido(link_pagamento)
 
     acoes = []

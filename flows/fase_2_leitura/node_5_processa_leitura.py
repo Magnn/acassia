@@ -30,6 +30,16 @@ from conversation_policy import lead_reportou_problema_entrega
 
 logger = logging.getLogger(__name__)
 
+_UNIVERSOS_VALIDOS = {
+    "amor_de_volta",
+    "encontrar_amor",
+    "salvar_relacionamento",
+    "prosperidade",
+    "familia_cura",
+    "superar_padrao",
+    "geral",
+}
+
 # ── CONFIGURAÇÕES E REGEX ──
 _CONFIANCA_MINIMA = 0.75
 _MAX_LOOPS_APROFUNDAMENTO = 2
@@ -443,8 +453,13 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
     # 4. PERSISTÊNCIA NA MEMÓRIA (TOTAL MAPPING)
     gatilho_txt = _sintetizar_gatilho_emocional(dados_extraidos)
+    universo_ia = str(dados_extraidos.get("UNIVERSO") or "").strip().lower()
+    universo_prev = str(meta.get("universo_desejo") or "").strip().lower()
+    universo_final = universo_ia if universo_ia in _UNIVERSOS_VALIDOS else (
+        universo_prev if universo_prev in _UNIVERSOS_VALIDOS else "geral"
+    )
     meta.update({
-        "universo_desejo": dados_extraidos.get("UNIVERSO", "geral").lower(),
+        "universo_desejo": universo_final,
         "genero_lead": _resolver_genero_lead(dados_extraidos, ctx),
         "arquetipo_lead": dados_extraidos.get("ARQUETIPO", "O Ferido"),
         "tom_cirurgico": dados_extraidos.get("TOM_CIRURGICO", "Maternal"),
@@ -467,8 +482,9 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     })
 
     # Higiene e Finalização
-    for k in list(meta.keys()):
-        if "url" in k.lower(): meta[k] = ""
+    for k in ("imagem_url", "media_url_temp", "ultima_midia_url"):
+        if k in meta:
+            meta[k] = ""
 
     ctx.metadata = meta
     ctx.estado_coleta = "node5_perfil_completo"

@@ -314,6 +314,22 @@ def _micro_percepcoes_desejo(desejo: str, universo: str) -> List[str]:
     return a[:2]
 
 
+def _append_node3_ancora(meta: dict, trecho: str) -> None:
+    atual = str(meta.get("node3_percepcoes_multas") or "").strip()
+    novo = " ".join(str(trecho or "").split()).strip()
+    if not novo:
+        return
+    if not atual:
+        meta["node3_percepcoes_multas"] = novo[:1200]
+        return
+    low_atual = atual.lower()
+    low_novo = novo.lower()
+    if low_novo in low_atual:
+        return
+    combinado = f"{atual} | {novo}".strip()
+    meta["node3_percepcoes_multas"] = combinado[:1200]
+
+
 def _classificar_universo_por_regex(texto: str) -> str:
     for nome, pat in _UNIVERSO_KEYWORDS:
         if pat.search(texto or ""):
@@ -712,7 +728,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             meta["universo_desejo"] = _classificar_universo(ctx, meta, meta.get("desabafo_original", ""))
             ctx.estado_coleta = "node3_camada2_desejo"
             logger.info("⚡ [NODE 3] Fast-track (foto+dor via Sniffer). Lead=%s universo=%s", nome_fmt, meta.get("universo_desejo"))
-            meta["node3_percepcoes_multas"] = ""
+            _append_node3_ancora(meta, _fechamento_camada2_presenca(meta.get("universo_desejo", "geral")))
             ft_blocos: List[Acao] = [
                 Acao(tipo="delay", segundos=random.randint(10, 16)),
                 Acao(tipo="text", conteudo=_fechamento_camada2_presenca(meta.get("universo_desejo", "geral"))),
@@ -850,7 +866,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             meta["universo_desejo"] = universo
             meta["node3_estado"] = "aguardando_desejo"
             ctx.estado_coleta = "node3_camada2_desejo"
-            meta["node3_percepcoes_multas"] = ""
+            _append_node3_ancora(meta, _fechamento_camada2_presenca(meta.get("universo_desejo", "geral")))
             acoes_c2: List[Acao] = [
                 Acao(tipo="delay", segundos=random.randint(6, 10)),
                 Acao(tipo="text", conteudo=_fechamento_camada2_presenca(meta.get("universo_desejo", "geral"))),
@@ -924,6 +940,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             )
             acoes_c3: List[Acao] = [Acao(tipo="delay", segundos=delay_dramatico())]
             for ptxt in percs_d:
+                _append_node3_ancora(meta, ptxt)
                 acoes_c3.extend(
                     [
                         Acao(tipo="delay", segundos=random.randint(8, 15)),
@@ -977,6 +994,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
         if meta.get("aprofundamento_texto"):
             meta.pop("node3_aprofundamento_acumulado", None)
+            _append_node3_ancora(meta, str(meta.get("aprofundamento_texto") or "")[:260])
             _extrair_dados_ricos_ia(ctx, meta)
             meta["node3_estado"] = "coleta_completa"
             ctx.estado_coleta = "node3_camada4_extracao_ok"
