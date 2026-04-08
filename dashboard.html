@@ -1097,6 +1097,20 @@
             background: var(--c-surface);
             border-bottom: 1px solid var(--c-border);
         }
+        .flow-inspector-panel {
+            position: fixed;
+            top: 96px;
+            right: 20px;
+            width: min(320px, 92vw);
+            z-index: 60;
+            background: var(--c-surface);
+            border: 1px solid var(--c-border);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 12px;
+            max-height: calc(100vh - 120px);
+            overflow: auto;
+        }
         .flow-inspector-meta {
             font-size: 10px;
             color: var(--c-muted2);
@@ -1301,6 +1315,22 @@
             stroke-linecap: round;
             stroke-linejoin: round;
             transition: stroke 0.12s ease, stroke-width 0.12s ease, opacity 0.12s ease;
+        }
+        .conn-path-selected {
+            stroke: #3b82f6 !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.45));
+        }
+        /* Cliques nas linhas passam pelo container vazio até ao SVG */
+        #flow-canvas-viewport #nodes-container {
+            pointer-events: none;
+        }
+        #flow-canvas-viewport #nodes-container .flow-node {
+            pointer-events: auto;
+        }
+        #svg-connections path.conn-path[data-flow-edge-id] {
+            pointer-events: stroke;
+            cursor: pointer;
         }
         #flow-temp-wire-path { filter: drop-shadow(0 0 4px rgba(124,90,245,.35)); }
         .flow-builder-toolbar {
@@ -2903,7 +2933,7 @@
             </div>
             <div id="flow-canvas-viewport" class="flow-canvas-viewport" style="position:relative;transform-origin:0 0;min-width:2000px;min-height:1200px">
             <!-- SVG de conexões estáticas (para visualização no base flow) -->
-            <svg id="svg-connections" style="position:absolute;top:0;left:0;width:1800px;height:800px;pointer-events:none;z-index:0">
+            <svg id="svg-connections" style="position:absolute;top:0;left:0;width:1800px;height:800px;z-index:0">
                 <defs>
                     <marker id="arrow" viewBox="0 0 12 12" refX="10.5" refY="6" markerWidth="8" markerHeight="8" orient="auto" markerUnits="userSpaceOnUse">
                         <path d="M0,1 L0,11 L11,6 z" fill="var(--c-border2)"/>
@@ -2935,7 +2965,7 @@
                 <i class="fas fa-plus"></i>
             </button>
             <!-- Inspetor legado (vazio): a configuração abre dentro de cada .flow-node -->
-            <div id="flow-inspector" class="flow-inspector-panel" hidden aria-hidden="true" style="display:none!important">
+            <div id="flow-inspector" class="flow-inspector-panel" hidden aria-hidden="true" style="display:none">
                 <div id="flow-inspector-body" style="display:none"></div>
             </div>
         </div>
@@ -4354,6 +4384,8 @@ let _flowEdges = [];
 let _flowConnectSource = null;
 let _flowWireDrag = null;
 let _flowSelectedNodeId = null;
+/** Aresta selecionada no canvas (data-flow-edge-id) — Missão 1.1 */
+let _flowSelectedEdgeId = null;
 let _currentFlowBlueprintId = null;
 let _flowSchemaCatalog = null;
 
@@ -4650,6 +4682,7 @@ function flowPasteNode() {
 function flowCanvasBackgroundClick(event) {
     const t = event.target;
     if (t && t.closest && (t.closest('.flow-node') || t.closest('#flow-builder-toolbar') || t.closest('#flow-minimap-wrap'))) return;
+    if (t && t.closest && t.closest('path[data-flow-edge-id]')) return;
     cancelFlowWire();
 }
 
@@ -4751,11 +4784,94 @@ function flowTryConnectEdge(fromId, toId) {
         return false;
     }
     const id = 'e-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-    _flowEdges.push({ id, from: fromId, to: toId });
+    _flowEdges.push({ id, from: fromId, to: toId, label: '' });
     redrawFlowEdges();
     toast('Conexão criada.', 'emerald');
     pushFlowHistory();
     return true;
+}
+
+function flowGetEdgeById(eid) {
+    const s = String(eid || '').trim();
+    return (_flowEdges || []).find((x) => String(x.id) === s) || null;
+}
+
+function flowClearEdgeSelection() {
+    _flowSelectedEdgeId = null;
+    const panel = document.getElementById('flow-inspector');
+    const body = document.getElementById('flow-inspector-body');
+    if (panel && body && body.getAttribute('data-flow-edge-inspector') === '1') {
+        panel.style.display = 'none';
+        panel.setAttribute('hidden', '');
+        panel.setAttribute('aria-hidden', 'true');
+        body.innerHTML = '';
+        body.style.display = 'none';
+        body.removeAttribute('data-flow-edge-inspector');
+    }
+    redrawFlowEdges();
+}
+
+function flowSelectEdge(edgeId) {
+    const eid = String(edgeId || '').trim();
+    if (!eid || !flowGetEdgeById(eid)) return;
+    closeFlowInspector();
+    _flowSelectedEdgeId = eid;
+    redrawFlowEdges();
+    openFlowEdgeInspector(eid);
+}
+
+function openFlowEdgeInspector(edgeId) {
+    const edge = flowGetEdgeById(edgeId);
+    if (!edge) return;
+    const panel = document.getElementById('flow-inspector');
+    const body = document.getElementById('flow-inspector-body');
+    if (!panel || !body) return;
+    const fromN = flowCanvasNodeById(edge.from);
+    const toN = flowCanvasNodeById(edge.to);
+    const fromTitle =
+        fromN && fromN.querySelector('.flow-node-head')
+            ? String(fromN.querySelector('.flow-node-head').innerText || '').trim()
+            : edge.from;
+    const toTitle =
+        toN && toN.querySelector('.flow-node-head')
+            ? String(toN.querySelector('.flow-node-head').innerText || '').trim()
+            : edge.to;
+    const label = edge.label != null ? String(edge.label) : '';
+    panel.style.display = 'block';
+    panel.removeAttribute('hidden');
+    panel.setAttribute('aria-hidden', 'false');
+    body.style.display = 'block';
+    body.setAttribute('data-flow-edge-inspector', '1');
+    body.innerHTML = `
+        <div class="flow-inspector-meta"><span style="color:#3b82f6;font-weight:700">Conexão</span> · <code style="font-size:9px">${flowEsc(edge.id)}</code></div>
+        <p style="font-size:11px;color:var(--c-muted);margin:6px 0 10px">${flowEsc(fromTitle)} → ${flowEsc(toTitle)}</p>
+        <label class="kpi-label">Label / transição</label>
+        <input type="text" class="input-field" id="flow-edge-inspector-label" data-flow-edge-field="label" value="${flowEsc(label)}" placeholder="ex.: FIRMO, opt-in, condição…" style="width:100%;padding:7px;font-size:11px"/>
+        <div style="display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--c-border)">
+            <button type="button" class="btn btn-primary" style="flex:1;font-size:11px;font-weight:600" onclick="applyFlowInspectorFormConfig()"><i class="fas fa-check"></i> Aplicar à conexão</button>
+            <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px" onclick="flowRemoveSelectedEdge()" title="Remover ligação"><i class="fas fa-unlink"></i></button>
+        </div>
+    `;
+}
+
+function flowRemoveSelectedEdge() {
+    const id = _flowSelectedEdgeId;
+    if (!id) return;
+    _flowEdges = (_flowEdges || []).filter((e) => String(e.id) !== String(id));
+    _flowSelectedEdgeId = null;
+    closeFlowInspector();
+    pushFlowHistory();
+    toast('Conexão removida.', 'amber');
+}
+
+function applyFlowEdgeInspectorConfig() {
+    const id = _flowSelectedEdgeId;
+    const edge = id ? flowGetEdgeById(id) : null;
+    if (!edge) return;
+    const inp = document.getElementById('flow-edge-inspector-label');
+    if (inp) edge.label = String(inp.value || '').trim();
+    pushFlowHistory();
+    toast('Conexão atualizada.', 'emerald');
 }
 
 /**
@@ -5189,6 +5305,13 @@ function flowInspectorRenderGeneric(meta, cfg, spec, bodyEl) {
 }
 
 function applyFlowInspectorFormConfig() {
+    if (_flowSelectedEdgeId) {
+        const body = document.getElementById('flow-inspector-body');
+        if (body && body.getAttribute('data-flow-edge-inspector') === '1') {
+            applyFlowEdgeInspectorConfig();
+            return;
+        }
+    }
     const nodeId = _flowSelectedNodeId;
     const node = nodeId ? flowCanvasNodeById(nodeId) : null;
     if (!node) return;
@@ -5246,7 +5369,12 @@ function flowSetSelectedNode(nodeEl) {
 }
 
 function flowInspectorIsOpen() {
-    return !!document.querySelector('#nodes-container .flow-node.flow-node--editing');
+    const edgeBody = document.getElementById('flow-inspector-body');
+    const edgeOpen =
+        !!_flowSelectedEdgeId &&
+        edgeBody &&
+        edgeBody.getAttribute('data-flow-edge-inspector') === '1';
+    return !!document.querySelector('#nodes-container .flow-node.flow-node--editing') || edgeOpen;
 }
 
 async function flowEditNode(btn) {
@@ -5327,13 +5455,31 @@ function initFlowNodeSelection() {
         if (e.target.closest('[data-flow-node-actions="1"]')) return;
         if (e.target.closest('input, textarea, select')) return;
         if (e.target.closest('[data-flow-node-inspector="1"]')) return;
+        if (e.target.closest && e.target.closest('path[data-flow-edge-id]')) return;
         const node = e.target.closest('#nodes-container .flow-node');
         if (!node) {
             flowSetSelectedNode(null);
+            flowClearEdgeSelection();
             return;
         }
         if (e.target.closest('.conn-dot')) return;
+        flowClearEdgeSelection();
         flowSetSelectedNode(node);
+    });
+}
+
+function initFlowEdgeSelection() {
+    const svg = document.getElementById('svg-connections');
+    if (!svg || svg.getAttribute('data-flow-edge-click-bound') === '1') return;
+    svg.setAttribute('data-flow-edge-click-bound', '1');
+    svg.addEventListener('click', function (e) {
+        const vb = document.getElementById('view-builder');
+        if (!vb || vb.style.display === 'none') return;
+        const path = e.target && e.target.closest && e.target.closest('path[data-flow-edge-id].conn-path');
+        if (!path) return;
+        e.stopPropagation();
+        const eid = path.getAttribute('data-flow-edge-id');
+        if (eid) flowSelectEdge(eid);
     });
 }
 
@@ -5393,6 +5539,11 @@ function initFlowBuilderGlobalHandlers() {
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
             if (e.target.closest('input, textarea, select')) return;
+            if (_flowSelectedEdgeId) {
+                e.preventDefault();
+                flowRemoveSelectedEdge();
+                return;
+            }
             const sel = document.querySelector('#nodes-container .flow-node.flow-node--selected');
             if (!sel) return;
             e.preventDefault();
@@ -5410,6 +5561,7 @@ function initFlowBuilderGlobalHandlers() {
             if (nid && nid !== _flowSelectedNodeId) closeFlowInspector();
             return;
         }
+        if (e.target.closest && e.target.closest('path.conn-path[data-flow-edge-id]')) return;
         const area = document.getElementById('flow-canvas-area');
         if (area && area.contains(e.target)) closeFlowInspector();
     });
@@ -5426,6 +5578,9 @@ function redrawFlowEdges() {
             <marker id="flow-arrow" viewBox="0 0 12 12" refX="10.2" refY="6" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
                 <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="rgba(124, 90, 245, 0.88)"/>
             </marker>
+            <marker id="flow-arrow-sel" viewBox="0 0 12 12" refX="10.2" refY="6" markerWidth="10" markerHeight="10" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="#3b82f6"/>
+            </marker>
         </defs>`;
     const paths = [];
     const scrollLeft = area.scrollLeft || 0;
@@ -5436,8 +5591,13 @@ function redrawFlowEdges() {
         if (!fromEl || !toEl) return;
         const { x1, y1, x2, y2 } = flowGetEdgeAnchorPoints(fromEl, toEl, area, scrollLeft, scrollTop);
         const d = flowSmoothBezierPathD(x1, y1, x2, y2);
+        const sel = _flowSelectedEdgeId && String(_flowSelectedEdgeId) === String(e.id);
+        const cls = sel ? 'conn-path conn-path-selected' : 'conn-path';
+        const mk = sel ? 'url(#flow-arrow-sel)' : 'url(#flow-arrow)';
+        const sw = sel ? '3' : '2.25';
+        const sc = sel ? '#3b82f6' : 'rgba(124, 90, 245, 0.5)';
         paths.push(
-            `<path class="conn-path" data-flow-edge-id="${flowEsc(e.id)}" d="${d}" stroke="rgba(124, 90, 245, 0.5)" stroke-width="2.25" marker-end="url(#flow-arrow)"/>`
+            `<path class="${cls}" data-flow-edge-id="${flowEsc(e.id)}" d="${d}" stroke="${sc}" stroke-width="${sw}" marker-end="${mk}"/>`
         );
     });
     svg.style.width = Math.max(1800, area.scrollWidth) + 'px';
@@ -5537,6 +5697,7 @@ function closeFlowInspector() {
     _flowSelectedNodeId = null;
     flowSetSelectedNode(null);
     try { delete window._flowConteudo; } catch (_) { window._flowConteudo = null; }
+    flowClearEdgeSelection();
 }
 
 function applyFlowInspectorConfig() {
@@ -5653,7 +5814,14 @@ function extractFlowGraphFromDom() {
         });
         nodes.push({ id, type, label, x, y, config });
     });
-    const edges = Array.isArray(_flowEdges) ? _flowEdges.map((e) => ({ id: e.id, from: e.from, to: e.to })) : [];
+    const edges = Array.isArray(_flowEdges)
+        ? _flowEdges.map((e) => ({
+              id: e.id,
+              from: e.from,
+              to: e.to,
+              ...(e.label != null && String(e.label).trim() !== '' ? { label: e.label } : {}),
+          }))
+        : [];
     return { nodes, edges };
 }
 
@@ -5712,6 +5880,7 @@ function deserializeFlowCanvas(doc) {
             id: e.id || ('e-' + Math.random().toString(16).slice(2)),
             from: e.from,
             to: e.to,
+            label: e.label != null ? String(e.label) : '',
         }));
     }
     if (doc.graph && Array.isArray(doc.graph.nodes)) {
@@ -8770,6 +8939,7 @@ function initDragAndDrop() {
     });
     flowEnsureNodeActionButtons();
     initFlowNodeSelection();
+    initFlowEdgeSelection();
     initFlowBuilderGlobalHandlers();
     wireFlowCanvasConnections();
     redrawFlowEdges();
