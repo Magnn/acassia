@@ -39,6 +39,52 @@ def document_to_acoes(doc: Mapping[str, Any]) -> List[Acao]:
     return steps_to_acoes(steps)
 
 
+def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
+    """Lista ordenada do bloco Conteúdo (texto, mídia, delay) → ações do motor."""
+    out: List[Acao] = []
+    items = cfg.get("contents")
+    if not isinstance(items, list):
+        return out
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        t = str(it.get("type") or "text").lower()
+        if t == "text":
+            body = str(it.get("body") or "").strip()
+            if body:
+                out.append(
+                    Acao(
+                        tipo="text",
+                        conteudo=body[:4000],
+                        metadata={"source": "flow_builder", "conteudo_item": "text"},
+                    )
+                )
+        elif t == "delay":
+            try:
+                sec = float(it.get("seconds") or 0)
+            except (TypeError, ValueError):
+                sec = 0.0
+            sec = max(0.0, min(sec, _MAX_DELAY_S))
+            if sec > 0:
+                out.append(Acao(tipo="delay", segundos=int(sec), metadata={"source": "flow_builder", "conteudo_item": "delay"}))
+        elif t in ("image", "video", "audio", "document"):
+            url = str(it.get("url") or "").strip()
+            if not url:
+                continue
+            cap = str(it.get("caption") or "").strip()
+            meta = {"source": "flow_builder", "conteudo_item": t}
+            if t == "image":
+                out.append(Acao(tipo="image", url=url, conteudo=cap[:900], metadata=meta))
+            elif t == "video":
+                out.append(Acao(tipo="video", url=url, conteudo=cap[:900], metadata=meta))
+            elif t == "audio":
+                out.append(Acao(tipo="audio", url=url, conteudo=url, metadata=meta))
+            else:
+                fn = str(it.get("filename") or "documento").strip()[:200]
+                out.append(Acao(tipo="document", url=url, conteudo=fn, metadata=meta))
+    return out
+
+
 def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
     acoes: List[Acao] = []
     for st in steps:
@@ -58,6 +104,19 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
                 acoes.append(
                     Acao(tipo="text", conteudo=note[:4000], metadata={"source": "flow_builder", "kind": "note"})
                 )
+            continue
+
+        if rk == "message" and ntype == "conteudo":
+            expanded = _expand_conteudo_items(cfg)
+            if expanded:
+                acoes.extend(expanded)
+                continue
+            body = (
+                str(cfg.get("body") or "").strip()
+                or str(cfg.get("step_name") or "").strip()
+            )
+            if body:
+                acoes.append(Acao(tipo="text", conteudo=body[:4000], metadata={"source": "flow_builder", "node_type": "conteudo"}))
             continue
 
         if rk == "message" or rk == "action":

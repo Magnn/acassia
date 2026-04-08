@@ -433,9 +433,24 @@ def simulate_flow(doc: Mapping[str, Any], *, max_steps: int = 40) -> Dict[str, A
         rk = spec.get("runtime", "passthrough")
         desc = f"[{ntype}] {spec.get('label', ntype)}"
         if rk == "message" or rk == "action":
-            body = cfg.get("body") or cfg.get("question") or cfg.get("payload") or "(vazio)"
-            desc += f" → enviar: {_safe_text(str(body), 120)}"
-            ctx["messages_sent"] = int(ctx.get("messages_sent", 0)) + 1
+            if ntype == "conteudo" and isinstance(cfg.get("contents"), list) and cfg["contents"]:
+                parts = []
+                for it in cfg["contents"][:20]:
+                    if not isinstance(it, dict):
+                        continue
+                    t = str(it.get("type") or "text").lower()
+                    if t == "text":
+                        parts.append(f"texto:{_safe_text(str(it.get('body')), 40)}")
+                    elif t == "delay":
+                        parts.append(f"delay:{it.get('seconds', '?')}s")
+                    elif t in ("image", "audio", "video", "document"):
+                        parts.append(f"{t}:{_safe_text(str(it.get('url')), 50)}")
+                desc += " → sequência: " + (" · ".join(parts) if parts else "(vazio)")
+                ctx["messages_sent"] = int(ctx.get("messages_sent", 0)) + max(1, len(parts))
+            else:
+                body = cfg.get("body") or cfg.get("question") or cfg.get("payload") or "(vazio)"
+                desc += f" → enviar: {_safe_text(str(body), 120)}"
+                ctx["messages_sent"] = int(ctx.get("messages_sent", 0)) + 1
         elif rk == "note":
             body = cfg.get("note") or cfg.get("body") or "(vazio)"
             desc += f" → anotação: {_safe_text(str(body), 120)}"
