@@ -241,6 +241,16 @@ def _normalizar_acoes_texto_node2(acoes: List[Acao]) -> List[Acao]:
         else:
             acoes[idx].conteudo = ""
     out = [a for a in acoes if not (a.tipo == "text" and not str(a.conteudo or "").strip())]
+    # Se houver pergunta, ela deve encerrar o turno (aguardar resposta do lead).
+    idx_q = -1
+    for i, a in enumerate(out):
+        if getattr(a, "tipo", "") == "text" and "?" in str(getattr(a, "conteudo", "") or ""):
+            idx_q = i
+            break
+    if idx_q >= 0:
+        out = out[: idx_q + 1]
+        while out and getattr(out[-1], "tipo", "") == "delay":
+            out.pop()
     # Guarda de segurança: evita turno vazio quando filtros removem tudo.
     if not any(getattr(a, "tipo", "") == "text" and str(getattr(a, "conteudo", "") or "").strip() for a in out):
         out.append(

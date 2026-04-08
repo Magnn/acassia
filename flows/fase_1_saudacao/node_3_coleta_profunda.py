@@ -265,11 +265,11 @@ def _nudge_aprofundamento_sem_duplicar(merged: str) -> str:
         )
     if t:
         return (
-            "Vou juntando o que você manda. Num próximo texto: quanto tempo isso pesa… "
+            "Vou juntando o que você manda. Num próximo texto: há quanto tempo isso pesa? "
             "e o que você já tentou (mesmo que seja 'tentei de tudo')?"
         )
     return (
-        "Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim… "
+        "Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? "
         "e o que você já tentou antes de chegar aqui?"
     )
 
@@ -399,6 +399,16 @@ def _normalizar_acoes_texto_node3(acoes: List[Acao]) -> List[Acao]:
     for i, idx in enumerate(idx_txt):
         acoes[idx].conteudo = norm[i] if i < len(norm) else ""
     out = [a for a in acoes if not (a.tipo == "text" and not str(a.conteudo or "").strip())]
+    # Regra conversacional: depois de pergunta, aguarda o lead (não empilha novos balões).
+    idx_q = -1
+    for i, a in enumerate(out):
+        if getattr(a, "tipo", "") == "text" and "?" in str(getattr(a, "conteudo", "") or ""):
+            idx_q = i
+            break
+    if idx_q >= 0:
+        out = out[: idx_q + 1]
+        while out and getattr(out[-1], "tipo", "") == "delay":
+            out.pop()
     if not any(getattr(a, "tipo", "") == "text" and str(getattr(a, "conteudo", "") or "").strip() for a in out):
         out.append(
             Acao(
@@ -907,7 +917,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     Acao(tipo="delay", segundos=random.randint(18, 32)),
                     Acao(
                         tipo="text",
-                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim… e o que você já tentou antes de chegar aqui?",
+                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
                     ),
                 ]
             )

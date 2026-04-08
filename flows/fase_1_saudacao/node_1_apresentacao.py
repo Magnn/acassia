@@ -751,8 +751,9 @@ def _montar_baloes_contrato_node1(periodo: str, nome: str, metadata: Optional[di
         else:
             baloes.append(vaga_txt)
     if nome_eh_placeholder(nome):
-        baloes.append("Me diz como você se chama, meu bem? Assim eu te falo direito.")
-    baloes.append("Vamos aproveitar com calma, podemos iniciar?")
+        baloes.append("Pra iniciarmos com calma, me diz como você se chama?")
+    else:
+        baloes.append("Vamos aproveitar com calma, podemos iniciar?")
     out = _sanear_baloes_saida_node1(baloes)
     out = _aplicar_cap_hierarquico_node1(out, nome)
     return _deduplicar_baloes_node1(out)[:_MAX_BALOES_NODE1]
