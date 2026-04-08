@@ -1,10 +1,10 @@
 """
-flows/fase_1_saudacao/node_1_apresentacao.py — MASTER SUPREMA v15 (ANTI-CHOKE)
+flows/fase_1_saudacao/node_1_apresentacao.py — Node 1 (apresentação / AcassIA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 A CHEGADA DA AUTORIDADE — Lead primeiro, funil em segundo; menos fallback por truncamento.
 
-🔥 v20:
-  Anti-repetição marca/instituto entre balões + vaga onde couber + JSON.
+Contrato: JSON hierárquico (personalizer) + pipeline anti-corte; fallback estável sem IA.
+Guardrails: `scripts/teste_node1_guardrails.py` (≤4 balões, ≤210 chars, prox 2 ou 3).
 """
 
 import logging
@@ -264,6 +264,12 @@ def _extrair_primeiro_nome(msg_lead: str) -> Optional[str]:
         tok = m.group(1).lower()
         if tok in ("a", "o", "um", "uma", "de", "do", "da", "em", "no", "na"):
             return None
+        return m.group(1).capitalize()
+    m = re.search(r"\bmeu\s+nome\s+[eé]\s+([a-zà-ú]{2,24})\b", msg_lead, re.IGNORECASE)
+    if m:
+        return m.group(1).capitalize()
+    m = re.search(r"\bnome\s+[eé]\s+([a-zà-ú]{2,24})\b", msg_lead, re.IGNORECASE)
+    if m:
         return m.group(1).capitalize()
     return None
 
@@ -805,7 +811,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                             f"{nome}, posso seguir contigo no próximo passo? 👇"
                         )
                     else:
-                        baloes_limpos.append("Posso seguir contigo no próximo passo? 👇")
+                        # Sem nome ainda: não pedir "próximo passo" genérico (contrato + anti-redundância com node 2/3).
+                        baloes_limpos.append(
+                            "Me diz como você se chama, meu bem? Assim eu te falo direito. 👇"
+                        )
 
                 acoes = [Acao(tipo="delay", segundos=random.randint(3, 6))]
                 for b in baloes_limpos[:4]:
@@ -858,6 +867,12 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         logger.info("⚡ [NODE 1] Fallback: burst completo → coleta (pula node 2).")
         return acoes_fb, "3_coleta_profunda"
     elapsed = time.time() - t0_node
-    if elapsed > 3.5:
-        logger.warning("⏱️ [NODE 1] Tempo fallback alto: %.2fs", elapsed)
+    _cfg_fb = (ctx.metadata or {}).get("__config__") or {}
+    _sla_fb = float(_cfg_fb.get("node_exec_sla_warn_seconds") or 6.0)
+    if elapsed > _sla_fb:
+        logger.warning(
+            "⏱️ [NODE 1] Tempo fallback alto: %.2fs (sla_warn=%.2fs)",
+            elapsed,
+            _sla_fb,
+        )
     return acoes_fb, "2_salvar_contato"

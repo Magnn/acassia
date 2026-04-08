@@ -33,6 +33,7 @@ def run() -> int:
         "preco": _ctx("qual o valor?"),
         "amor": _ctx("quero trazer meu ex de volta"),
         "nome": _ctx("me chamo Magno"),
+        "nome_meu_nome_e": _ctx("meu nome é Ana"),
     }
     erros = []
     for nome, ctx in cenarios.items():
