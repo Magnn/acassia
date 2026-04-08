@@ -3692,6 +3692,65 @@ function flowCanvasNodeById(fid) {
     return document.querySelector('#nodes-container .flow-node[data-flow-id="' + String(fid).replace(/"/g, '\\"') + '"]');
 }
 
+function flowEditNode(btn) {
+    const node = btn && btn.closest ? btn.closest('.flow-node') : null;
+    if (!node) return;
+    openFlowInspector(node);
+}
+
+function flowDuplicateNode(btn) {
+    const node = btn && btn.closest ? btn.closest('.flow-node') : null;
+    const container = document.getElementById('nodes-container');
+    if (!node || !container) return;
+    const clone = node.cloneNode(true);
+    const oldId = node.getAttribute('data-flow-id') || '';
+    const newId = newFlowNodeId();
+    clone.setAttribute('data-flow-id', newId);
+    const x = Number.parseFloat(node.style.left || '0') || 0;
+    const y = Number.parseFloat(node.style.top || '0') || 0;
+    clone.style.left = (x + 32) + 'px';
+    clone.style.top = (y + 32) + 'px';
+    container.appendChild(clone);
+    if (oldId) {
+        _flowEdges = (_flowEdges || []).filter((e) => e.from !== newId && e.to !== newId);
+    }
+    initDragAndDrop();
+    redrawFlowEdges();
+    toast('Bloco duplicado.', 'emerald');
+}
+
+function flowRemoveNode(btn) {
+    const node = btn && btn.closest ? btn.closest('.flow-node') : null;
+    if (!node) return;
+    const id = node.getAttribute('data-flow-id') || '';
+    node.remove();
+    if (id) {
+        _flowEdges = (_flowEdges || []).filter((e) => e.from !== id && e.to !== id);
+        redrawFlowEdges();
+    }
+    closeFlowInspector();
+}
+
+function flowEnsureNodeActionButtons() {
+    document.querySelectorAll('#nodes-container .flow-node').forEach((node) => {
+        const body = node.querySelector('.flow-node-body');
+        if (!body) return;
+        if (body.querySelector('[data-flow-node-actions="1"]')) return;
+        const bar = document.createElement('div');
+        bar.setAttribute('data-flow-node-actions', '1');
+        bar.style.display = 'flex';
+        bar.style.justifyContent = 'flex-end';
+        bar.style.gap = '6px';
+        bar.style.marginTop = '4px';
+        bar.innerHTML = `
+            <button type="button" class="icon-btn" style="width:24px;height:24px" title="Editar bloco" onclick="flowEditNode(this)"><i class="fas fa-pen text-xs" style="color:var(--c-purple2)"></i></button>
+            <button type="button" class="icon-btn" style="width:24px;height:24px" title="Duplicar bloco" onclick="flowDuplicateNode(this)"><i class="fas fa-copy text-xs" style="color:var(--c-emerald)"></i></button>
+            <button type="button" class="icon-btn" style="width:24px;height:24px" title="Excluir bloco" onclick="flowRemoveNode(this)"><i class="fas fa-trash text-xs" style="color:var(--c-rose)"></i></button>
+        `;
+        body.appendChild(bar);
+    });
+}
+
 function redrawFlowEdges() {
     const svg = document.getElementById('svg-connections');
     const area = document.getElementById('flow-canvas-area');
@@ -3751,10 +3810,6 @@ function wireFlowCanvasConnections() {
             if (flowTryConnectEdge(_flowConnectSource, toId)) cancelFlowWire();
             else cancelFlowWire();
         }
-    });
-    container.addEventListener('dblclick', (e) => {
-        const node = e.target.closest('.flow-node');
-        if (node && !e.target.closest('.conn-dot')) openFlowInspector(node);
     });
     initFlowWireDrag();
 }
@@ -6421,6 +6476,7 @@ function initDragAndDrop() {
             document.onmouseup = stopDrag;
         }
     });
+    flowEnsureNodeActionButtons();
     wireFlowCanvasConnections();
     redrawFlowEdges();
 }
@@ -6858,9 +6914,6 @@ function addSpecificNode(type) {
         <div class="flow-node-head" style="background:${headerBg}"><i class="${icon}"></i> ${title}</div>
         <div class="flow-node-body">
             ${bodyFields}
-            <div style="display:flex;justify-content:flex-end;margin-top:4px">
-                <button class="icon-btn" style="width:24px;height:24px" onclick="this.parentElement.parentElement.parentElement.remove()"><i class="fas fa-trash text-rose-500 text-xs"></i></button>
-            </div>
         </div>
         <div class="conn-dot conn-right"></div>
     `;
