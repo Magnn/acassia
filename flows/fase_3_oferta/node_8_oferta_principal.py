@@ -646,13 +646,13 @@ def executar_v2(ctx) -> tuple:
                     if len(blocos_gerados) < 5:
                         blocos_gerados = _extrair_blocos_fallback(resposta, max_blocos=9, min_len=8)
                         blocos_gerados = [b for b in blocos_gerados if not _bloco_e_somente_link(b)]
-                    if len(blocos_gerados) >= 5:
+                    if len(blocos_gerados) >= 4:
                         break
                     raise ValueError("Copy insuficiente.")
                 except Exception as ex:
                     ultima_exc = ex
                     blocos_gerados = []
-            if len(blocos_gerados) < 5:
+            if len(blocos_gerados) < 4:
                 raise ValueError(str(ultima_exc) if ultima_exc else "Copy insuficiente.")
         else:
             raise ValueError("IA Offline.")

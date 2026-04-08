@@ -1090,10 +1090,31 @@ class Engine:
                 ctx.metadata["node_atual_exec"] = current_id
                 res, prox = modulo.executar_v2(ctx)
                 elapsed_node = time.time() - t0_node
-                sla_warn_s = float(
-                    (ctx.metadata.get("__config__", {}) or {}).get("node_exec_sla_warn_seconds", 3.5)
-                    or 3.5
-                )
+                cfg = (ctx.metadata.get("__config__", {}) or {})
+                sla_warn_s = float(cfg.get("node_exec_sla_warn_seconds", 3.5) or 3.5)
+                # Nodes narrativos (leitura/oferta) são naturalmente mais longos; evita falso alerta.
+                sla_warn_por_node = {
+                    "6_atencao_dinamica": float(cfg.get("node6_exec_sla_warn_seconds", 18) or 18),
+                    "7_interesse_desejo": float(cfg.get("node7_exec_sla_warn_seconds", 18) or 18),
+                    "8_oferta_principal": float(cfg.get("node8_exec_sla_warn_seconds", 15) or 15),
+                }
+                sla_warn_s = float(sla_warn_por_node.get(current_id, sla_warn_s))
+                cap_por_node = {
+                    "6_atencao_dinamica": int(cfg.get("node6_max_acoes", 44) or 44),
+                    "7_interesse_desejo": int(cfg.get("node7_max_acoes", 30) or 30),
+                    "8_oferta_principal": int(cfg.get("node8_max_acoes", 36) or 36),
+                }
+                cap = max(1, int(cap_por_node.get(current_id, 0) or 0))
+                if cap and len(res or []) > cap:
+                    res = list((res or [])[:cap])
+                    while res and getattr(res[-1], "tipo", "") == "delay":
+                        res.pop()
+                    logger.warning(
+                        "event=node_action_cap_applied lead_id=%s node=%s cap=%s",
+                        lead.id,
+                        current_id,
+                        cap,
+                    )
                 logger.info(
                     "event=node_exec_timing lead_id=%s node=%s elapsed_s=%.3f acoes=%s prox=%s",
                     lead.id,
