@@ -977,6 +977,74 @@
                 0 14px 28px -6px rgb(99 102 241 / 0.16);
             z-index: 22;
         }
+        /* Missão 3.2 — lint visual (grafo): pulsação âmbar/vermelho sem sobrescrever sombra do cartão/seleção */
+        @keyframes flow-node-warning-glow {
+            0%, 100% {
+                box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.55);
+            }
+            50% {
+                box-shadow:
+                    inset 0 0 0 2px rgba(239, 68, 68, 0.5),
+                    inset 0 0 18px rgba(251, 146, 60, 0.07);
+            }
+        }
+        .flow-node.flow-node-warning::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 12;
+            animation: flow-node-warning-glow 2.2s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .flow-node.flow-node-warning::after {
+                animation: none;
+                box-shadow: inset 0 0 0 2px rgba(234, 88, 12, 0.5);
+            }
+        }
+        .flow-node-lint-flag {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            z-index: 30;
+            width: 18px;
+            height: 18px;
+            border-radius: 6px;
+            background: linear-gradient(145deg, #fff7ed, #ffedd5);
+            border: 1px solid rgba(234, 88, 12, 0.45);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            line-height: 1;
+            pointer-events: auto;
+            cursor: help;
+        }
+        .flow-node-lint-flag:focus {
+            outline: 2px solid rgba(99, 102, 241, 0.45);
+            outline-offset: 1px;
+        }
+        .flow-lint-status {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: #059669;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            white-space: nowrap;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .flow-lint-status.flow-lint-status--warn {
+            color: #c2410c;
+            background: rgba(251, 146, 60, 0.1);
+            border-color: rgba(234, 88, 12, 0.35);
+        }
 
         .flow-node-head {
             padding: 12px 12px 12px 14px;
@@ -3263,6 +3331,7 @@
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowRedo()" title="Refazer (Ctrl+Shift+Z)" id="flow-btn-redo" disabled><i class="fas fa-redo"></i></button>
                 <span style="width:1px;height:18px;background:var(--c-border);margin:0 2px;flex-shrink:0"></span>
                 <span id="flow-save-status" title="Estado de sincronização com o servidor"></span>
+                <span id="flow-lint-status" class="flow-lint-status" title="" aria-live="polite">✅ Fluxo Saudável</span>
                 <span style="width:1px;height:18px;background:var(--c-border);margin:0 2px;flex-shrink:0"></span>
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="flowZoomOut()" title="Menos zoom"><i class="fas fa-minus"></i></button>
                 <span id="flow-zoom-label" style="font-size:10px;color:var(--c-muted);min-width:40px;text-align:center">100%</span>
@@ -4804,6 +4873,7 @@ function pushFlowHistory() {
         _flowHistPointer--;
     }
     flowUpdateUndoRedoButtons();
+    flowScheduleLint();
 }
 
 function flowUpdateUndoRedoButtons() {
@@ -4823,6 +4893,7 @@ function restoreFlowSnapshot(snap) {
     } finally {
         _flowHistoryRestoring = false;
     }
+    flowScheduleLint();
 }
 
 function flowUndo() {
@@ -5181,6 +5252,7 @@ function initFlowBuilderCanvasUx() {
     flowRefreshSaveStatusToolbar();
     void flowFetchTenantVariables();
     flowInitVarPickerOutsideClose();
+    flowScheduleLint();
 }
 
 function cancelFlowWire() {
@@ -6581,6 +6653,121 @@ function flowAnalyzeGraphStructure(doc) {
     return { warnings };
 }
 
+/** Missão 3.2 — lint visual do grafo (O(V+E), coalescido por frame) */
+let _flowLintRaf = null;
+function flowScheduleLint() {
+    const vb = document.getElementById('view-builder');
+    if (!vb || vb.style.display === 'none') return;
+    if (_flowLintRaf != null) return;
+    _flowLintRaf = requestAnimationFrame(() => {
+        _flowLintRaf = null;
+        try {
+            flowValidateGraph();
+        } catch (err) {
+            console.warn('flowValidateGraph', err);
+        }
+    });
+}
+
+const FLOW_LINT_ENTRY_TYPES = new Set(['trigger', 'webhook']);
+const FLOW_LINT_TERMINAL_TYPES = new Set(['end', 'anotacao']);
+
+/**
+ * Analisa _flowEdges e nós no DOM; aplica .flow-node-warning e badge com tooltip.
+ * @returns {{ alertCount: number, issuesByNode: Map<string, string[]> }}
+ */
+function flowValidateGraph() {
+    const container = document.getElementById('nodes-container');
+    const statusEl = document.getElementById('flow-lint-status');
+    if (!container) {
+        return { alertCount: 0, issuesByNode: new Map() };
+    }
+
+    const nodes = [];
+    container.querySelectorAll('.flow-node').forEach((el) => {
+        const id = String(el.getAttribute('data-flow-id') || '').trim();
+        if (!id) return;
+        const type = String(el.getAttribute('data-node-type') || el.getAttribute('data-flow-block') || 'generic')
+            .trim()
+            .toLowerCase();
+        nodes.push({ id, type, el });
+    });
+
+    const edges = Array.isArray(_flowEdges) ? _flowEdges : [];
+    const idSet = new Set(nodes.map((n) => n.id));
+    const validEdges = edges.filter((e) => e && e.from && e.to && idSet.has(e.from) && idSet.has(e.to));
+
+    const indeg = Object.create(null);
+    const outdeg = Object.create(null);
+    nodes.forEach((n) => {
+        indeg[n.id] = 0;
+        outdeg[n.id] = 0;
+    });
+    validEdges.forEach((e) => {
+        indeg[e.to]++;
+        outdeg[e.from]++;
+    });
+
+    let alertCount = 0;
+    const issuesByNode = new Map();
+
+    function addIssue(id, msg) {
+        alertCount++;
+        if (!issuesByNode.has(id)) issuesByNode.set(id, []);
+        issuesByNode.get(id).push(msg);
+    }
+
+    nodes.forEach((n) => {
+        const inC = indeg[n.id] || 0;
+        const outC = outdeg[n.id] || 0;
+        if (inC === 0 && !FLOW_LINT_ENTRY_TYPES.has(n.type)) {
+            addIssue(n.id, 'Bloco sem entrada — ligue um fio ao ● esquerdo (exceto gatilhos).');
+        }
+        if (outC === 0 && !FLOW_LINT_TERMINAL_TYPES.has(n.type)) {
+            addIssue(n.id, 'Bloco sem saída — ligue o ● direito ao próximo passo (exceto fim ou anotação).');
+        }
+    });
+
+    container.querySelectorAll('.flow-node').forEach((el) => {
+        el.classList.remove('flow-node-warning');
+        el.removeAttribute('data-flow-lint');
+        el.querySelectorAll('.flow-node-lint-flag').forEach((x) => x.remove());
+    });
+
+    const allTitles = [];
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+    issuesByNode.forEach((msgs, nid) => {
+        const n = nodeById.get(nid);
+        const el = n ? n.el : flowCanvasNodeById(nid);
+        if (!el) return;
+        el.classList.add('flow-node-warning');
+        const tip = msgs.join(' ');
+        el.setAttribute('data-flow-lint', tip);
+        const flag = document.createElement('span');
+        flag.className = 'flow-node-lint-flag';
+        flag.textContent = '⚠';
+        flag.title = tip;
+        flag.setAttribute('aria-label', tip);
+        flag.setAttribute('role', 'img');
+        el.appendChild(flag);
+        msgs.forEach((m) => allTitles.push(m));
+    });
+
+    if (statusEl) {
+        if (alertCount === 0) {
+            statusEl.textContent = '✅ Fluxo Saudável';
+            statusEl.classList.remove('flow-lint-status--warn');
+            statusEl.title = 'Sem problemas de entrada/saída nos blocos.';
+        } else {
+            statusEl.textContent = '⚠️ ' + alertCount + (alertCount === 1 ? ' alerta' : ' alertas');
+            statusEl.classList.add('flow-lint-status--warn');
+            statusEl.title = allTitles.slice(0, 12).join(' · ') + (allTitles.length > 12 ? '…' : '');
+        }
+    }
+
+    return { alertCount, issuesByNode };
+}
+
 function extractFlowGraphFromDom() {
     const nodes = [];
     document.querySelectorAll('#nodes-container .flow-node').forEach((el) => {
@@ -6686,6 +6873,7 @@ function deserializeFlowCanvas(doc) {
     requestAnimationFrame(() => {
         redrawFlowEdges();
         updateFlowMinimap();
+        flowScheduleLint();
     });
     return true;
 }
