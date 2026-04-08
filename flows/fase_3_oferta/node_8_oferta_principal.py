@@ -299,6 +299,15 @@ def _resolver_link_ticket(meta: dict, config: dict, link_fallback: str, ticket: 
     cached = normalizar_link_para_envio(str(meta.get(key) or ""), instagram_mode=False)
     if cached:
         return cached
+    # URLs estáticas por ticket (.env CHECKOUT_URL_65 / _100 / _130) — têm prioridade sobre API Cakto.
+    cup = (config or {}).get("checkout_urls") or {}
+    if isinstance(cup, dict):
+        static_raw = str(cup.get(str(int(ticket))) or "").strip()
+        if static_raw:
+            norm = normalizar_link_para_envio(static_raw, instagram_mode=False)
+            if norm:
+                meta[key] = norm
+                return norm
     ck = (config or {}).get("cakto") or {}
     cli = _cakto_client_from_config(config)
     if not cli:

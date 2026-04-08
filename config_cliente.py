@@ -96,12 +96,30 @@ def carregar() -> dict:
     p_orig = _obter_limpo("CLIENTE_VALOR_TOTAL",       "CLIENTE_PRECO_ORIGINAL",  "360")
     
     # ── MAPEAMENTO DE LINKS E MÍDIA ──
-    # Checkout: só URLs do .env (nada de domínio genérico da plataforma no código).
+    # Checkout por ticket (A/B): CHECKOUT_URL_65 / _100 / _130 — alinhados ao node8_ticket_atual.
+    checkout_urls: dict[str, str] = {}
+    for _tk in (130, 100, 65, 50, 40, 30):
+        _raw_tk = _obter_limpo(f"CHECKOUT_URL_{_tk}", None, "").strip()
+        if _raw_tk:
+            checkout_urls[str(_tk)] = _normalizar_url_https(_raw_tk)
+
+    # Checkout único (fallback genérico e negociação sem URL específica).
     _chk = (
         _obter_limpo("LINK_CHECKOUT", "CHECKOUT_URL", "")
         or _obter_limpo("CAKTO_CHECKOUT_URL", "CLIENTE_LINK_PAGAMENTO", "")
     )
-    link_pgto = _normalizar_url_https(_chk) if _chk else "[LINK_NÃO_CONFIGURADO]"
+    if _chk:
+        link_pgto = _normalizar_url_https(_chk)
+    elif checkout_urls:
+        # Sem LINK_CHECKOUT: usa faixa “cheia” como default (130 > 100 > 65).
+        link_pgto = (
+            checkout_urls.get("130")
+            or checkout_urls.get("100")
+            or checkout_urls.get("65")
+            or next(iter(checkout_urls.values()))
+        )
+    else:
+        link_pgto = "[LINK_NÃO_CONFIGURADO]"
 
     _link_ds_raw = _obter_limpo("CLIENTE_LINK_DOWNSELL", None, "").strip()
     if not _link_ds_raw:
@@ -237,6 +255,7 @@ def carregar() -> dict:
 
         # Links e Prova Social
         "link_pagamento":    link_pgto,
+        "checkout_urls":     checkout_urls,
         "link_downsell":     link_downsell,
         "link_prova_social": link_prova_social,
         "imagem_perfil_instagram": (
@@ -318,6 +337,11 @@ def carregar() -> dict:
         config.get("inbox_max_retries_busy"),
         config.get("inbox_max_tamanho_fila_por_lead"),
     )
+    if config.get("checkout_urls"):
+        logger.info(
+            "📎 [CONFIG] CHECKOUT_URL_* por faixa (R$): %s",
+            ", ".join(sorted(config["checkout_urls"].keys(), key=lambda x: int(x))),
+        )
     logger.info(
         "🧾 [CONFIG] Cakto API: %s | offer_id=%s | offer_slug=%s",
         "ok" if config["cakto"]["enabled"] else "desativada",

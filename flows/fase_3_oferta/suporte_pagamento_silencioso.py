@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import random
 import re
-from typing import List
+from typing import List, Optional
 
 from schema import Acao
 from copy_sanitizer import normalizar_link_para_envio, preparar_texto_envio
@@ -45,10 +45,23 @@ def node_e_checkout_silencioso(node: str) -> bool:
     return (node or "").strip().lower() in _NODES_CHECKOUT
 
 
-def link_efetivo_para_node(node_atual: str, config: dict) -> str:
+def link_efetivo_para_node(
+    node_atual: str, config: dict, metadata: Optional[dict] = None
+) -> str:
     cfg = config if isinstance(config, dict) else {}
+    meta = metadata if isinstance(metadata, dict) else {}
     n = (node_atual or "").lower()
-    if "downsell" in n:
+    ticket = int(meta.get("node8_ticket_atual", meta.get("node8_ticket_inicial", 0)) or 0)
+    cup = cfg.get("checkout_urls") or {}
+    if (
+        ticket > 0
+        and isinstance(cup, dict)
+        and str(ticket) in cup
+        and (cup.get(str(ticket)) or "").strip()
+        and "downsell" not in n
+    ):
+        raw = str(cup[str(ticket)]).strip()
+    elif "downsell" in n:
         raw = (cfg.get("link_downsell") or cfg.get("link_pagamento") or "").strip()
     else:
         raw = (cfg.get("link_pagamento") or "").strip()

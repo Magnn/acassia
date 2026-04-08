@@ -1209,7 +1209,9 @@ class Engine:
                     ctx.texto_recebido or ""
                 ):
                     cfg = ctx.metadata.get("__config__") or CONFIG_CLIENTE
-                    lk = link_efetivo_para_node(ctx.node_atual, cfg)
+                    lk = link_efetivo_para_node(
+                        ctx.node_atual, cfg, getattr(ctx, "metadata", None) or {}
+                    )
                     logger.info(
                         "event=suporte_checkout_silencioso lead_id=%s node=%s",
                         lead.id,

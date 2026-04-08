@@ -79,6 +79,9 @@ def _resolver_link_checkout_recuperacao(metadata: dict, config: dict) -> str:
     candidatos = []
     if ticket > 0:
         candidatos.append(str(metadata.get(f"node8_checkout_link_{ticket}") or "").strip())
+        cup = (config or {}).get("checkout_urls") or {}
+        if isinstance(cup, dict):
+            candidatos.append(str(cup.get(str(ticket)) or "").strip())
     candidatos.extend(
         [
             str(metadata.get("node8_checkout_link") or "").strip(),
