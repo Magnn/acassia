@@ -341,6 +341,11 @@ def _classificar_universo(ctx, meta: dict, desabafo: str) -> str:
     return "geral"
 
 
+def _classificar_universo_rapido(desabafo: str) -> str:
+    """Classificação somente por regex (sem IA) para turnos silenciosos/objetivos."""
+    return _classificar_universo_por_regex(desabafo or "")
+
+
 def _delay_digitacao(texto: str) -> int:
     return max(7, min(len(str(texto)) // 15, 22)) if texto else 6
 
@@ -827,14 +832,21 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
         if meta.get("foto_recebida") and meta.get("desabafo_recebido"):
             desabafo = meta.get("desabafo_original", "")
-            meta["universo_desejo"] = _classificar_universo(ctx, meta, desabafo)
+            # Fast-path: em turno de mídia/silencioso, evita chamada IA cara só para classificar universo.
+            if not (msg_lead or "").strip() and bool(meta.get("universo_desejo")):
+                universo = str(meta.get("universo_desejo") or "geral")
+            elif not (msg_lead or "").strip():
+                universo = _classificar_universo_rapido(desabafo)
+            else:
+                universo = _classificar_universo(ctx, meta, desabafo)
+            meta["universo_desejo"] = universo
             meta["node3_estado"] = "aguardando_desejo"
             ctx.estado_coleta = "node3_camada2_desejo"
             meta["node3_percepcoes_multas"] = ""
             acoes_c2: List[Acao] = [
-                Acao(tipo="delay", segundos=delay_dramatico()),
+                Acao(tipo="delay", segundos=random.randint(6, 10)),
                 Acao(tipo="text", conteudo=_FECHAMENTO_CAMADA2_PRESENCA),
-                Acao(tipo="delay", segundos=random.randint(10, 18)),
+                Acao(tipo="delay", segundos=random.randint(6, 10)),
                 Acao(tipo="text", conteudo=_FECHAMENTO_CAMADA2_DIRECAO),
             ]
             ctx.metadata = meta

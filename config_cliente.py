@@ -109,7 +109,7 @@ def carregar() -> dict:
     link_downsell = _normalizar_url_https(_link_ds_raw)
 
     _ig_raw = _obter_limpo("LINK_INSTAGRAM", "CLIENTE_LINK_PROVA_SOCIAL", "") or _obter_limpo(
-        "INSTAGRAM_URL", "URL_INSTAGRAM", ""
+        "INSTAGRAM_URL", "URL_INSTAGRAM", "https://www.instagram.com/meumisterio_oficial/"
     )
     link_prova_social = _normalizar_url_https(_ig_raw) if _ig_raw else ""
 
@@ -239,10 +239,10 @@ def carregar() -> dict:
         "link_pagamento":    link_pgto,
         "link_downsell":     link_downsell,
         "link_prova_social": link_prova_social,
-        "imagem_perfil_instagram": _obter_limpo(
-            "CLIENTE_IMAGEM_PERFIL_INSTAGRAM",
-            "IMAGEM_PERFIL_INSTAGRAM_URL",
-            "",
+        "imagem_perfil_instagram": (
+            _obter_limpo("CLIENTE_IMAGEM_PERFIL_INSTAGRAM", "IMAGEM_PERFIL_INSTAGRAM_URL", "")
+            or _obter_limpo("CLIENTE_IMAGEM_INSTAGRAM", "INSTAGRAM_PROFILE_IMAGE_URL", "")
+            or _obter_limpo("CLIENTE_FOTO_PERFIL_INSTAGRAM", None, "")
         ),
         "imagem_altar":      _obter_limpo("CLIENTE_IMAGEM_ALTAR", None, ""),
         "depoimentos_urls":  depoimentos,

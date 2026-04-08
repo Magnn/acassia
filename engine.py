@@ -970,6 +970,35 @@ class Engine:
         return False
 
     @staticmethod
+    def _resumo_acoes_turno(acoes: list[Acao]) -> dict:
+        resumo = {
+            "total": 0,
+            "textos": 0,
+            "delays": 0,
+            "midias": 0,
+            "audios_tts": 0,
+            "vcards": 0,
+            "delay_total_s": 0,
+        }
+        for acao in acoes or []:
+            tipo = str(getattr(acao, "tipo", "") or "").strip().lower()
+            if not tipo:
+                continue
+            resumo["total"] += 1
+            if tipo == "text":
+                resumo["textos"] += 1
+            elif tipo == "delay":
+                resumo["delays"] += 1
+                resumo["delay_total_s"] += int(getattr(acao, "segundos", 0) or 0)
+            elif tipo in {"image", "video"}:
+                resumo["midias"] += 1
+            elif tipo in {"audio", "tts"}:
+                resumo["audios_tts"] += 1
+            elif tipo == "vcard":
+                resumo["vcards"] += 1
+        return resumo
+
+    @staticmethod
     def _dedup_db_desligado_para_node(node: str) -> bool:
         """
         Estados silenciosos costumam reutilizar o mesmo ack fixo; dedup curto (90s) suprimia
@@ -1203,6 +1232,20 @@ class Engine:
                     elapsed_node,
                     len(res or []),
                     prox,
+                )
+                resumo_turno = self._resumo_acoes_turno(list(res or []))
+                logger.info(
+                    "event=node_turn_telemetry lead_id=%s node=%s total=%s textos=%s delays=%s delay_total_s=%s midias=%s audios_tts=%s vcards=%s pergunta_final=%s",
+                    lead.id,
+                    current_id,
+                    resumo_turno["total"],
+                    resumo_turno["textos"],
+                    resumo_turno["delays"],
+                    resumo_turno["delay_total_s"],
+                    resumo_turno["midias"],
+                    resumo_turno["audios_tts"],
+                    resumo_turno["vcards"],
+                    self._ultima_fala_do_bot_e_pergunta(list(res or [])),
                 )
                 if elapsed_node > sla_warn_s:
                     logger.warning(

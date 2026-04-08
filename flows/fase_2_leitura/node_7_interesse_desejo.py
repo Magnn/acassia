@@ -100,15 +100,24 @@ def _assinar_semantica_curta(texto: str) -> str:
 
 def _aplicar_framework_fechamento(blocos: list[str], nome_fmt: str) -> list[str]:
     base = [str(b or "").strip() for b in (blocos or []) if str(b or "").strip()]
+    q1_opcoes = [
+        f"{nome_fmt}, você quer resolver isso?",
+        f"{nome_fmt}, você quer encerrar esse ciclo de uma vez?",
+        f"{nome_fmt}, você quer mudar isso de verdade agora?",
+    ]
+    q2_opcoes = [
+        "Se eu te mostrar um caminho claro, você topa seguir?",
+        "Se eu te mostrar o passo a passo certo, você topa ir comigo?",
+        "Se eu te explicar o caminho com clareza, você topa fazer do jeito certo?",
+    ]
+    q1 = random.choice(q1_opcoes)
+    q2 = random.choice(q2_opcoes)
     if not base:
-        return [
-            f"{nome_fmt}, você quer resolver isso?",
-            "Se eu te mostrar um caminho claro, você topa seguir?",
-        ]
+        return [q1, q2]
     if len(base) == 1:
-        return base + ["Se eu te mostrar um caminho claro, você topa seguir?"]
-    base[-2] = f"{nome_fmt}, você quer resolver isso?"
-    base[-1] = "Se eu te mostrar um caminho claro, você topa seguir?"
+        return base + [q2]
+    base[-2] = q1
+    base[-1] = q2
     return base
 
 
@@ -384,5 +393,13 @@ def executar_v2(ctx) -> tuple:
 
     ctx.estado_coleta = "node7_agitacao_enviada"
     ctx.metadata = meta
+    total_textos = sum(1 for a in acoes if getattr(a, "tipo", "") == "text")
+    total_delays = sum(int(getattr(a, "segundos", 0) or 0) for a in acoes if getattr(a, "tipo", "") == "delay")
+    logger.info(
+        "event=node7_telemetria_turno blocos_enviados=%s textos=%s delay_total_s=%s",
+        len(blocos_gerados),
+        total_textos,
+        total_delays,
+    )
     logger.info(f"🔥 [NODE 7 v17] Agitação finalizada para {nome_fmt}.")
     return acoes, "8_oferta_principal"

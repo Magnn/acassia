@@ -126,13 +126,25 @@ def montar_acoes_suporte_checkout(
         )
 
     acoes.append(Acao(tipo="delay", segundos=random.randint(6, 11)))
+    fechamento_opcoes = [
+        "Se ainda falhar, manda um print ou a mensagem de erro em uma frase que eu te oriento no próximo passo. Combinado?",
+        "Se aparecer qualquer erro de novo, me manda um print que eu te guio no próximo passo, tudo bem?",
+        "Se continuar travando, me manda em uma frase o erro que eu te ajudo a destravar agora, pode ser?",
+    ]
     acoes.append(
         Acao(
             tipo="text",
-            conteudo=(
-                "Se ainda falhar, manda um print ou a mensagem de erro em uma frase "
-                "que eu te oriento no próximo passo. Combinado?"
-            ),
+            conteudo=random.choice(fechamento_opcoes),
+            metadata={"skip_gancho_final": True},
         )
+    )
+    total_textos = sum(1 for a in acoes if getattr(a, "tipo", "") == "text")
+    total_delays = sum(int(getattr(a, "segundos", 0) or 0) for a in acoes if getattr(a, "tipo", "") == "delay")
+    logger.info(
+        "event=suporte_checkout_telemetria node=%s textos=%s delay_total_s=%s tem_link=%s",
+        node_atual,
+        total_textos,
+        total_delays,
+        tem_link,
     )
     return acoes

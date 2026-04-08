@@ -128,15 +128,24 @@ def _aplicar_framework_fechamento(blocos: list[str], nome_fmt: str) -> list[str]
     2) Se eu te mostrar um caminho claro, você topa seguir?
     """
     base = [str(b or "").strip() for b in (blocos or []) if str(b or "").strip()]
+    q1_opcoes = [
+        f"{nome_fmt}, você quer resolver isso?",
+        f"{nome_fmt}, você quer encerrar esse ciclo de uma vez?",
+        f"{nome_fmt}, você quer mudar isso de verdade agora?",
+    ]
+    q2_opcoes = [
+        "Se eu te mostrar um caminho claro, você topa seguir?",
+        "Se eu te mostrar o passo a passo certo, você topa ir comigo?",
+        "Se eu te explicar o caminho com clareza, você topa fazer do jeito certo?",
+    ]
+    q1 = random.choice(q1_opcoes)
+    q2 = random.choice(q2_opcoes)
     if not base:
-        return [
-            f"{nome_fmt}, você quer resolver isso?",
-            "Se eu te mostrar um caminho claro, você topa seguir?",
-        ]
+        return [q1, q2]
     if len(base) == 1:
-        return base + ["Se eu te mostrar um caminho claro, você topa seguir?"]
-    base[-2] = f"{nome_fmt}, você quer resolver isso?"
-    base[-1] = "Se eu te mostrar um caminho claro, você topa seguir?"
+        return base + [q2]
+    base[-2] = q1
+    base[-1] = q2
     return base
 
 
@@ -388,6 +397,9 @@ def executar_v2(ctx) -> tuple:
         ]
 
     blocos_gerados = _aplicar_framework_fechamento(blocos_gerados, nome_fmt)
+    if len(blocos_gerados) > 9:
+        # Ritmo de WhatsApp: reduz carga sem perder progressão.
+        blocos_gerados = blocos_gerados[:7] + blocos_gerados[-2:]
     acoes = []
     
     if img_altar:
@@ -461,10 +473,18 @@ def executar_v2(ctx) -> tuple:
                 acoes.append(Acao(tipo="delay", segundos=14))
             else:
                 acoes.append(Acao(tipo="text", conteudo=pedaco))
-                pausa_pos = 16 if num_bloco in _INDICES_IMPACTO else 9
+                pausa_pos = 12 if num_bloco in _INDICES_IMPACTO else 7
                 acoes.append(Acao(tipo="delay", segundos=pausa_pos))
 
     ctx.estado_coleta = "node6_leitura_enviada"
     ctx.metadata = meta
+    total_textos = sum(1 for a in acoes if getattr(a, "tipo", "") == "text")
+    total_delays = sum(int(getattr(a, "segundos", 0) or 0) for a in acoes if getattr(a, "tipo", "") == "delay")
+    logger.info(
+        "event=node6_telemetria_turno blocos_enviados=%s textos=%s delay_total_s=%s",
+        len(blocos_gerados),
+        total_textos,
+        total_delays,
+    )
     logger.info(f"🔮 [NODE 6 v15] Leitura enviada para {nome_fmt}.")
     return acoes, "7_interesse_desejo"

@@ -39,6 +39,27 @@ def _calcular_delay_humano(texto: str) -> int:
     return max(7, min(tempo, 15))
 
 
+def _fechamento_recuperacao_variavel(nome_fmt: str, tentativa: int) -> str:
+    if tentativa == 1:
+        opcoes = [
+            "Se travou em algum ponto, me diz em uma frase que eu te ajudo agora?",
+            f"{nome_fmt}, quer que eu te explique o próximo passo em 1 minuto?",
+            "Se você quiser, eu simplifico tudo em uma mensagem curta, pode ser?",
+        ]
+    elif tentativa == 2:
+        opcoes = [
+            "Se fizer sentido para você, eu te envio o caminho certo agora?",
+            "Quer que eu te mande o link novamente e te acompanhe até finalizar?",
+            "Você quer resolver isso hoje com calma e clareza?",
+        ]
+    else:
+        opcoes = [
+            "Se quiser retomar depois, me chama com calma.",
+            "Quando quiser reabrir esse processo, me chama aqui.",
+        ]
+    return random.choice(opcoes)
+
+
 def executar_v2(ctx, tentativa: int = 1) -> tuple:
     # 1. Resgate de Inteligência (Dados do Maestro - Node 5)
     metadata = getattr(ctx, "metadata", {}) or {}
@@ -80,7 +101,11 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
             Acao(tipo="delay", segundos=_calcular_delay_humano(txt4)),
             Acao(tipo="text", conteudo=txt4),
             Acao(tipo="delay", segundos=random.randint(8, 12)),
-            Acao(tipo="text", conteudo="Se tiver qualquer dúvida antes de firmar, me fala em uma frase que eu te ajudo."),
+            Acao(
+                tipo="text",
+                conteudo=_fechamento_recuperacao_variavel(nome_fmt, 1),
+                metadata={"skip_gancho_final": True},
+            ),
         ]
         proximo_node = "aguardando_pagamento"
 
@@ -107,6 +132,12 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
                 conteudo=str(link_pagamento).strip(),
                 metadata={"skip_gancho_final": True},
             ),
+            Acao(tipo="delay", segundos=random.randint(6, 10)),
+            Acao(
+                tipo="text",
+                conteudo=_fechamento_recuperacao_variavel(nome_fmt, 2),
+                metadata={"skip_gancho_final": True},
+            ),
         ]
         proximo_node = "aguardando_pagamento"
 
@@ -122,7 +153,7 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
             Acao(tipo="delay", segundos=random.randint(12, 18)),
             Acao(tipo="text", conteudo=txt_f2),
             Acao(tipo="delay", segundos=random.randint(10, 15)),
-            Acao(tipo="text", conteudo="Se quiser retomar depois, me chama com calma. Sem pressão, só clareza."),
+            Acao(tipo="text", conteudo=_fechamento_recuperacao_variavel(nome_fmt, 3)),
             Acao(tipo="delay", segundos=random.randint(6, 10)),
             Acao(
                 tipo="text",
@@ -139,5 +170,13 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
 
     ctx.estado_coleta = f"node9_recuperacao_t{tentativa}"
     ctx.metadata = metadata
-    logger.info("event=node9_recuperacao tentativa=%s lead=%s", tentativa, nome_fmt)
+    total_textos = sum(1 for a in acoes if getattr(a, "tipo", "") == "text")
+    total_delays = sum(int(getattr(a, "segundos", 0) or 0) for a in acoes if getattr(a, "tipo", "") == "delay")
+    logger.info(
+        "event=node9_recuperacao tentativa=%s lead=%s textos=%s delay_total_s=%s",
+        tentativa,
+        nome_fmt,
+        total_textos,
+        total_delays,
+    )
     return acoes, proximo_node

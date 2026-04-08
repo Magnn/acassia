@@ -274,6 +274,24 @@ def _ponte_emocional_preco(nome_fmt: str, dor: str, tempo_ctx: str, ancora_quer:
     )
 
 
+def _cta_firmo_variavel(nome_fmt: str, ticket: int) -> str:
+    opcoes = [
+        (
+            f"{nome_fmt}, se fizer sentido pra você, escreve *FIRMO* e eu te envio o link "
+            f"no valor de R$ {ticket} na próxima mensagem, tudo bem?"
+        ),
+        (
+            f"Se você quiser seguir no valor de R$ {ticket}, me chama com *FIRMO* "
+            "que eu já te mando o checkout em seguida, pode ser?"
+        ),
+        (
+            f"{nome_fmt}, quando você decidir avançar em R$ {ticket}, escreve *FIRMO* "
+            "e eu te envio o link agora, combinado?"
+        ),
+    ]
+    return random.choice(opcoes)
+
+
 def _resolver_link_ticket(meta: dict, config: dict, link_fallback: str, ticket: int) -> str:
     key = f"node8_checkout_link_{int(ticket)}"
     cached = normalizar_link_para_envio(str(meta.get(key) or ""), instagram_mode=False)
@@ -601,7 +619,10 @@ def executar_v2(ctx) -> tuple:
             ]
             return acoes, "aguardando_pagamento"
 
-        nudge = f"Quando quiser dar o passo no valor de R$ {int(meta.get('node8_ticket_atual', ticket_inicial) or ticket_inicial)}, escreve *FIRMO* que eu te mando o link na hora. 🙏"
+        nudge = _cta_firmo_variavel(
+            nome_fmt,
+            int(meta.get("node8_ticket_atual", ticket_inicial) or ticket_inicial),
+        )
         ctx.metadata = meta
         return (
             [
@@ -782,11 +803,15 @@ def executar_v2(ctx) -> tuple:
     meta["node8_ticket_inicial"] = int(meta.get("node8_ticket_inicial", ticket_inicial) or ticket_inicial)
     ctx.estado_coleta = "node8_oferta_enviada"
     ctx.metadata = meta
+    total_textos = sum(1 for a in acoes if getattr(a, "tipo", "") == "text")
+    total_delays = sum(int(getattr(a, "segundos", 0) or 0) for a in acoes if getattr(a, "tipo", "") == "delay")
     logger.info(
-        "event=node8_oferta_ok lead=%s blocos=%s fase=esperando_firmo ticket=%s",
+        "event=node8_oferta_ok lead=%s blocos=%s fase=esperando_firmo ticket=%s textos=%s delay_total_s=%s",
         nome_fmt,
         len(blocos_gerados),
         meta.get("node8_ticket_atual"),
+        total_textos,
+        total_delays,
     )
 
     return acoes, "8_oferta_principal"

@@ -50,6 +50,7 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|card|cart[aã]o\s+de\s+contato)"
 )
+_IG_CANONICO_CIGANA = "https://www.instagram.com/meumisterio_oficial/"
 
 
 def _handle_instagram_para_fallback(link_ig: str) -> str:
@@ -103,7 +104,7 @@ def _normalizar_link_ig(link_raw: str) -> str:
     link = normalizar_link_para_envio(link_raw, instagram_mode=True)
     link = preparar_texto_envio(link, "node4_link_ig").strip()
     if not link:
-        return ""
+        return _IG_CANONICO_CIGANA
     if _RE_LINK_VALIDO.match(link):
         # Preferir perfil (não reel/página interna) para manter URL estável.
         if _RE_LINK_INSTAGRAM_ESTRITO.match(link):
@@ -118,8 +119,24 @@ def _normalizar_link_ig(link_raw: str) -> str:
     m_handle = re.search(r"@([A-Za-z0-9._]+)", link_raw or "")
     if m_handle:
         return f"https://www.instagram.com/{m_handle.group(1)}/"
-    logger.warning("[NODE 4] link_prova_social do .env com formato duvidoso (não enviado): %s", link[:120])
-    return ""
+    logger.warning("[NODE 4] link_prova_social inválido no .env. Usando canônico da Cigana.")
+    return _IG_CANONICO_CIGANA
+
+
+def _encurtar_balao_node4(texto: str, limite: int = 170) -> str:
+    t = re.sub(r"\s+", " ", str(texto or "")).strip()
+    if len(t) <= limite:
+        return t
+    corte = t[:limite]
+    ult = max(corte.rfind("."), corte.rfind("?"), corte.rfind("!"))
+    if ult >= 50:
+        corte = corte[: ult + 1]
+    else:
+        ws = corte.rfind(" ")
+        if ws >= 40:
+            corte = corte[:ws].rstrip(" ,;:-")
+        corte = corte.rstrip() + "..."
+    return corte
 
 
 def _acoes_texto_e_url_instagram(link_ig: str, imagem_perfil_ig: str = "") -> List[Acao]:
@@ -139,9 +156,7 @@ def _acoes_texto_e_url_instagram(link_ig: str, imagem_perfil_ig: str = "") -> Li
                 metadata={"skip_gancho_final": True},
             ),
         ]
-    out = [
-        Acao(tipo="delay", segundos=random.randint(6, 10)),
-    ]
+    out = [Acao(tipo="delay", segundos=random.randint(4, 7))]
     if (imagem_perfil_ig or "").strip():
         out.extend(
             [
@@ -153,12 +168,10 @@ def _acoes_texto_e_url_instagram(link_ig: str, imagem_perfil_ig: str = "") -> Li
         Acao(
             tipo="text",
             conteudo=(
-                "Esse perfil é onde eu deixo um pouco do templo: trabalho, depoimentos e quem já passou por aqui. "
-                "O acesso direto é este:"
+                "Esse é o perfil do templo, com depoimentos e o trabalho. Acesso direto:"
             ),
             metadata={"skip_gancho_final": True},
         ),
-        Acao(tipo="delay", segundos=random.randint(4, 8)),
         Acao(
             tipo="text",
             conteudo=link_ig.strip(),
@@ -279,22 +292,25 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     break
 
             if len(baloes_limpos) >= 2:
-                acoes = [Acao(tipo="delay", segundos=max(6, min(len(desabafo_prompt) // 20, 10)))]
+                acoes = [Acao(tipo="delay", segundos=max(5, min(len(desabafo_prompt) // 24, 8)))]
                 
                 for b in baloes_limpos:
-                    acoes.append(Acao(tipo="delay", segundos=_delay_digitacao(b)))
+                    acoes.append(Acao(tipo="delay", segundos=max(5, _delay_digitacao(b) - 2)))
+                    b_seguro = _encurtar_balao_node4(b)
                     acoes.append(
                         Acao(
                             tipo="text",
-                            conteudo=b,
+                            conteudo=b_seguro,
                             metadata={"skip_gancho_final": True},
                         )
                     )
 
                 acoes.extend(_acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig))
 
-                hook = f"Quando passar por lá, {nome_fmt}, o que bateu mais forte no teu peito?"
-                acoes.append(Acao(tipo="delay", segundos=random.randint(12, 20)))
+                hook = _encurtar_balao_node4(
+                    f"Quando passar por lá, {nome_fmt}, o que bateu mais forte no teu peito?"
+                )
+                acoes.append(Acao(tipo="delay", segundos=random.randint(7, 12)))
                 acoes.append(Acao(tipo="text", conteudo=hook, metadata={"skip_gancho_final": True}))
 
                 meta["insta_enviado"] = True

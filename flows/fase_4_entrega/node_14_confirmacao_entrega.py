@@ -21,6 +21,16 @@ from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
 
+
+def _pergunta_dados_altar(voc: str) -> str:
+    opcoes = [
+        f"Para eu fazer a consagração com precisão, {voc}, me envia seu nome completo e data de nascimento?",
+        f"{voc}, para eu fechar seu altar do jeito certo, me manda seu nome completo e sua data de nascimento?",
+        f"Me confirma aqui, {voc}: qual seu nome completo e sua data de nascimento para eu iniciar agora?",
+    ]
+    return random.choice(opcoes)
+
+
 def executar_v2(ctx) -> tuple:
     nome = (ctx.nome_lead or "").strip() or VOCATIVO_SEM_NOME
     meta = getattr(ctx, "metadata", {}) or {}
@@ -49,16 +59,27 @@ def executar_v2(ctx) -> tuple:
         
         # Pedido de dados para o ritual
         Acao(tipo="delay", segundos=random.randint(14, 22)),
-        Acao(tipo="text", conteudo="Para eu fazer a consagração perfeita e colocar o seu nome no trabalho de forma definitiva, escreva aqui o seu nome completo e a data de nascimento."),
+        Acao(
+            tipo="text",
+            conteudo=_pergunta_dados_altar(voc),
+            metadata={"skip_gancho_final": True},
+        ),
         Acao(tipo="delay", segundos=random.randint(4, 7)),
-        Acao(tipo="text", conteudo="Se houver outra pessoa no meio da história, pode incluir o nome dela também."),
-        
-        # Fechamento acolhedor
-        Acao(tipo="delay", segundos=random.randint(8, 12)),
-        Acao(tipo="text", conteudo="Estou a aguardar com todo o carinho para dar início a tudo! 🔮")
+        Acao(
+            tipo="text",
+            conteudo="Se houver outra pessoa no meio da história, pode incluir o nome dela também, combinado?",
+            metadata={"skip_gancho_final": True},
+        ),
     ]
-    
-    logger.info("event=node14_pos_venda_ok lead=%s", nome)
+
+    total_textos = sum(1 for a in acoes if getattr(a, "tipo", "") == "text")
+    total_delays = sum(int(getattr(a, "segundos", 0) or 0) for a in acoes if getattr(a, "tipo", "") == "delay")
+    logger.info(
+        "event=node14_pos_venda_ok lead=%s textos=%s delay_total_s=%s",
+        nome,
+        total_textos,
+        total_delays,
+    )
 
     ctx.estado_coleta = "node14_pos_pagamento_boas_vindas"
     # Mantém o lead no estado de pausa "aguardando_dados_altar"
