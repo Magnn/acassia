@@ -791,7 +791,13 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     acoes_fb: List[Acao] = [Acao(tipo="delay", segundos=random.randint(2, 4))]
     for t in textos_node1:
         acoes_fb.append(Acao(tipo="delay", segundos=max(3, _delay_digitacao(t) - 1)))
-        acoes_fb.append(Acao(tipo="text", conteudo=t))
+        acoes_fb.append(
+            Acao(
+                tipo="text",
+                conteudo=t,
+                metadata={"skip_gancho_final": True},
+            )
+        )
     ctx.estado_coleta = "node1_recepcao_contrato"
     ctx.metadata["node1_baloes_enviados"] = int(len(textos_node1))
     if _pode_ir_direto_coleta_sem_node2(ctx, nome, blob_ctx):
