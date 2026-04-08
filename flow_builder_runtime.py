@@ -47,31 +47,31 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Gatilho",
         "runtime": "entry",
         "required_config": [],
-        "optional_keys": ("event", "integration", "keyword"),
+        "optional_keys": ("event", "integration", "keyword", "step_name"),
     },
     "webhook": {
         "label": "Webhook",
         "runtime": "entry",
         "required_config": [],
-        "optional_keys": ("path", "method"),
+        "optional_keys": ("path", "method", "step_name"),
     },
     "engine": {
         "label": "Engine",
         "runtime": "system",
         "required_config": [],
-        "optional_keys": (),
+        "optional_keys": ("body", "step_name"),
     },
     "nucleo_ia": {
         "label": "Núcleo IA",
         "runtime": "system",
         "required_config": [],
-        "optional_keys": (),
+        "optional_keys": ("body", "step_name"),
     },
     "motor_ref": {
         "label": "Referência motor Python",
         "runtime": "system",
         "required_config": [],
-        "optional_keys": ("module_hint",),
+        "optional_keys": ("module_hint", "step_name"),
     },
     "conteudo": {
         "label": "Conteúdo",
@@ -95,7 +95,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Delay",
         "runtime": "delay",
         "required_config": (),
-        "optional_keys": ("seconds",),
+        "optional_keys": ("seconds", "body"),
     },
     "condicao": {
         "label": "Condição",
@@ -125,7 +125,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "API HTTP",
         "runtime": "http",
         "required_config": (),
-        "optional_keys": ("url", "method", "headers", "body"),
+        "optional_keys": ("url", "method", "headers", "body", "query_string", "step_name"),
     },
     "gpt": {
         "label": "GPT / LLM",
@@ -155,7 +155,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Fim",
         "runtime": "terminal",
         "required_config": [],
-        "optional_keys": (),
+        "optional_keys": ("step_name",),
     },
     "generic": {
         "label": "Genérico",

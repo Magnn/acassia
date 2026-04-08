@@ -6,6 +6,7 @@ Executor ponta-a-ponta: plano compilado do Flow Builder → lista de Acao (schem
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any, Dict, List, Mapping, Optional
@@ -142,23 +143,55 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
                 sec = 0.0
             sec = max(0.0, min(sec, _MAX_DELAY_S))
             if sec > 0:
-                acoes.append(
-                    Acao(tipo="delay", segundos=int(sec), metadata={"source": "flow_builder"})
-                )
+                dmeta: Dict[str, Any] = {"source": "flow_builder"}
+                note = str(cfg.get("body") or "").strip()
+                if note:
+                    dmeta["delay_note"] = note[:400]
+                acoes.append(Acao(tipo="delay", segundos=int(sec), metadata=dmeta))
             continue
 
         if rk == "http" and _ALLOW_HTTP:
             url = str(cfg.get("url") or "").strip()
             method = str(cfg.get("method") or "GET").upper()
+            qs = str(cfg.get("query_string") or "").strip().lstrip("?")
+            if qs and url and ("https://" in url or "http://" in url):
+                url = url + ("&" if "?" in url else "?") + qs
+            hdrs: Dict[str, str] = {}
+            raw_h = cfg.get("headers")
+            if isinstance(raw_h, str) and raw_h.strip():
+                try:
+                    parsed = json.loads(raw_h)
+                    if isinstance(parsed, dict):
+                        hdrs = {str(k): str(v) for k, v in parsed.items()}
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+            body_raw = str(cfg.get("body") or "").strip()
             if url.startswith("https://") or url.startswith("http://"):
                 try:
-                    r = requests.request(method, url, timeout=8)
+                    req_kw: Dict[str, Any] = {"method": method, "url": url, "timeout": 8}
+                    if hdrs:
+                        req_kw["headers"] = hdrs
+                    if body_raw and method in ("POST", "PUT", "PATCH", "DELETE"):
+                        if body_raw.startswith("{"):
+                            try:
+                                req_kw["json"] = json.loads(body_raw)
+                            except (json.JSONDecodeError, TypeError, ValueError):
+                                req_kw["data"] = body_raw
+                        else:
+                            req_kw["data"] = body_raw
+                    r = requests.request(**req_kw)
                     preview = (r.text or "")[:280]
+                    hmeta: Dict[str, Any] = {
+                        "source": "flow_builder",
+                        "http_status": r.status_code,
+                    }
+                    if hdrs:
+                        hmeta["http_headers_sent"] = True
                     acoes.append(
                         Acao(
                             tipo="text",
-                            conteudo=f"🔧 API {method} {url[:80]}… → HTTP {r.status_code}\n{preview}",
-                            metadata={"source": "flow_builder", "http_status": r.status_code},
+                            conteudo=f"🔧 API {method} {url[:96]}… → HTTP {r.status_code}\n{preview}",
+                            metadata=hmeta,
                         )
                     )
                 except Exception as e:

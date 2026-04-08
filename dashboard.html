@@ -1094,6 +1094,26 @@
             border-color: var(--c-purple);
             color: var(--c-text);
         }
+        .flow-snippet-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 0 0 8px;
+        }
+        .flow-snippet-row button {
+            font-size: 9px;
+            font-weight: 600;
+            padding: 3px 7px;
+            border-radius: 6px;
+            border: 1px solid var(--c-border);
+            background: var(--c-surface2);
+            color: var(--c-muted);
+            cursor: pointer;
+        }
+        .flow-snippet-row button:hover {
+            border-color: var(--c-purple);
+            color: var(--c-text);
+        }
         .conn-dot {
             position: absolute; top: 50%; transform: translateY(-50%);
             width: 14px; height: 14px; border-radius: 50%;
@@ -3827,6 +3847,7 @@ function writeFlowStore(obj) {
 /** Catálogo de tipos de ação (bloco «Ação») — valores persistidos em config.action_kind */
 const FLOW_ACTION_KIND_OPTIONS = [
     { value: 'mensagem_texto', label: 'Enviar mensagem (texto WhatsApp)' },
+    { value: 'template_waba', label: 'Template WhatsApp aprovado (HSM)' },
     { value: 'nota_interna', label: 'Nota interna (equipa)' },
     { value: 'etiqueta_lead', label: 'Etiqueta / tag no lead' },
     { value: 'agendar_followup', label: 'Agendar follow-up' },
@@ -3885,6 +3906,55 @@ function flowDelayPresetClick(btn, seconds) {
     const inp = node.querySelector('[data-flow-cfg="seconds"]');
     if (inp) {
         inp.value = String(seconds);
+        try {
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+        } catch (_) {}
+    }
+    try {
+        pushFlowHistory();
+    } catch (_) {}
+}
+
+/** Insere fragmento na expressão do bloco Condição (estilo n8n / Make) */
+function flowCondicaoSnippet(btn, text) {
+    const node = btn && btn.closest ? btn.closest('.flow-node') : null;
+    if (!node) return;
+    const ta = node.querySelector('[data-flow-cfg="expression"]');
+    if (!ta) return;
+    const cur = ta.value || '';
+    const add = cur && !/\s$/.test(cur) && cur.length ? ' ' + text : text;
+    ta.value = cur + add;
+    try {
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (_) {}
+    try {
+        pushFlowHistory();
+    } catch (_) {}
+}
+
+/** Pesos A/B rápidos */
+function flowDivisaoPresetClick(btn, a, b) {
+    const node = btn && btn.closest ? btn.closest('.flow-node') : null;
+    if (!node) return;
+    const inp = node.querySelector('[data-flow-cfg="weights"]');
+    if (inp) {
+        inp.value = 'A:' + a + ',B:' + b;
+        try {
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+        } catch (_) {}
+    }
+    try {
+        pushFlowHistory();
+    } catch (_) {}
+}
+
+/** Temperatura LLM comum */
+function flowGptTempClick(btn, t) {
+    const node = btn && btn.closest ? btn.closest('.flow-node') : null;
+    if (!node) return;
+    const inp = node.querySelector('[data-flow-cfg="temperature"]');
+    if (inp) {
+        inp.value = String(t);
         try {
             inp.dispatchEvent(new Event('input', { bubbles: true }));
         } catch (_) {}
@@ -8216,7 +8286,7 @@ function flowDefaultConfigByType(type) {
     if (t === 'expediente') return { timezone: 'America/Sao_Paulo', windows: '' };
     if (t === 'notificar') return { channel: 'log', message: '' };
     if (t === 'divisao') return { weights: 'A:50,B:50' };
-    if (t === 'api') return { method: 'GET', url: '', headers: '', body: '' };
+    if (t === 'api') return { method: 'GET', url: '', query_string: '', headers: '', body: '' };
     if (t === 'gpt') return { prompt: '', model: 'gpt-4o-mini', temperature: '0.7' };
     if (t === 'agente_ia') return { instructions: '', model: 'gpt-4o-mini', temperature: '0.5' };
     if (t === 'voice_studio') return { script: '', voice_profile: 'padrao' };
@@ -8231,6 +8301,7 @@ function addSpecificNode(type) {
     node.className = 'flow-node';
     node.setAttribute('data-flow-id', newFlowNodeId());
     node.setAttribute('data-node-type', type || 'generic');
+    node.setAttribute('data-flow-block', type || 'generic');
     try {
         node.setAttribute('data-flow-config', JSON.stringify(flowDefaultConfigByType(type)));
     } catch (_) {
@@ -8241,7 +8312,13 @@ function addSpecificNode(type) {
     node.style.top = (250 + Math.random() * 50) + 'px';
     
     let headerBg, icon, title;
-    if(type === 'conteudo') { headerBg = 'linear-gradient(135deg,#6d28d9,#7c5af5)'; icon = 'fas fa-window-maximize'; title = 'Conteúdo'; }
+    if(type === 'trigger') { headerBg = 'linear-gradient(135deg,#6d28d9,#7c5af5)'; icon = 'fas fa-bolt'; title = 'Gatilho'; }
+    else if(type === 'webhook') { headerBg = 'linear-gradient(135deg,#5b21b6,#7c5af5)'; icon = 'fas fa-link'; title = 'Webhook'; }
+    else if(type === 'engine') { headerBg = 'linear-gradient(135deg,#c2410c,#f97316)'; icon = 'fas fa-microchip'; title = 'Engine'; }
+    else if(type === 'nucleo_ia') { headerBg = 'linear-gradient(135deg,#065f46,#10b981)'; icon = 'fas fa-brain'; title = 'Núcleo IA'; }
+    else if(type === 'motor_ref') { headerBg = 'linear-gradient(135deg,#1d4ed8,#3b82f6)'; icon = 'fas fa-code'; title = 'Motor Python'; }
+    else if(type === 'end') { headerBg = 'linear-gradient(135deg,#475569,#64748b)'; icon = 'fas fa-stop-circle'; title = 'Fim'; }
+    else if(type === 'conteudo') { headerBg = 'linear-gradient(135deg,#6d28d9,#7c5af5)'; icon = 'fas fa-window-maximize'; title = 'Conteúdo'; }
     else if(type === 'pergunta') { headerBg = 'linear-gradient(135deg,#c2410c,#f97316)'; icon = 'fas fa-question'; title = 'Pergunta'; }
     else if(type === 'acao') { headerBg = 'linear-gradient(135deg,#1d4ed8,#3b82f6)'; icon = 'fas fa-bolt'; title = 'Ação'; }
     else if(type === 'delay') { headerBg = 'linear-gradient(135deg,#475569,#64748b)'; icon = 'far fa-clock'; title = 'Delay'; }
@@ -8325,14 +8402,15 @@ function addSpecificNode(type) {
             <textarea class="input-field" data-flow-cfg="payload" placeholder="Texto, JSON ou instrução" style="${ta};height:50px"></textarea>`;
     } else if (type === 'api') {
         bodyFields = `
-            ${fh('HTTP Request (n8n): URL + método + corpo. Chamadas reais no servidor exigem FLOW_BLUEPRINT_ALLOW_HTTP=1.')}
+            ${fh('HTTP (Postman/n8n): URL base + query em GET; headers JSON; corpo JSON. Requer FLOW_BLUEPRINT_ALLOW_HTTP=1 no servidor.')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="url" placeholder="https://…" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="url" placeholder="https://api.exemplo.com/v1/recurso" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="query_string" placeholder="Query string (GET), ex: foo=1&bar=2" class="input-field" style="${fs}">
             <select data-flow-cfg="method" class="input-field" style="${fs}">
                 <option value="GET">GET</option><option value="POST">POST</option><option value="PUT">PUT</option><option value="PATCH">PATCH</option><option value="DELETE">DELETE</option>
             </select>
-            <textarea class="input-field" data-flow-cfg="headers" placeholder='Cabeçalhos (JSON), ex: {"Authorization":"Bearer …"}' style="${ta};height:36px"></textarea>
-            <textarea class="input-field" data-flow-cfg="body" placeholder="Corpo JSON (opcional)" style="${ta};height:40px"></textarea>`;
+            <textarea class="input-field" data-flow-cfg="headers" placeholder='Cabeçalhos JSON: {"Authorization":"Bearer …","Content-Type":"application/json"}' style="${ta};height:36px"></textarea>
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Corpo JSON (POST/PUT/PATCH)" style="${ta};height:40px"></textarea>`;
     } else if (type === 'notificar') {
         bodyFields = `
             ${fh('Alertas a equipa (Slack/Teams/email): escolha o canal e a mensagem.')}
@@ -8347,19 +8425,32 @@ function addSpecificNode(type) {
             <textarea class="input-field" data-flow-cfg="note" placeholder="Anotação interna" style="${ta};height:50px"></textarea>`;
     } else if (type === 'gpt') {
         bodyFields = `
-            ${fh('LLM (Langflow): modelo + temperatura + prompt — execução real depende do motor.')}
+            ${fh('LLM (OpenAI / Langflow): modelo, temperatura e prompt — execução real depende do motor.')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
             <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Modelo</label>
             <select data-flow-cfg="model" class="input-field" style="${fs}">${gptModelOpts}</select>
-            <input type="text" data-flow-cfg="temperature" placeholder="Temperatura 0–2 (ex: 0.7)" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Temperatura (0–2)</label>
+            <input type="number" min="0" max="2" step="0.1" data-flow-cfg="temperature" placeholder="0.7" class="input-field" style="${fs}">
+            <div class="flow-snippet-row">
+                <button type="button" onclick="flowGptTempClick(this,0)">0</button>
+                <button type="button" onclick="flowGptTempClick(this,0.3)">0.3</button>
+                <button type="button" onclick="flowGptTempClick(this,0.7)">0.7</button>
+                <button type="button" onclick="flowGptTempClick(this,1)">1</button>
+            </div>
             <textarea class="input-field" data-flow-cfg="prompt" placeholder="Prompt do sistema / utilizador" style="${ta};height:50px"></textarea>`;
     } else if (type === 'agente_ia') {
         bodyFields = `
-            ${fh('Agente com instruções estáveis (Botpress-style); modelo e temperatura para futura API.')}
+            ${fh('Agente (Botpress / Copilot Studio): persona estável; modelo e temperatura para API futura.')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
             <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Modelo</label>
             <select data-flow-cfg="model" class="input-field" style="${fs}">${gptModelOpts}</select>
-            <input type="text" data-flow-cfg="temperature" placeholder="Temperatura (ex: 0.5)" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Temperatura (0–2)</label>
+            <input type="number" min="0" max="2" step="0.1" data-flow-cfg="temperature" placeholder="0.5" class="input-field" style="${fs}">
+            <div class="flow-snippet-row">
+                <button type="button" onclick="flowGptTempClick(this,0.2)">0.2</button>
+                <button type="button" onclick="flowGptTempClick(this,0.5)">0.5</button>
+                <button type="button" onclick="flowGptTempClick(this,0.8)">0.8</button>
+            </div>
             <textarea class="input-field" data-flow-cfg="instructions" placeholder="Instruções do agente (persona, ferramentas, limites)" style="${ta};height:56px"></textarea>`;
     } else if (type === 'voice_studio') {
         bodyFields = `
@@ -8377,15 +8468,30 @@ function addSpecificNode(type) {
             <textarea class="input-field" data-flow-cfg="question" placeholder="Texto da pergunta ou lista (uma linha por opção)" style="${ta};height:50px"></textarea>`;
     } else if (type === 'condicao') {
         bodyFields = `
-            ${fh('Branching: expressão sobre variáveis (ex. lead.etiqueta, resposta). Ramos reais = ligações no canvas + IDs opcionais.')}
+            ${fh('Branching (Zapier paths): variáveis do contexto; ligue dois fios no canvas para ramos sim/não.')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <div class="flow-snippet-row">
+                <button type="button" onclick="flowCondicaoSnippet(this,'lead.')">lead.</button>
+                <button type="button" onclick="flowCondicaoSnippet(this,'resposta')">resposta</button>
+                <button type="button" onclick="flowCondicaoSnippet(this,'==')">==</button>
+                <button type="button" onclick="flowCondicaoSnippet(this,'!=')">!=</button>
+                <button type="button" onclick="flowCondicaoSnippet(this,'>')">&gt;</button>
+                <button type="button" onclick="flowCondicaoSnippet(this,'<')">&lt;</button>
+                <button type="button" onclick="flowCondicaoSnippet(this,'contem(')">contem(</button>
+            </div>
             <textarea class="input-field" data-flow-cfg="expression" placeholder="Ex: lead.score &gt; 70  ·  resposta == &quot;sim&quot;" style="${ta};height:46px"></textarea>
             <input type="text" data-flow-cfg="true_to" placeholder="ID nó se verdadeiro (opcional)" class="input-field" style="${fs}">
             <input type="text" data-flow-cfg="false_to" placeholder="ID nó se falso (opcional)" class="input-field" style="${fs}">`;
     } else if (type === 'divisao') {
         bodyFields = `
-            ${fh('A/B test: pesos percentuais; no mercado liga-se um fio para cada variante a partir deste bloco.')}
+            ${fh('A/B (Optimizely): pesos; ligue um fio por variante a partir deste bloco.')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <div class="flow-snippet-row">
+                <button type="button" onclick="flowDivisaoPresetClick(this,50,50)">50/50</button>
+                <button type="button" onclick="flowDivisaoPresetClick(this,70,30)">70/30</button>
+                <button type="button" onclick="flowDivisaoPresetClick(this,80,20)">80/20</button>
+                <button type="button" onclick="flowDivisaoPresetClick(this,90,10)">90/10</button>
+            </div>
             <input type="text" data-flow-cfg="weights" placeholder="A:50,B:50 (percentagens)" class="input-field" style="${fs}">`;
     } else if (type === 'expediente') {
         bodyFields = `
