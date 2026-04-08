@@ -754,8 +754,13 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     # ── 2. Name Lock ──
     nome = VOCATIVO_SEM_NOME
     nome_extraido = _extrair_primeiro_nome(blob_ctx)
+    nome_ctx = str(getattr(ctx, "nome_lead", "") or "").strip()
     if nome_extraido:
         nome = nome_extraido
+    elif nome_ctx and not nome_eh_placeholder(nome_ctx):
+        # Reusa nome já conhecido do contexto para não perder burst/checklist.
+        nome = nome_ctx.split()[0].capitalize()
+    if nome != VOCATIVO_SEM_NOME:
         if not hasattr(ctx, "metadata") or ctx.metadata is None:
             ctx.metadata = {}
         ctx.metadata["nome_lead"] = nome

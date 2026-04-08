@@ -1104,8 +1104,9 @@ class Engine:
                     "7_interesse_desejo": int(cfg.get("node7_max_acoes", 30) or 30),
                     "8_oferta_principal": int(cfg.get("node8_max_acoes", 36) or 36),
                 }
-                cap = max(1, int(cap_por_node.get(current_id, 0) or 0))
-                if cap and len(res or []) > cap:
+                cap_raw = int(cap_por_node.get(current_id, 0) or 0)
+                cap = max(1, cap_raw) if cap_raw > 0 else 0
+                if cap > 0 and len(res or []) > cap:
                     res = list((res or [])[:cap])
                     while res and getattr(res[-1], "tipo", "") == "delay":
                         res.pop()
