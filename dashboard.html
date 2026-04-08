@@ -3798,6 +3798,16 @@ function writeFlowStore(obj) {
     localStorage.setItem(_FLOW_STORE_KEY, JSON.stringify(obj));
 }
 
+/** Catálogo de tipos de ação (bloco «Ação») — valores persistidos em config.action_kind */
+const FLOW_ACTION_KIND_OPTIONS = [
+    { value: 'mensagem_texto', label: 'Enviar mensagem (texto WhatsApp)' },
+    { value: 'nota_interna', label: 'Nota interna (equipa)' },
+    { value: 'etiqueta_lead', label: 'Etiqueta / tag no lead' },
+    { value: 'agendar_followup', label: 'Agendar follow-up' },
+    { value: 'transferir_humano', label: 'Transferir para atendente humano' },
+    { value: 'personalizado', label: 'Personalizado (instrução livre)' },
+];
+
 /** Ligações estruturadas + modo conectar (saída → entrada) */
 let _flowEdges = [];
 let _flowConnectSource = null;
@@ -4886,6 +4896,65 @@ function syncFlowFormValuesIntoDom() {
     });
 }
 
+/**
+ * Análise de conectividade do grafo (cliente) — alinha avisos ao que o compilador espera.
+ * @returns {{ warnings: string[] }}
+ */
+function flowAnalyzeGraphStructure(doc) {
+    const warnings = [];
+    const g = doc && doc.graph ? doc.graph : null;
+    if (!g || !Array.isArray(g.nodes)) return { warnings };
+    const nodes = g.nodes;
+    const edges = Array.isArray(g.edges) ? g.edges : [];
+    const ids = new Set(nodes.map((n) => n && n.id).filter(Boolean));
+    const validEdges = edges.filter((e) => e && e.from && e.to && ids.has(e.from) && ids.has(e.to));
+
+    if (nodes.length >= 2 && validEdges.length === 0) {
+        warnings.push('Vários blocos sem ligações. Ligue saída (● direito) → entrada (● esquerdo) para definir a ordem do fluxo.');
+    }
+
+    const indeg = {};
+    const outdeg = {};
+    nodes.forEach((n) => {
+        if (!n || !n.id) return;
+        indeg[n.id] = 0;
+        outdeg[n.id] = 0;
+    });
+    validEdges.forEach((e) => {
+        indeg[e.to] = (indeg[e.to] || 0) + 1;
+        outdeg[e.from] = (outdeg[e.from] || 0) + 1;
+    });
+
+    const roots = nodes.filter((n) => n && n.id && (indeg[n.id] || 0) === 0).map((n) => n.id);
+    const visited = new Set();
+    function walk(id) {
+        if (!id || visited.has(id)) return;
+        visited.add(id);
+        validEdges.filter((e) => e.from === id).forEach((e) => walk(e.to));
+    }
+    roots.forEach((rid) => walk(rid));
+    const unreachable = nodes.filter((n) => n && n.id && !visited.has(n.id)).map((n) => n.id);
+    if (unreachable.length) {
+        warnings.push(
+            'Blocos possivelmente inatingíveis a partir do início: ' +
+                unreachable.slice(0, 5).join(', ') +
+                (unreachable.length > 5 ? '…' : '')
+        );
+    }
+
+    const entryTypes = new Set(['trigger', 'webhook']);
+    roots.forEach((rid) => {
+        const n = nodes.find((x) => x && x.id === rid);
+        if (!n) return;
+        const t = String(n.type || '').toLowerCase();
+        if (entryTypes.has(t) && (outdeg[rid] || 0) === 0) {
+            warnings.push('O gatilho «' + String(n.label || rid).slice(0, 80) + '» não tem ligação de saída para o próximo bloco.');
+        }
+    });
+
+    return { warnings };
+}
+
 function extractFlowGraphFromDom() {
     const nodes = [];
     document.querySelectorAll('#nodes-container .flow-node').forEach((el) => {
@@ -4907,17 +4976,7 @@ function extractFlowGraphFromDom() {
         });
         nodes.push({ id, type, label, x, y, config });
     });
-    let edges = Array.isArray(_flowEdges) ? _flowEdges.map((e) => ({ id: e.id, from: e.from, to: e.to })) : [];
-    if (!edges.length) {
-        const connPaths = document.querySelectorAll('#svg-connections path.conn-path');
-        const sorted = [...nodes].sort((a, b) => a.x - b.x || a.y - b.y);
-        if (connPaths.length > 0 && sorted.length > 1) {
-            const steps = Math.min(connPaths.length, sorted.length - 1);
-            for (let i = 0; i < steps; i++) {
-                edges.push({ id: null, from: sorted[i].id, to: sorted[i + 1].id });
-            }
-        }
-    }
+    const edges = Array.isArray(_flowEdges) ? _flowEdges.map((e) => ({ id: e.id, from: e.from, to: e.to })) : [];
     return { nodes, edges };
 }
 
@@ -4950,6 +5009,15 @@ function hydrateFlowNodeInputsFromConfig() {
             const k = inp.getAttribute('data-flow-cfg');
             if (!k || cfg[k] === undefined || cfg[k] === null) return;
             inp.value = String(cfg[k]);
+            if (inp.tagName === 'SELECT' && k === 'action_kind') {
+                const ok = Array.from(inp.options).some((o) => o.value === inp.value);
+                if (!ok && inp.value) {
+                    const opt = document.createElement('option');
+                    opt.value = inp.value;
+                    opt.textContent = inp.value + ' (legado)';
+                    inp.appendChild(opt);
+                }
+            }
         });
     });
 }
@@ -4981,6 +5049,10 @@ function deserializeFlowCanvas(doc) {
     }
     hydrateFlowNodeInputsFromConfig();
     initDragAndDrop();
+    requestAnimationFrame(() => {
+        redrawFlowEdges();
+        updateFlowMinimap();
+    });
     return true;
 }
 
@@ -5124,6 +5196,8 @@ async function validateFlowDraft(opts = {}) {
     const forDeploy = !!opts.forDeploy;
     const silent = !!opts.silent;
     const doc = serializeFlowCanvas();
+    const graphPre = flowAnalyzeGraphStructure(doc);
+    const clientGraphHints = graphPre.warnings || [];
     try {
         const res = await fetch(`${API}/api/flows/validate`, {
             method: 'POST',
@@ -5133,9 +5207,19 @@ async function validateFlowDraft(opts = {}) {
         const j = await res.json();
         if (!res.ok && !j) throw new Error('validate_failed');
         const errors = Array.isArray(j.errors) ? j.errors : [];
-        const warnings = Array.isArray(j.warnings) ? j.warnings : [];
+        const apiWarnings = Array.isArray(j.warnings) ? j.warnings : [];
+        const warnings = [
+            ...clientGraphHints.map((msg) => ({ level: 'warning', message: msg, code: 'client_graph' })),
+            ...apiWarnings,
+        ];
         if (!silent) {
-            appendFlowBuilderLog('Validação', { ok: !errors.length, errors, warnings, response: j });
+            appendFlowBuilderLog('Validação', {
+                ok: !errors.length,
+                errors,
+                warnings,
+                response: j,
+                graph_hints: clientGraphHints,
+            });
         }
         if (errors.length) {
             const msg = errors.slice(0, 2).map((e) => `• ${e.message}`).join(' ');
@@ -8040,7 +8124,7 @@ function flowDefaultConfigByType(type) {
     if (t === 'motor_ref') return { module_hint: '' };
     if (t === 'conteudo') return { body: '', contents: [] };
     if (t === 'pergunta') return { question: '' };
-    if (t === 'acao') return { action_kind: '', payload: '' };
+    if (t === 'acao') return { action_kind: 'mensagem_texto', payload: '' };
     if (t === 'delay') return { seconds: 3 };
     if (t === 'condicao') return { expression: '' };
     if (t === 'expediente') return { timezone: 'America/Sao_Paulo', windows: '' };
@@ -8118,10 +8202,14 @@ function addSpecificNode(type) {
             <input type="number" min="0" max="86400" step="1" data-flow-cfg="seconds" placeholder="Segundos de espera" class="input-field" style="${fs}">
             <textarea class="input-field" data-flow-cfg="body" placeholder="Nota (opcional)" style="${ta};height:40px"></textarea>`;
     } else if (type === 'acao') {
+        const actOpts = FLOW_ACTION_KIND_OPTIONS.map(
+            (o) => `<option value="${o.value.replace(/"/g, '&quot;')}">${String(o.label).replace(/</g, '')}</option>`
+        ).join('');
         bodyFields = `
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">
-            <input type="text" data-flow-cfg="action_kind" placeholder="Tipo da ação (opcional)" class="input-field" style="${fs}">
-            <textarea class="input-field" data-flow-cfg="payload" placeholder="Payload / instrução da ação" style="${ta};height:50px"></textarea>`;
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Tipo de ação</label>
+            <select data-flow-cfg="action_kind" class="input-field" style="${fs}">${actOpts}</select>
+            <textarea class="input-field" data-flow-cfg="payload" placeholder="Texto / instrução / payload" style="${ta};height:50px"></textarea>`;
     } else if (type === 'api') {
         bodyFields = `
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do Passo..." class="input-field" style="${fs}">

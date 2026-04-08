@@ -125,7 +125,11 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
                 or str(cfg.get("step_name") or "").strip()
             )
             if body:
-                acoes.append(Acao(tipo="text", conteudo=body[:4000], metadata={"source": "flow_builder", "node_type": ntype}))
+                meta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype}
+                ak = str(cfg.get("action_kind") or "").strip()
+                if ak:
+                    meta["action_kind"] = ak
+                acoes.append(Acao(tipo="text", conteudo=body[:4000], metadata=meta))
             continue
 
         if rk == "delay":
