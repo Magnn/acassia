@@ -185,8 +185,9 @@ def _encurtar_balao_node2(texto: str, max_chars: int = _MAX_CHARS_BALAO_NODE2) -
         total += extra
     if out:
         return " ".join(out).strip()
-    curto = t[: max_chars - 1].rsplit(" ", 1)[0].strip()
-    return (curto or t[: max_chars - 1]).strip() + "…"
+    # Se não houver frase completa no limite, não corta no meio.
+    # O engine faz fatiamento seguro posteriormente.
+    return t
 
 
 def _sanear_textos_node2(textos: List[str]) -> List[str]:
@@ -236,7 +237,16 @@ def _normalizar_acoes_texto_node2(acoes: List[Acao]) -> List[Acao]:
             acoes[idx].conteudo = textos[pos]
         else:
             acoes[idx].conteudo = ""
-    return [a for a in acoes if not (a.tipo == "text" and not str(a.conteudo or "").strip())]
+    out = [a for a in acoes if not (a.tipo == "text" and not str(a.conteudo or "").strip())]
+    # Guarda de segurança: evita turno vazio quando filtros removem tudo.
+    if not any(getattr(a, "tipo", "") == "text" and str(getattr(a, "conteudo", "") or "").strip() for a in out):
+        out.append(
+            Acao(
+                tipo="text",
+                conteudo="Vou te guiar com calma por aqui. Assim que salvar meu contato, eu sigo contigo no próximo passo.",
+            )
+        )
+    return out
 
 
 _RE_CONTATO_SALVO_USER = re.compile(

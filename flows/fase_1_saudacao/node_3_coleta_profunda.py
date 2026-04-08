@@ -399,7 +399,15 @@ def _normalizar_acoes_texto_node3(acoes: List[Acao]) -> List[Acao]:
         norm.append(tx)
     for i, idx in enumerate(idx_txt):
         acoes[idx].conteudo = norm[i] if i < len(norm) else ""
-    return [a for a in acoes if not (a.tipo == "text" and not str(a.conteudo or "").strip())]
+    out = [a for a in acoes if not (a.tipo == "text" and not str(a.conteudo or "").strip())]
+    if not any(getattr(a, "tipo", "") == "text" and str(getattr(a, "conteudo", "") or "").strip() for a in out):
+        out.append(
+            Acao(
+                tipo="text",
+                conteudo="Eu sigo aqui com você, no teu ritmo. Me manda em uma mensagem o ponto principal que mais pesa agora?",
+            )
+        )
+    return out
 
 
 def _mime_por_magic_bytes(data: bytes) -> str:
