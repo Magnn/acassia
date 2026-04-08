@@ -366,8 +366,9 @@ def _encurtar_balao_node3(texto: str, max_chars: int = _MAX_CHARS_BALAO_NODE3) -
         total += extra
     if out:
         return " ".join(out).strip()
-    curto = t[: max_chars - 1].rsplit(" ", 1)[0].strip()
-    return (curto or t[: max_chars - 1]).strip() + "…"
+    # Se não há sentença completa dentro do limite, não trunca no meio.
+    # Deixa o engine fatiar depois com segurança por balões.
+    return t
 
 
 def _normalizar_acoes_texto_node3(acoes: List[Acao]) -> List[Acao]:
@@ -388,6 +389,9 @@ def _normalizar_acoes_texto_node3(acoes: List[Acao]) -> List[Acao]:
             tx = _encurtar_balao_node3(tx, _MAX_CHARS_NODE3_EXPLICA)
         else:
             tx = _encurtar_balao_node3(tx, _MAX_CHARS_BALAO_NODE3)
+        # Evita enviar frase pendurada por corte sintático.
+        if re.search(_REGEX_CORTE_FATAL, tx.lower()):
+            continue
         k = re.sub(r"\s+", " ", tx.lower()).strip(" .!?…")
         if k in vistos:
             continue
