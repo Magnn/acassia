@@ -98,6 +98,20 @@ def _assinar_semantica_curta(texto: str) -> str:
     return " ".join(toks[:8])
 
 
+def _aplicar_framework_fechamento(blocos: list[str], nome_fmt: str) -> list[str]:
+    base = [str(b or "").strip() for b in (blocos or []) if str(b or "").strip()]
+    if not base:
+        return [
+            f"{nome_fmt}, você quer resolver isso?",
+            "Se eu te mostrar um caminho claro, você topa seguir?",
+        ]
+    if len(base) == 1:
+        return base + ["Se eu te mostrar um caminho claro, você topa seguir?"]
+    base[-2] = f"{nome_fmt}, você quer resolver isso?"
+    base[-1] = "Se eu te mostrar um caminho claro, você topa seguir?"
+    return base
+
+
 def _reacao_curta_ao_input(msg_lead: str, nome_fmt: str) -> str:
     t = (msg_lead or "").strip().lower()
     if re.search(r"\b(sim|faz sentido|bateu|ressonou|verdade)\b", t):
@@ -293,6 +307,7 @@ def executar_v2(ctx) -> tuple:
         b1 = str(blocos_gerados[0] or "").strip().lower()
         if not re.search(r"\b(confirm|entendo\s+sua\s+d[uú]vida|recebi\s+o\s+que\s+voc[eê]\s+falou)\b", b1):
             blocos_gerados[0] = f"{_reacao_curta_ao_input(msg_lead, nome_fmt)} {blocos_gerados[0]}".strip()
+    blocos_gerados = _aplicar_framework_fechamento(blocos_gerados, nome_fmt)
 
     acoes = []
     leitura_pre = max(7, min(len(msg_lead) // 22, 12))

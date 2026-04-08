@@ -121,6 +121,25 @@ def _limpar_meta_textual(v: str, max_len: int = 220) -> str:
     return t[:max_len]
 
 
+def _aplicar_framework_fechamento(blocos: list[str], nome_fmt: str) -> list[str]:
+    """
+    Framework de fechamento universal:
+    1) Você quer resolver isso?
+    2) Se eu te mostrar um caminho claro, você topa seguir?
+    """
+    base = [str(b or "").strip() for b in (blocos or []) if str(b or "").strip()]
+    if not base:
+        return [
+            f"{nome_fmt}, você quer resolver isso?",
+            "Se eu te mostrar um caminho claro, você topa seguir?",
+        ]
+    if len(base) == 1:
+        return base + ["Se eu te mostrar um caminho claro, você topa seguir?"]
+    base[-2] = f"{nome_fmt}, você quer resolver isso?"
+    base[-1] = "Se eu te mostrar um caminho claro, você topa seguir?"
+    return base
+
+
 def _assinar_semantica_curta(texto: str) -> str:
     t = re.sub(r"[^a-z0-9\s]", " ", (texto or "").lower())
     toks = [w for w in t.split() if len(w) > 2]
@@ -368,6 +387,7 @@ def executar_v2(ctx) -> tuple:
             f"Isso está longe da sua realidade, {nome_fmt}… ou tocou exatamente onde dói?",
         ]
 
+    blocos_gerados = _aplicar_framework_fechamento(blocos_gerados, nome_fmt)
     acoes = []
     
     if img_altar:
