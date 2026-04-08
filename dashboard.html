@@ -1149,27 +1149,25 @@
         .flow-node-pills {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
+            gap: 4px;
             align-items: flex-start;
         }
         .flow-node-pill {
             display: inline-flex;
             align-items: center;
             max-width: 100%;
-            padding: 5px 10px;
+            padding: 4px 9px;
             font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
             font-size: 11px;
             font-weight: 500;
             color: #334155;
             background: #f1f5f9;
             border: 1px solid #e2e8f0;
-            border-radius: 999px;
+            border-radius: 12px;
             line-height: 1.35;
             word-break: break-word;
         }
         .flow-node.flow-node--editing {
-            width: min(480px, calc(100vw - 48px));
-            max-width: min(480px, 92vw);
             z-index: 35;
             border-radius: 16px;
             box-shadow:
@@ -1177,6 +1175,78 @@
                 0 2px 4px -2px rgb(0 0 0 / 0.1),
                 0 0 0 2px var(--flow-accent),
                 0 20px 40px -12px rgb(15 23 42 / 0.12);
+        }
+        /* Focus Drawer — overlay + painel fixo à direita */
+        #flow-inspector-overlay.flow-inspector-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 999;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-in-out;
+        }
+        #flow-inspector-overlay.flow-inspector-overlay.flow-inspector-overlay--visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #flow-inspector.flow-inspector-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            width: min(480px, 100vw);
+            max-width: 100vw;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
+            border-radius: 0;
+            border-left: 1px solid #e2e8f0;
+            max-height: none;
+            box-shadow: -8px 0 40px -12px rgb(15 23 42 / 0.18);
+        }
+        #flow-inspector.flow-inspector-drawer.flow-inspector-drawer--open {
+            transform: translateX(0);
+        }
+        .flow-inspector-drawer__mode {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+        .flow-inspector-drawer__mode.flow-inspector-mode-visible {
+            display: flex;
+        }
+        .flow-inspector-drawer__node-mount {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+        #flow-inspector-node-mount .flow-node-inspector {
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+            border-radius: 0;
+            border-top: none;
+        }
+        #flow-inspector-node-mount .flow-node-inspector-main {
+            max-height: none;
+        }
+        .flow-inspector-drawer__mode--edge .flow-inspector-panel__scroll {
+            flex: 1;
+            min-height: 0;
+        }
+        body.flow-canvas-locked #flow-canvas-area {
+            pointer-events: none;
+        }
+        body.flow-canvas-locked #flow-inspector {
+            pointer-events: auto !important;
         }
         .flow-node-inspector {
             border-top: 1px solid #e2e8f0;
@@ -1222,19 +1292,8 @@
             color: #6366f1;
         }
         .flow-inspector-panel {
-            position: fixed;
-            top: 96px;
-            right: 20px;
-            width: min(340px, 92vw);
-            z-index: 60;
             background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            box-shadow:
-                0 4px 6px -1px rgb(0 0 0 / 0.08),
-                0 12px 24px -8px rgb(15 23 42 / 0.12);
             padding: 0;
-            max-height: calc(100vh - 120px);
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -2330,6 +2389,177 @@
             border-color: rgba(99, 102, 241, 0.45);
             color: #4338ca;
         }
+        /* Construtor sequencial de conteúdo */
+        .flow-content-builder {
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        }
+        .flow-content-type-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        @media (max-width: 420px) {
+            .flow-content-type-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        .flow-content-type-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 10px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            background: #fafafa;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+        }
+        .flow-content-type-btn:hover {
+            background: #fff;
+            border-color: #c7d2fe;
+            color: #4338ca;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+        }
+        .flow-content-type-btn i {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        #flow-content-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 4px;
+        }
+        .flow-content-card {
+            position: relative;
+            background: #fafafa;
+            border-radius: 12px;
+            border: 1px solid #e8ecf1;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+            padding: 12px 12px 12px 16px;
+            overflow: hidden;
+        }
+        .flow-content-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 4px;
+            border-radius: 4px;
+            background: #cbd5e1;
+        }
+        .flow-content-card--text::before {
+            background: #a5b4fc;
+        }
+        .flow-content-card--image::before {
+            background: #7dd3fc;
+        }
+        .flow-content-card--video::before {
+            background: #c4b5fd;
+        }
+        .flow-content-card--audio::before {
+            background: #fcd34d;
+        }
+        .flow-content-card--document::before {
+            background: #fdba74;
+        }
+        .flow-content-card--delay::before {
+            background: #86efac;
+        }
+        .flow-content-card__toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .flow-content-card__badge {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+        .flow-content-card__actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .flow-content-card__actions button {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: none;
+            border-radius: 8px;
+            background: #fff;
+            color: #64748b;
+            cursor: pointer;
+            border: 1px solid #e2e8f0;
+            transition: background 0.12s, color 0.12s;
+        }
+        .flow-content-card__actions button:hover {
+            background: #f1f5f9;
+            color: #4338ca;
+        }
+        .flow-content-card__actions button.flow-content-card__btn-del:hover {
+            color: #e11d48;
+            border-color: #fecdd3;
+            background: #fff1f2;
+        }
+        .flow-content-card[draggable='true'] {
+            cursor: grab;
+        }
+        .flow-content-card.flow-content-card--dragging {
+            opacity: 0.48;
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+            z-index: 20;
+            cursor: grabbing;
+            user-select: none;
+        }
+        #flow-content-dnd-line {
+            height: 3px;
+            margin: 6px 0;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #6366f1, #818cf8);
+            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.25);
+            pointer-events: none;
+            flex-shrink: 0;
+        }
+        #flow-content-dnd-line.flow-content-drop-indicator--inactive {
+            display: none;
+        }
+        .flow-content-card__delay-slider {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .flow-content-card__delay-slider input[type='range'] {
+            width: 100%;
+            accent-color: #6366f1;
+        }
+        .flow-content-card__delay-val {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+        }
+        .flow-node-inspector-body .flow-inspector-btn-save--seq-builder {
+            border-radius: 12px;
+            background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 2px 12px rgba(16, 185, 129, 0.35);
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .flow-node-inspector-body .flow-inspector-btn-save--seq-builder:hover {
+            filter: brightness(1.03);
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+        }
         .flow-sim-conteudo-pack {
             max-width: 100%;
         }
@@ -3047,15 +3277,24 @@
             background: #f8fafc;
             border-color: #94a3b8;
         }
-        .flow-sim-topbar .flow-sim-step-label {
+        .flow-simulator-chat .flow-sim-step-toggle-row {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #475569;
+            gap: 10px;
             cursor: pointer;
             user-select: none;
+        }
+        .flow-simulator-chat .flow-sim-step-toggle-label {
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            color: #334155;
+        }
+        .flow-simulator-chat .flow-sim-step-toggle-row:hover .flow-sim-step-toggle-label {
+            color: #1e293b;
+        }
+        .flow-simulator-chat .flow-sim-step-toggle-row .flow-inspector-ai__switch {
+            cursor: pointer;
         }
         .flow-sim-topbar .flow-sim-mode-badge {
             font-size: 10px;
@@ -4881,12 +5120,45 @@
             <button class="fab" style="position:absolute;bottom:24px;right:24px;z-index:50" onclick="openNodeMenu()" title="Adicionar Bloco">
                 <i class="fas fa-plus"></i>
             </button>
-            <!-- Inspetor legado (vazio): a configuração abre dentro de cada .flow-node -->
-            <div id="flow-inspector" class="flow-inspector-panel" hidden aria-hidden="true" style="display:none">
-                <div id="flow-inspector-body" class="flow-inspector-panel__scroll" style="display:none"></div>
-                <div id="flow-inspector-edge-footer" class="flow-node-inspector-footer" style="display:none">
-                    <button type="button" class="flow-inspector-btn-save" onclick="flowInspectorFooterApply()"><i class="fas fa-check"></i> Salvar dados</button>
-                    <button type="button" class="flow-inspector-btn-json" onclick="flowRemoveSelectedEdge()" title="Remover ligação"><i class="fas fa-unlink"></i></button>
+            <div
+                id="flow-inspector-overlay"
+                class="flow-inspector-overlay"
+                hidden
+                aria-hidden="true"
+                role="presentation"
+                onclick="closeFlowInspector()"
+            ></div>
+            <div
+                id="flow-inspector"
+                class="flow-inspector-panel flow-inspector-drawer"
+                hidden
+                aria-hidden="true"
+                style="display:none"
+                onclick="event.stopPropagation()"
+            >
+                <div id="flow-inspector-mode-node" class="flow-inspector-drawer__mode flow-inspector-drawer__mode--node">
+                    <div id="flow-inspector-node-mount" class="flow-inspector-drawer__node-mount"></div>
+                </div>
+                <div id="flow-inspector-mode-edge" class="flow-inspector-drawer__mode flow-inspector-drawer__mode--edge">
+                    <div class="flow-node-inspector-toolbar flow-inspector-drawer__edge-toolbar">
+                        <span class="flow-node-inspector-title" id="flow-inspector-edge-heading"
+                            ><i class="fas fa-link flow-node-inspector-ic"></i> Conexão
+                            <span class="flow-node-inspector-sub">transição entre blocos</span></span
+                        >
+                        <button
+                            type="button"
+                            class="icon-btn flow-node-inspector-close"
+                            onclick="event.stopPropagation(); closeFlowInspector()"
+                            title="Fechar (Esc)"
+                        >
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div id="flow-inspector-body" class="flow-inspector-panel__scroll" style="display:none"></div>
+                    <div id="flow-inspector-edge-footer" class="flow-node-inspector-footer" style="display:none">
+                        <button type="button" class="flow-inspector-btn-save" onclick="event.stopPropagation(); flowInspectorFooterApply()"><i class="fas fa-check"></i> Salvar dados</button>
+                        <button type="button" class="flow-inspector-btn-json" onclick="event.stopPropagation(); flowRemoveSelectedEdge()" title="Remover ligação"><i class="fas fa-unlink"></i></button>
+                    </div>
                 </div>
             </div>
 
@@ -4927,8 +5199,12 @@
                 <div class="flow-sim-topbar">
                     <button type="button" onclick="flowSimRestart()" title="Parar e voltar ao formulário de teste">Reiniciar simulação</button>
                     <button type="button" onclick="flowSimReplayOpenModal()" title="Carregar execução real do servidor">Carregar Log de Lead</button>
-                    <label class="flow-sim-step-label" title="Pausa após cada bloco; use «Próximo» para continuar">
-                        <input type="checkbox" id="flow-sim-step-toggle" /> Modo passo a passo
+                    <label class="flow-sim-step-toggle-row" title="Pausa após cada bloco; use «Próximo» para continuar">
+                        <span class="flow-sim-step-toggle-label">Modo passo a passo</span>
+                        <span class="flow-inspector-ai__switch" title="Ativar ou desativar modo passo a passo">
+                            <input type="checkbox" id="flow-sim-step-toggle" aria-label="Modo passo a passo" />
+                            <span class="flow-inspector-ai__switch-slider" aria-hidden="true"></span>
+                        </span>
                     </label>
                     <span id="flow-sim-mode-badge" class="flow-sim-mode-badge">Modo: simulação</span>
                 </div>
@@ -6181,6 +6457,15 @@ const FLOW_CONTEUDO_MEDIA_KINDS = [
     { value: 'audio', label: 'Áudio' },
     { value: 'document', label: 'Documento' },
 ];
+/** Botões do construtor sequencial (ordem = passos no fluxo). */
+const FLOW_CONTEUDO_SEQ_GRID = [
+    { type: 'text', label: 'Texto', icon: 'fa-font' },
+    { type: 'image', label: 'Imagem', icon: 'fa-image' },
+    { type: 'video', label: 'Vídeo', icon: 'fa-video' },
+    { type: 'audio', label: 'Áudio', icon: 'fa-microphone' },
+    { type: 'document', label: 'Documento', icon: 'fa-file-alt' },
+    { type: 'delay', label: 'Delay', icon: 'fa-hourglass-half' },
+];
 const FLOW_PERGUNTA_MODOS = [
     { value: 'texto_livre', label: 'Resposta em texto livre' },
     { value: 'lista_opcoes', label: 'Lista de opções (estilo WhatsApp)' },
@@ -6241,16 +6526,56 @@ function flowLabelFromOptions(opts, value) {
     return o && o.label ? String(o.label) : v;
 }
 
+function flowMediaKindLabel(kind) {
+    const k = String(kind || 'text').toLowerCase();
+    const o = FLOW_CONTEUDO_MEDIA_KINDS.find((x) => x && String(x.value) === k);
+    return o ? String(o.label) : k;
+}
+
+/** Último segmento útil da URL para pill (caminho / fim). */
+function flowUrlTailForPill(url, maxLen) {
+    const u = String(url || '').trim();
+    if (!u) return '';
+    let path = u.split('?')[0];
+    try {
+        if (/^https?:\/\//i.test(u)) {
+            const parsed = new URL(u);
+            path = parsed.pathname || '/';
+        }
+    } catch (_) {}
+    path = path.replace(/\\/g, '/');
+    const parts = path.split('/').filter(Boolean);
+    let tail = '';
+    if (parts.length >= 2) tail = parts.slice(-2).join('/');
+    else if (parts.length === 1) tail = parts[0];
+    else tail = path.length > 36 ? path.slice(-32) : path;
+    return flowTruncatePill(tail, maxLen || 32);
+}
+
+/** Primeira regra do Rule Builder em uma linha curta. */
+function flowCondRuleShort(rule) {
+    if (!rule || typeof rule !== 'object') return '';
+    const v = String(rule.var ?? '').trim();
+    const op = String(rule.op || 'eq');
+    if (op === 'empty') return flowTruncatePill((v || 'var') + ' · vazio', 34);
+    if (op === 'not_empty') return flowTruncatePill((v || 'var') + ' · preenchido', 34);
+    const val = String(rule.val != null ? rule.val : '').trim();
+    const sym = { eq: '=', ne: '≠', contains: '~', not_contains: '!~', gt: '>', lt: '<' }[op] || op;
+    const piece = val ? `${v || '?'} ${sym} ${flowTruncatePill(val, 14)}` : `${v || '?'} ${sym}`;
+    return flowTruncatePill(piece, 40);
+}
+
 function flowNodePillItems(nodeType, cfg) {
     const t = String(nodeType || 'generic');
     const c = cfg && typeof cfg === 'object' ? cfg : {};
     const pills = [];
     const step = c.step_name != null && String(c.step_name).trim() !== '' ? flowTruncatePill(String(c.step_name), 30) : '';
-    if (step) pills.push(step);
+    const skipStepFirst = t === 'agente_ia';
+    if (!skipStepFirst && step) pills.push(step);
 
     const push = (s) => {
         const x = String(s ?? '').trim();
-        if (x) pills.push(flowTruncatePill(x, 40));
+        if (x) pills.push(flowTruncatePill(x, 44));
     };
 
     switch (t) {
@@ -6271,10 +6596,16 @@ function flowNodePillItems(nodeType, cfg) {
             if (c.module_hint) push(String(c.module_hint));
             break;
         case 'conteudo': {
-            const kind = c.content_media_kind || c.media_type || 'text';
-            push(String(kind));
-            const txt = c.content_text != null ? String(c.content_text) : String(c.body || '');
-            if (txt.trim()) push(txt);
+            const seq = flowConteudoSeqItemsFromConfig(c);
+            push(String(seq.length) + ' passo' + (seq.length !== 1 ? 's' : ''));
+            const ft = seq.find((x) => x && x.type === 'text' && String(x.value || '').trim());
+            if (ft) push(flowTruncatePill(String(ft.value), 36));
+            else {
+                const fm = seq.find((x) => x && ['image', 'video', 'audio', 'document'].includes(x.type));
+                if (fm && fm.value && String(fm.value.url || '').trim()) {
+                    push(flowMediaKindLabel(fm.type) + ' · ' + flowUrlTailForPill(String(fm.value.url), 28));
+                }
+            }
             break;
         }
         case 'delay': {
@@ -6292,7 +6623,8 @@ function flowNodePillItems(nodeType, cfg) {
             const m = String(c.api_method || c.method || 'GET').toUpperCase();
             push(m);
             const u = c.api_url != null ? String(c.api_url) : String(c.url || '');
-            if (u.trim()) push(u);
+            const tail = flowUrlTailForPill(u, 34);
+            if (tail) push('…/' + tail);
             break;
         }
         case 'notificar':
@@ -6310,9 +6642,11 @@ function flowNodePillItems(nodeType, cfg) {
             break;
         }
         case 'agente_ia': {
-            push(String(c.model || 'gpt-4o-mini'));
-            if (c.temperature != null && String(c.temperature) !== '') push('temp ' + String(c.temperature));
-            if (c.instructions) push(String(c.instructions));
+            const agentLabel =
+                c.step_name != null && String(c.step_name).trim() !== '' ? String(c.step_name).trim() : 'Sem nome';
+            push('Agente: ' + flowTruncatePill(agentLabel, 24));
+            push('Modelo: ' + flowTruncatePill(String(c.model || 'gpt-4o-mini'), 22));
+            if (c.temperature != null && String(c.temperature) !== '') push('Temp: ' + String(c.temperature));
             break;
         }
         case 'voice_studio': {
@@ -6327,9 +6661,16 @@ function flowNodePillItems(nodeType, cfg) {
             break;
         }
         case 'condicao': {
-            push(String((c.logic || 'AND').toUpperCase() === 'OR' ? 'OU' : 'E'));
-            const rules = Array.isArray(c.rules) ? c.rules.length : 0;
-            push(rules + ' regra' + (rules === 1 ? '' : 's'));
+            const logic = String(c.logic || 'AND').toUpperCase() === 'OR' ? 'OR' : 'AND';
+            push('Lógica: ' + logic);
+            const rules = Array.isArray(c.rules) ? c.rules : [];
+            const first = rules.length ? rules[0] : null;
+            if (first && (String(first.var || '').trim() || first.op)) {
+                push(flowCondRuleShort(first));
+            } else {
+                const ex = String(c.expression || '').trim();
+                if (ex) push('Expr: ' + flowTruncatePill(ex, 32));
+            }
             break;
         }
         case 'divisao':
@@ -6346,7 +6687,7 @@ function flowNodePillItems(nodeType, cfg) {
             if (c.body != null && String(c.body).trim()) push(String(c.body));
     }
 
-    const out = pills.filter(Boolean).slice(0, 6);
+    const out = pills.filter(Boolean).slice(0, 8);
     if (!out.length) out.push('Configurar no inspetor');
     return out;
 }
@@ -6655,7 +6996,7 @@ function restoreFlowSnapshot(snap) {
     if (!snap || !snap.doc) return;
     _flowHistoryRestoring = true;
     try {
-        closeFlowInspector();
+        closeFlowInspectorImmediate();
         deserializeFlowCanvas(snap.doc);
         updateFlowMinimap();
     } finally {
@@ -6719,6 +7060,7 @@ function flowZoomAtPointer(targetZoom, clientX, clientY) {
 }
 
 function flowZoomIn() {
+    if (document.body.classList.contains('flow-canvas-locked')) return;
     const area = document.getElementById('flow-canvas-area');
     if (area) {
         const r = area.getBoundingClientRect();
@@ -6729,6 +7071,7 @@ function flowZoomIn() {
 }
 
 function flowZoomOut() {
+    if (document.body.classList.contains('flow-canvas-locked')) return;
     const area = document.getElementById('flow-canvas-area');
     if (area) {
         const r = area.getBoundingClientRect();
@@ -6739,6 +7082,7 @@ function flowZoomOut() {
 }
 
 function flowZoomReset() {
+    if (document.body.classList.contains('flow-canvas-locked')) return;
     _flowZoom = 1;
     _flowPanX = 0;
     _flowPanY = 0;
@@ -6748,6 +7092,7 @@ function flowZoomReset() {
 }
 
 function flowFitView() {
+    if (document.body.classList.contains('flow-canvas-locked')) return;
     const nodes = document.querySelectorAll('#nodes-container .flow-node');
     const area = document.getElementById('flow-canvas-area');
     const cv = document.getElementById('flow-canvas-viewport');
@@ -6808,7 +7153,7 @@ function flowClearCanvas() {
     _flowConnectSource = null;
     const container = document.getElementById('nodes-container');
     if (container) container.innerHTML = '';
-    closeFlowInspector();
+    closeFlowInspectorImmediate();
     flowResetHistory();
     redrawFlowEdges();
     updateFlowMinimap();
@@ -6883,6 +7228,7 @@ function updateFlowMinimap() {
 
 function flowMinimapClick(ev) {
     ev.stopPropagation();
+    if (document.body.classList.contains('flow-canvas-locked')) return;
     const area = document.getElementById('flow-canvas-area');
     const cv = document.getElementById('flow-canvas-viewport');
     const cvs = document.getElementById('flow-minimap-canvas');
@@ -6974,10 +7320,45 @@ function flowPasteNode() {
     toast('Bloco colado.', 'emerald');
 }
 
+function flowInspectorEventTargetInsideDrawerShell(target) {
+    const el = target && target.nodeType === 1 ? target : target && target.parentElement;
+    if (!el || !el.closest) return false;
+    return !!(
+        el.closest('#flow-inspector') ||
+        el.closest('#flow-inspector-node-mount') ||
+        el.closest('[data-flow-node-inspector="1"]') ||
+        el.closest('.flow-node-inspector')
+    );
+}
+
+/** Cliques que não devem disparar o fecho “clique fora” (painel, anexos ao inspetor). */
+function flowInspectorEventTargetKeepsDrawerOpen(target) {
+    if (flowInspectorEventTargetInsideDrawerShell(target)) return true;
+    const el = target && target.nodeType === 1 ? target : target && target.parentElement;
+    if (el && el.closest && el.closest('#flow-var-picker-popover')) return true;
+    return false;
+}
+
+function flowBindInspectorShellPropagation() {
+    const panel = document.getElementById('flow-inspector');
+    if (!panel || panel.getAttribute('data-flow-shell-prop') === '1') return;
+    panel.setAttribute('data-flow-shell-prop', '1');
+    const stop = (e) => {
+        e.stopPropagation();
+    };
+    panel.addEventListener('mousedown', stop, false);
+    panel.addEventListener('click', stop, false);
+    panel.addEventListener('pointerdown', stop, false);
+}
+
 function flowCanvasBackgroundClick(event) {
     const t = event.target;
-    if (t && t.closest && (t.closest('.flow-node') || t.closest('#flow-builder-toolbar') || t.closest('#flow-minimap-wrap'))) return;
-    if (t && t.closest && t.closest('path[data-flow-edge-id]')) return;
+    const el = t && t.nodeType === 1 ? t : t && t.parentElement;
+    if (!el) return;
+    if (flowInspectorEventTargetInsideDrawerShell(el)) return;
+    if (el.closest('#flow-inspector-overlay')) return;
+    if (el.closest('.flow-node') || el.closest('#flow-builder-toolbar') || el.closest('#flow-minimap-wrap')) return;
+    if (el.closest('path[data-flow-edge-id]')) return;
     cancelFlowWire();
 }
 
@@ -6994,9 +7375,11 @@ function closeFlowShortcutsModal() {
 }
 
 function flowCanvasPanEligibleTarget(e) {
+    if (document.body.classList.contains('flow-canvas-locked')) return false;
     if (e.target.closest && e.target.closest('.flow-node')) return false;
     if (e.target.closest && e.target.closest('#flow-builder-toolbar')) return false;
     if (e.target.closest && e.target.closest('#flow-inspector')) return false;
+    if (e.target.closest && e.target.closest('#flow-inspector-overlay')) return false;
     if (e.target.closest && e.target.closest('path[data-flow-edge-id]')) return false;
     if (e.target.closest && e.target.closest('#flow-minimap-wrap')) return false;
     if (e.target.closest && e.target.closest('.fab')) return false;
@@ -7005,6 +7388,7 @@ function flowCanvasPanEligibleTarget(e) {
 }
 
 function flowCanvasBeginPan(e) {
+    if (document.body.classList.contains('flow-canvas-locked')) return false;
     const vb = document.getElementById('view-builder');
     if (!vb || vb.style.display === 'none') return false;
     if (e.button === 1) return flowCanvasPanEligibleTarget(e);
@@ -7023,6 +7407,10 @@ function initFlowBuilderCanvasUx() {
         (e) => {
             const vb = document.getElementById('view-builder');
             if (!vb || vb.style.display === 'none') return;
+            if (document.body.classList.contains('flow-canvas-locked')) {
+                e.preventDefault();
+                return;
+            }
             e.preventDefault();
             const delta = e.deltaY > 0 ? -0.08 : 0.08;
             flowZoomAtPointer((_flowZoom || 1) + delta, e.clientX, e.clientY);
@@ -7095,19 +7483,48 @@ function flowGetEdgeById(eid) {
     return (_flowEdges || []).find((x) => String(x.id) === s) || null;
 }
 
-function flowClearEdgeSelection() {
-    _flowSelectedEdgeId = null;
-    const panel = document.getElementById('flow-inspector');
+function flowResetEdgeInspectorDom() {
     const body = document.getElementById('flow-inspector-body');
     const foot = document.getElementById('flow-inspector-edge-footer');
     if (foot) foot.style.display = 'none';
-    if (panel && body && body.getAttribute('data-flow-edge-inspector') === '1') {
-        panel.style.display = 'none';
-        panel.setAttribute('hidden', '');
-        panel.setAttribute('aria-hidden', 'true');
+    if (body && body.getAttribute('data-flow-edge-inspector') === '1') {
         body.innerHTML = '';
         body.style.display = 'none';
         body.removeAttribute('data-flow-edge-inspector');
+    }
+}
+
+/** Abre overlay + painel (sem animação de entrada — use após requestAnimationFrame). */
+function flowFocusDrawerOpen() {
+    const panel = document.getElementById('flow-inspector');
+    const overlay = document.getElementById('flow-inspector-overlay');
+    if (!panel) return;
+    document.body.classList.add('flow-canvas-locked');
+    if (overlay) {
+        overlay.removeAttribute('hidden');
+        overlay.setAttribute('aria-hidden', 'false');
+        overlay.style.display = 'block';
+    }
+    panel.style.display = 'flex';
+    panel.removeAttribute('hidden');
+    panel.setAttribute('aria-hidden', 'false');
+    panel.classList.remove('flow-inspector-drawer--open');
+    if (overlay) overlay.classList.remove('flow-inspector-overlay--visible');
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            panel.classList.add('flow-inspector-drawer--open');
+            if (overlay) overlay.classList.add('flow-inspector-overlay--visible');
+        });
+    });
+}
+
+function flowClearEdgeSelection() {
+    const body = document.getElementById('flow-inspector-body');
+    const hadEdgeInspector = !!(body && body.getAttribute('data-flow-edge-inspector') === '1');
+    _flowSelectedEdgeId = null;
+    flowResetEdgeInspectorDom();
+    if (hadEdgeInspector && !_flowSelectedNodeId) {
+        closeFlowInspector();
     }
     redrawFlowEdges();
 }
@@ -7115,7 +7532,7 @@ function flowClearEdgeSelection() {
 function flowSelectEdge(edgeId) {
     const eid = String(edgeId || '').trim();
     if (!eid || !flowGetEdgeById(eid)) return;
-    closeFlowInspector();
+    closeFlowInspectorImmediate();
     _flowSelectedEdgeId = eid;
     redrawFlowEdges();
     openFlowEdgeInspector(eid);
@@ -7127,7 +7544,17 @@ function openFlowEdgeInspector(edgeId) {
     const panel = document.getElementById('flow-inspector');
     const body = document.getElementById('flow-inspector-body');
     const foot = document.getElementById('flow-inspector-edge-footer');
+    const modeNode = document.getElementById('flow-inspector-mode-node');
+    const modeEdge = document.getElementById('flow-inspector-mode-edge');
     if (!panel || !body) return;
+    if (modeNode) {
+        modeNode.style.display = 'none';
+        modeNode.classList.remove('flow-inspector-mode-visible');
+    }
+    if (modeEdge) {
+        modeEdge.style.display = 'flex';
+        modeEdge.classList.add('flow-inspector-mode-visible');
+    }
     const fromN = flowCanvasNodeById(edge.from);
     const toN = flowCanvasNodeById(edge.to);
     const fromTitle =
@@ -7139,9 +7566,10 @@ function openFlowEdgeInspector(edgeId) {
             ? String(toN.querySelector('.flow-node-head').innerText || '').trim()
             : edge.to;
     const label = edge.label != null ? String(edge.label) : '';
-    panel.style.display = 'flex';
-    panel.removeAttribute('hidden');
-    panel.setAttribute('aria-hidden', 'false');
+    const edgeHeading = document.getElementById('flow-inspector-edge-heading');
+    if (edgeHeading) {
+        edgeHeading.innerHTML = `<i class="fas fa-link flow-node-inspector-ic"></i> ${flowEsc(fromTitle)} <span style="color:#94a3b8">→</span> ${flowEsc(toTitle)} <span class="flow-node-inspector-sub">ligação</span>`;
+    }
     body.style.display = 'block';
     body.setAttribute('data-flow-edge-inspector', '1');
     if (foot) foot.style.display = 'flex';
@@ -7157,6 +7585,7 @@ function openFlowEdgeInspector(edgeId) {
     `;
     const insp = document.getElementById('flow-inspector');
     if (insp) flowEnhanceInspectorVariableButtons(insp);
+    flowFocusDrawerOpen();
 }
 
 function flowRemoveSelectedEdge() {
@@ -7164,7 +7593,7 @@ function flowRemoveSelectedEdge() {
     if (!id) return;
     _flowEdges = (_flowEdges || []).filter((e) => String(e.id) !== String(id));
     _flowSelectedEdgeId = null;
-    closeFlowInspector();
+    closeFlowInspectorImmediate();
     pushFlowHistory();
     toast('Conexão removida.', 'amber');
     requestFlowAutoSave();
@@ -7448,9 +7877,25 @@ function flowEsc(s) {
     return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 }
 
+function flowGetNodeInspectorBody(node) {
+    if (!node) return null;
+    const bid = node.getAttribute('data-flow-id') || '';
+    if (bid && _flowSelectedNodeId === bid) {
+        const inDrawer = document.querySelector('#flow-inspector-node-mount .flow-node-inspector-body');
+        if (inDrawer) return inDrawer;
+    }
+    return node.querySelector('.flow-node-inspector-body');
+}
+
 function flowGetInspectorBodyEl() {
-    const inline = document.querySelector('#nodes-container .flow-node.flow-node--editing .flow-node-inspector-body');
-    if (inline) return inline;
+    if (_flowSelectedNodeId) {
+        const node = flowCanvasNodeById(_flowSelectedNodeId);
+        const b = node && flowGetNodeInspectorBody(node);
+        if (b) return b;
+        const mountBody = document.querySelector('#flow-inspector-node-mount .flow-node-inspector-body');
+        if (mountBody) return mountBody;
+        return null;
+    }
     return document.getElementById('flow-inspector-body');
 }
 
@@ -7732,7 +8177,9 @@ function flowEnhanceInspectorVariableButtons(root) {
 
 function flowEnsureInlineInspectorHost(nodeEl) {
     if (!nodeEl) return null;
-    let host = nodeEl.querySelector('[data-flow-node-inspector="1"]');
+    const mount = document.getElementById('flow-inspector-node-mount');
+    if (!mount) return null;
+    let host = nodeEl.querySelector('[data-flow-node-inspector="1"]') || mount.querySelector('[data-flow-node-inspector="1"]');
     if (!host) {
         host = document.createElement('div');
         host.setAttribute('data-flow-node-inspector', '1');
@@ -7740,7 +8187,7 @@ function flowEnsureInlineInspectorHost(nodeEl) {
         host.setAttribute('hidden', '');
         host.innerHTML = `
             <div class="flow-node-inspector-toolbar">
-                <span class="flow-node-inspector-title"><i class="fas fa-sliders-h flow-node-inspector-ic"></i> Configuração <span class="flow-node-inspector-sub">ajuste este bloco</span></span>
+                <span class="flow-node-inspector-title" id="flow-inspector-node-heading"><i class="fas fa-sliders-h flow-node-inspector-ic"></i> <span class="flow-inspector-heading-label">Configuração</span> <span class="flow-node-inspector-sub">ajuste este bloco</span></span>
                 <button type="button" class="icon-btn flow-node-inspector-close" onclick="event.stopPropagation(); closeFlowInspector()" title="Fechar (Esc)"><i class="fas fa-times"></i></button>
             </div>
             <div class="flow-node-inspector-main">
@@ -7750,9 +8197,19 @@ function flowEnsureInlineInspectorHost(nodeEl) {
                     <button type="button" class="flow-inspector-btn-json" onclick="event.stopPropagation(); openRawFlowInspectorJson()" title="Editar JSON (avançado)"><i class="fas fa-code"></i></button>
                 </div>
             </div>`;
-        const body = nodeEl.querySelector('.flow-node-body');
-        if (body) body.insertAdjacentElement('afterend', host);
-        else nodeEl.appendChild(host);
+        mount.appendChild(host);
+    } else if (host.parentElement !== mount) {
+        mount.appendChild(host);
+    }
+    const modeNode = document.getElementById('flow-inspector-mode-node');
+    const modeEdge = document.getElementById('flow-inspector-mode-edge');
+    if (modeNode) {
+        modeNode.style.display = 'flex';
+        modeNode.classList.add('flow-inspector-mode-visible');
+    }
+    if (modeEdge) {
+        modeEdge.style.display = 'none';
+        modeEdge.classList.remove('flow-inspector-mode-visible');
     }
     host.removeAttribute('hidden');
     return host.querySelector('.flow-node-inspector-body');
@@ -7764,30 +8221,388 @@ function flowStripInlineInspectorFromClone(el) {
     el.querySelectorAll('[data-flow-node-inspector="1"]').forEach((h) => h.remove());
 }
 
-function flowConteudoResolvedBrain(cfg) {
-    const c = cfg && typeof cfg === 'object' ? cfg : {};
-    const allowed = new Set(FLOW_CONTEUDO_MEDIA_KINDS.map((x) => x.value));
-    let kind = String(c.content_media_kind || c.media_type || 'text').toLowerCase();
-    if (!allowed.has(kind)) kind = 'text';
-    let url = c.content_media_url != null ? String(c.content_media_url) : '';
-    let text = c.content_text != null ? String(c.content_text) : String(c.body || '');
-    const hasNew = !!(c.content_media_kind || (c.content_text != null && c.content_text !== '') || c.content_media_url);
-    if (!hasNew && Array.isArray(c.contents) && c.contents.length) {
-        const first = c.contents.find((x) => x && (x.type || 'text') !== 'delay') || c.contents[0];
-        const t0 = first && first.type ? String(first.type).toLowerCase() : 'text';
-        if (allowed.has(t0)) kind = t0;
-        if (first && first.url) url = String(first.url);
-        if (first && first.body) text = text || String(first.body);
-        if (first && first.caption) text = text || String(first.caption);
+function flowConteudoSeqNormalizeItem(raw) {
+    if (!raw || typeof raw !== 'object') return { type: 'text', value: '' };
+    const type = String(raw.type || 'text').toLowerCase();
+    if (type === 'delay') {
+        const v = raw.value != null ? Number(raw.value) : Number(raw.seconds || 0);
+        const n = Number.isFinite(v) ? Math.max(0, Math.min(86400, v)) : 0;
+        return { type: 'delay', value: n };
     }
-    let delaySec = parseFloat(String(c.content_delay_sec != null ? c.content_delay_sec : '0'));
-    if (!Number.isFinite(delaySec)) delaySec = 0;
-    delaySec = Math.max(0, Math.min(86400, delaySec));
+    if (type === 'text') {
+        return { type: 'text', value: String(raw.value != null ? raw.value : raw.body || '') };
+    }
+    if (['image', 'video', 'audio', 'document'].includes(type)) {
+        const val = raw.value;
+        if (val && typeof val === 'object') {
+            return {
+                type,
+                value: {
+                    url: String(val.url != null ? val.url : ''),
+                    caption: String(val.caption != null ? val.caption : ''),
+                },
+            };
+        }
+        return {
+            type,
+            value: {
+                url: String(raw.url != null ? raw.url : ''),
+                caption: String(raw.caption != null ? raw.caption : ''),
+            },
+        };
+    }
+    return { type: 'text', value: '' };
+}
+
+function flowConteudoSeqDefaultItem(type) {
+    const t = String(type || 'text').toLowerCase();
+    if (t === 'delay') return { type: 'delay', value: 3 };
+    if (['image', 'video', 'audio', 'document'].includes(t)) return { type: t, value: { url: '', caption: '' } };
+    return { type: 'text', value: '' };
+}
+
+function flowConteudoSeqMigrateLegacy(c) {
+    const kind = String(c.content_media_kind || c.media_type || 'text').toLowerCase();
+    const allowed = new Set(['text', 'image', 'video', 'audio', 'document']);
+    const k = allowed.has(kind) ? kind : 'text';
+    const url = c.content_media_url != null ? String(c.content_media_url) : '';
+    const text = c.content_text != null ? String(c.content_text) : String(c.body || '');
+    const delaySec = parseFloat(String(c.content_delay_sec != null ? c.content_delay_sec : '0'));
+    const d = Number.isFinite(delaySec) ? Math.max(0, Math.min(86400, delaySec)) : 0;
+    const items = [];
+    if (k === 'text' && !String(url).trim()) {
+        items.push({ type: 'text', value: text });
+    } else if (k !== 'text' || String(url).trim()) {
+        if (k === 'text') items.push({ type: 'text', value: text });
+        else items.push({ type: k, value: { url: String(url).trim(), caption: text } });
+    } else {
+        items.push({ type: 'text', value: text });
+    }
+    if (d > 0) items.push({ type: 'delay', value: d });
+    if (!items.length) items.push({ type: 'text', value: '' });
+    return items.map(flowConteudoSeqNormalizeItem);
+}
+
+function flowConteudoSeqItemsFromConfig(cfg) {
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    if (Array.isArray(c.contents) && c.contents.length) {
+        return c.contents.map(flowConteudoSeqNormalizeItem);
+    }
+    return flowConteudoSeqMigrateLegacy(c);
+}
+
+function flowConteudoSeqLabelForType(type) {
+    const t = String(type || 'text').toLowerCase();
+    const m = FLOW_CONTEUDO_SEQ_GRID.find((x) => x.type === t);
+    if (m) return m.label;
+    return flowMediaKindLabel(t);
+}
+
+function flowConteudoSeqCollectFromDom(wrap) {
+    const list = wrap && wrap.querySelector('#flow-content-list');
+    if (!list) return [];
+    const cards = list.querySelectorAll('[data-flow-ct-seq-card]');
+    const out = [];
+    cards.forEach((card) => {
+        const type = String(card.getAttribute('data-flow-ct-seq-type') || 'text').toLowerCase();
+        if (type === 'text') {
+            const ta = card.querySelector('[data-flow-ct-seq-field="text"]');
+            out.push({ type: 'text', value: ta ? String(ta.value || '') : '' });
+        } else if (type === 'delay') {
+            const rng = card.querySelector('[data-flow-ct-seq-field="delay"]');
+            const n = rng ? parseFloat(String(rng.value || '0')) : 0;
+            out.push({ type: 'delay', value: Number.isFinite(n) ? Math.max(0, Math.min(86400, n)) : 0 });
+        } else if (['image', 'video', 'audio', 'document'].includes(type)) {
+            const url = card.querySelector('[data-flow-ct-seq-field="url"]');
+            const cap = card.querySelector('[data-flow-ct-seq-field="caption"]');
+            out.push({
+                type,
+                value: {
+                    url: url ? String(url.value || '').trim() : '',
+                    caption: cap ? String(cap.value || '') : '',
+                },
+            });
+        }
+    });
+    return out;
+}
+
+function flowConteudoSeqFillList(body, items) {
+    const list = body.querySelector('#flow-content-list');
+    if (!list || !window._flowConteudo) return;
+    const id = window._flowConteudo._meta && window._flowConteudo._meta.id ? window._flowConteudo._meta.id : 'n';
+    const safeId = String(id).replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
+    list.innerHTML = items.map((it, i) => flowConteudoSeqCardHtml(it, i, safeId)).join('');
+    flowConteudoSeqEnsureDnDLine(list);
+    flowConteudoSeqBindDelayLabels(list);
+    flowConteudoSeqBindDnD(list);
+}
+
+function flowConteudoSeqCardHtml(item, idx, safeId) {
+    const it = flowConteudoSeqNormalizeItem(item);
+    const t = it.type;
+    const modClass =
+        t === 'text'
+            ? 'text'
+            : t === 'delay'
+              ? 'delay'
+              : t === 'image'
+                ? 'image'
+                : t === 'video'
+                  ? 'video'
+                  : t === 'audio'
+                    ? 'audio'
+                    : 'document';
+    const badge = flowConteudoSeqLabelForType(t);
+    let inner = '';
+    if (t === 'text') {
+        const v = String(it.value != null ? it.value : '');
+        inner = `<textarea class="input-field flow-inspector-conteudo__textarea" data-flow-ct-seq-field="text" rows="4" placeholder="Mensagem…">${flowEsc(
+            v,
+        )}</textarea>`;
+    } else if (t === 'delay') {
+        const sec = typeof it.value === 'number' ? it.value : parseFloat(it.value) || 0;
+        const clamped = Math.max(0, Math.min(600, sec));
+        inner = `
+            <div class="flow-content-card__delay-slider">
+                <div class="flow-content-card__delay-val" data-flow-ct-seq-delay-lbl>${Math.round(clamped)}s</div>
+                <input type="range" min="0" max="600" step="1" data-flow-ct-seq-field="delay" value="${Math.round(clamped)}" oninput="flowConteudoSeqDelayInput(this)" />
+                <span style="font-size:10px;color:#94a3b8">0–600s · pausa antes do próximo passo</span>
+            </div>`;
+    } else {
+        const url = it.value && it.value.url != null ? String(it.value.url) : '';
+        const cap = it.value && it.value.caption != null ? String(it.value.caption) : '';
+        inner = `
+            <label class="flow-inspector-conteudo__label"><i class="fas fa-link"></i> URL</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                <input type="text" class="input-field flow-inspector-conteudo__input" data-flow-ct-seq-field="url" value="${flowEsc(url)}" style="flex:1;min-width:0" placeholder="https://…" autocomplete="off" />
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px;border-radius:10px;white-space:nowrap" onclick="event.stopPropagation();void flowConteudoBrainUpload(this)"><i class="fas fa-cloud-upload-alt"></i> Upload</button>
+            </div>
+            <label class="flow-inspector-conteudo__label"><i class="fas fa-align-left"></i> Legenda</label>
+            <textarea class="input-field flow-inspector-conteudo__textarea" data-flow-ct-seq-field="caption" rows="2" placeholder="Legenda opcional…">${flowEsc(cap)}</textarea>`;
+    }
+    return `
+        <div class="flow-content-card flow-content-card--${modClass}" data-flow-ct-seq-card="1" data-flow-ct-seq-type="${flowEsc(t)}" draggable="true">
+            <div class="flow-content-card__toolbar">
+                <span class="flow-content-card__badge">${flowEsc(badge)} · ${idx + 1}</span>
+                <div class="flow-content-card__actions">
+                    <button type="button" onclick="event.stopPropagation(); flowConteudoSeqMove(this,-1)" title="Mover para cima"><i class="fas fa-chevron-up"></i></button>
+                    <button type="button" onclick="event.stopPropagation(); flowConteudoSeqMove(this,1)" title="Mover para baixo"><i class="fas fa-chevron-down"></i></button>
+                    <button type="button" class="flow-content-card__btn-del" onclick="event.stopPropagation(); flowConteudoSeqRemove(this)" title="Remover"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div>
+            ${inner}
+        </div>`;
+}
+
+function flowConteudoSeqDelayInput(el) {
+    const card = el && el.closest && el.closest('[data-flow-ct-seq-card]');
+    const lbl = card && card.querySelector('[data-flow-ct-seq-delay-lbl]');
+    if (lbl) lbl.textContent = String(Math.round(Number(el.value) || 0)) + 's';
+}
+
+function flowConteudoSeqBindDelayLabels(list) {
+    if (!list || !list.querySelectorAll) return;
+    list.querySelectorAll('[data-flow-ct-seq-field="delay"]').forEach((el) => flowConteudoSeqDelayInput(el));
+}
+
+function flowConteudoSeqMove(btn, dir) {
+    const card = btn && btn.closest('[data-flow-ct-seq-card]');
+    const list = document.getElementById('flow-content-list');
+    if (!card || !list || list.id !== 'flow-content-list') return;
+    const cards = Array.from(list.querySelectorAll('[data-flow-ct-seq-card]'));
+    const i = cards.indexOf(card);
+    if (i < 0) return;
+    if (dir < 0 && i > 0) list.insertBefore(card, cards[i - 1]);
+    else if (dir > 0 && i < cards.length - 1) list.insertBefore(cards[i + 1], card);
+    flowConteudoSeqRenumberCards(list);
+}
+
+function flowConteudoSeqRenumberCards(list) {
+    const cards = list.querySelectorAll('[data-flow-ct-seq-card]');
+    cards.forEach((card, idx) => {
+        const b = card.querySelector('.flow-content-card__badge');
+        if (!b) return;
+        const t = String(card.getAttribute('data-flow-ct-seq-type') || 'text').toLowerCase();
+        b.textContent = flowConteudoSeqLabelForType(t) + ' · ' + (idx + 1);
+    });
+}
+
+window._flowCtDnD = window._flowCtDnD || { dragEl: null, blockFromInteractive: false, _globalMouseUp: false };
+
+function flowConteudoSeqEnsureDnDLine(list) {
+    let line = list.querySelector('#flow-content-dnd-line');
+    if (!line) {
+        line = document.createElement('div');
+        line.id = 'flow-content-dnd-line';
+        line.setAttribute('aria-hidden', 'true');
+        list.appendChild(line);
+    }
+    line.classList.add('flow-content-drop-indicator--inactive');
+    return line;
+}
+
+function flowConteudoSeqDnDHideLine(list) {
+    const line = list && list.querySelector('#flow-content-dnd-line');
+    if (!line) return;
+    line.classList.add('flow-content-drop-indicator--inactive');
+    try {
+        list.appendChild(line);
+    } catch (_) {}
+}
+
+function flowConteudoSeqDnDInsertBeforeFromPoint(list, clientY) {
+    const dragEl = window._flowCtDnD && window._flowCtDnD.dragEl;
+    if (!list || !dragEl) return null;
+    const cards = Array.from(list.querySelectorAll('[data-flow-ct-seq-card]')).filter((c) => c !== dragEl);
+    for (let i = 0; i < cards.length; i++) {
+        const c = cards[i];
+        const rect = c.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (clientY < mid) return c;
+    }
+    return null;
+}
+
+function flowConteudoSeqDnDOnListMouseDown(e) {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    window._flowCtDnD.blockFromInteractive = !!t.closest(
+        'button, textarea, input, select, label, .flow-content-card__actions',
+    );
+}
+
+function flowConteudoSeqDnDOnListMouseUp() {
+    window._flowCtDnD.blockFromInteractive = false;
+}
+
+function flowConteudoSeqDnDOnDragStart(e) {
+    const list = e.currentTarget;
+    if (!(list && list.id === 'flow-content-list')) return;
+    if (window._flowCtDnD.blockFromInteractive) {
+        e.preventDefault();
+        return;
+    }
+    const card = e.target && e.target.closest ? e.target.closest('[data-flow-ct-seq-card]') : null;
+    if (!card || !list.contains(card)) return;
+    window._flowCtDnD.dragEl = card;
+    try {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', 'flow-ct-seq');
+    } catch (_) {}
+    card.classList.add('flow-content-card--dragging');
+    flowConteudoSeqEnsureDnDLine(list);
+}
+
+function flowConteudoSeqDnDOnDragOver(e) {
+    const list = e.currentTarget;
+    const dragEl = window._flowCtDnD.dragEl;
+    if (!list || !dragEl || list.id !== 'flow-content-list') return;
+    e.preventDefault();
+    try {
+        e.dataTransfer.dropEffect = 'move';
+    } catch (_) {}
+    const line = flowConteudoSeqEnsureDnDLine(list);
+    line.classList.remove('flow-content-drop-indicator--inactive');
+    const insertBefore = flowConteudoSeqDnDInsertBeforeFromPoint(list, e.clientY);
+    if (insertBefore) list.insertBefore(line, insertBefore);
+    else list.appendChild(line);
+}
+
+function flowConteudoSeqDnDOnDrop(e) {
+    const list = e.currentTarget;
+    const dragEl = window._flowCtDnD.dragEl;
+    e.preventDefault();
+    if (!list || !dragEl || list.id !== 'flow-content-list' || !list.contains(dragEl)) {
+        flowConteudoSeqDnDHideLine(list);
+        return;
+    }
+    const insertBefore = flowConteudoSeqDnDInsertBeforeFromPoint(list, e.clientY);
+    flowConteudoSeqDnDHideLine(list);
+    if (insertBefore) list.insertBefore(dragEl, insertBefore);
+    else list.appendChild(dragEl);
+    dragEl.classList.remove('flow-content-card--dragging');
+    window._flowCtDnD.dragEl = null;
+    flowConteudoSeqRenumberCards(list);
+    const st = window._flowConteudo;
+    const node = st && flowCanvasNodeById(st.nodeId);
+    const wrap = node && flowGetNodeInspectorBody(node);
+    if (node && wrap) flowConteudoSeqPersistFromDom(wrap, node, { toast: false });
+}
+
+function flowConteudoSeqDnDOnDragEnd(e) {
+    const list = e.currentTarget;
+    const dragEl = window._flowCtDnD.dragEl;
+    if (dragEl) dragEl.classList.remove('flow-content-card--dragging');
+    window._flowCtDnD.dragEl = null;
+    if (list && list.id === 'flow-content-list') flowConteudoSeqDnDHideLine(list);
+}
+
+function flowConteudoSeqDnDEnsureGlobalMouseUp() {
+    if (window._flowCtDnD._globalMouseUp) return;
+    window._flowCtDnD._globalMouseUp = true;
+    document.addEventListener('mouseup', flowConteudoSeqDnDOnListMouseUp, true);
+}
+
+function flowConteudoSeqBindDnD(list) {
+    if (!list || list._flowCtDnDBound) return;
+    list._flowCtDnDBound = true;
+    flowConteudoSeqEnsureDnDLine(list);
+    flowConteudoSeqDnDEnsureGlobalMouseUp();
+    list.addEventListener('mousedown', flowConteudoSeqDnDOnListMouseDown, true);
+    list.addEventListener('dragstart', flowConteudoSeqDnDOnDragStart, true);
+    list.addEventListener('dragover', flowConteudoSeqDnDOnDragOver);
+    list.addEventListener('drop', flowConteudoSeqDnDOnDrop);
+    list.addEventListener('dragend', flowConteudoSeqDnDOnDragEnd, true);
+}
+
+function flowConteudoSeqRemove(btn) {
+    const card = btn && btn.closest('[data-flow-ct-seq-card]');
+    const list = document.getElementById('flow-content-list');
+    if (!card || !list) return;
+    if (list.querySelectorAll('[data-flow-ct-seq-card]').length <= 1) {
+        toast('Mantenha pelo menos um passo na sequência.', 'amber');
+        return;
+    }
+    card.remove();
+    flowConteudoSeqRenumberCards(list);
+}
+
+function flowConteudoSeqAddCard(type) {
+    const body = flowGetInspectorBodyEl();
+    if (!body) return;
+    const items = flowConteudoSeqCollectFromDom(body);
+    items.push(flowConteudoSeqDefaultItem(type));
+    flowConteudoSeqFillList(body, items);
+    const wrap = body;
+    flowEnhanceInspectorVariableButtons(wrap);
+}
+
+/** Agrega primeiro texto/mídia/delay para compat (pré-visualização / legado). */
+function flowConteudoResolvedBrain(cfg) {
+    const items = flowConteudoSeqItemsFromConfig(cfg);
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    const firstM = items.find((x) => ['image', 'video', 'audio', 'document'].includes(x.type));
+    const firstT = items.find((x) => x.type === 'text');
+    const lastD = [...items].reverse().find((x) => x.type === 'delay');
+    let kind = 'text';
+    let url = '';
+    let text = '';
+    if (firstM) {
+        kind = firstM.type;
+        const v = firstM.value || {};
+        url = String(v.url || '');
+        text = String(v.caption != null ? v.caption : '');
+    } else if (firstT) {
+        kind = 'text';
+        text = String(firstT.value || '');
+    }
+    const delaySec = lastD && lastD.type === 'delay' ? Number(lastD.value) || 0 : parseFloat(String(c.content_delay_sec || 0)) || 0;
     const typing = c.content_typing === true || c.content_typing === 'true' || c.content_typing === 1;
-    let buttons = Array.isArray(c.api_buttons)
+    const buttons = Array.isArray(c.api_buttons)
         ? c.api_buttons.map((b) => ({ label: String((b && b.label) || ''), value: String((b && b.value) || '') }))
         : [];
-    return { kind, url, text, delaySec, typing, buttons };
+    return { kind, url, text, delaySec, typing, buttons, _seqItems: items };
 }
 
 function flowConteudoBrainButtonRowHtml(row) {
@@ -7797,51 +8612,6 @@ function flowConteudoBrainButtonRowHtml(row) {
             <input type="text" class="input-field" data-flow-ct-btn-value placeholder="Valor da resposta" value="${flowEsc(row.value || '')}" autocomplete="off" />
             <button type="button" class="flow-inspector-conteudo__row-remove" onclick="flowConteudoBrainRemoveButton(this)" title="Remover" aria-label="Remover"><i class="fas fa-times"></i></button>
         </div>`;
-}
-
-function flowConteudoKindSegmentedHtml(safeId, selected) {
-    const sel = String(selected || 'text');
-    const kindOpts = FLOW_CONTEUDO_MEDIA_KINDS.map((o) => {
-        const s = o.value === sel ? ' selected' : '';
-        return `<option value="${o.value}"${s}>${String(o.label).replace(/</g, '')}</option>`;
-    }).join('');
-    const seg = FLOW_CONTEUDO_MEDIA_KINDS.map((o) => {
-        const active = o.value === sel ? ' flow-segmented__btn--active' : '';
-        return `<button type="button" class="flow-segmented__btn${active}" data-flow-ct-kind-btn="${o.value}" aria-pressed="${o.value === sel ? 'true' : 'false'}">${flowEsc(o.label)}</button>`;
-    }).join('');
-    return `
-        <div class="flow-inspector-section">
-            <div class="flow-inspector-section__title">Tipo de mídia</div>
-            <div class="flow-segmented flow-segmented--wrap" role="tablist" aria-label="Tipo de mídia">${seg}</div>
-            <select id="flow-ct-kind-${safeId}" class="flow-inspector-sr-only input-field" data-flow-ct-field="kind" autocomplete="off" onchange="flowConteudoBrainToggleUrlRow(this)">${kindOpts}</select>
-        </div>`;
-}
-
-function flowConteudoBrainBindKindSegmented(body) {
-    if (!body || !body.querySelectorAll) return;
-    body.querySelectorAll('[data-flow-ct-kind-btn]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const v = btn.getAttribute('data-flow-ct-kind-btn');
-            const sel = body.querySelector('[data-flow-ct-field="kind"]');
-            if (!sel || !v) return;
-            sel.value = v;
-            body.querySelectorAll('[data-flow-ct-kind-btn]').forEach((b) => {
-                const on = b.getAttribute('data-flow-ct-kind-btn') === v;
-                b.classList.toggle('flow-segmented__btn--active', on);
-                b.setAttribute('aria-pressed', on ? 'true' : 'false');
-            });
-            flowConteudoBrainToggleUrlRow(sel);
-        });
-    });
-}
-
-function flowConteudoBrainToggleUrlRow(sel) {
-    const host = sel && sel.closest('.flow-inspector-conteudo');
-    const wrap = host && host.querySelector('[data-flow-ct-url-wrap="1"]');
-    if (!wrap || !sel) return;
-    wrap.style.display = sel.value === 'text' ? 'none' : 'block';
 }
 
 function flowConteudoBrainAddButton(btn) {
@@ -7867,9 +8637,9 @@ function flowConteudoBrainRemoveButton(btn) {
     row.remove();
 }
 
-function flowConteudoBrainRenderInspector(meta) {
-    const body = flowGetInspectorBodyEl();
-    if (!body || !window._flowConteudo) return;
+function flowConteudoBrainRenderInspector(meta, bodyEl) {
+    const targetBody = bodyEl || flowGetInspectorBodyEl();
+    if (!targetBody || !window._flowConteudo) return;
     const st = window._flowConteudo;
     const node = flowCanvasNodeById(st.nodeId);
     if (!node) return;
@@ -7878,70 +8648,53 @@ function flowConteudoBrainRenderInspector(meta) {
         cfg = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
     const r = flowConteudoResolvedBrain(cfg);
-    const { typ, id } = meta;
-    const safeId = String(id || 'n').replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
-    const urlDisplay = r.kind === 'text' ? 'none' : 'block';
+    const items = flowConteudoSeqItemsFromConfig(cfg);
     const btnRows = (r.buttons.length ? r.buttons : [{ label: '', value: '' }]).map((b) => flowConteudoBrainButtonRowHtml(b)).join('');
-    body.innerHTML = `
+    const gridBtns = FLOW_CONTEUDO_SEQ_GRID.map(
+        (g) =>
+            `<button type="button" class="flow-content-type-btn" onclick="event.stopPropagation();flowConteudoSeqAddCard(${JSON.stringify(
+                g.type,
+            )})" title="Adicionar ${flowEsc(g.label)}"><i class="fas ${g.icon}"></i><span>${flowEsc(g.label)}</span></button>`,
+    ).join('');
+    targetBody.innerHTML = `
         ${flowInspectorSummaryHtml(meta)}
-        <div class="flow-inspector-stack">
+        <div class="flow-inspector-stack flow-content-builder">
         <div class="flow-inspector-conteudo">
             <div class="flow-inspector-conteudo__head">
                 <div class="flow-inspector-conteudo__head-ico" aria-hidden="true"><i class="fab fa-whatsapp"></i></div>
                 <div>
-                    <div class="flow-inspector-conteudo__title">Cérebro de Conteúdo</div>
-                    <div class="flow-inspector-conteudo__sub">Mídia, mensagem, ritmo humano e botões de resposta rápida (WhatsApp).</div>
+                    <div class="flow-inspector-conteudo__title">Construtor de conteúdo</div>
+                    <div class="flow-inspector-conteudo__sub">Monte a sequência de mensagens (texto, mídia, pausa). Ordem = ordem de envio.</div>
                 </div>
             </div>
-            ${flowConteudoKindSegmentedHtml(safeId, r.kind)}
-            <div class="flow-inspector-conteudo__field" data-flow-ct-url-wrap="1" style="display:${urlDisplay}">
-                <label class="flow-inspector-conteudo__label" for="flow-ct-url-${safeId}"><i class="fas fa-link"></i> URL da mídia</label>
-                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-                    <input id="flow-ct-url-${safeId}" type="text" class="input-field flow-inspector-conteudo__input" data-flow-ct-field="url" value="${flowEsc(r.url)}" placeholder="https://… ou /media/…" style="flex:1;min-width:0" autocomplete="off" />
-                    <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px;white-space:nowrap;border-radius:10px" onclick="event.stopPropagation();void flowConteudoBrainUpload(this)"><i class="fas fa-cloud-upload-alt"></i> Upload</button>
-                </div>
-            </div>
-            <div class="flow-inspector-conteudo__field">
-                <label class="flow-inspector-conteudo__label" for="flow-ct-text-${safeId}"><i class="fas fa-align-left"></i> Legenda / mensagem</label>
-                <textarea id="flow-ct-text-${safeId}" class="input-field flow-inspector-conteudo__textarea" data-flow-ct-field="text" placeholder="Mensagem principal ao lead…">${flowEsc(r.text)}</textarea>
-            </div>
-            <div class="flow-inspector-section__title" style="margin-top:4px;padding-top:16px;border-top:1px solid rgba(148,163,184,0.22)">Humanização</div>
-            <div class="flow-inspector-conteudo__field">
-                <label class="flow-inspector-conteudo__label" for="flow-ct-delay-${safeId}"><i class="fas fa-hourglass-half"></i> Tempo de espera (segundos)</label>
-                <input id="flow-ct-delay-${safeId}" type="number" min="0" max="86400" step="1" class="input-field flow-inspector-conteudo__input" data-flow-ct-field="delay" value="${flowEsc(String(r.delaySec))}" placeholder="0" />
-            </div>
-            <div class="flow-inspector-conteudo__field">
-                <div class="flow-inspector-conteudo__toggle">
-                    <span>Mostrar indicador de digitando…</span>
-                    <label class="flow-inspector-conteudo__switch" title="Durante o atraso, simula digitação">
-                        <input type="checkbox" data-flow-ct-field="typing" ${r.typing ? 'checked' : ''} />
-                        <span class="flow-inspector-conteudo__switch-slider" aria-hidden="true"></span>
-                    </label>
-                </div>
-            </div>
-            <div class="flow-inspector-section__title" style="margin-top:4px;padding-top:16px;border-top:1px solid rgba(148,163,184,0.22)">Botões de resposta rápida</div>
+            <div class="flow-inspector-section__title" style="margin-top:2px">Adicionar passo</div>
+            <div class="flow-content-type-grid" role="toolbar" aria-label="Tipos de passo">${gridBtns}</div>
+            <div id="flow-content-list" aria-live="polite"></div>
+            <div class="flow-inspector-section__title" style="margin-top:8px;padding-top:16px;border-top:1px solid rgba(148,163,184,0.22)">Botões de resposta rápida (após a sequência)</div>
             <div class="flow-inspector-conteudo__table-wrap">
                 <div class="flow-inspector-conteudo__table-head"><span>Texto do botão</span><span>Valor da resposta</span><span></span></div>
                 <div data-flow-ct-buttons-table>${btnRows}</div>
             </div>
-            <button type="button" class="flow-inspector-conteudo__btn-add" onclick="flowConteudoBrainAddButton(this)"><i class="fas fa-plus"></i> Adicionar botão</button>
+            <button type="button" class="flow-inspector-conteudo__btn-add" onclick="event.stopPropagation(); flowConteudoBrainAddButton(this)"><i class="fas fa-plus"></i> Adicionar botão</button>
         </div>
         </div>
     `;
-    flowEnhanceInspectorVariableButtons(body);
-    flowConteudoBrainBindKindSegmented(body);
-    const ks = body.querySelector('#flow-ct-kind-' + safeId);
-    if (ks) flowConteudoBrainToggleUrlRow(ks);
+    flowConteudoSeqFillList(targetBody, items);
+    flowEnhanceInspectorVariableButtons(targetBody);
+    const host = targetBody.closest('.flow-node-inspector');
+    const saveBtn = host && host.querySelector('.flow-inspector-btn-save');
+    if (saveBtn) {
+        saveBtn.classList.add('flow-inspector-btn-save--seq-builder');
+    }
 }
 
-function flowConteudoRenderInspector(meta) {
-    flowConteudoBrainRenderInspector(meta);
+function flowConteudoRenderInspector(meta, bodyEl) {
+    flowConteudoBrainRenderInspector(meta, bodyEl);
 }
 
 async function flowConteudoBrainUpload(btn) {
-    const body = flowGetInspectorBodyEl();
-    const kindEl = body && body.querySelector('[data-flow-ct-field="kind"]');
-    const kind = kindEl ? String(kindEl.value || 'image') : 'image';
+    const card = btn && btn.closest('[data-flow-ct-seq-card]');
+    const kind = card ? String(card.getAttribute('data-flow-ct-seq-type') || 'image').toLowerCase() : 'image';
     const inp = document.createElement('input');
     inp.type = 'file';
     const acceptMap = {
@@ -7961,7 +8714,7 @@ async function flowConteudoBrainUpload(btn) {
             const res = await fetch(`${API}/api/media/upload`, { method: 'POST', body: fd });
             const j = await res.json();
             if (!res.ok || !j.ok) throw new Error(j.error || 'Falha no upload');
-            const urlInp = body && body.querySelector('[data-flow-ct-field="url"]');
+            const urlInp = card && card.querySelector('[data-flow-ct-seq-field="url"]');
             if (urlInp) urlInp.value = j.url || '';
             toast('Ficheiro enviado; URL preenchida.', 'emerald');
         } catch (e) {
@@ -7973,33 +8726,33 @@ async function flowConteudoBrainUpload(btn) {
     inp.click();
 }
 
-function flowConteudoBrainSave() {
-    const st = window._flowConteudo;
-    if (!st) return;
-    const node = flowCanvasNodeById(st.nodeId);
-    const wrap = node && node.querySelector('.flow-node-inspector-body');
-    if (!node || !wrap) return;
+function flowConteudoSeqPersistFromDom(wrap, node, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const showToast = o.toast !== false;
+    if (!wrap || !node) return;
     let base = {};
     try {
         base = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
     if (typeof base !== 'object' || base === null) base = {};
-    const kindEl = wrap.querySelector('[data-flow-ct-field="kind"]');
-    if (kindEl) base.content_media_kind = String(kindEl.value || 'text');
-    const urlEl = wrap.querySelector('[data-flow-ct-field="url"]');
-    if (urlEl) base.content_media_url = String(urlEl.value || '');
-    const ta = wrap.querySelector('[data-flow-ct-field="text"]');
-    if (ta) {
-        base.content_text = String(ta.value || '');
-        base.body = base.content_text;
+    const contents = flowConteudoSeqCollectFromDom(wrap);
+    base.contents = contents;
+    const textJoined = contents
+        .filter((x) => x && x.type === 'text')
+        .map((x) => String(x.value || ''))
+        .join('\n\n');
+    base.content_text = textJoined;
+    base.body = textJoined;
+    const firstMedia = contents.find((x) => x && ['image', 'video', 'audio', 'document'].includes(x.type));
+    if (firstMedia && firstMedia.value && firstMedia.value.url) {
+        base.content_media_kind = firstMedia.type;
+        base.content_media_url = String(firstMedia.value.url || '');
+    } else {
+        base.content_media_kind = 'text';
+        base.content_media_url = '';
     }
-    const dEl = wrap.querySelector('[data-flow-ct-field="delay"]');
-    if (dEl) {
-        const n = parseFloat(String(dEl.value || '0'));
-        base.content_delay_sec = Number.isFinite(n) ? Math.max(0, Math.min(86400, n)) : 0;
-    }
-    const typChk = wrap.querySelector('[data-flow-ct-field="typing"]');
-    if (typChk) base.content_typing = !!typChk.checked;
+    const lastDelay = [...contents].reverse().find((x) => x && x.type === 'delay');
+    base.content_delay_sec = lastDelay && lastDelay.type === 'delay' ? Number(lastDelay.value) || 0 : 0;
     const btns = [];
     wrap.querySelectorAll('[data-flow-ct-btn="1"]').forEach((row) => {
         const l = row.querySelector('[data-flow-ct-btn-label]');
@@ -8015,8 +8768,17 @@ function flowConteudoBrainSave() {
     } catch (_) {}
     flowRefreshNodePreview(node);
     pushFlowHistory();
-    toast('Conteúdo guardado no bloco.', 'emerald');
+    if (showToast) toast('Conteúdo guardado no bloco.', 'emerald');
     requestFlowAutoSave();
+}
+
+function flowConteudoBrainSave() {
+    const st = window._flowConteudo;
+    if (!st) return;
+    const node = flowCanvasNodeById(st.nodeId);
+    const wrap = node && flowGetNodeInspectorBody(node);
+    if (!node || !wrap) return;
+    flowConteudoSeqPersistFromDom(wrap, node, { toast: true });
 }
 
 async function ensureFlowSchemaCatalog() {
@@ -8274,13 +9036,13 @@ function applyFlowInspectorAiBrain() {
         obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
     if (typeof obj !== 'object' || obj === null) obj = {};
-    const wrap = node.querySelector('.flow-node-inspector-body');
-    const scope = wrap || node;
-    const modelEl = scope.querySelector('[data-flow-inspector-key="ai_model"]');
-    const sysEl = scope.querySelector('[data-flow-inspector-key="ai_system_prompt"]');
-    const tempEl = scope.querySelector('[data-flow-inspector-key="ai_temperature"]');
-    const outEl = scope.querySelector('[data-flow-inspector-key="ai_output_var"]');
-    const memEl = scope.querySelector('[data-flow-inspector-key="ai_memory"]');
+    const wrap = flowGetNodeInspectorBody(node);
+    if (!wrap) return;
+    const modelEl = wrap.querySelector('[data-flow-inspector-key="ai_model"]');
+    const sysEl = wrap.querySelector('[data-flow-inspector-key="ai_system_prompt"]');
+    const tempEl = wrap.querySelector('[data-flow-inspector-key="ai_temperature"]');
+    const outEl = wrap.querySelector('[data-flow-inspector-key="ai_output_var"]');
+    const memEl = wrap.querySelector('[data-flow-inspector-key="ai_memory"]');
     if (modelEl) obj.ai_model = String(modelEl.value || '').trim() || 'gpt-4o';
     if (sysEl) obj.ai_system_prompt = String(sysEl.value || '');
     if (tempEl) {
@@ -8443,7 +9205,7 @@ function applyFlowInspectorCondicao() {
         obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
     if (typeof obj !== 'object' || obj === null) obj = {};
-    const wrap = node.querySelector('.flow-node-inspector-body');
+    const wrap = flowGetNodeInspectorBody(node);
     if (!wrap) return;
     const logicEl = wrap.querySelector('[data-flow-cond-logic="1"]');
     if (logicEl) obj.logic = String(logicEl.value || 'AND').toUpperCase() === 'OR' ? 'OR' : 'AND';
@@ -8681,7 +9443,7 @@ function applyFlowInspectorApi() {
         obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
     if (typeof obj !== 'object' || obj === null) obj = {};
-    const wrap = node.querySelector('.flow-node-inspector-body');
+    const wrap = flowGetNodeInspectorBody(node);
     if (!wrap) return;
     const mEl = wrap.querySelector('[data-flow-api-field="method"]');
     if (mEl) obj.api_method = String(mEl.value || 'GET').toUpperCase();
@@ -8747,9 +9509,9 @@ function applyFlowInspectorFormConfig() {
         obj = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
     if (typeof obj !== 'object' || obj === null) obj = {};
-    const wrap = node.querySelector('.flow-node-inspector-body');
-    const scope = wrap || node;
-    scope.querySelectorAll('[data-flow-inspector-key]').forEach((el) => {
+    const wrap = flowGetNodeInspectorBody(node);
+    if (!wrap) return;
+    wrap.querySelectorAll('[data-flow-inspector-key]').forEach((el) => {
         const k = el.getAttribute('data-flow-inspector-key');
         if (!k) return;
         const raw = (el.value || '').trim();
@@ -8822,7 +9584,7 @@ async function flowEditNode(btn) {
 function flowRemoveNodeEl(node) {
     if (!node) return;
     const id = node.getAttribute('data-flow-id') || '';
-    if (id === _flowSelectedNodeId) closeFlowInspector();
+    if (id === _flowSelectedNodeId) closeFlowInspectorImmediate();
     node.remove();
     if (id) {
         _flowEdges = (_flowEdges || []).filter((e) => e.from !== id && e.to !== id);
@@ -8892,7 +9654,7 @@ function initFlowNodeSelection() {
         if (!vb || vb.style.display === 'none') return;
         if (e.target.closest('[data-flow-node-actions="1"]')) return;
         if (e.target.closest('input, textarea, select')) return;
-        if (e.target.closest('[data-flow-node-inspector="1"]')) return;
+        if (e.target.closest('[data-flow-node-inspector="1"]') || e.target.closest('#flow-inspector')) return;
         if (e.target.closest && e.target.closest('path[data-flow-edge-id]')) return;
         const node = e.target.closest('#nodes-container .flow-node');
         if (!node) {
@@ -8966,11 +9728,13 @@ function initFlowBuilderGlobalHandlers() {
             return;
         }
         if (!inField && (e.key === '+' || e.key === '=' || e.key === 'NumpadAdd')) {
+            if (document.body.classList.contains('flow-canvas-locked')) return;
             e.preventDefault();
             flowZoomIn();
             return;
         }
         if (!inField && (e.key === '-' || e.key === 'NumpadSubtract')) {
+            if (document.body.classList.contains('flow-canvas-locked')) return;
             e.preventDefault();
             flowZoomOut();
             return;
@@ -8990,19 +9754,26 @@ function initFlowBuilderGlobalHandlers() {
     });
     document.addEventListener('mousedown', (e) => {
         if (!flowInspectorIsOpen()) return;
-        const panel = document.getElementById('flow-inspector');
-        if (!panel) return;
-        if (panel.contains(e.target)) return;
-        const hitNode = e.target.closest('#nodes-container .flow-node');
+        const el = e.target && e.target.nodeType === 1 ? e.target : e.target && e.target.parentElement;
+        if (!el) return;
+        if (flowInspectorEventTargetKeepsDrawerOpen(el)) return;
+        const hitNode = el.closest('#nodes-container .flow-node');
         if (hitNode) {
             const nid = hitNode.getAttribute('data-flow-id') || '';
             if (nid && nid !== _flowSelectedNodeId) closeFlowInspector();
             return;
         }
-        if (e.target.closest && e.target.closest('path.conn-path[data-flow-edge-id]')) return;
+        if (el.closest('path.conn-path[data-flow-edge-id]')) return;
+        if (el.closest('#flow-builder-toolbar')) return;
+        if (el.closest('#flow-minimap-wrap')) return;
+        if (el.closest('.flow-canvas-fab-stack') || el.closest('.fab')) return;
+        if (el.closest('#flow-builder-tab-panels')) return;
+        if (el.closest('#flow-sim-lead-modal, #flow-simulator-chat, #flow-sim-replay-modal')) return;
         const area = document.getElementById('flow-canvas-area');
-        if (area && area.contains(e.target)) closeFlowInspector();
+        if (!area || !area.contains(el)) return;
+        closeFlowInspector();
     });
+    flowBindInspectorShellPropagation();
 }
 
 function redrawFlowEdges() {
@@ -9105,13 +9876,13 @@ async function openFlowInspector(nodeEl) {
         closeFlowInspector();
         return;
     }
-    closeFlowInspector();
-    const panel = document.getElementById('flow-inspector');
-    if (panel) panel.style.display = 'none';
+    closeFlowInspectorImmediate();
     _flowSelectedNodeId = id;
     flowSetSelectedNode(nodeEl);
     const bodyEl = flowEnsureInlineInspectorHost(nodeEl);
     if (!bodyEl) return;
+    const saveBtnReset = document.querySelector('#flow-inspector-node-mount .flow-inspector-btn-save');
+    if (saveBtnReset) saveBtnReset.classList.remove('flow-inspector-btn-save--seq-builder');
     nodeEl.classList.add('flow-node--editing');
     nodeEl.setAttribute('aria-expanded', 'true');
     try {
@@ -9120,6 +9891,8 @@ async function openFlowInspector(nodeEl) {
     const typ = nodeEl.getAttribute('data-node-type') || 'generic';
     const head = nodeEl.querySelector('.flow-node-head');
     const title = head ? String(head.innerText || '').trim() : typ;
+    const headingLabel = document.querySelector('#flow-inspector-node-heading .flow-inspector-heading-label');
+    if (headingLabel) headingLabel.textContent = title || typ;
     let cfg = {};
     try {
         const raw = nodeEl.getAttribute('data-flow-config');
@@ -9130,27 +9903,31 @@ async function openFlowInspector(nodeEl) {
     if (typ === 'conteudo') {
         const meta = { typ, title, incom, outgo, id };
         window._flowConteudo = { nodeId: id, _meta: meta };
-        flowConteudoRenderInspector(meta);
+        flowConteudoRenderInspector(meta, bodyEl);
         redrawFlowEdges();
         updateFlowMinimap();
+        flowFocusDrawerOpen();
         return;
     }
     if (typ === 'gpt') {
         flowInspectorRenderGpt({ typ, title, incom, outgo, id }, cfg, bodyEl);
         redrawFlowEdges();
         updateFlowMinimap();
+        flowFocusDrawerOpen();
         return;
     }
     if (typ === 'condicao') {
         flowInspectorRenderCondicao({ typ, title, incom, outgo, id }, cfg, bodyEl);
         redrawFlowEdges();
         updateFlowMinimap();
+        flowFocusDrawerOpen();
         return;
     }
     if (typ === 'api') {
         flowInspectorRenderApi({ typ, title, incom, outgo, id }, cfg, bodyEl);
         redrawFlowEdges();
         updateFlowMinimap();
+        flowFocusDrawerOpen();
         return;
     }
     const catalog = await ensureFlowSchemaCatalog();
@@ -9158,32 +9935,90 @@ async function openFlowInspector(nodeEl) {
     flowInspectorRenderGeneric({ typ, title, incom, outgo, id }, cfg, spec, bodyEl);
     redrawFlowEdges();
     updateFlowMinimap();
+    flowFocusDrawerOpen();
+}
+
+let _flowInspectorCloseTimer = null;
+
+function closeFlowInspectorImmediate() {
+    if (_flowInspectorCloseTimer) {
+        clearTimeout(_flowInspectorCloseTimer);
+        _flowInspectorCloseTimer = null;
+    }
+    const panel = document.getElementById('flow-inspector');
+    const overlay = document.getElementById('flow-inspector-overlay');
+    document.body.classList.remove('flow-canvas-locked');
+    if (overlay) {
+        overlay.classList.remove('flow-inspector-overlay--visible');
+        overlay.setAttribute('hidden', '');
+        overlay.setAttribute('aria-hidden', 'true');
+        overlay.style.display = 'none';
+    }
+    if (panel) {
+        panel.classList.remove('flow-inspector-drawer--open');
+        panel.style.display = 'none';
+        panel.setAttribute('hidden', '');
+        panel.setAttribute('aria-hidden', 'true');
+    }
+    const modeNode = document.getElementById('flow-inspector-mode-node');
+    const modeEdge = document.getElementById('flow-inspector-mode-edge');
+    if (modeNode) {
+        modeNode.style.display = 'none';
+        modeNode.classList.remove('flow-inspector-mode-visible');
+    }
+    if (modeEdge) {
+        modeEdge.style.display = 'none';
+        modeEdge.classList.remove('flow-inspector-mode-visible');
+    }
+    document.querySelectorAll('#nodes-container .flow-node.flow-node--editing').forEach((n) => {
+        n.classList.remove('flow-node--editing');
+        n.removeAttribute('aria-expanded');
+    });
+    const mountHost = document.querySelector('#flow-inspector-node-mount [data-flow-node-inspector="1"]');
+    if (mountHost) {
+        mountHost.setAttribute('hidden', '');
+        const b = mountHost.querySelector('.flow-node-inspector-body');
+        if (b) b.innerHTML = '';
+    }
+    _flowSelectedNodeId = null;
+    flowSetSelectedNode(null);
+    try {
+        delete window._flowConteudo;
+    } catch (_) {
+        window._flowConteudo = null;
+    }
+    _flowSelectedEdgeId = null;
+    flowResetEdgeInspectorDom();
+    redrawFlowEdges();
 }
 
 function closeFlowInspector() {
     const panel = document.getElementById('flow-inspector');
-    if (panel) panel.style.display = 'none';
-    document.querySelectorAll('#nodes-container .flow-node.flow-node--editing').forEach((n) => {
-        n.classList.remove('flow-node--editing');
-        n.removeAttribute('aria-expanded');
-        const host = n.querySelector('[data-flow-node-inspector="1"]');
-        if (host) {
-            host.setAttribute('hidden', '');
-            const b = host.querySelector('.flow-node-inspector-body');
-            if (b) b.innerHTML = '';
+    if (panel && panel.classList.contains('flow-inspector-drawer--open')) {
+        if (_flowInspectorCloseTimer) {
+            clearTimeout(_flowInspectorCloseTimer);
+            _flowInspectorCloseTimer = null;
         }
-    });
-    _flowSelectedNodeId = null;
-    flowSetSelectedNode(null);
-    try { delete window._flowConteudo; } catch (_) { window._flowConteudo = null; }
-    flowClearEdgeSelection();
+        panel.classList.remove('flow-inspector-drawer--open');
+        const overlay = document.getElementById('flow-inspector-overlay');
+        if (overlay) overlay.classList.remove('flow-inspector-overlay--visible');
+        document.body.classList.remove('flow-canvas-locked');
+        _flowInspectorCloseTimer = setTimeout(() => {
+            _flowInspectorCloseTimer = null;
+            closeFlowInspectorImmediate();
+        }, 300);
+        return;
+    }
+    closeFlowInspectorImmediate();
 }
 
 function applyFlowInspectorConfig() {
     const nodeId = _flowSelectedNodeId;
-    const node = nodeId ? document.querySelector('#nodes-container .flow-node[data-flow-id="' + nodeId.replace(/"/g, '\\"') + '"]') : null;
-    const ta = node ? node.querySelector('.flow-inspector-cfg') : null;
-    if (!ta || !node) return;
+    const node = nodeId ? flowCanvasNodeById(nodeId) : null;
+    if (!node) return;
+    const bodyEl = flowGetNodeInspectorBody(node) || flowGetInspectorBodyEl();
+    const ta = bodyEl ? bodyEl.querySelector('.flow-inspector-cfg') : null;
+    if (!ta) return;
     let obj = {};
     try {
         obj = JSON.parse(ta.value || '{}');
@@ -9203,7 +10038,12 @@ function applyFlowInspectorConfig() {
         flowApiSyncLegacyKeysFromApi(obj);
     }
     if (String(node.getAttribute('data-node-type') || '') === 'conteudo') {
-        if (obj.content_text != null && String(obj.content_text) !== '') {
+        if (Array.isArray(obj.contents)) {
+            const textParts = obj.contents.filter((x) => x && x.type === 'text').map((x) => String(x.value != null ? x.value : ''));
+            const joined = textParts.join('\n\n');
+            obj.content_text = joined;
+            obj.body = joined;
+        } else if (obj.content_text != null && String(obj.content_text) !== '') {
             obj.body = obj.content_text;
         } else if (obj.body != null && (obj.content_text === undefined || obj.content_text === '')) {
             obj.content_text = obj.body;
@@ -10248,77 +11088,103 @@ function flowSimConteudoDelayMs(sec) {
 }
 
 /**
- * Simula envio rico (mídia + legenda + botões). Botões disparam o mesmo resolver que o input de texto.
+ * Simula sequência de conteúdos (contents[]) e, no fim, botões rápidos se existirem.
  */
 async function flowSimPlayConteudo(nodeId, cfg, L) {
-    const r = flowConteudoResolvedBrain(cfg);
+    const items = flowConteudoSeqItemsFromConfig(cfg);
     const box = document.getElementById('flow-sim-messages');
-    const delayMs = flowSimConteudoDelayMs(r.delaySec);
-    if (delayMs > 0) {
-        let typingEl = null;
-        if (r.typing && box) {
-            typingEl = document.createElement('div');
-            typingEl.className = 'flow-sim-typing';
-            typingEl.textContent = '… está digitando';
-            box.appendChild(typingEl);
-            box.scrollTop = box.scrollHeight;
+    let lastWrap = null;
+    for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it.type === 'delay') {
+            const delayMs = flowSimConteudoDelayMs(Number(it.value) || 0);
+            if (delayMs > 0) await flowSimDelay(delayMs);
+            continue;
         }
-        await flowSimDelay(delayMs);
-        if (typingEl && typingEl.parentNode) typingEl.remove();
-    }
-    const urlDisp = flowSimSubstituteVars(r.url, L);
-    const cap = flowSimSubstituteVars(r.text, L);
-    const kind = r.kind;
-    const kindMeta = FLOW_CONTEUDO_MEDIA_KINDS.find((x) => x.value === kind);
-    const kindLabel = kindMeta ? kindMeta.label : kind;
-    const wrap = document.createElement('div');
-    wrap.className = 'flow-sim-bubble flow-sim-bubble--bot flow-sim-conteudo-pack';
-    if (kind !== 'text') {
-        const chip = document.createElement('div');
-        chip.className = 'flow-sim-conteudo-chip';
-        const icon = document.createElement('i');
-        icon.setAttribute('aria-hidden', 'true');
-        icon.className =
-            kind === 'image'
-                ? 'fas fa-image'
-                : kind === 'video'
-                  ? 'fas fa-video'
-                  : kind === 'audio'
-                    ? 'fas fa-microphone'
-                    : 'fas fa-file-alt';
-        icon.style.color = '#6366f1';
-        chip.appendChild(icon);
-        const lab = document.createElement('span');
-        const shortUrl = urlDisp
-            ? urlDisp.length > 96
-                ? urlDisp.slice(0, 96) + '…'
-                : urlDisp
-            : '';
-        lab.textContent = shortUrl ? kindLabel + ': ' + shortUrl : kindLabel + (urlDisp === '' ? ' (sem URL)' : '');
-        chip.appendChild(lab);
-        wrap.appendChild(chip);
-        if (kind === 'image' && /^https?:\/\//i.test(urlDisp)) {
-            const im = document.createElement('img');
-            im.className = 'flow-sim-conteudo-thumb';
-            im.alt = '';
-            im.loading = 'lazy';
-            im.src = urlDisp;
-            im.onerror = function () {
-                this.style.display = 'none';
-            };
-            wrap.appendChild(im);
+        if (it.type === 'text') {
+            const cap = flowSimSubstituteVars(String(it.value || ''), L);
+            const wrap = document.createElement('div');
+            wrap.className = 'flow-sim-bubble flow-sim-bubble--bot flow-sim-conteudo-pack';
+            const p = document.createElement('div');
+            p.className = 'flow-sim-conteudo-caption';
+            p.textContent = cap || '(mensagem vazia)';
+            wrap.appendChild(p);
+            if (box) {
+                box.appendChild(wrap);
+                box.scrollTop = box.scrollHeight;
+            }
+            lastWrap = wrap;
+            continue;
+        }
+        if (['image', 'video', 'audio', 'document'].includes(it.type)) {
+            const v = it.value || {};
+            const urlDisp = flowSimSubstituteVars(String(v.url || ''), L);
+            const cap = flowSimSubstituteVars(String(v.caption != null ? v.caption : ''), L);
+            const kind = it.type;
+            const kindMeta = FLOW_CONTEUDO_MEDIA_KINDS.find((x) => x.value === kind);
+            const kindLabel = kindMeta ? kindMeta.label : kind;
+            const wrap = document.createElement('div');
+            wrap.className = 'flow-sim-bubble flow-sim-bubble--bot flow-sim-conteudo-pack';
+            const chip = document.createElement('div');
+            chip.className = 'flow-sim-conteudo-chip';
+            const icon = document.createElement('i');
+            icon.setAttribute('aria-hidden', 'true');
+            icon.className =
+                kind === 'image'
+                    ? 'fas fa-image'
+                    : kind === 'video'
+                      ? 'fas fa-video'
+                      : kind === 'audio'
+                        ? 'fas fa-microphone'
+                        : 'fas fa-file-alt';
+            icon.style.color = '#6366f1';
+            chip.appendChild(icon);
+            const lab = document.createElement('span');
+            const shortUrl = urlDisp ? (urlDisp.length > 96 ? urlDisp.slice(0, 96) + '…' : urlDisp) : '';
+            lab.textContent = shortUrl ? kindLabel + ': ' + shortUrl : kindLabel + (urlDisp === '' ? ' (sem URL)' : '');
+            chip.appendChild(lab);
+            wrap.appendChild(chip);
+            if (kind === 'image' && /^https?:\/\//i.test(urlDisp)) {
+                const im = document.createElement('img');
+                im.className = 'flow-sim-conteudo-thumb';
+                im.alt = '';
+                im.loading = 'lazy';
+                im.src = urlDisp;
+                im.onerror = function () {
+                    this.style.display = 'none';
+                };
+                wrap.appendChild(im);
+            }
+            if (cap) {
+                const p = document.createElement('div');
+                p.className = 'flow-sim-conteudo-caption';
+                p.textContent = cap;
+                wrap.appendChild(p);
+            }
+            if (box) {
+                box.appendChild(wrap);
+                box.scrollTop = box.scrollHeight;
+            }
+            lastWrap = wrap;
         }
     }
-    if (kind === 'text' || cap) {
-        const p = document.createElement('div');
-        p.className = 'flow-sim-conteudo-caption';
-        p.textContent = cap || '(mensagem vazia)';
-        wrap.appendChild(p);
-    }
-    const btnList = (r.buttons || []).filter(
+    const btnList = (Array.isArray(cfg.api_buttons) ? cfg.api_buttons : []).filter(
         (b) => b && (String(b.label || '').trim() || String(b.value != null ? b.value : '').trim()),
     );
-    if (btnList.length) {
+    let wrap = lastWrap;
+    if (btnList.length && !wrap) {
+        wrap = document.createElement('div');
+        wrap.className = 'flow-sim-bubble flow-sim-bubble--bot flow-sim-conteudo-pack';
+        const p = document.createElement('div');
+        p.className = 'flow-sim-conteudo-caption';
+        p.textContent = '(apenas botões)';
+        wrap.appendChild(p);
+        if (box) {
+            box.appendChild(wrap);
+            box.scrollTop = box.scrollHeight;
+        }
+    }
+    if (btnList.length && wrap) {
         const br = document.createElement('div');
         br.className = 'flow-sim-quick-replies';
         btnList.forEach((b) => {
@@ -10343,10 +11209,6 @@ async function flowSimPlayConteudo(nodeId, cfg, L) {
             br.appendChild(btn);
         });
         wrap.appendChild(br);
-    }
-    if (box) {
-        box.appendChild(wrap);
-        box.scrollTop = box.scrollHeight;
     }
     if (btnList.length) {
         await flowSimWaitUserLine();
@@ -13949,6 +14811,7 @@ function initDragAndDrop() {
         }
         head.onmousedown = function (e) {
             if (e.button !== 0) return;
+            if (document.body.classList.contains('flow-canvas-locked')) return;
             draggedNode = this.parentElement;
             if (draggedNode) draggedNode.classList.add('flow-node--dragging');
             _flowDragMoved = false;
@@ -14268,12 +15131,11 @@ function flowDefaultConfigByType(type) {
     if (t === 'conteudo') {
         return {
             body: '',
-            contents: [],
+            contents: [{ type: 'text', value: '' }],
             content_media_kind: 'text',
             content_media_url: '',
             content_text: '',
             content_delay_sec: 0,
-            content_typing: false,
             api_buttons: [],
         };
     }

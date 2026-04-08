@@ -472,11 +472,25 @@ def simulate_flow(doc: Mapping[str, Any], *, max_steps: int = 40) -> Dict[str, A
                         continue
                     t = str(it.get("type") or "text").lower()
                     if t == "text":
-                        parts.append(f"texto:{_safe_text(str(it.get('body')), 40)}")
+                        tx = it.get("body")
+                        if tx is None:
+                            tx = it.get("value")
+                        if tx is None:
+                            tx = ""
+                        parts.append(f"texto:{_safe_text(str(tx), 40)}")
                     elif t == "delay":
-                        parts.append(f"delay:{it.get('seconds', '?')}s")
+                        ds = it.get("seconds")
+                        if ds is None:
+                            ds = it.get("value")
+                        parts.append(f"delay:{ds if ds is not None else '?'}s")
                     elif t in ("image", "audio", "video", "document"):
-                        parts.append(f"{t}:{_safe_text(str(it.get('url')), 50)}")
+                        val = it.get("value")
+                        u = (
+                            str(val.get("url") or "").strip()
+                            if isinstance(val, dict)
+                            else str(it.get("url") or "")
+                        )
+                        parts.append(f"{t}:{_safe_text(str(u), 50)}")
                 desc += " → sequência: " + (" · ".join(parts) if parts else "(vazio)")
                 ctx["messages_sent"] = int(ctx.get("messages_sent", 0)) + max(1, len(parts))
             else:

@@ -41,7 +41,11 @@ def document_to_acoes(doc: Mapping[str, Any]) -> List[Acao]:
 
 
 def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
-    """Lista ordenada do bloco Conteúdo (texto, mídia, delay) → ações do motor."""
+    """Lista ordenada do bloco Conteúdo (texto, mídia, delay) → ações do motor.
+
+    Cada item pode usar o formato novo do Flow Builder: ``{type, value}`` (texto/delay)
+    ou ``{type, value: {url, caption}}`` (mídia). Mantém compat com ``body`` / ``seconds`` / chaves no topo.
+    """
     out: List[Acao] = []
     items = cfg.get("contents")
     if not isinstance(items, list):
@@ -51,7 +55,7 @@ def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
             continue
         t = str(it.get("type") or "text").lower()
         if t == "text":
-            body = str(it.get("body") or "").strip()
+            body = str(it.get("body") or it.get("value") or "").strip()
             if body:
                 out.append(
                     Acao(
@@ -61,18 +65,26 @@ def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
                     )
                 )
         elif t == "delay":
+            raw = it.get("seconds")
+            if raw is None and it.get("value") is not None:
+                raw = it.get("value")
             try:
-                sec = float(it.get("seconds") or 0)
+                sec = float(raw or 0)
             except (TypeError, ValueError):
                 sec = 0.0
             sec = max(0.0, min(sec, _MAX_DELAY_S))
             if sec > 0:
                 out.append(Acao(tipo="delay", segundos=int(sec), metadata={"source": "flow_builder", "conteudo_item": "delay"}))
         elif t in ("image", "video", "audio", "document"):
-            url = str(it.get("url") or "").strip()
+            val = it.get("value")
+            if isinstance(val, dict):
+                url = str(val.get("url") or "").strip()
+                cap = str(val.get("caption") or "").strip()
+            else:
+                url = str(it.get("url") or "").strip()
+                cap = str(it.get("caption") or "").strip()
             if not url:
                 continue
-            cap = str(it.get("caption") or "").strip()
             meta = {"source": "flow_builder", "conteudo_item": t}
             if t == "image":
                 out.append(Acao(tipo="image", url=url, conteudo=cap[:900], metadata=meta))
