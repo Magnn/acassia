@@ -203,3 +203,127 @@ class FlowPublish(Base):
         nullable=True,
         index=True,
     )
+
+
+class FlowBlueprintVersion(Base):
+    """Snapshot imutável do documento acassia-flow (histórico / restore)."""
+
+    __tablename__ = "flow_blueprint_versions"
+    __table_args__ = (UniqueConstraint("blueprint_id", "version_number", name="uq_flow_bp_version_num"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    blueprint_id = Column(Integer, ForeignKey("flow_blueprints.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_number = Column(Integer, nullable=False)
+    body_json = Column(JSON, default=dict)
+    note = Column(Text, nullable=True)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+
+
+class FlowBlueprintLock(Base):
+    """Lock cooperativo por blueprint (colaboração)."""
+
+    __tablename__ = "flow_blueprint_locks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    blueprint_id = Column(Integer, ForeignKey("flow_blueprints.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    lock_holder = Column(String(200), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+
+
+class FlowBlueprintComment(Base):
+    """Comentário opcionalmente ancorado a um nó (node_ref)."""
+
+    __tablename__ = "flow_blueprint_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    blueprint_id = Column(Integer, ForeignKey("flow_blueprints.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    node_ref = Column(String(200), nullable=True)
+    body = Column(Text, nullable=False)
+    author_label = Column(String(200), nullable=True)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+
+
+class FlowRun(Base):
+    """Execução observável de um blueprint (manual ou futuro agendado)."""
+
+    __tablename__ = "flow_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    blueprint_id = Column(Integer, ForeignKey("flow_blueprints.id", ondelete="SET NULL"), nullable=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True)
+    status = Column(String(32), nullable=False, default="queued")
+    meta_json = Column(JSON, default=dict)
+    started_at = Column(DateTime(timezone=True), default=_agora_utc)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class FlowRunEvent(Base):
+    __tablename__ = "flow_run_events"
+    __table_args__ = (UniqueConstraint("run_id", "seq", name="uq_flow_run_event_seq"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, ForeignKey("flow_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    seq = Column(Integer, nullable=False)
+    event_type = Column(String(64), nullable=False)
+    payload_json = Column(JSON, default=dict)
+    timestamp = Column(DateTime(timezone=True), default=_agora_utc)
+
+
+class TenantFlowSecret(Base):
+    """Segredos por tenant (valor ofuscado em repouso; use cofre em produção)."""
+
+    __tablename__ = "tenant_flow_secrets"
+    __table_args__ = (UniqueConstraint("tenant_id", "key", name="uq_tenant_flow_secret_key"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    key = Column(String(128), nullable=False)
+    value_cipher = Column(Text, nullable=False)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+    atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
+
+
+class TenantFlowVariable(Base):
+    """Variáveis não sensíveis (JSON) por tenant."""
+
+    __tablename__ = "tenant_flow_variables"
+    __table_args__ = (UniqueConstraint("tenant_id", "key", name="uq_tenant_flow_var_key"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    key = Column(String(128), nullable=False)
+    value_json = Column(JSON, nullable=True)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+    atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
+
+
+class FlowBlueprintAclEntry(Base):
+    __tablename__ = "flow_blueprint_acl"
+    __table_args__ = (UniqueConstraint("blueprint_id", "principal", name="uq_flow_bp_acl_principal"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    blueprint_id = Column(Integer, ForeignKey("flow_blueprints.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    principal = Column(String(200), nullable=False)
+    role = Column(String(32), nullable=False)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+
+
+class FlowSchedule(Base):
+    """Agendamento (cron) — persistência; worker de disparo é etapa futura."""
+
+    __tablename__ = "flow_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    blueprint_id = Column(Integer, ForeignKey("flow_blueprints.id", ondelete="CASCADE"), nullable=False, index=True)
+    cron_expr = Column(String(120), nullable=False)
+    timezone = Column(String(64), nullable=False, default="America/Sao_Paulo")
+    active = Column(Boolean, default=True)
+    meta_json = Column(JSON, default=dict)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+    atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)

@@ -27,9 +27,11 @@ import queue
 import json
 import random
 import re
+import uuid
 from decimal import Decimal
 from collections import deque
 from flask import Flask, request, jsonify, send_from_directory
+from werkzeug.utils import secure_filename
 from flask_cors import CORS 
 from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
@@ -122,6 +124,10 @@ try:
 except Exception as e:
     logger.critical(f"🚨 [DATABASE] Falha ao sincronizar banco: {e}")
     sys.exit(1)
+
+from api.flow_platform import register_flow_platform_routes
+
+register_flow_platform_routes(app)
 
 # Inicialização dos Motores de IA
 personalizer = Personalizer(api_key=GEMINI_API_KEY)
@@ -441,6 +447,67 @@ def serve_assets(filename):
 def serve_media(filename):
     """Serve mídias baixadas (fotos da mão/áudios)."""
     return send_from_directory(DOWNLOAD_DIR, filename)
+
+
+@app.route("/api/media/upload", methods=["POST"])
+def api_media_upload():
+    """
+    Upload para a pasta `downloads/` — URL devolvida (/media/…) para usar no bloco Conteúdo do flow builder.
+    Limites: tipos comuns de imagem/vídeo/áudio/documento; máx. 40MB.
+    """
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "ficheiro em falta (campo 'file')"}), 400
+    f = request.files["file"]
+    if not f or not getattr(f, "filename", None):
+        return jsonify({"ok": False, "error": "nome de ficheiro inválido"}), 400
+    orig = str(f.filename or "")
+    ext = os.path.splitext(orig)[1].lower()
+    allowed = {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".mp4",
+        ".mov",
+        ".webm",
+        ".avi",
+        ".ogg",
+        ".mp3",
+        ".m4a",
+        ".wav",
+        ".pdf",
+        ".doc",
+        ".docx",
+    }
+    if ext not in allowed:
+        return jsonify({"ok": False, "error": f"extensão não permitida: {ext or '(vazia)'}"}), 400
+    max_b = 40 * 1024 * 1024
+    try:
+        f.seek(0, os.SEEK_END)
+        sz = f.tell()
+        f.seek(0)
+    except Exception:
+        sz = int(request.content_length or -1)
+    if sz > max_b > 0:
+        return jsonify({"ok": False, "error": "ficheiro demasiado grande (máx. 40MB)"}), 400
+    safe_name = f"{uuid.uuid4().hex}{ext}"
+    path = os.path.join(DOWNLOAD_DIR, safe_name)
+    try:
+        f.save(path)
+    except Exception as e:
+        logger.error("[API] /api/media/upload save: %s", e)
+        return jsonify({"ok": False, "error": "falha ao gravar ficheiro"}), 500
+    orig_disp = secure_filename(orig) or safe_name
+    return jsonify(
+        {
+            "ok": True,
+            "url": f"/media/{safe_name}",
+            "filename": safe_name,
+            "original_filename": orig_disp,
+        }
+    ), 200
+
 
 def _humanize_delta_pt(ts: datetime, now: datetime) -> str:
     """Ex.: 'há 10 dias', 'há 3 horas' — para UI do chat."""
@@ -1044,6 +1111,27 @@ def api_flows_blueprint_one(bid: int):
         db.close()
 
 
+@app.route("/api/flows/blueprints/by-slug/<string:slug>", methods=["GET"])
+def api_flows_blueprint_by_slug(slug: str):
+    """Carrega documento acassia-flow por slug estável (uma ida ao servidor)."""
+    tid = get_request_tenant_id()
+    ns = (slug or "").strip().lower()[:128]
+    if not ns:
+        return jsonify({"ok": False, "error": "slug inválido"}), 400
+    db = SessionLocal()
+    try:
+        row = db.query(models.FlowBlueprint).filter_by(tenant_id=tid, slug=ns).first()
+        if not row:
+            return jsonify({"ok": False, "error": "não encontrado"}), 404
+        body = row.body_json if isinstance(row.body_json, dict) else {}
+        return jsonify({"ok": True, "blueprint": {**_serialize_flow_blueprint_row(row), "body": body}}), 200
+    except Exception as e:
+        logger.error("🚨 [API] blueprint by-slug %s: %s", slug, e)
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        db.close()
+
+
 def _ensure_flow_publish_row(db, tenant_id: str) -> models.FlowPublish:
     tid = (tenant_id or "default").strip() or "default"
     row = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
@@ -1184,6 +1272,13 @@ def api_flows_blueprint_execute(bid: int):
             )
         )
         db.commit()
+
+        try:
+            from api.flow_platform import record_execute_flow_run
+
+            record_execute_flow_run(tid, bid, lead.id)
+        except Exception:
+            pass
 
         threading.Thread(
             target=motor._processar_fila,

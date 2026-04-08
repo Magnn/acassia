@@ -912,11 +912,12 @@
             color: white; flex-shrink: 0;
         }
 
-        /* ── FLOW BUILDER ────────────────────────────────────────── */
+        /* ── FLOW BUILDER — canvas & blocos (nível produto) ─────── */
         .flow-canvas {
-            background: var(--c-bg);
-            background-image: radial-gradient(circle, var(--c-border) 1px, transparent 1px);
-            background-size: 22px 22px;
+            background: linear-gradient(165deg, #eef1f8 0%, var(--c-bg) 38%, #f0f4fc 100%);
+            background-image: radial-gradient(rgba(15, 23, 42, 0.055) 1.2px, transparent 1.2px);
+            background-size: 20px 20px;
+            background-blend-mode: multiply;
         }
         .flow-canvas.flow-connecting {
             cursor: crosshair !important;
@@ -924,49 +925,165 @@
         .flow-canvas.flow-connecting .flow-node {
             cursor: crosshair !important;
         }
+        /* Tons por família de bloco — borda esquerda + foco em inputs */
+        .flow-tone-violet  { --flow-accent: #7c5af5; --flow-accent-soft: rgba(124, 90, 245, 0.12); }
+        .flow-tone-blue     { --flow-accent: #3b82f6; --flow-accent-soft: rgba(59, 130, 246, 0.12); }
+        .flow-tone-emerald  { --flow-accent: #10b981; --flow-accent-soft: rgba(16, 185, 129, 0.12); }
+        .flow-tone-amber    { --flow-accent: #f59e0b; --flow-accent-soft: rgba(245, 158, 11, 0.12); }
+        .flow-tone-rose     { --flow-accent: #f43f5e; --flow-accent-soft: rgba(244, 63, 94, 0.1); }
+        .flow-tone-slate    { --flow-accent: #64748b; --flow-accent-soft: rgba(100, 116, 139, 0.12); }
+        .flow-node[class*="flow-tone-"] {
+            border-left: 3px solid var(--flow-accent);
+        }
         .flow-node {
             position: absolute;
+            --flow-accent: var(--c-purple2);
+            --flow-accent-soft: var(--c-purple-glow);
             background: var(--c-surface);
-            border: 1px solid var(--c-border);
-            border-radius: var(--radius);
-            width: 250px;
+            border: 1px solid rgba(15, 23, 42, 0.07);
+            border-radius: 12px;
+            width: 268px;
             font-size: 12px;
             z-index: 10;
-            transition: box-shadow 0.2s, border-color 0.2s;
+            overflow: hidden;
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.65) inset,
+                0 1px 1px rgba(15, 23, 42, 0.04),
+                0 4px 16px rgba(15, 23, 42, 0.07);
+            transition: box-shadow 0.22s ease, border-color 0.22s ease, transform 0.18s ease;
             cursor: grab;
             user-select: none;
         }
+        @media (prefers-reduced-motion: reduce) {
+            .flow-node { transition: none; }
+        }
         .flow-node:active { cursor: grabbing; z-index: 50; }
-        .flow-node:hover { border-color: var(--c-purple); box-shadow: 0 0 24px var(--c-purple-glow); }
+        .flow-node:hover {
+            border-color: rgba(124, 90, 245, 0.35);
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.65) inset,
+                0 2px 8px rgba(124, 90, 245, 0.1),
+                0 12px 32px rgba(15, 23, 42, 0.08);
+        }
         .flow-node.flow-node--selected {
-            border-color: var(--c-purple);
-            box-shadow: 0 0 0 2px rgba(124, 90, 245, 0.35), 0 8px 28px var(--c-purple-glow);
+            border-color: rgba(124, 90, 245, 0.55);
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.7) inset,
+                0 0 0 2px rgba(124, 90, 245, 0.45),
+                0 10px 36px rgba(124, 90, 245, 0.18);
             z-index: 22;
         }
         
         .flow-node-head {
-            padding: 10px 12px;
-            border-radius: 9px 9px 0 0;
-            display: flex; align-items: center; gap: 7px;
-            font-family: var(--f-display); font-weight: 700; font-size: 12px; color: white;
+            padding: 11px 10px 11px 12px;
+            border-radius: 11px 11px 0 0;
+            display: flex; align-items: center; gap: 8px;
+            min-width: 0;
+            font-family: var(--f-display); font-weight: 700; font-size: 12px; letter-spacing: -0.02em;
+            color: white;
             cursor: grab;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+        }
+        .flow-node-head-label {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+        }
+        .flow-node-head-label > i:first-child {
+            width: 26px;
+            height: 26px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.16);
+            font-size: 12px;
+        }
+        .flow-node-head-actions {
+            display: flex;
+            gap: 3px;
+            flex-shrink: 0;
+            align-items: center;
+        }
+        .flow-node-head-actions .icon-btn {
+            width: 26px;
+            height: 26px;
+            border: none;
+            background: rgba(255, 255, 255, 0.14);
+            box-shadow: none;
+        }
+        .flow-node-head-actions .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.26);
+        }
+        .flow-node-head-actions .icon-btn i {
+            color: #fff !important;
+            opacity: 0.95;
         }
         .flow-node-head:active { cursor: grabbing; }
         
-        .flow-node-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .flow-node-body {
+            padding: 12px 13px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, var(--c-surface2) 100%);
+        }
+        .flow-node .input-field,
+        .flow-node select.input-field,
+        .flow-node textarea.input-field {
+            min-height: 34px;
+            border-radius: 8px;
+            border: 1px solid var(--c-border);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            font-size: 11px;
+        }
+        .flow-node .input-field:focus {
+            outline: none;
+            border-color: var(--flow-accent, var(--c-purple));
+            box-shadow: 0 0 0 3px var(--flow-accent-soft, var(--c-purple-glow));
+        }
+        .flow-node-body label {
+            font-size: 10px !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.05em !important;
+            text-transform: uppercase !important;
+            color: var(--c-muted) !important;
+            margin-bottom: 4px !important;
+        }
+        .flow-node .flow-field-hint {
+            font-size: 9px;
+            line-height: 1.45;
+            color: var(--c-muted);
+            letter-spacing: 0.02em;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(124, 90, 245, 0.05);
+            border: 1px solid rgba(124, 90, 245, 0.1);
+            margin: 0 0 4px;
+        }
         .flow-node.flow-node--editing {
-            width: min(420px, calc(100vw - 48px));
-            max-width: min(420px, 92vw);
+            width: min(440px, calc(100vw - 48px));
+            max-width: min(440px, 92vw);
             z-index: 35;
             box-shadow:
-                0 16px 48px rgba(15, 23, 42, 0.14),
-                0 0 0 2px rgba(124, 90, 245, 0.42);
+                0 0 0 1px rgba(255, 255, 255, 0.75) inset,
+                0 18px 56px rgba(15, 23, 42, 0.12),
+                0 0 0 2px rgba(124, 90, 245, 0.38);
         }
         .flow-node-inspector {
             border-top: 1px solid var(--c-border);
-            background: linear-gradient(180deg, rgba(124, 90, 245, 0.07), var(--c-surface2));
-            border-radius: 0 0 9px 9px;
+            background: linear-gradient(180deg, rgba(124, 90, 245, 0.06), #f3f6fd);
+            border-radius: 0 0 11px 11px;
             overflow: hidden;
+            box-shadow: inset 0 2px 8px rgba(124, 90, 245, 0.04);
         }
         .flow-node-inspector[hidden] {
             display: none !important;
@@ -976,9 +1093,21 @@
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-            padding: 8px 10px;
-            background: var(--c-surface2);
+            padding: 7px 10px;
+            background: var(--c-surface);
             border-bottom: 1px solid var(--c-border);
+        }
+        .flow-inspector-meta {
+            font-size: 10px;
+            color: var(--c-muted2);
+            margin: 0 0 10px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: var(--c-surface2);
+            border: 1px solid var(--c-border);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            line-height: 1.35;
+            word-break: break-all;
         }
         .flow-builder-tab-btn {
             padding: 4px 14px;
@@ -1051,22 +1180,35 @@
             min-width: 0;
         }
         .flow-node-inspector-body {
-            padding: 10px 12px 12px;
-            max-height: min(52vh, 460px);
+            padding: 10px 12px 14px;
+            max-height: min(48vh, 400px);
             overflow: auto;
             font-size: 11px;
-            color: var(--c-muted);
+            color: var(--c-text);
             line-height: 1.45;
             overscroll-behavior: contain;
+        }
+        .flow-node-inspector-body .kpi-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--c-muted);
+            text-transform: none;
+            letter-spacing: 0;
         }
         .flow-node-head[title] {
             cursor: grab;
         }
         .flow-tag {
-            background: var(--c-surface2); border: 1px solid var(--c-border);
-            border-radius: 5px; padding: 6px 8px;
-            font-size: 11px; color: var(--c-muted2);
-            display: flex; align-items: center; gap: 6px;
+            background: var(--c-surface);
+            border: 1px solid var(--c-border);
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 11px;
+            color: var(--c-muted2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
         }
         .flow-field-hint {
             font-size: 9px;
@@ -1115,19 +1257,38 @@
             color: var(--c-text);
         }
         .conn-dot {
-            position: absolute; top: 50%; transform: translateY(-50%);
-            width: 14px; height: 14px; border-radius: 50%;
-            background: var(--c-surface); border: 2px solid var(--c-border2);
-            z-index: 25; cursor: grab;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #ffffff, var(--c-surface2));
+            z-index: 25;
+            cursor: grab;
             pointer-events: auto;
-            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
         }
         .conn-dot:active { cursor: grabbing; }
-        .conn-left { left: -7px; }
-        .conn-right { right: -7px; border-color: var(--c-purple); }
+        .conn-left {
+            left: -8px;
+            border: 2px solid #94a3b8;
+            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.15);
+        }
+        .conn-left:hover {
+            transform: translateY(-50%) scale(1.1);
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.22);
+        }
+        .conn-right {
+            right: -8px;
+            border: 2px solid var(--c-purple);
+            box-shadow: 0 0 0 2px rgba(124, 90, 245, 0.15);
+        }
         .conn-right:hover {
             transform: translateY(-50%) scale(1.12);
-            box-shadow: 0 0 0 4px rgba(124, 90, 245, 0.22);
+            border-color: #a78bfa;
+            box-shadow: 0 0 0 5px rgba(124, 90, 245, 0.28);
         }
         .flow-cont-add-btn:hover {
             border-color: var(--c-purple) !important;
@@ -2463,7 +2624,9 @@
                         <option value="whatsapp">WhatsApp</option>
                         <option value="chat">Chat ao vivo</option>
                         <option value="recovery">Recuperação</option>
-                        <option value="draft">Rascunhos</option>
+                        <option value="server">Servidor (SQLite)</option>
+                        <option value="synced">Local + servidor</option>
+                        <option value="draft">Só neste browser</option>
                     </select>
                     <input type="search" id="fluxos-search" placeholder="Pesquisar..." autocomplete="off" oninput="renderFluxosList()" class="input-field" style="font-size:11px;padding:7px 8px;min-width:260px">
                 </div>
@@ -2683,7 +2846,7 @@
                 </div>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center;max-width:min(100%,520px)">
-                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Guardar estado do canvas neste browser" onclick="saveFlowDraftToStorage(true)"><i class="fas fa-save"></i> Rascunho</button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Guardar local e sincronizar com o servidor se o fluxo estiver ligado a um blueprint" onclick="void saveFlowDraftToStorage(true)"><i class="fas fa-save"></i> Rascunho</button>
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Validar estrutura do fluxo" onclick="validateFlowDraft()"><i class="fas fa-check-circle"></i> Validar</button>
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Compilar plano (ordem de execução)" onclick="compileFlowDraft()"><i class="fas fa-cogs"></i> Compilar</button>
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:6px 10px" title="Simular dry-run (sem WhatsApp)" onclick="simulateFlowDraft()"><i class="fas fa-flask"></i> Simular</button>
@@ -3607,7 +3770,7 @@ function go(name, contextTitle = null) {
         } catch (_) {
             _currentFlowBlueprintId = null;
         }
-        loadOrRenderBuilderCanvas(contextTitle);
+        void loadOrRenderBuilderCanvas(contextTitle);
         refreshFlowPublishStatus();
         ensureFlowSchemaCatalog();
     }
@@ -3618,11 +3781,23 @@ let _fluxosSummaryCache = null;
 
 let _fluxCatalogRemote = [];
 let _fluxCatalogIsFallback = false;
+/** Lista GET /api/flows/blueprints — usada em getFluxCatalog() com rascunhos locais */
+let _fluxBlueprintsServer = [];
 let _flowBuilderTab = 'automacao';
 let _flowBuilderLogText = '';
 let _flowBlueprintPickerList = [];
 let _flowBlueprintPickerFiltered = [];
 let _flowBlueprintPickerSelectedId = null;
+
+async function loadFluxBlueprintsFromServer() {
+    try {
+        const res = await fetch(`${API}/api/flows/blueprints`);
+        const j = await res.json();
+        _fluxBlueprintsServer = j.ok && Array.isArray(j.blueprints) ? j.blueprints : [];
+    } catch (_) {
+        _fluxBlueprintsServer = [];
+    }
+}
 
 async function loadFluxCatalogFromApi() {
     try {
@@ -3649,24 +3824,85 @@ async function loadFluxCatalogFromApi() {
 }
 
 function getFluxCatalog() {
-    const drafts = Object.values(readFlowStore()).filter((d) => d && d.format === 'acassia-flow');
-    const draftItems = drafts.map((d, i) => ({
-        kind: 'draft',
-        name: d.title || `Rascunho ${i + 1}`,
-        trigger: 'Rascunho local (JSON)',
-        integration: 'draft',
-        flowId: '#' + (70000 + i),
-        lastRun: d.updatedAt ? new Date(d.updatedAt).toLocaleDateString('pt-PT') : '—',
-        builderContext: d.title || `Rascunho ${i + 1}`,
-    }));
-    return [..._fluxCatalogRemote, ...draftItems];
+    const store = readFlowStore();
+    const drafts = Object.values(store).filter((d) => d && d.format === 'acassia-flow');
+    const draftBySlug = {};
+    drafts.forEach((d) => {
+        const slug = _flowSlug(d.title || '');
+        if (slug) draftBySlug[slug] = d;
+    });
+    const seenSlugs = new Set();
+    const merged = [];
+
+    (_fluxBlueprintsServer || []).forEach((bp) => {
+        const slug = String(bp.slug || '').toLowerCase();
+        if (!slug) return;
+        seenSlugs.add(slug);
+        const local = draftBySlug[slug];
+        const syncStatus = local ? 'both' : 'server_only';
+        merged.push({
+            kind: 'server_blueprint',
+            name: String(bp.title || slug).replace(/</g, ''),
+            trigger: syncStatus === 'both' ? 'Canvas local + cópia no servidor' : 'Guardado no servidor (SQLite)',
+            integration: syncStatus === 'both' ? 'synced' : 'server',
+            flowId: '#' + bp.id,
+            lastRun: bp.updated_at ? new Date(bp.updated_at).toLocaleString('pt-PT') : '—',
+            builderContext: String(bp.title || slug).replace(/</g, ''),
+            slug,
+            blueprintId: bp.id,
+            syncStatus,
+        });
+    });
+
+    drafts.forEach((d, i) => {
+        const slug = _flowSlug(d.title || '');
+        if (slug && seenSlugs.has(slug)) return;
+        merged.push({
+            kind: 'draft',
+            name: String(d.title || `Rascunho ${i + 1}`).replace(/</g, ''),
+            trigger: 'Só neste browser (sem blueprint no servidor)',
+            integration: 'draft',
+            flowId: '#' + (70000 + i),
+            lastRun: d.updatedAt ? new Date(d.updatedAt).toLocaleDateString('pt-PT') : '—',
+            builderContext: String(d.title || `Rascunho ${i + 1}`).replace(/</g, ''),
+            slug: slug || '',
+            syncStatus: 'local_only',
+        });
+    });
+
+    return [..._fluxCatalogRemote, ...merged];
 }
 
 function getFlowIconForIntegration(integration) {
     if (integration === 'whatsapp') return '<i class="fab fa-whatsapp" style="color:#22c55e"></i>';
     if (integration === 'chat') return '<i class="fas fa-comment-dots" style="color:#60a5fa"></i>';
     if (integration === 'recovery') return '<i class="fas fa-redo-alt" style="color:#60a5fa"></i>';
+    if (integration === 'server') return '<i class="fas fa-database" style="color:var(--c-emerald)"></i>';
+    if (integration === 'synced') return '<i class="fas fa-clone" style="color:var(--c-emerald)"></i>';
+    if (integration === 'draft') return '<i class="fas fa-laptop-house" style="color:var(--c-amber)"></i>';
     return '<i class="fas fa-diagram-project" style="color:var(--c-purple)"></i>';
+}
+
+function fluxDraftSyncSubtitle(slug) {
+    const s = String(slug || '').toLowerCase();
+    if (!s) return 'Rascunho guardado neste browser';
+    const hit = (_fluxBlueprintsServer || []).find((b) => String(b.slug || '').toLowerCase() === s);
+    if (hit) return 'Local + servidor (SQLite) — cópia sincronizada';
+    return 'Só neste browser — ainda não guardado no servidor';
+}
+
+function fluxSyncBadgeHtml(f) {
+    const st = f.syncStatus || '';
+    if (st === 'both' || f.integration === 'synced') {
+        return '<span class="badge badge-emerald" style="font-size:9px">Local + servidor</span>';
+    }
+    if (st === 'server_only' || f.integration === 'server') {
+        return '<span class="badge badge-gray" style="font-size:9px">Servidor</span>';
+    }
+    if (st === 'local_only' || f.integration === 'draft') {
+        return '<span class="badge badge-amber" style="font-size:9px">Só local</span>';
+    }
+    return '';
 }
 
 function openFluxFolder(folderId) {
@@ -3713,28 +3949,33 @@ function renderFluxosList() {
     const q = (document.getElementById('fluxos-search')?.value || '').trim().toLowerCase();
     const integration = (document.getElementById('fluxos-integration-filter')?.value || '').toLowerCase();
     const arr = getFluxCatalog().filter((f) => {
-        const okInt = !integration || integration === 'all' || f.integration === integration;
-        const blob = `${f.name} ${f.trigger} ${f.flowId} ${f.integration}`.toLowerCase();
+        let okInt = !integration || integration === 'all' || f.integration === integration;
+        if (integration === 'server') okInt = f.kind === 'server_blueprint';
+        if (integration === 'synced') okInt = f.integration === 'synced';
+        const blob = `${f.name} ${f.trigger} ${f.flowId} ${f.integration} ${f.slug || ''}`.toLowerCase();
         const okSearch = !q || blob.includes(q);
         return okInt && okSearch;
     });
     list.innerHTML = arr.map((f) => `
-        <div class="card fluxo-list-item" data-flow-name="${encodeURIComponent(String(f.builderContext || f.name || 'Fluxo'))}" style="padding:10px 12px;cursor:pointer">
+        <div class="card fluxo-list-item" data-flow-name="${encodeURIComponent(String(f.builderContext || f.name || 'Fluxo'))}" data-flow-slug="${encodeURIComponent(String(f.slug || ''))}" style="padding:10px 12px;cursor:pointer">
             <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
                 <div style="display:flex;gap:8px;align-items:center;min-width:0">
-                    <div style="width:22px;display:flex;justify-content:center">${getFlowIconForIntegration(f.integration)}</div>
+                    <div style="width:22px;display:flex;justify-content:center;flex-shrink:0">${getFlowIconForIntegration(f.integration)}</div>
                     <div style="min-width:0">
-                        <div style="font-size:12px;font-weight:700;color:var(--c-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                            <span style="font-size:12px;font-weight:700;color:var(--c-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</span>
+                            ${fluxSyncBadgeHtml(f)}
+                        </div>
                         <div style="font-size:11px;color:var(--c-muted)">${f.trigger}</div>
                     </div>
                 </div>
                 <div style="text-align:right;flex-shrink:0">
-                    <div style="font-size:11px;color:var(--c-text)">Automação Id:</div>
+                    <div style="font-size:11px;color:var(--c-text)">ID</div>
                     <div style="font-size:11px;font-weight:700">${f.flowId}</div>
                 </div>
             </div>
-            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--c-border);display:flex;justify-content:space-between;font-size:10px;color:var(--c-muted)">
-                <span>Última execução: ${f.lastRun}</span>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--c-border);display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--c-muted);gap:8px">
+                <span>Atualizado: ${f.lastRun}</span>
                 <span style="color:var(--c-purple2)"><i class="fas fa-ellipsis-v"></i></span>
             </div>
         </div>
@@ -3753,6 +3994,7 @@ function renderFluxosList() {
 
 async function loadFluxosSummary() {
     await loadFluxCatalogFromApi();
+    await loadFluxBlueprintsFromServer();
     const catHint = document.getElementById('fluxos-catalog-hint');
     if (catHint) {
         if (_fluxCatalogIsFallback) catHint.classList.remove('hidden');
@@ -3897,6 +4139,143 @@ const FLOW_VOICE_PROFILES = [
 
 function flowOptsHtml(items, valueKey, labelKey) {
     return items.map((o) => `<option value="${String(o[valueKey]).replace(/"/g, '&quot;')}">${String(o[labelKey]).replace(/</g, '')}</option>`).join('');
+}
+
+function flowOptsHtmlSelected(items, valueKey, labelKey, selectedVal) {
+    const sel = selectedVal == null || selectedVal === undefined ? '' : String(selectedVal);
+    return items
+        .map((o) => {
+            const v = String(o[valueKey]);
+            const isSel = v === sel ? ' selected' : '';
+            return `<option value="${v.replace(/"/g, '&quot;')}"${isSel}>${String(o[labelKey]).replace(/</g, '')}</option>`;
+        })
+        .join('');
+}
+
+function flowEscapeAttrJson(obj) {
+    try {
+        return String(JSON.stringify(obj || {}))
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;');
+    } catch (_) {
+        return '{}';
+    }
+}
+
+/** HTML do bloco Gatilho (igual addSpecificNode) — usado em newFlow / templates */
+function flowTriggerNodeHtmlString(id, left, top, cfg, iconClass, headline) {
+    const fs = 'width:100%;margin-bottom:8px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
+    const fh = (t) => `<div class="flow-field-hint">${t}</div>`;
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    const integOpts = flowOptsHtmlSelected(FLOW_MARKET_INTEGRATIONS, 'value', 'label', c.integration);
+    const evOpts = flowOptsHtmlSelected(FLOW_TRIGGER_EVENTS, 'value', 'label', c.event);
+    const cfgAttr = flowEscapeAttrJson(c);
+    const headSafe = String(headline || 'Gatilho').replace(/</g, '');
+    const icon = iconClass || 'fas fa-bolt';
+    const body = `
+            ${fh('Mercado: um único ponto de entrada por canal (WhatsApp, web, etc.). Ligue o ● direito ao próximo bloco.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome interno do gatilho…" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Canal</label>
+            <select data-flow-cfg="integration" class="input-field" style="${fs}">${integOpts}</select>
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Tipo de evento</label>
+            <select data-flow-cfg="event" class="input-field" style="${fs}">${evOpts}</select>
+            <input type="text" data-flow-cfg="keyword" placeholder="Palavra-chave (se evento = palavra-chave)" class="input-field" style="${fs}">`;
+    return `<div class="flow-node node-purple flow-tone-violet" data-flow-id="${id}" data-node-type="trigger" data-flow-block="trigger" data-flow-config="${cfgAttr}" style="left:${left}px;top:${top}px">
+        <div class="conn-dot conn-left"></div>
+        <div class="flow-node-head" style="background:linear-gradient(135deg,#6d28d9,#7c5af5)"><span class="flow-node-head-label"><i class="${icon}"></i> ${headSafe}</span></div>
+        <div class="flow-node-body">${body}</div>
+        <div class="conn-dot conn-right"></div>
+    </div>`;
+}
+
+function flowCanonicalIntegrationFromModal(btn) {
+    if (!btn) return 'whatsapp';
+    const name = (btn.getAttribute('data-name') || '').toLowerCase();
+    const typ = btn.getAttribute('data-type') || '';
+    if (name.includes('whatsapp') || typ === 'chat') return 'whatsapp';
+    if (name.includes('instagram')) return 'instagram';
+    if (typ === 'pay') return 'web';
+    if (typ === 'crm') return 'web';
+    return 'web';
+}
+
+function flowCanonicalEventFromModal(eventName) {
+    const m = {
+        'Mensagem recebida': 'mensagem_recebida',
+        'Enviou palavra chave': 'palavra_chave',
+        'Novo lead': 'primeiro_contato',
+        'Tag adicionada': 'palavra_chave',
+        'Pagamento Aprovado': 'webhook_externo',
+        'Pagamento recusado': 'webhook_externo',
+        'Aguardando pagamento': 'webhook_externo',
+        Chargeback: 'webhook_externo',
+    };
+    return m[eventName] || 'mensagem_recebida';
+}
+
+function flowWebhookNodeHtmlString(id, left, top, cfg) {
+    const fs = 'width:100%;margin-bottom:8px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
+    const fh = (t) => `<div class="flow-field-hint">${t}</div>`;
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    const whM = FLOW_WEBHOOK_METHODS.map((m) => {
+        const sel = String(c.method || 'POST') === m ? ' selected' : '';
+        return `<option value="${m}"${sel}>${m}</option>`;
+    }).join('');
+    const cfgAttr = flowEscapeAttrJson(c);
+    const body = `
+            ${fh('Padrão Zapier/n8n: caminho relativo exposto pela API; método HTTP explícito.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do webhook…" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="path" placeholder="/webhook/entrada" class="input-field" style="${fs}">
+            <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Método</label>
+            <select data-flow-cfg="method" class="input-field" style="${fs}">${whM}</select>`;
+    return `<div class="flow-node node-purple flow-tone-violet" data-flow-id="${id}" data-node-type="webhook" data-flow-block="webhook" data-flow-config="${cfgAttr}" style="left:${left}px;top:${top}px">
+        <div class="conn-dot conn-left"></div>
+        <div class="flow-node-head" style="background:linear-gradient(135deg,#5b21b6,#7c5af5)"><span class="flow-node-head-label"><i class="fas fa-link"></i> Webhook</span></div>
+        <div class="flow-node-body">${body}</div>
+        <div class="conn-dot conn-right"></div>
+    </div>`;
+}
+
+function flowEngineNodeHtmlString(id, left, top, cfg, isNucleo) {
+    const fs = 'width:100%;margin-bottom:8px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
+    const ta = 'width:100%;resize:none;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
+    const fh = (t) => `<div class="flow-field-hint">${t}</div>`;
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    const cfgAttr = flowEscapeAttrJson(c);
+    const typ = isNucleo ? 'nucleo_ia' : 'engine';
+    const title = isNucleo ? 'Núcleo IA AcassIA' : 'Engine';
+    const icon = isNucleo ? 'fas fa-brain' : 'fas fa-microchip';
+    const headBg = isNucleo ? 'linear-gradient(135deg,#065f46,#10b981)' : 'linear-gradient(135deg,#c2410c,#f97316)';
+    const hint = isNucleo
+        ? 'Núcleo de IA: contexto e políticas; integração real depende do backend.'
+        : 'Fila, coalescing e encaminhamento — alinhar com o motor em produção.';
+    const body = `
+            ${fh(hint)}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <textarea class="input-field" data-flow-cfg="body" placeholder="Descrição / notas de sistema" style="${ta};height:44px"></textarea>`;
+    return `<div class="flow-node ${isNucleo ? 'node-green' : 'node-orange'} ${isNucleo ? 'flow-tone-emerald' : 'flow-tone-blue'}" data-flow-id="${id}" data-node-type="${typ}" data-flow-block="${typ}" data-flow-config="${cfgAttr}" style="left:${left}px;top:${top}px">
+        <div class="conn-dot conn-left"></div>
+        <div class="flow-node-head" style="background:${headBg}"><span class="flow-node-head-label"><i class="${icon}"></i> ${title}</span></div>
+        <div class="flow-node-body">${body}</div>
+        <div class="conn-dot conn-right"></div>
+    </div>`;
+}
+
+function flowMotorRefNodeHtmlString(id, left, top, cfg) {
+    const fs = 'width:100%;margin-bottom:8px;padding:6px;font-size:11px;color:var(--c-text);background:var(--c-surface2);border-color:var(--c-border);border-radius:8px';
+    const fh = (t) => `<div class="flow-field-hint">${t}</div>`;
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    const cfgAttr = flowEscapeAttrJson(c);
+    const body = `
+            ${fh('Referência ao código Python em flows/ — deve coincidir com ficheiros listados no resumo do motor.')}
+            <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
+            <input type="text" data-flow-cfg="module_hint" placeholder="flows/fase_X/node_*.py" class="input-field" style="${fs}">`;
+    return `<div class="flow-node node-orange flow-tone-blue" data-flow-id="${id}" data-node-type="motor_ref" data-flow-block="motor_ref" data-flow-config="${cfgAttr}" style="left:${left}px;top:${top}px">
+        <div class="conn-dot conn-left"></div>
+        <div class="flow-node-head" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)"><span class="flow-node-head-label"><i class="fas fa-code"></i> Motor Python</span></div>
+        <div class="flow-node-body">${body}</div>
+        <div class="conn-dot conn-right"></div>
+    </div>`;
 }
 
 /** Ajusta segundos no bloco Delay (presets tipo ManyChat / Dialogflow) */
@@ -4469,7 +4848,7 @@ function flowEnsureInlineInspectorHost(nodeEl) {
         host.setAttribute('hidden', '');
         host.innerHTML = `
             <div class="flow-node-inspector-toolbar">
-                <span class="flow-node-inspector-title"><i class="fas fa-sliders-h" style="opacity:.88"></i> Configuração</span>
+                <span class="flow-node-inspector-title"><i class="fas fa-sliders-h" style="opacity:.88"></i> Avançado <span style="font-weight:500;opacity:.72;font-size:10px">schema / API</span></span>
                 <button type="button" class="icon-btn" style="width:28px;height:28px" onclick="event.stopPropagation(); closeFlowInspector()" title="Fechar (Esc)"><i class="fas fa-times"></i></button>
             </div>
             <div class="flow-node-inspector-body"></div>`;
@@ -4519,14 +4898,27 @@ function flowConteudoRenderInspector(meta) {
             fields = `<input type="number" min="0" max="86400" class="input-field" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${sec}" oninput="flowConteudoPatch(${idx},'seconds',this.value)"/>`;
         } else if (t === 'image' || t === 'video') {
             fields = `
-                <input type="text" class="input-field" placeholder="URL (https://)" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px">
+                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="event.stopPropagation();void flowConteudoUploadFile(${idx},'${t}')"><i class="fas fa-cloud-upload-alt"></i> Carregar ficheiro</button>
+                    <span style="font-size:9px;color:var(--c-muted2)">ou indique uma URL pública</span>
+                </div>
+                <input type="text" class="input-field" placeholder="https://… ou /media/… (após upload)" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>
                 <input type="text" class="input-field" placeholder="Legenda (opcional)" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.caption || '')}" oninput="flowConteudoPatch(${idx},'caption',this.value)"/>`;
         } else if (t === 'audio') {
-            fields = `<input type="text" class="input-field" placeholder="URL do áudio" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>`;
+            fields = `
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px">
+                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="event.stopPropagation();void flowConteudoUploadFile(${idx},'audio')"><i class="fas fa-cloud-upload-alt"></i> Carregar áudio</button>
+                    <span style="font-size:9px;color:var(--c-muted2)">ou URL</span>
+                </div>
+                <input type="text" class="input-field" placeholder="https://… ou /media/…" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>`;
         } else if (t === 'document') {
             fields = `
-                <input type="text" class="input-field" placeholder="URL do documento" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>
-                <input type="text" class="input-field" placeholder="Nome do ficheiro" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.filename || '')}" oninput="flowConteudoPatch(${idx},'filename',this.value)"/>`;
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px">
+                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 10px" onclick="event.stopPropagation();void flowConteudoUploadFile(${idx},'document')"><i class="fas fa-cloud-upload-alt"></i> Carregar documento</button>
+                    <span style="font-size:9px;color:var(--c-muted2)">ou URL</span>
+                </div>
+                <input type="text" class="input-field" placeholder="https://… ou /media/…" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.url || '')}" oninput="flowConteudoPatch(${idx},'url',this.value)"/>
+                <input type="text" class="input-field" placeholder="Nome visível (opcional)" style="width:100%;margin-top:6px;padding:6px;font-size:11px" value="${flowEsc(it.filename || '')}" oninput="flowConteudoPatch(${idx},'filename',this.value)"/>`;
         }
         listHtml += `
             <div style="border:1px solid var(--c-border);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--c-surface2)">
@@ -4588,6 +4980,43 @@ function flowConteudoPatch(index, field, value) {
     }
 }
 
+async function flowConteudoUploadFile(idx, mediaType) {
+    const st = window._flowConteudo;
+    if (!st || !st.contents[idx]) return;
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    const acceptMap = {
+        image: 'image/jpeg,image/png,image/gif,image/webp',
+        video: 'video/mp4,video/quicktime,video/webm,video/*',
+        audio: 'audio/ogg,audio/mpeg,audio/mp4,audio/wav,.mp3,.m4a,.ogg',
+        document: '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+    inp.accept = acceptMap[mediaType] || '*/*';
+    inp.onchange = async () => {
+        const file = inp.files && inp.files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        if (typeof setAppBusy === 'function') setAppBusy(true, 'A enviar ficheiro…');
+        try {
+            const res = await fetch(`${API}/api/media/upload`, { method: 'POST', body: fd });
+            const j = await res.json();
+            if (!res.ok || !j.ok) throw new Error(j.error || 'Falha no upload');
+            st.contents[idx].url = j.url || '';
+            if (mediaType === 'document' && j.original_filename) {
+                st.contents[idx].filename = j.original_filename;
+            }
+            flowConteudoRenderInspector(st._meta);
+            toast('Ficheiro guardado no servidor. URL preenchida automaticamente.', 'emerald');
+        } catch (e) {
+            toast(String(e.message || e), 'rose');
+        } finally {
+            if (typeof setAppBusy === 'function') setAppBusy(false);
+        }
+    };
+    inp.click();
+}
+
 function flowConteudoSave() {
     const st = window._flowConteudo;
     if (!st) return;
@@ -4618,6 +5047,41 @@ async function ensureFlowSchemaCatalog() {
     return _flowSchemaCatalog;
 }
 
+function flowHumanizeInspectorKey(k) {
+    const map = {
+        step_name: 'Nome do passo',
+        action_kind: 'Tipo de ação',
+        payload: 'Mensagem ou payload',
+        integration: 'Canal',
+        event: 'Evento',
+        keyword: 'Palavra-chave',
+        path: 'Caminho',
+        method: 'Método HTTP',
+        module_hint: 'Módulo Python',
+        expression: 'Expressão',
+        seconds: 'Segundos',
+        channel: 'Canal de alerta',
+        message: 'Mensagem',
+        note: 'Nota',
+        model: 'Modelo',
+        temperature: 'Temperatura',
+        prompt: 'Prompt',
+        instructions: 'Instruções',
+        question: 'Pergunta',
+        url: 'URL',
+        headers: 'Cabeçalhos',
+        body: 'Corpo',
+        weights: 'Pesos A/B',
+        timezone: 'Fuso horário',
+        windows: 'Janelas',
+        reply_mode: 'Modo de resposta',
+        script: 'Roteiro',
+    };
+    const s = String(k || '');
+    if (map[s]) return map[s];
+    return s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+}
+
 function flowInspectorInputTypeForKey(k) {
     const key = String(k || '').toLowerCase();
     if (key === 'seconds' || key === 'temperature') return 'number';
@@ -4635,33 +5099,32 @@ function flowInspectorRenderGeneric(meta, cfg, spec, bodyEl) {
         const t = flowInspectorInputTypeForKey(k);
         const v = cfg[k] == null ? '' : String(cfg[k]);
         const req = (spec.required_config || []).includes(k) ? ' *' : '';
+        const lab = flowHumanizeInspectorKey(k);
         if (t === 'textarea') {
             return `
-                <label class="kpi-label" style="margin-top:6px">${flowEsc(k)}${req}</label>
-                <textarea class="input-field" data-flow-inspector-key="${flowEsc(k)}" style="width:100%;min-height:54px;font-size:11px">${flowEsc(v)}</textarea>`;
+                <label class="kpi-label" style="margin-top:8px">${flowEsc(lab)}${req}</label>
+                <textarea class="input-field" data-flow-inspector-key="${flowEsc(k)}" style="width:100%;min-height:48px;font-size:11px">${flowEsc(v)}</textarea>`;
         }
         if (t === 'select_method') {
             const meth = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
             return `
-                <label class="kpi-label" style="margin-top:6px">${flowEsc(k)}${req}</label>
+                <label class="kpi-label" style="margin-top:8px">${flowEsc(lab)}${req}</label>
                 <select class="input-field" data-flow-inspector-key="${flowEsc(k)}" style="width:100%;padding:7px;font-size:11px">
                     ${meth.map((m) => `<option value="${m}" ${String(v || 'GET').toUpperCase() === m ? 'selected' : ''}>${m}</option>`).join('')}
                 </select>`;
         }
         const extra = t === 'number' ? 'type="number" step="any"' : 'type="text"';
         return `
-            <label class="kpi-label" style="margin-top:6px">${flowEsc(k)}${req}</label>
+            <label class="kpi-label" style="margin-top:8px">${flowEsc(lab)}${req}</label>
             <input ${extra} class="input-field" data-flow-inspector-key="${flowEsc(k)}" value="${flowEsc(v)}" style="width:100%;padding:7px;font-size:11px">`;
     }).join('');
 
     body.innerHTML = `
-        <div style="margin-bottom:8px"><span class="badge badge-purple" style="font-size:9px">${flowEsc(meta.typ)}</span></div>
-        <div style="margin-bottom:6px"><strong style="color:var(--c-text)">${flowEsc(meta.title)}</strong></div>
-        <div style="font-size:10px;margin-bottom:8px">ID: <code style="font-size:9px">${flowEsc(meta.id)}</code><br>Entradas: ${meta.incom} · Saídas: ${meta.outgo}</div>
-        ${fields || '<div style="font-size:11px;color:var(--c-muted)">Sem campos configuráveis para este bloco.</div>'}
-        <div style="display:flex;gap:6px;margin-top:10px">
-            <button type="button" class="btn btn-primary" style="flex:1;font-size:11px" onclick="applyFlowInspectorFormConfig()"><i class="fas fa-save"></i> Salvar campos</button>
-            <button type="button" class="btn btn-ghost" style="font-size:11px" onclick="openRawFlowInspectorJson()"><i class="fas fa-code"></i> JSON</button>
+        <div class="flow-inspector-meta"><span style="color:var(--c-purple2);font-weight:700">${flowEsc(meta.typ)}</span> · <code style="font-size:9px">${flowEsc(meta.id)}</code> · entradas ${meta.incom} · saídas ${meta.outgo}</div>
+        ${fields || '<div style="font-size:11px;color:var(--c-muted)">Sem campos extra neste schema.</div>'}
+        <div style="display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--c-border)">
+            <button type="button" class="btn btn-primary" style="flex:1;font-size:11px;font-weight:600" onclick="applyFlowInspectorFormConfig()"><i class="fas fa-check"></i> Aplicar ao bloco</button>
+            <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px" onclick="openRawFlowInspectorJson()" title="Editar JSON cru"><i class="fas fa-code"></i></button>
         </div>
     `;
 }
@@ -4776,21 +5239,22 @@ function flowRemoveNode(btn) {
 
 function flowEnsureNodeActionButtons() {
     document.querySelectorAll('#nodes-container .flow-node').forEach((node) => {
-        const body = node.querySelector('.flow-node-body');
-        if (!body) return;
-        if (body.querySelector('[data-flow-node-actions="1"]')) return;
+        flowEnsureNodeToneClass(node);
+        const head = node.querySelector('.flow-node-head');
+        if (!head) return;
+        const stale = node.querySelector('.flow-node-body [data-flow-node-actions="1"]');
+        if (stale) stale.remove();
+        if (head.querySelector('[data-flow-node-actions="1"]')) return;
         const bar = document.createElement('div');
         bar.setAttribute('data-flow-node-actions', '1');
-        bar.style.display = 'flex';
-        bar.style.justifyContent = 'flex-end';
-        bar.style.gap = '6px';
-        bar.style.marginTop = '4px';
+        bar.className = 'flow-node-head-actions';
+        bar.addEventListener('mousedown', (e) => e.stopPropagation());
         bar.innerHTML = `
-            <button type="button" class="icon-btn" style="width:28px;height:28px" title="Editar bloco" aria-label="Editar bloco" onclick="event.stopPropagation(); flowEditNode(this)"><i class="fas fa-pen text-xs" style="color:var(--c-purple2)"></i></button>
-            <button type="button" class="icon-btn" style="width:28px;height:28px" title="Duplicar bloco" aria-label="Duplicar bloco" onclick="event.stopPropagation(); flowDuplicateNode(this)"><i class="fas fa-copy text-xs" style="color:var(--c-emerald)"></i></button>
-            <button type="button" class="icon-btn" style="width:28px;height:28px" title="Excluir bloco" aria-label="Excluir bloco" onclick="event.stopPropagation(); flowRemoveNode(this)"><i class="fas fa-trash text-xs" style="color:var(--c-rose)"></i></button>
+            <button type="button" class="icon-btn" title="Configuração avançada" aria-label="Avançado" onclick="event.stopPropagation(); flowEditNode(this)"><i class="fas fa-sliders-h" style="font-size:11px"></i></button>
+            <button type="button" class="icon-btn" title="Duplicar" aria-label="Duplicar" onclick="event.stopPropagation(); flowDuplicateNode(this)"><i class="fas fa-copy" style="font-size:11px"></i></button>
+            <button type="button" class="icon-btn" title="Eliminar" aria-label="Eliminar" onclick="event.stopPropagation(); flowRemoveNode(this)"><i class="fas fa-trash" style="font-size:11px"></i></button>
         `;
-        body.appendChild(bar);
+        head.appendChild(bar);
     });
 }
 
@@ -4899,7 +5363,7 @@ function redrawFlowEdges() {
     const markerDef = `
         <defs>
             <marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                <path d="M0,0 L0,6 L8,3 z" fill="var(--c-border2)"/>
+                <path d="M0,0 L0,6 L8,3 z" fill="rgba(124, 90, 245, 0.7)"/>
             </marker>
         </defs>`;
     const paths = [];
@@ -4917,7 +5381,7 @@ function redrawFlowEdges() {
         const x2 = tr.left - ar.left + scrollLeft + 8;
         const y2 = tr.top - ar.top + scrollTop + tr.height / 2;
         const mx = (x1 + x2) / 2;
-        paths.push(`<path class="conn-path" d="M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="var(--c-border2)" stroke-width="2.5" stroke-linecap="round" marker-end="url(#flow-arrow)"/>`);
+        paths.push(`<path class="conn-path" d="M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="rgba(124, 90, 245, 0.45)" stroke-width="2" stroke-linecap="round" marker-end="url(#flow-arrow)"/>`);
     });
     svg.style.width = Math.max(1800, area.scrollWidth) + 'px';
     svg.style.height = Math.max(800, area.scrollHeight) + 'px';
@@ -5212,7 +5676,115 @@ function deserializeFlowCanvas(doc) {
     return true;
 }
 
-function saveFlowDraftToStorage(showToast) {
+async function syncFlowDraftToServerIfLinked(opts) {
+    const silent = !!(opts && opts.silent);
+    if (!_currentFlowBlueprintId) return;
+    const ok = await validateFlowDraft({ silent: true });
+    if (!ok) return;
+    const doc = serializeFlowCanvas();
+    try {
+        const res = await fetch(`${API}/api/flows/blueprints/${_currentFlowBlueprintId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body: doc, title: doc.title }),
+        });
+        const out = await res.json();
+        if (!res.ok || !out.ok) return;
+        if (!silent) toast('Rascunho sincronizado com o servidor.', 'emerald');
+        refreshFlowPublishStatus();
+        await loadFluxBlueprintsFromServer();
+        hydrateDraftCardsFromStorage();
+        renderFluxFolders();
+        if (_fluxFolder !== 'root') renderFluxosList();
+    } catch (_) {}
+}
+
+async function tryLoadFlowDocumentFromServer(slug) {
+    const s = String(slug || '').toLowerCase();
+    try {
+        const bySlug = await fetch(`${API}/api/flows/blueprints/by-slug/${encodeURIComponent(s)}`);
+        const js = await bySlug.json();
+        if (bySlug.ok && js.ok && js.blueprint && js.blueprint.body && typeof js.blueprint.body === 'object') {
+            if (js.blueprint.id) {
+                _currentFlowBlueprintId = js.blueprint.id;
+                try { localStorage.setItem('acassia_flow_blueprint_id', String(js.blueprint.id)); } catch (_) {}
+            }
+            return js.blueprint.body;
+        }
+        if (_currentFlowBlueprintId) {
+            const r = await fetch(`${API}/api/flows/blueprints/${_currentFlowBlueprintId}`);
+            const j = await r.json();
+            if (r.ok && j.ok && j.blueprint && j.blueprint.body && typeof j.blueprint.body === 'object') {
+                const rowSlug = String(j.blueprint.slug || '').toLowerCase();
+                if (rowSlug === s) {
+                    return j.blueprint.body;
+                }
+                _currentFlowBlueprintId = null;
+                try { localStorage.removeItem('acassia_flow_blueprint_id'); } catch (_) {}
+            }
+        }
+        const listRes = await fetch(`${API}/api/flows/blueprints`);
+        const listJ = await listRes.json();
+        if (!listRes.ok || !listJ.ok || !Array.isArray(listJ.blueprints)) return null;
+        const hit = listJ.blueprints.find((b) => String(b.slug || '').toLowerCase() === s);
+        if (!hit || !hit.id) return null;
+        _currentFlowBlueprintId = hit.id;
+        try { localStorage.setItem('acassia_flow_blueprint_id', String(hit.id)); } catch (_) {}
+        const r2 = await fetch(`${API}/api/flows/blueprints/${hit.id}`);
+        const d = await r2.json();
+        if (r2.ok && d.ok && d.blueprint && d.blueprint.body && typeof d.blueprint.body === 'object') {
+            return d.blueprint.body;
+        }
+    } catch (_) {}
+    return null;
+}
+
+async function tryCreateBlueprintOnServerAfterNewFlow(slug, title, doc) {
+    if (!doc || doc.format !== 'acassia-flow') return;
+    try {
+        const res = await fetch(`${API}/api/flows/blueprints`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title || doc.title, slug, body: doc }),
+        });
+        const out = await res.json();
+        if (res.ok && out.ok && out.blueprint && out.blueprint.id) {
+            _currentFlowBlueprintId = out.blueprint.id;
+            try { localStorage.setItem('acassia_flow_blueprint_id', String(_currentFlowBlueprintId)); } catch (_) {}
+            refreshFlowPublishStatus();
+            await loadFluxBlueprintsFromServer();
+            hydrateDraftCardsFromStorage();
+            renderFluxFolders();
+            if (_fluxFolder !== 'root') renderFluxosList();
+            return;
+        }
+        if (res.status === 409) {
+            const listRes = await fetch(`${API}/api/flows/blueprints`);
+            const listJ = await listRes.json();
+            const hit = listJ.blueprints && listJ.blueprints.find((b) => String(b.slug || '').toLowerCase() === String(slug).toLowerCase());
+            if (hit && hit.id) {
+                _currentFlowBlueprintId = hit.id;
+                try { localStorage.setItem('acassia_flow_blueprint_id', String(hit.id)); } catch (_) {}
+                const patch = await fetch(`${API}/api/flows/blueprints/${hit.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ body: doc, title: title || doc.title }),
+                });
+                const pj = await patch.json();
+                if (patch.ok && pj.ok) {
+                    refreshFlowPublishStatus();
+                    toast('Fluxo atualizado no servidor (slug já existia).', 'amber');
+                    await loadFluxBlueprintsFromServer();
+                    hydrateDraftCardsFromStorage();
+                    renderFluxFolders();
+                    if (_fluxFolder !== 'root') renderFluxosList();
+                }
+            }
+        }
+    } catch (_) {}
+}
+
+async function saveFlowDraftToStorage(showToast) {
     const doc = serializeFlowCanvas();
     const slug = _flowSlug(doc.title);
     const store = readFlowStore();
@@ -5220,6 +5792,7 @@ function saveFlowDraftToStorage(showToast) {
     writeFlowStore(store);
     ensureDraftCardForSlug(slug, doc.title);
     if (showToast) toast('Rascunho guardado neste browser.', 'emerald');
+    await syncFlowDraftToServerIfLinked({ silent: true });
 }
 
 function loadFlowDraftFromStorage(slug) {
@@ -5227,9 +5800,26 @@ function loadFlowDraftFromStorage(slug) {
     return store[slug] || null;
 }
 
-function loadOrRenderBuilderCanvas(contextTitle) {
+async function loadOrRenderBuilderCanvas(contextTitle) {
     const plain = contextTitle ? String(contextTitle).replace(/<[^>]*>/g, '').trim() : getBuilderTitlePlain();
     const slug = _flowSlug(plain);
+    setAppBusy(true, 'A carregar fluxo…');
+    try {
+        const serverDoc = await tryLoadFlowDocumentFromServer(slug);
+        if (serverDoc && deserializeFlowCanvas(serverDoc)) {
+            flowResetHistory();
+            pushFlowHistory();
+            initFlowBuilderCanvasUx();
+            flowZoomReset();
+            toast('Fluxo carregado do servidor.', 'emerald');
+            refreshFlowPublishStatus();
+            return;
+        }
+    } catch (_) {
+        /* fallback local */
+    } finally {
+        setAppBusy(false);
+    }
     const doc = loadFlowDraftFromStorage(slug);
     if (doc && deserializeFlowCanvas(doc)) {
         flowResetHistory();
@@ -5301,11 +5891,61 @@ async function flowLoadRelatoriosPanel() {
     if (!el) return;
     el.textContent = 'A carregar…';
     try {
-        const res = await fetch(`${API}/api/flows/summary`);
-        const j = await res.json();
-        if (!res.ok || !j.ok) throw new Error(j.error || 'summary_failed');
+        const reqs = await Promise.allSettled([
+            fetch(`${API}/api/flows/summary`),
+            fetch(`${API}/api/flows/quotas`),
+            fetch(`${API}/api/flows/runs?limit=8`),
+            _currentFlowBlueprintId ? fetch(`${API}/api/flows/blueprints/${_currentFlowBlueprintId}/versions`) : Promise.resolve(null),
+            fetch(`${API}/api/flows/tenant/secrets`),
+        ]);
+        const summaryRes = reqs[0].status === 'fulfilled' ? reqs[0].value : null;
+        const quotasRes = reqs[1].status === 'fulfilled' ? reqs[1].value : null;
+        const runsRes = reqs[2].status === 'fulfilled' ? reqs[2].value : null;
+        const versionsRes = reqs[3].status === 'fulfilled' ? reqs[3].value : null;
+        const secretsRes = reqs[4].status === 'fulfilled' ? reqs[4].value : null;
+
+        const j = summaryRes ? await summaryRes.json() : { ok: false };
+        const q = quotasRes ? await quotasRes.json() : { ok: false };
+        const r = runsRes ? await runsRes.json() : { ok: false, runs: [] };
+        const v = versionsRes ? await versionsRes.json() : { ok: false, versions: [] };
+        const s = secretsRes ? await secretsRes.json() : { ok: false, secrets: [] };
+
+        if (!j.ok) throw new Error(j.error || 'summary_failed');
         const phases = (j.phases || []).length;
         const mnodes = (j.motor_nodes || []).length;
+        const runs = Array.isArray(r.runs) ? r.runs : [];
+        const versions = Array.isArray(v.versions) ? v.versions : [];
+        const secrets = Array.isArray(s.secrets) ? s.secrets : [];
+        const quotas = q && q.ok && q.quotas ? q.quotas : {};
+        const qBp = quotas.blueprints ?? '—';
+        const qVr = quotas.versions ?? '—';
+        const qRn = quotas.runs ?? '—';
+        const qSc = quotas.schedules ?? '—';
+        const runsHtml = runs.length
+            ? runs.map((row) => {
+                const st = String(row.status || 'unknown').replace(/</g, '');
+                const bid = row.blueprint_id == null ? '—' : `#${row.blueprint_id}`;
+                const lid = row.lead_id == null ? '—' : String(row.lead_id);
+                return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--c-border)">
+                    <span style="min-width:0;overflow:hidden;text-overflow:ellipsis">Run #${row.id} · BP ${bid} · Lead ${lid}</span>
+                    <span class="badge ${st === 'queued' ? 'badge-amber' : 'badge-emerald'}">${st}</span>
+                </div>`;
+            }).join('')
+            : '<div style="font-size:10px;color:var(--c-muted)">Sem runs ainda neste tenant.</div>';
+        const versionsHtml = _currentFlowBlueprintId
+            ? (versions.length
+                ? versions.slice(0, 8).map((row) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--c-border)">
+                    <span>v${row.version_number}${row.note ? ` — ${String(row.note).replace(/</g, '').slice(0, 42)}` : ''}</span>
+                    <span style="font-size:10px;color:var(--c-muted2)">${String(row.created_at || '').slice(0, 19).replace('T', ' ')}</span>
+                </div>`).join('')
+                : '<div style="font-size:10px;color:var(--c-muted)">Sem snapshots para este blueprint.</div>')
+            : '<div style="font-size:10px;color:var(--c-muted)">Abra/guarde um blueprint no servidor para gerir versões.</div>';
+        const secretsHtml = secrets.length
+            ? secrets.slice(0, 6).map((row) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--c-border)">
+                <span style="font-family:monospace">${String(row.key || '').replace(/</g, '')}</span>
+                <span style="font-size:10px;color:var(--c-muted2)">${String(row.masked || '****').replace(/</g, '')}</span>
+            </div>`).join('')
+            : '<div style="font-size:10px;color:var(--c-muted)">Sem segredos cadastrados.</div>';
         el.innerHTML = `
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:10px">
                 <div>
@@ -5325,11 +5965,105 @@ async function flowLoadRelatoriosPanel() {
                     <div style="font-weight:700;font-size:16px">${j.whatsapp_configured === true ? '<span style="color:var(--c-emerald)">OK</span>' : '<span style="color:var(--c-amber)">Pendente</span>'}</div>
                 </div>
             </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin:8px 0 10px">
+                <div class="card" style="padding:8px;background:var(--c-surface2)">
+                    <div style="font-size:9px;color:var(--c-muted2);text-transform:uppercase">Blueprints</div>
+                    <div style="font-weight:700;font-size:14px">${qBp}</div>
+                </div>
+                <div class="card" style="padding:8px;background:var(--c-surface2)">
+                    <div style="font-size:9px;color:var(--c-muted2);text-transform:uppercase">Versões</div>
+                    <div style="font-weight:700;font-size:14px">${qVr}</div>
+                </div>
+                <div class="card" style="padding:8px;background:var(--c-surface2)">
+                    <div style="font-size:9px;color:var(--c-muted2);text-transform:uppercase">Runs</div>
+                    <div style="font-weight:700;font-size:14px">${qRn}</div>
+                </div>
+                <div class="card" style="padding:8px;background:var(--c-surface2)">
+                    <div style="font-size:9px;color:var(--c-muted2);text-transform:uppercase">Schedules</div>
+                    <div style="font-weight:700;font-size:14px">${qSc}</div>
+                </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px">
+                <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 8px" onclick="flowRelCreateVersion()"><i class="fas fa-camera"></i> Snapshot versão</button>
+                <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 8px" onclick="flowLoadRelatoriosPanel()"><i class="fas fa-sync"></i> Atualizar</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:10px">
+                <div class="card" style="padding:10px;background:var(--c-surface2)">
+                    <div style="font-size:10px;color:var(--c-text);font-weight:700;margin-bottom:4px">Últimos runs</div>
+                    ${runsHtml}
+                </div>
+                <div class="card" style="padding:10px;background:var(--c-surface2)">
+                    <div style="font-size:10px;color:var(--c-text);font-weight:700;margin-bottom:4px">Versões do blueprint atual</div>
+                    ${versionsHtml}
+                </div>
+            </div>
+            <div class="card" style="padding:10px;background:var(--c-surface2);margin-bottom:10px">
+                <div style="font-size:10px;color:var(--c-text);font-weight:700;margin-bottom:8px">Segredos do tenant</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                    <input id="flow-secret-key-input" class="input-field" style="max-width:170px;font-size:11px" placeholder="chave.ex: webhook_token">
+                    <input id="flow-secret-value-input" class="input-field" style="min-width:180px;font-size:11px" placeholder="valor">
+                    <button type="button" class="btn btn-ghost" style="font-size:10px;padding:5px 8px" onclick="flowRelSaveSecret()"><i class="fas fa-key"></i> Guardar secret</button>
+                </div>
+                ${secretsHtml}
+            </div>
             <div style="font-size:10px;color:var(--c-muted);border-top:1px solid var(--c-border);padding-top:8px">
                 Módulos Python em disco: ${mnodes}. Estado publicado: veja a linha «Publicado» no cabeçalho do builder.
             </div>`;
     } catch (_) {
         el.innerHTML = '<span style="color:var(--c-rose)">Não foi possível carregar /api/flows/summary.</span>';
+    }
+}
+
+async function flowRelCreateVersion() {
+    if (!_currentFlowBlueprintId) {
+        toast('Abra um blueprint no servidor antes de criar snapshot.', 'amber');
+        return;
+    }
+    const note = (prompt('Nota da versão (opcional):', '') || '').trim();
+    const doc = serializeFlowCanvas();
+    setAppBusy(true, 'Criando snapshot…');
+    try {
+        const res = await fetch(`${API}/api/flows/blueprints/${_currentFlowBlueprintId}/versions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ note, body: doc }),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.ok) throw new Error(j.error || 'version_failed');
+        toast(`Snapshot criado: v${j.version && j.version.version_number ? j.version.version_number : '?'}.`, 'emerald');
+        flowLoadRelatoriosPanel();
+    } catch (e) {
+        toast(String(e.message || e), 'rose');
+    } finally {
+        setAppBusy(false);
+    }
+}
+
+async function flowRelSaveSecret() {
+    const keyEl = document.getElementById('flow-secret-key-input');
+    const valEl = document.getElementById('flow-secret-value-input');
+    const key = keyEl ? keyEl.value.trim() : '';
+    const value = valEl ? valEl.value : '';
+    if (!key || !value) {
+        toast('Preencha chave e valor do secret.', 'amber');
+        return;
+    }
+    setAppBusy(true, 'Salvando secret…');
+    try {
+        const res = await fetch(`${API}/api/flows/tenant/secrets`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, value }),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.ok) throw new Error(j.error || 'secret_failed');
+        if (valEl) valEl.value = '';
+        toast('Secret salvo no tenant.', 'emerald');
+        flowLoadRelatoriosPanel();
+    } catch (e) {
+        toast(String(e.message || e), 'rose');
+    } finally {
+        setAppBusy(false);
     }
 }
 
@@ -5391,7 +6125,7 @@ async function validateFlowDraft(opts = {}) {
             }
         }
         if (forDeploy) {
-            saveFlowDraftToStorage(false);
+            await saveFlowDraftToStorage(false);
             if (!silent) toast('Deploy local: rascunho validado e guardado. Motor em produção segue em flows/ (Python).', 'emerald');
         }
         return true;
@@ -5476,6 +6210,10 @@ async function saveFlowBlueprintServer() {
         }
         toast('Fluxo guardado no servidor.', 'emerald');
         refreshFlowPublishStatus();
+        await loadFluxBlueprintsFromServer();
+        hydrateDraftCardsFromStorage();
+        renderFluxFolders();
+        if (_fluxFolder !== 'root') renderFluxosList();
     } catch (_) {
         toast('Falha ao guardar no servidor (slug duplicado?).', 'rose');
     } finally {
@@ -5748,6 +6486,8 @@ function ensureDraftCardForSlug(slug, title) {
     if (existing) {
         const h = existing.querySelector('[data-draft-headline]');
         if (h) h.textContent = title;
+        const syn = existing.querySelector('[data-draft-sync]');
+        if (syn) syn.textContent = fluxDraftSyncSubtitle(slug);
         renderFluxFolders();
         if (_fluxFolder !== 'root') renderFluxosList();
         return;
@@ -5767,7 +6507,7 @@ function ensureDraftCardForSlug(slug, title) {
                 <div style="width:42px;height:42px;border-radius:10px;background:var(--c-purple-glow);border:1px solid rgba(124,90,245,.3);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--c-purple);flex-shrink:0"><i class="fas fa-diagram-project"></i></div>
                 <div style="min-width:0">
                     <div data-draft-headline style="font-family:var(--f-display);font-weight:700;font-size:14px"></div>
-                    <div style="font-size:11px;color:var(--c-muted);margin-top:2px">Rascunho guardado neste browser</div>
+                    <div data-draft-sync style="font-size:11px;color:var(--c-muted);margin-top:2px">${fluxDraftSyncSubtitle(slug)}</div>
                 </div>
             </div>
             <span class="badge badge-amber">Rascunho</span>
@@ -5796,6 +6536,11 @@ function hydrateDraftCardsFromStorage() {
             if (c.getAttribute('data-flow-slug') === slug) has = true;
         });
         if (!has) ensureDraftCardForSlug(slug, doc.title || slug);
+    });
+    grid.querySelectorAll('[data-flow-slug]').forEach((c) => {
+        const slug = c.getAttribute('data-flow-slug') || '';
+        const syn = c.querySelector('[data-draft-sync]');
+        if (syn) syn.textContent = fluxDraftSyncSubtitle(slug);
     });
     renderFluxFolders();
 }
@@ -8006,28 +8751,21 @@ function renderRecoveryFlowPreview() {
     const svg = document.getElementById('svg-connections');
     const a = newFlowNodeId();
     const b = newFlowNodeId();
-    container.innerHTML = `
-        <div class="flow-node node-purple" data-flow-id="${a}" data-node-type="trigger" style="left:72px;top:140px">
-            <div class="flow-node-head" style="background:linear-gradient(135deg,#6d28d9,#7c5af5)"><i class="fas fa-clock"></i> Recuperação agendada</div>
-            <div class="flow-node-body">
-                <div class="flow-tag"><i class="fas fa-redo-alt" style="color:#60a5fa"></i> Protocolo pós-oferta / silêncio</div>
-                <div style="font-size:10px;color:var(--c-muted);margin-top:6px">Visual de referência — lógica real em <code style="font-size:9px">node_9_recuperacao.py</code></div>
-            </div>
-            <div class="conn-dot conn-right"></div>
-        </div>
-        <div class="flow-node node-orange" data-flow-id="${b}" data-node-type="motor_ref" style="left:420px;top:140px">
-            <div class="conn-dot conn-left"></div>
-            <div class="flow-node-head" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)"><i class="fas fa-code"></i> Node 9 · Motor Python</div>
-            <div class="flow-node-body">
-                <div class="flow-tag"><i class="fas fa-folder-open" style="color:var(--c-amber)"></i> flows/fase_3_oferta/</div>
-            </div>
-            <div class="conn-dot conn-right"></div>
-        </div>
-    `;
-    svg.innerHTML = `
-        <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="var(--c-border2)"/></marker></defs>
-        <path class="conn-path" d="M 330 175 C 360 175, 390 175, 420 175" fill="none" stroke="var(--c-border2)" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
-    `;
+    const cfgA = {
+        step_name: 'Recuperação agendada',
+        integration: 'whatsapp',
+        event: 'webhook_externo',
+        keyword: '',
+    };
+    const cfgB = {
+        step_name: 'Node 9',
+        module_hint: 'flows/fase_3_oferta/node_9_recuperacao.py',
+    };
+    container.innerHTML =
+        flowTriggerNodeHtmlString(a, 72, 140, cfgA, 'fas fa-clock', 'Recuperação agendada') + flowMotorRefNodeHtmlString(b, 420, 140, cfgB);
+    if (svg) svg.innerHTML = '';
+    _flowEdges = [{ id: 'e-rec-1', from: a, to: b }];
+    hydrateFlowNodeInputsFromConfig();
     initDragAndDrop();
     flowResetHistory();
     pushFlowHistory();
@@ -8039,42 +8777,23 @@ function renderBaseFlow() {
     _flowEdges = [];
     cancelFlowWire();
     const container = document.getElementById('nodes-container');
+    const svg = document.getElementById('svg-connections');
     const n1 = newFlowNodeId();
     const n2 = newFlowNodeId();
     const n3 = newFlowNodeId();
-    container.innerHTML = `
-        <div class="flow-node node-purple" data-flow-id="${n1}" data-node-type="webhook" style="left:80px;top:155px">
-            <div class="flow-node-head" style="background:linear-gradient(135deg,#6d28d9,#7c5af5)"><i class="fas fa-bolt"></i> Webhook Meta</div>
-            <div class="flow-node-body">
-                <div class="flow-tag"><i class="fab fa-whatsapp" style="color:var(--c-emerald)"></i> Msg Recebida</div>
-            </div>
-            <div class="conn-dot conn-right"></div>
-        </div>
-        <div class="flow-node node-orange" data-flow-id="${n2}" data-node-type="engine" style="left:460px;top:155px">
-            <div class="conn-dot conn-left"></div>
-            <div class="flow-node-head" style="background:linear-gradient(135deg,#c2410c,#f97316)"><i class="fas fa-microchip"></i> Engine</div>
-            <div class="flow-node-body">
-                <div class="flow-tag"><i class="fas fa-filter" style="color:var(--c-amber)"></i> Fila & Coalescing</div>
-            </div>
-            <div class="conn-dot conn-right"></div>
-        </div>
-        <div class="flow-node node-green" data-flow-id="${n3}" data-node-type="nucleo_ia" style="left:780px;top:155px">
-            <div class="conn-dot conn-left"></div>
-            <div class="flow-node-head" style="background:linear-gradient(135deg,#065f46,#10b981)"><i class="fas fa-brain"></i> Núcleo IA AcassIA</div>
-            <div class="flow-node-body">
-                <div class="flow-tag"><i class="fas fa-eye" style="color:var(--c-emerald)"></i> Vision Integration</div>
-            </div>
-            <div class="conn-dot conn-right"></div>
-        </div>
-    `;
-    
-    const svg = document.getElementById('svg-connections');
-    svg.innerHTML = `
-        <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="var(--c-border2)"/></marker></defs>
-        <path class="conn-path" d="M 330 190 C 390 190, 400 190, 460 190" fill="none" stroke="var(--c-border2)" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
-        <path class="conn-path" d="M 710 190 C 740 190, 750 190, 780 190" fill="none" stroke="var(--c-border2)" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>
-    `;
-    
+    const cfg1 = { step_name: 'Webhook entrada', path: '/webhook/meta', method: 'POST' };
+    const cfg2 = { step_name: 'Engine', body: 'Fila & coalescing' };
+    const cfg3 = { step_name: 'Núcleo IA', body: 'Vision integration' };
+    container.innerHTML =
+        flowWebhookNodeHtmlString(n1, 80, 155, cfg1) +
+        flowEngineNodeHtmlString(n2, 460, 155, cfg2, false) +
+        flowEngineNodeHtmlString(n3, 780, 155, cfg3, true);
+    if (svg) svg.innerHTML = '';
+    _flowEdges = [
+        { id: 'e-base-1', from: n1, to: n2 },
+        { id: 'e-base-2', from: n2, to: n3 },
+    ];
+    hydrateFlowNodeInputsFromConfig();
     initDragAndDrop();
     flowResetHistory();
     pushFlowHistory();
@@ -8140,7 +8859,7 @@ function handleEventSelection(select) {
     }
 }
 
-function saveNewFlow() {
+async function saveNewFlow() {
     const titleInput = document.getElementById('new-flow-title');
     const title = titleInput.value.trim();
     const eventSelect = document.getElementById('flow-event-select');
@@ -8217,21 +8936,15 @@ function saveNewFlow() {
     }
     
     const trigId = newFlowNodeId();
-    let nodeDetails = `<div class="flow-tag"><i class="fas fa-bolt" style="color:var(--c-emerald)"></i> ${eventName}</div>`;
-    if (eventName === 'Enviou palavra chave') {
-        nodeDetails += `<div class="flow-tag mt-2"><i class="fas fa-key" style="color:var(--c-amber)"></i> "${keyword.replace(/"/g, '&quot;')}"</div>`;
-    }
-    nodeDetails += `<div style="font-size:10px;color:var(--c-muted);font-style:italic;margin-top:6px">Aguardando payload...</div>`;
-
-    const nodesInnerHTML = `
-        <div class="flow-node node-purple" data-flow-id="${trigId}" data-node-type="trigger" style="left:80px;top:150px">
-            <div class="flow-node-head" style="background:linear-gradient(135deg,#6d28d9,#7c5af5)"><i class="${iconClass}"></i> Gatilho: ${integName}</div>
-            <div class="flow-node-body">
-                ${nodeDetails}
-            </div>
-            <div class="conn-dot conn-right"></div>
-        </div>
-    `;
+    const integVal = flowCanonicalIntegrationFromModal(activeBtn);
+    const eventVal = flowCanonicalEventFromModal(eventName);
+    const cfg = {
+        step_name: title.slice(0, 120),
+        integration: integVal,
+        event: eventVal,
+    };
+    if (keyword) cfg.keyword = keyword;
+    const nodesInnerHTML = flowTriggerNodeHtmlString(trigId, 80, 150, cfg, iconClass, `Gatilho: ${integName}`);
     const st = readFlowStore();
     st[slug] = {
         format: 'acassia-flow',
@@ -8248,18 +8961,19 @@ function saveNewFlow() {
                     label: `Gatilho: ${integName}`,
                     x: 80,
                     y: 150,
-                    config: {
-                        event: eventName,
-                        integration: integName || '',
-                        ...(keyword ? { keyword } : {}),
-                    },
+                    config: cfg,
                 },
             ],
             edges: [],
         },
     };
     writeFlowStore(st);
-
+    setAppBusy(true, 'A sincronizar fluxo…');
+    try {
+        await tryCreateBlueprintOnServerAfterNewFlow(slug, title, st[slug]);
+    } finally {
+        setAppBusy(false);
+    }
     go('builder', title);
 }
 
@@ -8294,11 +9008,45 @@ function flowDefaultConfigByType(type) {
     return {};
 }
 
+/** Cor de acento (borda + foco) alinhada à família do bloco — estética tipo n8n / Make */
+function flowNodeToneClassForType(type) {
+    const t = String(type || 'generic');
+    const map = {
+        trigger: 'flow-tone-violet',
+        webhook: 'flow-tone-violet',
+        conteudo: 'flow-tone-violet',
+        pergunta: 'flow-tone-violet',
+        acao: 'flow-tone-blue',
+        engine: 'flow-tone-blue',
+        motor_ref: 'flow-tone-blue',
+        api: 'flow-tone-blue',
+        notificar: 'flow-tone-blue',
+        nucleo_ia: 'flow-tone-emerald',
+        gpt: 'flow-tone-emerald',
+        agente_ia: 'flow-tone-emerald',
+        anotacao: 'flow-tone-emerald',
+        delay: 'flow-tone-amber',
+        expediente: 'flow-tone-amber',
+        divisao: 'flow-tone-amber',
+        condicao: 'flow-tone-rose',
+        voice_studio: 'flow-tone-rose',
+        end: 'flow-tone-slate',
+    };
+    return map[t] || 'flow-tone-violet';
+}
+
+function flowEnsureNodeToneClass(node) {
+    if (!node || !node.classList || !node.classList.contains('flow-node')) return;
+    if (/\bflow-tone-/.test(node.className)) return;
+    const t = node.getAttribute('data-node-type') || node.getAttribute('data-flow-block') || 'generic';
+    node.classList.add(flowNodeToneClassForType(t));
+}
+
 function addSpecificNode(type) {
     closeNodeMenu();
     const container = document.getElementById('nodes-container');
     const node = document.createElement('div');
-    node.className = 'flow-node';
+    node.className = 'flow-node ' + flowNodeToneClassForType(type);
     node.setAttribute('data-flow-id', newFlowNodeId());
     node.setAttribute('data-node-type', type || 'generic');
     node.setAttribute('data-flow-block', type || 'generic');
@@ -8395,11 +9143,11 @@ function addSpecificNode(type) {
             (o) => `<option value="${o.value.replace(/"/g, '&quot;')}">${String(o.label).replace(/</g, '')}</option>`
         ).join('');
         bodyFields = `
-            ${fh('Automations (HubSpot, Salesforce): ação nomeada + payload. O tipo guia integrações futuras (metadata.action_kind).')}
+            ${fh('Ação de automação: tipo define o comportamento; o texto vai para o motor como payload.')}
             <input type="text" data-flow-cfg="step_name" placeholder="Nome do passo…" class="input-field" style="${fs}">
             <label style="font-size:10px;color:var(--c-muted);display:block;margin-bottom:2px">Tipo de ação</label>
             <select data-flow-cfg="action_kind" class="input-field" style="${fs}">${actOpts}</select>
-            <textarea class="input-field" data-flow-cfg="payload" placeholder="Texto, JSON ou instrução" style="${ta};height:50px"></textarea>`;
+            <textarea class="input-field" data-flow-cfg="payload" placeholder="Mensagem ao cliente, JSON ou instrução interna" style="${ta};height:56px"></textarea>`;
     } else if (type === 'api') {
         bodyFields = `
             ${fh('HTTP (Postman/n8n): URL base + query em GET; headers JSON; corpo JSON. Requer FLOW_BLUEPRINT_ALLOW_HTTP=1 no servidor.')}
@@ -8513,7 +9261,7 @@ function addSpecificNode(type) {
 
     node.innerHTML = `
         <div class="conn-dot conn-left"></div>
-        <div class="flow-node-head" style="background:${headerBg}"><i class="${icon}"></i> ${title}</div>
+        <div class="flow-node-head" style="background:${headerBg}"><span class="flow-node-head-label"><i class="${icon}"></i> ${title}</span></div>
         <div class="flow-node-body">
             ${bodyFields}
         </div>
