@@ -67,7 +67,7 @@ def executar_v2(ctx) -> tuple:
         Acao(tipo="delay", segundos=random.randint(4, 7)),
         Acao(
             tipo="text",
-            conteudo="Se houver outra pessoa no meio da história, pode incluir o nome dela também, combinado?",
+            conteudo="Se houver outra pessoa no meio da história, pode incluir o nome dela também.",
             metadata={"skip_gancho_final": True},
         ),
     ]

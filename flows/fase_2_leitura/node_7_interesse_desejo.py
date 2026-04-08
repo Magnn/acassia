@@ -48,11 +48,16 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
+_RE_URL_AUDIO = re.compile(r"(?i)^https?://\S+\.(mp3|m4a|ogg|opus|wav|aac)(\?\S*)?$")
 
 def _delay_digitacao(texto: str, eh_audio: bool = False) -> int:
     if not texto: return 8
     fator = 14 if eh_audio else 18
     return max(10, min(len(str(texto)) // fator, 26))
+
+
+def _depoimento_audio_valido(url: str) -> bool:
+    return bool(_RE_URL_AUDIO.match(str(url or "").strip()))
 
 
 def _extrair_blocos_fallback(texto: str, max_blocos: int = 7, min_len: int = 8) -> list[str]:
@@ -375,21 +380,34 @@ def executar_v2(ctx) -> tuple:
 
         if num_bloco == 4 and depos:
             depo_url = random.choice(depos)
-            acoes += [
-                Acao(tipo="delay", segundos=8),
-                Acao(
-                    tipo="text",
-                    conteudo="Escuta o que vou te mandar agora… é um áudio de alguém que passava pela mesma provação que você:",
-                ),
-                Acao(tipo="delay", segundos=6),
-                Acao(tipo="audio", url=depo_url),
-                Acao(tipo="delay", segundos=22),
-                Acao(
-                    tipo="text",
-                    conteudo=f"É essa leveza que eu quero ver o {mecanismo} trazer pros seus dias, {nome_fmt}. ✨",
-                ),
-                Acao(tipo="delay", segundos=10),
-            ]
+            if _depoimento_audio_valido(depo_url):
+                acoes += [
+                    Acao(tipo="delay", segundos=8),
+                    Acao(
+                        tipo="text",
+                        conteudo="Escuta o que vou te mandar agora… é um áudio de alguém que passava pela mesma provação que você:",
+                    ),
+                    Acao(tipo="delay", segundos=6),
+                    Acao(tipo="audio", url=depo_url),
+                    Acao(tipo="delay", segundos=22),
+                    Acao(
+                        tipo="text",
+                        conteudo=f"É essa leveza que eu quero ver o {mecanismo} trazer pros seus dias, {nome_fmt}. ✨",
+                    ),
+                    Acao(tipo="delay", segundos=10),
+                ]
+            else:
+                logger.warning("event=node7_depoimento_invalido url=%s", str(depo_url)[:140])
+                acoes += [
+                    Acao(tipo="delay", segundos=6),
+                    Acao(
+                        tipo="text",
+                        conteudo=(
+                            "Tenho um depoimento real pra te mostrar em seguida, mas o áudio não carregou aqui agora. "
+                            "Eu sigo contigo no teu caso, sem te soltar."
+                        ),
+                    ),
+                ]
 
     ctx.estado_coleta = "node7_agitacao_enviada"
     ctx.metadata = meta

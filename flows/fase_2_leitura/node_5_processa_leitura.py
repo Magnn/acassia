@@ -399,7 +399,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             
             # 🔥 Backup de DOR: só desabafo (evita colar confirmações tipo "já estou te seguindo" no resumo)
             if not dados_extraidos.get("DOR_CENTRAL") or dados_extraidos.get("DOR_CENTRAL").upper() == "INDEFINIDA":
-                _fb = resumo_dor_para_copy((_d or "")[:1200], max_len=100)
+                _fb = resumo_dor_para_copy((texto_completo or "")[:1200], max_len=100)
                 dados_extraidos["DOR_CENTRAL"] = _fb or "esse peso nas suas linhas"
         except Exception as e:
             logger.error(f"🚨 [NODE 5] Erro na extração: {e}")

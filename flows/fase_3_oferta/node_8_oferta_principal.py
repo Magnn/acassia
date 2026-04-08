@@ -197,6 +197,8 @@ def _lead_pediu_link(txt: str) -> bool:
         return False
     if re.search(r"\bfirmo\b", t):
         return True
+    if re.search(r"\b(link|manda\s+link|envia\s+r?o?\s*link)\b", t):
+        return True
     if len(t) <= 48 and re.search(
         r"\b(sim|quero|confirmo|manda|pode\s+mandar|fecha|fechado|combinado)\b", t
     ):

@@ -16,6 +16,7 @@ MELHORIAS:
 
 import logging
 import random
+import re
 from schema import Acao
 from copy_sanitizer import (
     frase_dor_contextualizada,
@@ -24,6 +25,7 @@ from copy_sanitizer import (
     resumo_dor_para_copy,
     resolver_gatilho_emocional,
     vocativo_cigana,
+    normalizar_link_para_envio,
     preparar_texto_envio,
 )
 from flows.funnel_gates import VOCATIVO_SEM_NOME
@@ -60,6 +62,18 @@ def _fechamento_recuperacao_variavel(nome_fmt: str, tentativa: int) -> str:
     return random.choice(opcoes)
 
 
+def _link_checkout_valido(link: str) -> bool:
+    s = re.sub(r"\s+", "", str(link or "")).strip()
+    if not s or s.startswith("["):
+        return False
+    if any(tok in s for tok in ("[", "]", "{", "}", "<", ">")):
+        return False
+    low = s.lower()
+    if "nao_configurado" in low or "não_configurado" in low:
+        return False
+    return low.startswith("https://") or low.startswith("http://")
+
+
 def executar_v2(ctx, tentativa: int = 1) -> tuple:
     # 1. Resgate de Inteligência (Dados do Maestro - Node 5)
     metadata = getattr(ctx, "metadata", {}) or {}
@@ -80,7 +94,9 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
     # Configurações Dinâmicas
     config = metadata.get("__config__", {})
     preco_mat = config.get("preco_materiais", "60")
-    link_pagamento = metadata.get("link_pagamento", config.get("link_pagamento", "[LINK]"))
+    link_bruto = str(metadata.get("link_pagamento", config.get("link_pagamento", "[LINK]")) or "").strip()
+    link_pagamento = normalizar_link_para_envio(link_bruto, instagram_mode=False) or link_bruto
+    link_ok = _link_checkout_valido(link_pagamento)
 
     acoes = []
 
@@ -124,13 +140,11 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
             Acao(tipo="delay", segundos=random.randint(8, 12)),
             Acao(
                 tipo="text",
-                conteudo=f"O link ainda está ativo para a sua firmação de R$ {preco_mat}. Toca no endereço abaixo para abrir no celular:",
-            ),
-            Acao(tipo="delay", segundos=random.randint(5, 9)),
-            Acao(
-                tipo="text",
-                conteudo=str(link_pagamento).strip(),
-                metadata={"skip_gancho_final": True},
+                conteudo=(
+                    f"O link ainda está ativo para a sua firmação de R$ {preco_mat}. Toca no endereço abaixo para abrir no celular:"
+                    if link_ok
+                    else "Me responde *FIRMO* que eu te envio um checkout válido na sequência."
+                ),
             ),
             Acao(tipo="delay", segundos=random.randint(6, 10)),
             Acao(
@@ -139,6 +153,18 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
                 metadata={"skip_gancho_final": True},
             ),
         ]
+        if link_ok:
+            acoes.insert(8, Acao(tipo="delay", segundos=random.randint(5, 9)))
+            acoes.insert(
+                9,
+                Acao(
+                    tipo="text",
+                    conteudo=str(link_pagamento).strip(),
+                    metadata={"skip_gancho_final": True},
+                ),
+            )
+        else:
+            logger.warning("event=node9_link_invalido lead=%s tentativa=%s", nome_fmt, tentativa)
         proximo_node = "aguardando_pagamento"
 
     elif tentativa == 3:
@@ -157,12 +183,18 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
             Acao(tipo="delay", segundos=random.randint(6, 10)),
             Acao(
                 tipo="text",
-                conteudo=str(link_pagamento).strip(),
+                conteudo=(
+                    str(link_pagamento).strip()
+                    if link_ok
+                    else "Quando quiser retomar, me chama com *FIRMO* que eu te envio um checkout válido."
+                ),
                 metadata={"skip_gancho_final": True},
             ),
             Acao(tipo="delay", segundos=random.randint(8, 12)),
             Acao(tipo="text", conteudo="Que a luz te encontre. Fique em paz. ✨"),
         ]
+        if not link_ok:
+            logger.warning("event=node9_link_invalido lead=%s tentativa=%s", nome_fmt, tentativa)
         proximo_node = "fluxo_encerrado"
 
     else:
