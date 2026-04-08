@@ -132,7 +132,7 @@ _FECHAMENTO_CAMADA2_PRESENCA = (
     "e já tô com isso aqui comigo."
 )
 _FECHAMENTO_CAMADA2_DIRECAO = (
-    "Pra abrir tuas linhas sem dispersar, me diz em uma mensagem o foco principal agora."
+    "Pra abrir tuas linhas sem dispersar, me diz em uma mensagem o foco principal agora?"
 )
 
 
