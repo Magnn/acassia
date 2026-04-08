@@ -2479,17 +2479,17 @@
         <!-- SIDEBAR DE OPÇÕES DE NÓS (Escondida por defeito) -->
         <div id="node-options-menu" class="absolute top-0 left-0 h-full w-80 bg-white border-r border-slate-200 shadow-2xl z-40 transform -translate-x-full transition-transform duration-300 flex flex-col" style="background:var(--c-surface); border-color:var(--c-border);">
             <div class="flex justify-between items-center p-5 border-b border-slate-100" style="border-color:var(--c-border);">
-                <h3 class="font-bold text-slate-800 text-sm" style="color:var(--c-text); font-family:var(--f-display);">Menu de opções</h3>
+                <h3 class="font-bold text-slate-800 text-sm" style="color:var(--c-text); font-family:var(--f-display);">Biblioteca de blocos</h3>
                 <button onclick="closeNodeMenu()" class="text-slate-400 hover:text-slate-600 transition" style="color:var(--c-muted);"><i class="fas fa-times"></i></button>
             </div>
             
             <div class="flex-1 overflow-y-auto p-3 space-y-2">
-                <!-- Menu -->
-                <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition group" style="background:var(--c-surface2); border-color:var(--c-border);">
-                    <div class="text-slate-500 w-8 h-8 flex items-center justify-center rounded bg-slate-100 group-hover:bg-white transition" style="background:transparent; color:var(--c-muted);"><i class="fas fa-bars text-lg"></i></div>
+                <!-- Dica -->
+                <div class="flex items-center gap-3 p-3 rounded-lg border border-transparent transition group" style="background:var(--c-surface2); border-color:var(--c-border); opacity:0.95">
+                    <div class="text-slate-500 w-8 h-8 flex items-center justify-center rounded bg-slate-100 transition" style="background:transparent; color:var(--c-muted);"><i class="fas fa-info-circle text-lg"></i></div>
                     <div class="flex-1">
-                        <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Menu</h4>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Menu de opções</p>
+                        <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Como usar</h4>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Toque num bloco para adicionar · ligue ● direito → ● esquerdo</p>
                     </div>
                 </div>
 
@@ -2501,7 +2501,7 @@
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Conteúdo</h4>
                             <span class="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold" style="background:rgba(255,255,255,0.05); color:var(--c-muted);">Popular</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Enviar mensagem de texto, imagem...</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Texto, mídia, lista — duplo clique: sequência rica</p>
                     </div>
                 </div>
 
@@ -2513,7 +2513,7 @@
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Pergunta</h4>
                             <span class="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold" style="background:rgba(255,255,255,0.05); color:var(--c-muted);">Popular</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Enviar pergunta</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Texto livre, lista ou botões (WhatsApp)</p>
                     </div>
                 </div>
 
@@ -2525,7 +2525,7 @@
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Ação</h4>
                             <span class="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold" style="background:rgba(255,255,255,0.05); color:var(--c-muted);">Popular</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Executar uma ação</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Tag, nota, mensagem, transferência — tipo + payload</p>
                     </div>
                 </div>
 
@@ -2536,7 +2536,7 @@
                         <div class="flex justify-between items-center">
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Delay</h4>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Aguardar um período</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Pausa entre mensagens — presets no bloco</p>
                     </div>
                 </div>
 
@@ -2548,7 +2548,7 @@
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Expediente</h4>
                             <span class="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold" style="background:rgba(59, 130, 246, 0.15); color:#60a5fa;">Novidade</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Adicionar horário de funcionamento</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Fuso IANA + janelas (dentro/fora de horas)</p>
                     </div>
                 </div>
 
@@ -2560,7 +2560,7 @@
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Condição</h4>
                             <span class="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold" style="background:rgba(255,255,255,0.05); color:var(--c-muted);">Popular</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Validar uma condição</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Ramificar por expressão (variáveis / resposta)</p>
                     </div>
                 </div>
 
@@ -2571,7 +2571,7 @@
                         <div class="flex justify-between items-center">
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Notificar Atendente</h4>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Enviar mensagem para atendente</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Alerta à equipa: log, email, Slack, webhook</p>
                     </div>
                 </div>
 
@@ -2582,7 +2582,7 @@
                         <div class="flex justify-between items-center">
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Divisão</h4>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Distribuição de contatos</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Teste A/B — pesos e ramos no canvas</p>
                     </div>
                 </div>
 
@@ -2593,7 +2593,7 @@
                         <div class="flex justify-between items-center">
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">API Request</h4>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Requisição externa(API)</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">HTTP: URL, método, headers JSON, corpo</p>
                     </div>
                 </div>
 
@@ -2604,7 +2604,7 @@
                         <div class="flex justify-between items-center">
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">GPT</h4>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Gerador de textos GPT</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">LLM: modelo, temperatura, prompt</p>
                     </div>
                 </div>
 
@@ -2616,7 +2616,7 @@
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Agente IA</h4>
                             <span class="text-[9px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-bold" style="background:rgba(147, 51, 234, 0.15); color:#c084fc;">BETA</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Diálogo inteligente</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Persona + instruções + modelo (agente)</p>
                     </div>
                 </div>
 
@@ -2628,7 +2628,7 @@
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Voice Studio</h4>
                             <span class="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold" style="background:rgba(255,255,255,0.05); color:var(--c-muted);">Popular</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Gere uma áudio de voz com modelo.</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">TTS: perfil de voz + roteiro falado</p>
                     </div>
                 </div>
 
@@ -2639,7 +2639,7 @@
                         <div class="flex justify-between items-center">
                             <h4 class="font-bold text-slate-800 text-xs" style="color:var(--c-text);">Anotação</h4>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Escreva uma anotação.</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" style="color:var(--c-muted);">Nota interna — não enviada ao cliente</p>
                     </div>
                 </div>
 
