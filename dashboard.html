@@ -916,7 +916,9 @@
         /* ── FLOW BUILDER — canvas SaaS premium (Linear / Vercel) ─ */
         #view-builder .flow-canvas,
         #flow-canvas-viewport,
-        #flow-canvas-viewport .flow-node {
+        #flow-viewport,
+        #flow-canvas-viewport .flow-node,
+        #flow-viewport .flow-node {
             font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
         }
         .flow-canvas {
@@ -1590,11 +1592,22 @@
             filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.45));
         }
         /* Cliques nas linhas passam pelo container vazio até ao SVG */
-        #flow-canvas-viewport #nodes-container {
+        #flow-canvas-viewport #flow-viewport #nodes-container,
+        #flow-viewport #nodes-container {
             pointer-events: none;
         }
-        #flow-canvas-viewport #nodes-container .flow-node {
+        #flow-canvas-viewport #flow-viewport #nodes-container .flow-node,
+        #flow-viewport #nodes-container .flow-node {
             pointer-events: auto;
+        }
+        #flow-viewport {
+            position: relative;
+            z-index: 0;
+            transform-origin: 0 0;
+            will-change: transform;
+            display: block;
+            width: 100%;
+            min-height: 100%;
         }
         #svg-connections path.conn-path[data-flow-edge-id] {
             pointer-events: stroke;
@@ -3935,7 +3948,8 @@
                 <input type="search" id="flow-node-search" placeholder="Buscar bloco…" class="input-field" style="max-width:160px;font-size:11px;padding:4px 8px" oninput="flowSearchNodes(this.value)" autocomplete="off">
                 <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="openFlowShortcutsModal()" title="Atalhos (? )"><i class="fas fa-keyboard"></i></button>
             </div>
-            <div id="flow-canvas-viewport" class="flow-canvas-viewport" style="position:relative;transform-origin:0 0;min-width:2000px;min-height:1200px">
+            <div id="flow-canvas-viewport" class="flow-canvas-viewport" style="position:relative;min-width:2000px;min-height:1200px">
+            <div id="flow-viewport" class="flow-viewport">
             <!-- SVG de conexões estáticas (para visualização no base flow) -->
             <svg id="svg-connections" style="position:absolute;top:0;left:0;width:1800px;height:800px;z-index:0">
                 <defs>
@@ -3950,6 +3964,7 @@
             <!-- Nodes Dinâmicos (adicionados via JS se for novo, ou preenchidos aqui se for o principal) -->
             <div id="nodes-container">
                 <!-- Nodes Base preenchidos via JS para facilitar arrastar -->
+            </div>
             </div>
             </div>
 
@@ -4053,7 +4068,8 @@
                 <button type="button" class="icon-btn" onclick="closeFlowShortcutsModal()" title="Fechar"><i class="fas fa-times"></i></button>
             </div>
             <ul style="font-size:11px;color:var(--c-muted);line-height:1.85;margin:0;padding-left:18px">
-                <li><strong style="color:var(--c-text)">Ctrl</strong> + roda do rato — zoom in/out</li>
+                <li><strong style="color:var(--c-text)">Roda do rato</strong> — zoom (centrado no cursor)</li>
+                <li><strong style="color:var(--c-text)">Espaço</strong> + arrastar · <strong>botão direito</strong> · <strong>botão do meio</strong> · clique no fundo vazio — mover o canvas (pan)</li>
                 <li><strong style="color:var(--c-text)">Ctrl+Z</strong> / <strong style="color:var(--c-text)">Ctrl+Shift+Z</strong> — desfazer / refazer</li>
                 <li><strong style="color:var(--c-text)">Ctrl+C</strong> / <strong style="color:var(--c-text)">Ctrl+V</strong> — copiar / colar bloco selecionado</li>
                 <li><strong style="color:var(--c-text)">Delete</strong> / <strong style="color:var(--c-text)">Backspace</strong> — remover bloco selecionado</li>
@@ -4124,7 +4140,7 @@
             <div style="font-size:11px;color:var(--c-muted);line-height:1.75">
                 <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Estado do servidor</strong> — O indicador verde no cabeçalho confirma <code style="font-size:10px">GET /api/health</code>. Vermelho: servidor parado, rede ou URL errada.</p>
                 <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Tenant</strong> — Em <strong>Configurações</strong> (ícone de roda) defina o tenant. Todas as chamadas <code style="font-size:10px">/api/*</code> enviam o cabeçalho <code style="font-size:10px">X-Acassia-Tenant</code>.</p>
-                <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Flow Builder</strong> — <kbd>Ctrl</kbd>+roda para zoom; <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Shift+Z</kbd> histórico; <kbd>?</kbd> atalhos do canvas; <kbd>Esc</kbd> fecha painéis.</p>
+                <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Flow Builder</strong> — roda para zoom; pan no fundo / espaço / botão direito; <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Shift+Z</kbd> histórico; <kbd>?</kbd> atalhos; <kbd>Esc</kbd> fecha painéis.</p>
                 <p style="margin:0"><strong style="color:var(--c-text)">Pedidos API</strong> — Timeout automático (~30s) em chamadas à API local para evitar ecrãs presos.</p>
             </div>
         </div>
@@ -5469,6 +5485,9 @@ let _flowSchemaCatalog = null;
 
 /** Zoom, histórico, mini-mapa e UX do canvas */
 let _flowZoom = 1;
+/** Pan em px (espaço do #flow-canvas-viewport, antes do scale) — não altera posições JSON dos blocos */
+let _flowPanX = 0;
+let _flowPanY = 0;
 let _flowHistory = [];
 let _flowHistPointer = -1;
 let _flowHistoryRestoring = false;
@@ -5573,32 +5592,69 @@ function flowRedo() {
 }
 
 function applyFlowViewportTransform() {
-    const vp = document.getElementById('flow-canvas-viewport');
-    if (!vp) return;
+    const fv = document.getElementById('flow-viewport');
+    if (!fv) return;
     const z = Math.min(2, Math.max(0.25, _flowZoom || 1));
     _flowZoom = z;
-    vp.style.transform = 'scale(' + z + ')';
-    vp.style.transformOrigin = '0 0';
+    const px = _flowPanX || 0;
+    const py = _flowPanY || 0;
+    fv.style.willChange = 'transform';
+    fv.style.transformOrigin = '0 0';
+    fv.style.transform = 'translate(' + px + 'px,' + py + 'px) scale(' + z + ')';
     const lab = document.getElementById('flow-zoom-label');
     if (lab) lab.textContent = Math.round(z * 100) + '%';
 }
 
-function flowZoomIn() {
-    _flowZoom = Math.min(2, (_flowZoom || 1) + 0.1);
+/** Posição do cursor no sistema local do #flow-canvas-viewport (antes de translate/scale do #flow-viewport). */
+function flowCanvasLocalFromClient(clientX, clientY) {
+    const area = document.getElementById('flow-canvas-area');
+    const cv = document.getElementById('flow-canvas-viewport');
+    if (!area || !cv) return { lx: 0, ly: 0 };
+    const ar = area.getBoundingClientRect();
+    return {
+        lx: clientX - ar.left + area.scrollLeft - cv.offsetLeft,
+        ly: clientY - ar.top + area.scrollTop - cv.offsetTop,
+    };
+}
+
+function flowZoomAtPointer(targetZoom, clientX, clientY) {
+    const z0 = Math.min(2, Math.max(0.25, _flowZoom || 1));
+    const z1 = Math.min(2, Math.max(0.25, targetZoom));
+    const { lx, ly } = flowCanvasLocalFromClient(clientX, clientY);
+    const wx = (lx - _flowPanX) / z0;
+    const wy = (ly - _flowPanY) / z0;
+    _flowPanX = lx - wx * z1;
+    _flowPanY = ly - wy * z1;
+    _flowZoom = z1;
     applyFlowViewportTransform();
     redrawFlowEdges();
     updateFlowMinimap();
 }
 
+function flowZoomIn() {
+    const area = document.getElementById('flow-canvas-area');
+    if (area) {
+        const r = area.getBoundingClientRect();
+        flowZoomAtPointer(Math.min(2, (_flowZoom || 1) + 0.1), r.left + r.width / 2, r.top + r.height / 2);
+    } else {
+        flowZoomAtPointer(Math.min(2, (_flowZoom || 1) + 0.1), 0, 0);
+    }
+}
+
 function flowZoomOut() {
-    _flowZoom = Math.max(0.25, (_flowZoom || 1) - 0.1);
-    applyFlowViewportTransform();
-    redrawFlowEdges();
-    updateFlowMinimap();
+    const area = document.getElementById('flow-canvas-area');
+    if (area) {
+        const r = area.getBoundingClientRect();
+        flowZoomAtPointer(Math.max(0.25, (_flowZoom || 1) - 0.1), r.left + r.width / 2, r.top + r.height / 2);
+    } else {
+        flowZoomAtPointer(Math.max(0.25, (_flowZoom || 1) - 0.1), 0, 0);
+    }
 }
 
 function flowZoomReset() {
     _flowZoom = 1;
+    _flowPanX = 0;
+    _flowPanY = 0;
     applyFlowViewportTransform();
     redrawFlowEdges();
     updateFlowMinimap();
@@ -5607,7 +5663,8 @@ function flowZoomReset() {
 function flowFitView() {
     const nodes = document.querySelectorAll('#nodes-container .flow-node');
     const area = document.getElementById('flow-canvas-area');
-    if (!nodes.length || !area) return;
+    const cv = document.getElementById('flow-canvas-viewport');
+    if (!nodes.length || !area || !cv) return;
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -5632,12 +5689,16 @@ function flowFitView() {
     const aw = area.clientWidth;
     const ah = area.clientHeight;
     const z = Math.min(1.5, Math.max(0.25, Math.min(aw / bw, ah / bh)));
-    _flowZoom = z;
-    applyFlowViewportTransform();
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
-    area.scrollLeft = Math.max(0, cx - aw / 2);
-    area.scrollTop = Math.max(0, cy - ah / 2);
+    _flowZoom = z;
+    area.scrollLeft = 0;
+    area.scrollTop = 0;
+    const vx = area.scrollLeft + aw / 2 - cv.offsetLeft;
+    const vy = area.scrollTop + ah / 2 - cv.offsetTop;
+    _flowPanX = vx - cx * z;
+    _flowPanY = vy - cy * z;
+    applyFlowViewportTransform();
     redrawFlowEdges();
     updateFlowMinimap();
 }
@@ -5736,8 +5797,9 @@ function updateFlowMinimap() {
 function flowMinimapClick(ev) {
     ev.stopPropagation();
     const area = document.getElementById('flow-canvas-area');
+    const cv = document.getElementById('flow-canvas-viewport');
     const cvs = document.getElementById('flow-minimap-canvas');
-    if (!area || !cvs) return;
+    if (!area || !cv || !cvs) return;
     const rect = cvs.getBoundingClientRect();
     const mx = ev.clientX - rect.left;
     const my = ev.clientY - rect.top;
@@ -5771,8 +5833,12 @@ function flowMinimapClick(ev) {
     const oy = (H - bh * scale) / 2 - minY * scale;
     const wx = (mx - ox) / scale;
     const wy = (my - oy) / scale;
-    area.scrollLeft = Math.max(0, wx - area.clientWidth / 2);
-    area.scrollTop = Math.max(0, wy - area.clientHeight / 2);
+    const z = Math.min(2, Math.max(0.25, _flowZoom || 1));
+    const vx = area.scrollLeft + area.clientWidth / 2 - cv.offsetLeft;
+    const vy = area.scrollTop + area.clientHeight / 2 - cv.offsetTop;
+    _flowPanX = vx - wx * z;
+    _flowPanY = vy - wy * z;
+    applyFlowViewportTransform();
     redrawFlowEdges();
 }
 
@@ -5839,6 +5905,27 @@ function closeFlowShortcutsModal() {
     m.classList.add('hidden');
 }
 
+function flowCanvasPanEligibleTarget(e) {
+    if (e.target.closest && e.target.closest('.flow-node')) return false;
+    if (e.target.closest && e.target.closest('#flow-builder-toolbar')) return false;
+    if (e.target.closest && e.target.closest('#flow-inspector')) return false;
+    if (e.target.closest && e.target.closest('path[data-flow-edge-id]')) return false;
+    if (e.target.closest && e.target.closest('#flow-minimap-wrap')) return false;
+    if (e.target.closest && e.target.closest('.fab')) return false;
+    if (e.target.closest && e.target.closest('.flow-canvas-fab-stack')) return false;
+    return true;
+}
+
+function flowCanvasBeginPan(e) {
+    const vb = document.getElementById('view-builder');
+    if (!vb || vb.style.display === 'none') return false;
+    if (e.button === 1) return flowCanvasPanEligibleTarget(e);
+    if (e.button === 2) return flowCanvasPanEligibleTarget(e);
+    if (e.button === 0 && _flowSpaceDown) return !e.target.closest('.flow-node') && !e.target.closest('#flow-builder-toolbar');
+    if (e.button === 0) return flowCanvasPanEligibleTarget(e);
+    return false;
+}
+
 function initFlowBuilderCanvasUx() {
     const area = document.getElementById('flow-canvas-area');
     if (!area || area.getAttribute('data-flow-ux') === '1') return;
@@ -5848,26 +5935,20 @@ function initFlowBuilderCanvasUx() {
         (e) => {
             const vb = document.getElementById('view-builder');
             if (!vb || vb.style.display === 'none') return;
-            if (!e.ctrlKey) return;
             e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.06 : 0.06;
-            _flowZoom = Math.min(2, Math.max(0.25, (_flowZoom || 1) + delta));
-            applyFlowViewportTransform();
-            redrawFlowEdges();
-            updateFlowMinimap();
+            const delta = e.deltaY > 0 ? -0.08 : 0.08;
+            flowZoomAtPointer((_flowZoom || 1) + delta, e.clientX, e.clientY);
         },
         { passive: false }
     );
     area.addEventListener('mousedown', (e) => {
-        if (e.button !== 1) return;
-        const vb = document.getElementById('view-builder');
-        if (!vb || vb.style.display === 'none') return;
-        if (e.target.closest && e.target.closest('.flow-node')) return;
+        if (!flowCanvasBeginPan(e)) return;
         e.preventDefault();
-        const start = { x: e.clientX, y: e.clientY, sl: area.scrollLeft, st: area.scrollTop };
+        const start = { x: e.clientX, y: e.clientY, px: _flowPanX, py: _flowPanY };
         const onMove = (ev) => {
-            area.scrollLeft = start.sl - (ev.clientX - start.x);
-            area.scrollTop = start.st - (ev.clientY - start.y);
+            _flowPanX = start.px + (ev.clientX - start.x);
+            _flowPanY = start.py + (ev.clientY - start.y);
+            applyFlowViewportTransform();
             redrawFlowEdges();
             updateFlowMinimap();
         };
@@ -5878,25 +5959,8 @@ function initFlowBuilderCanvasUx() {
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
     });
-    area.addEventListener('mousedown', (e) => {
-        if (e.button !== 0 || !_flowSpaceDown) return;
-        const vb = document.getElementById('view-builder');
-        if (!vb || vb.style.display === 'none') return;
-        if (e.target.closest && (e.target.closest('.flow-node') || e.target.closest('#flow-builder-toolbar'))) return;
-        e.preventDefault();
-        const start = { x: e.clientX, y: e.clientY, sl: area.scrollLeft, st: area.scrollTop };
-        const onMove = (ev) => {
-            area.scrollLeft = start.sl - (ev.clientX - start.x);
-            area.scrollTop = start.st - (ev.clientY - start.y);
-            redrawFlowEdges();
-            updateFlowMinimap();
-        };
-        const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
+    area.addEventListener('contextmenu', (e) => {
+        if (flowCanvasPanEligibleTarget(e)) e.preventDefault();
     });
     document.addEventListener('keydown', (e) => {
         const vb = document.getElementById('view-builder');
@@ -5911,6 +5975,7 @@ function initFlowBuilderCanvasUx() {
         _flowSpaceDown = false;
         area.classList.remove('flow-pan-space');
     });
+    applyFlowViewportTransform();
     flowRefreshSaveStatusToolbar();
     void flowFetchTenantVariables();
     flowInitVarPickerOutsideClose();
@@ -6027,30 +6092,47 @@ function applyFlowEdgeInspectorConfig() {
 }
 
 /**
- * Ancoragem nos handles (●) quando existirem — alinha ao desenho do bloco em tempo real.
+ * Ancoragem em coordenadas de mundo (px no #flow-viewport), independentes de pan/zoom visual.
  */
-function flowGetEdgeAnchorPoints(fromEl, toEl, area, scrollLeft, scrollTop) {
-    const ar = area.getBoundingClientRect();
+function flowGetEdgeAnchorWorldPoints(fromEl, toEl) {
     const out = fromEl.querySelector('.conn-right');
     const inn = toEl.querySelector('.conn-left');
+    const fl = parseFloat(fromEl.style.left) || 0;
+    const ft = parseFloat(fromEl.style.top) || 0;
+    const tl = parseFloat(toEl.style.left) || 0;
+    const tt = parseFloat(toEl.style.top) || 0;
     if (out && inn) {
-        const fr = out.getBoundingClientRect();
-        const tr = inn.getBoundingClientRect();
         return {
-            x1: fr.right - ar.left + scrollLeft,
-            y1: fr.top - ar.top + scrollTop + fr.height / 2,
-            x2: tr.left - ar.left + scrollLeft,
-            y2: tr.top - ar.top + scrollTop + tr.height / 2,
+            x1: fl + out.offsetLeft + out.offsetWidth,
+            y1: ft + out.offsetTop + out.offsetHeight / 2,
+            x2: tl + inn.offsetLeft,
+            y2: tt + inn.offsetTop + inn.offsetHeight / 2,
         };
     }
-    const fr = fromEl.getBoundingClientRect();
-    const tr = toEl.getBoundingClientRect();
+    const fw = fromEl.offsetWidth || 268;
+    const fh = fromEl.offsetHeight || 120;
+    const tw = toEl.offsetWidth || 268;
+    const th = toEl.offsetHeight || 120;
     return {
-        x1: fr.right - ar.left + scrollLeft - 6,
-        y1: fr.top - ar.top + scrollTop + fr.height / 2,
-        x2: tr.left - ar.left + scrollLeft + 6,
-        y2: tr.top - ar.top + scrollTop + tr.height / 2,
+        x1: fl + fw - 6,
+        y1: ft + fh / 2,
+        x2: tl + 6,
+        y2: tt + th / 2,
     };
+}
+
+function flowFlowWorldExtent() {
+    let maxX = 1800;
+    let maxY = 800;
+    document.querySelectorAll('#nodes-container .flow-node').forEach((el) => {
+        const x = parseFloat(el.style.left) || 0;
+        const y = parseFloat(el.style.top) || 0;
+        const w = el.offsetWidth || 268;
+        const h = el.offsetHeight || 120;
+        maxX = Math.max(maxX, x + w + 96);
+        maxY = Math.max(maxY, y + h + 96);
+    });
+    return { w: maxX, h: maxY };
 }
 
 /**
@@ -6191,21 +6273,18 @@ function removeFlowTempWire() {
 
 function flowWireMove(e) {
     if (!_flowWireDrag) return;
-    const { fromId, area } = _flowWireDrag;
+    const { fromId } = _flowWireDrag;
     const fromEl = flowCanvasNodeById(fromId);
     if (!fromEl) return;
     const out = fromEl.querySelector('.conn-right');
     if (!out) return;
-    const ar = area.getBoundingClientRect();
-    const fr = out.getBoundingClientRect();
-    const scrollLeft = area.scrollLeft || 0;
-    const scrollTop = area.scrollTop || 0;
-    const x1 = fr.right - ar.left + scrollLeft;
-    const y1 = fr.top - ar.top + scrollTop + fr.height / 2;
-    const x2 = e.clientX - ar.left + scrollLeft;
-    const y2 = e.clientY - ar.top + scrollTop;
+    const fl = parseFloat(fromEl.style.left) || 0;
+    const ft = parseFloat(fromEl.style.top) || 0;
+    const x1 = fl + out.offsetLeft + out.offsetWidth;
+    const y1 = ft + out.offsetTop + out.offsetHeight / 2;
+    const w = flowViewportClientToWorld(e.clientX, e.clientY);
     const path = document.getElementById('flow-temp-wire-path');
-    if (path) path.setAttribute('d', flowSmoothBezierPathD(x1, y1, x2, y2));
+    if (path) path.setAttribute('d', flowSmoothBezierPathD(x1, y1, w.x, w.y));
 }
 
 function flowWireUp(e) {
@@ -7101,13 +7180,12 @@ function redrawFlowEdges() {
         </defs>`;
     const paths = [];
     const labels = [];
-    const scrollLeft = area.scrollLeft || 0;
-    const scrollTop = area.scrollTop || 0;
+    const ext = flowFlowWorldExtent();
     (_flowEdges || []).forEach((e) => {
         const fromEl = flowCanvasNodeById(e.from);
         const toEl = flowCanvasNodeById(e.to);
         if (!fromEl || !toEl) return;
-        const { x1, y1, x2, y2 } = flowGetEdgeAnchorPoints(fromEl, toEl, area, scrollLeft, scrollTop);
+        const { x1, y1, x2, y2 } = flowGetEdgeAnchorWorldPoints(fromEl, toEl);
         const d = flowSmoothBezierPathD(x1, y1, x2, y2);
         const sel = _flowSelectedEdgeId && String(_flowSelectedEdgeId) === String(e.id);
         const simTr = _flowSimTraceEdgeId && String(_flowSimTraceEdgeId) === String(e.id);
@@ -7136,8 +7214,8 @@ function redrawFlowEdges() {
             if (badge) labels.push(badge);
         }
     });
-    svg.style.width = Math.max(1800, area.scrollWidth) + 'px';
-    svg.style.height = Math.max(800, area.scrollHeight) + 'px';
+    svg.style.width = ext.w + 'px';
+    svg.style.height = ext.h + 'px';
     svg.innerHTML = markerDef + paths.join('') + labels.join('') + tempHtml;
 }
 
@@ -12051,15 +12129,15 @@ function flowEnsureNodeToneClass(node) {
     node.classList.add(flowNodeToneClassForType(t));
 }
 
-/** Coordenadas no espaço do #flow-canvas-viewport (antes do scale visual), alinhado a dragNode / zoom */
+/** Coordenadas de mundo (px no #flow-viewport, iguais a style.left/top dos blocos — independentes de pan/zoom visual). */
 function flowViewportClientToWorld(clientX, clientY) {
-    const vp = document.getElementById('flow-canvas-viewport');
-    if (!vp) return { x: 0, y: 0 };
+    const { lx, ly } = flowCanvasLocalFromClient(clientX, clientY);
     const z = Math.min(2, Math.max(0.25, parseFloat(String(_flowZoom || 1)) || 1));
-    const r = vp.getBoundingClientRect();
+    const px = _flowPanX || 0;
+    const py = _flowPanY || 0;
     return {
-        x: (clientX - r.left) / z,
-        y: (clientY - r.top) / z,
+        x: (lx - px) / z,
+        y: (ly - py) / z,
     };
 }
 
