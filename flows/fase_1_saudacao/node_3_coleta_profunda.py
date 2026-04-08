@@ -127,10 +127,18 @@ _PERGUNTA_DESEJO_POR_UNIVERSO: Dict[str, str] = {
 }
 
 # Transição camada 1 → 2: presença (continuidade) + direção da leitura (não “vida genérica” nem segundo desabafo).
-_FECHAMENTO_CAMADA2_PRESENCA = (
-    "Li o que você me contou com calma. Entendi o que você quer no amor, "
-    "e já tô com isso aqui comigo."
-)
+def _fechamento_camada2_presenca(universo: str) -> str:
+    u = (universo or "geral").strip().lower()
+    mapa = {
+        "amor_de_volta": "Li o que você me contou com calma. Entendi o que você quer no amor, e já tô com isso aqui comigo.",
+        "encontrar_amor": "Li o que você me contou com calma. Entendi o que você busca no campo afetivo, e já tô com isso aqui comigo.",
+        "salvar_relacionamento": "Li o que você me contou com calma. Entendi o que está em jogo no teu relacionamento, e já tô com isso aqui comigo.",
+        "prosperidade": "Li o que você me contou com calma. Entendi o que está travando teu caminho financeiro, e já tô com isso aqui comigo.",
+        "familia_cura": "Li o que você me contou com calma. Entendi o peso que isso trouxe pra tua família, e já tô com isso aqui comigo.",
+        "superar_padrao": "Li o que você me contou com calma. Entendi o ciclo que você quer quebrar, e já tô com isso aqui comigo.",
+        "geral": "Li o que você me contou com calma. Entendi o foco que mais pesa pra você agora, e já tô com isso aqui comigo.",
+    }
+    return mapa.get(u, mapa["geral"])
 _FECHAMENTO_CAMADA2_DIRECAO = (
     "Pra abrir tuas linhas sem dispersar, me diz em uma mensagem o foco principal agora?"
 )
@@ -707,7 +715,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             meta["node3_percepcoes_multas"] = ""
             ft_blocos: List[Acao] = [
                 Acao(tipo="delay", segundos=random.randint(10, 16)),
-                Acao(tipo="text", conteudo=_FECHAMENTO_CAMADA2_PRESENCA),
+                Acao(tipo="text", conteudo=_fechamento_camada2_presenca(meta.get("universo_desejo", "geral"))),
                 Acao(tipo="delay", segundos=random.randint(10, 18)),
                 Acao(tipo="text", conteudo=_FECHAMENTO_CAMADA2_DIRECAO),
             ]
@@ -845,7 +853,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             meta["node3_percepcoes_multas"] = ""
             acoes_c2: List[Acao] = [
                 Acao(tipo="delay", segundos=random.randint(6, 10)),
-                Acao(tipo="text", conteudo=_FECHAMENTO_CAMADA2_PRESENCA),
+                Acao(tipo="text", conteudo=_fechamento_camada2_presenca(meta.get("universo_desejo", "geral"))),
                 Acao(tipo="delay", segundos=random.randint(6, 10)),
                 Acao(tipo="text", conteudo=_FECHAMENTO_CAMADA2_DIRECAO),
             ]
