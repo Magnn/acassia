@@ -149,6 +149,14 @@ _RE_SNIFFER_INTENCAO_CONSULTA_CURTA = re.compile(
     r"namora|namorad|casamento|casar\s+com)\b"
 )
 
+# Mensagens curtas (4–14 palavras) com carga emocional explícita — o gatilho longo (>8 palavras)
+# deixa passar quem manda parágrafos; aqui pegamos o “grito” de 1–2 linhas no WhatsApp.
+_RE_SNIFFER_DOR_CURTA = re.compile(
+    r"(?i)\b(dor(es)?|dói|doi|sofr\w*|ang[uú]st|ansiedade|desesper\w*|"
+    r"chor\w*|medo|traiu|separ\w*|ajuda|urgente|n[aã]o\s+aguento|acab\w*|"
+    r"destru[ií]\w*)\b"
+)
+
 _SNIFFER_GATILHOS_DESABAFO = (
     "traição",
     "traicao",
@@ -257,6 +265,8 @@ def sniffer_aplicar_desabafo_recebido(
     palavras_msg = msg_lower.split()
     marcou = len(palavras_msg) > 8 and any(g in msg_lower for g in _SNIFFER_GATILHOS_DESABAFO)
     if not marcou and len(palavras_msg) >= 4 and _RE_SNIFFER_INTENCAO_CONSULTA_CURTA.search(msg_lower):
+        marcou = True
+    if not marcou and 4 <= len(palavras_msg) <= 14 and _RE_SNIFFER_DOR_CURTA.search(msg_lower):
         marcou = True
     if not marcou:
         return ""

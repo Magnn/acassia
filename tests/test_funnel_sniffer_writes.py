@@ -55,6 +55,15 @@ class TestSnifferDesabafo(unittest.TestCase):
         self.assertTrue(meta_tem_desabafo(meta))
         self.assertIn("traição", (meta.get("desabafo_original") or "").lower())
 
+    def test_marca_desabafo_curto_com_dor_explicita(self):
+        """Evita depender de 9+ palavras quando o lead manda 1–2 linhas emotivas."""
+        from flows.funnel_gates import meta_tem_desabafo, sniffer_aplicar_desabafo_recebido
+
+        meta: dict = {}
+        txt = "estou com muita dor no peito e não aguento mais"
+        self.assertEqual(sniffer_aplicar_desabafo_recebido(meta, texto_sniff=txt), "desabafo")
+        self.assertTrue(meta_tem_desabafo(meta))
+
 
 class TestSnifferFase1Flags(unittest.TestCase):
     def test_ordem_e_multiplos_eventos(self):

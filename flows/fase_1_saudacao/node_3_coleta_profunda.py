@@ -23,7 +23,7 @@ import random
 import re
 import os
 from datetime import datetime, timezone
-from typing import List, Tuple, Dict
+from typing import Dict, List, Optional, Tuple
 
 import requests
 from google import genai
@@ -116,32 +116,30 @@ _UNIVERSO_KEYWORDS: List[Tuple[str, re.Pattern]] = [
 ]
 
 
+# Uma pergunta por universo: uma frase, direta, simpática. Sem travessão (—).
 _PERGUNTA_DESEJO_POR_UNIVERSO: Dict[str, str] = {
-    "amor_de_volta": "Se as linhas pudessem mostrar um caminho, o que você quer ver acontecer com essa pessoa primeiro — sem censurar o que sente?",
-    "encontrar_amor": "O que você quer que eu sinta nas linhas sobre o amor que você busca: companhia, escolha, paz… ou outra coisa que só você nomeia?",
-    "salvar_relacionamento": "Onde você quer que eu ponha a luz agora: no que ainda dá pra salvar, no que dói, ou no que você precisa ouvir com clareza?",
-    "prosperidade": "Na leitura, qual frente você quer que eu abra primeiro: dinheiro entrando, dívida saindo, trabalho, ou esse aperto que não te deixa respirar direito?",
-    "familia_cura": "Quando pensa nessa pessoa, o que você mais precisa que as linhas confirmem: proteção, perdão, notícia, ou só um sinal de que não tá sozinha(o) nisso?",
-    "superar_padrao": "Que ciclo você quer que eu enxergue com nome nas linhas… e o que você gostaria de sentir no lugar, mesmo que ainda pareça longe?",
-    "geral": "Com o que você já trouxe aqui no zap, qual é o foco que você quer que eu segure na leitura agora: amor, caminho, dinheiro, família… ou aquele nó que não cabe em etiqueta?",
+    "amor_de_volta": "O que você quer ver acontecer primeiro com essa pessoa?",
+    "encontrar_amor": "O que você está buscando no amor agora?",
+    "salvar_relacionamento": "O que é mais importante pra você aqui: salvar o que dá, entender a dor, ou ouvir uma verdade?",
+    "prosperidade": "O que mais aperta hoje: dinheiro entrando, dívida, trabalho ou outra coisa?",
+    "familia_cura": "O que você mais precisa entender sobre essa situação na família?",
+    "superar_padrao": "Qual padrão você quer que eu olhe nas linhas?",
+    "geral": "Qual é o foco principal da leitura pra você agora?",
 }
 
-# Transição camada 1 → 2: presença (continuidade) + direção da leitura (não “vida genérica” nem segundo desabafo).
+# Transição camada 1 → 2: uma linha de acolhimento (sem “?” — o normalizador corta no primeiro interrogação).
 def _fechamento_camada2_presenca(universo: str) -> str:
     u = (universo or "geral").strip().lower()
     mapa = {
-        "amor_de_volta": "Li o que você me contou com calma. Entendi o que você quer no amor, e já tô com isso aqui comigo.",
-        "encontrar_amor": "Li o que você me contou com calma. Entendi o que você busca no campo afetivo, e já tô com isso aqui comigo.",
-        "salvar_relacionamento": "Li o que você me contou com calma. Entendi o que está em jogo no teu relacionamento, e já tô com isso aqui comigo.",
-        "prosperidade": "Li o que você me contou com calma. Entendi o que está travando teu caminho financeiro, e já tô com isso aqui comigo.",
-        "familia_cura": "Li o que você me contou com calma. Entendi o peso que isso trouxe pra tua família, e já tô com isso aqui comigo.",
-        "superar_padrao": "Li o que você me contou com calma. Entendi o ciclo que você quer quebrar, e já tô com isso aqui comigo.",
-        "geral": "Li o que você me contou com calma. Entendi o foco que mais pesa pra você agora, e já tô com isso aqui comigo.",
+        "amor_de_volta": "Li o que você mandou, com carinho. Tô aqui com você.",
+        "encontrar_amor": "Li o que você mandou. Vamos com calma.",
+        "salvar_relacionamento": "Li o que você mandou. Conta comigo.",
+        "prosperidade": "Li o que você mandou. Vamos direto ao ponto.",
+        "familia_cura": "Li o que você mandou. Família pesa, eu sei.",
+        "superar_padrao": "Li o que você mandou. A gente olha isso junto.",
+        "geral": "Li o que você mandou, com respeito. Tô aqui.",
     }
     return mapa.get(u, mapa["geral"])
-_FECHAMENTO_CAMADA2_DIRECAO = (
-    "Pra abrir tuas linhas sem dispersar, me diz em uma mensagem o foco principal agora?"
-)
 
 
 def _eh_reconhecimento_só_foto(texto: str) -> bool:
@@ -406,36 +404,34 @@ def _normalizar_acoes_texto_node3(acoes: List[Acao]) -> List[Acao]:
     if not idx_txt:
         return acoes
     textos = [str(acoes[i].conteudo or "").strip() for i in idx_txt]
-    norm: List[str] = []
+    processed: List[Optional[str]] = [None] * len(idx_txt)
     vistos: set[str] = set()
     for pos, tx in enumerate(textos):
         if not tx:
             continue
         if "?" in tx or "👇" in tx:
-            tx = _encurtar_balao_node3(tx, _MAX_CHARS_NODE3_PERGUNTA)
+            txc = _encurtar_balao_node3(tx, _MAX_CHARS_NODE3_PERGUNTA)
         elif pos == 0:
-            tx = _encurtar_balao_node3(tx, _MAX_CHARS_NODE3_EXPLICA)
+            txc = _encurtar_balao_node3(tx, _MAX_CHARS_NODE3_EXPLICA)
         else:
-            tx = _encurtar_balao_node3(tx, _MAX_CHARS_BALAO_NODE3)
-        # Evita enviar frase pendurada por corte sintático.
-        if re.search(_REGEX_CORTE_FATAL, tx.lower()):
+            txc = _encurtar_balao_node3(tx, _MAX_CHARS_BALAO_NODE3)
+        if re.search(_REGEX_CORTE_FATAL, txc.lower()):
             continue
-        k = re.sub(r"\s+", " ", tx.lower()).strip(" .!?…")
+        k = re.sub(r"\s+", " ", txc.lower()).strip(" .!?…")
         if k in vistos:
             continue
         vistos.add(k)
-        norm.append(tx)
-    for i, idx in enumerate(idx_txt):
-        acoes[idx].conteudo = norm[i] if i < len(norm) else ""
+        processed[pos] = txc
+    for pos, idx in enumerate(idx_txt):
+        acoes[idx].conteudo = processed[pos] or ""
     out = [a for a in acoes if not (a.tipo == "text" and not str(a.conteudo or "").strip())]
-    # Regra conversacional: depois de pergunta, aguarda o lead (não empilha novos balões).
-    idx_q = -1
+    # Corta após a ÚLTIMA mensagem com interrogação (presença sem ? + pergunta no mesmo turno).
+    idx_last_q = -1
     for i, a in enumerate(out):
         if getattr(a, "tipo", "") == "text" and "?" in str(getattr(a, "conteudo", "") or ""):
-            idx_q = i
-            break
-    if idx_q >= 0:
-        out = out[: idx_q + 1]
+            idx_last_q = i
+    if idx_last_q >= 0:
+        out = out[: idx_last_q + 1]
         while out and getattr(out[-1], "tipo", "") == "delay":
             out.pop()
     if not any(getattr(a, "tipo", "") == "text" and str(getattr(a, "conteudo", "") or "").strip() for a in out):
@@ -673,10 +669,19 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
     proximo_node = "3_coleta_profunda"
 
-    # Leads antigos (DB) que já tinham estado legado
+    # Leads antigos (DB) ou resquício: o pré-flight costuma pular para o 4 antes; se o 3 ainda rodar,
+    # não devolve lista vazia (evita turno “mudo” se o encadeamento falhar).
     if estado == "coleta_completa":
         ctx.metadata = meta
-        return _normalizar_acoes_texto_node3([]), "4_instagram"
+        acoes_handoff = [
+            Acao(tipo="delay", segundos=2),
+            Acao(
+                tipo="text",
+                conteudo="Vou te levar pro próximo passo da leitura, no teu ritmo. ✨",
+                metadata={"skip_gancho_final": True},
+            ),
+        ]
+        return _normalizar_acoes_texto_node3(acoes_handoff), "4_instagram"
 
     # ── inicial (God-Mode + Sniffer: ramifica copy; funil 2–4 preservado) ──
     # Nota: não saltar para 4_instagram com coleta_completa aqui — faltariam desejo,
@@ -728,12 +733,16 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             meta["universo_desejo"] = _classificar_universo(ctx, meta, meta.get("desabafo_original", ""))
             ctx.estado_coleta = "node3_camada2_desejo"
             logger.info("⚡ [NODE 3] Fast-track (foto+dor via Sniffer). Lead=%s universo=%s", nome_fmt, meta.get("universo_desejo"))
-            _append_node3_ancora(meta, _fechamento_camada2_presenca(meta.get("universo_desejo", "geral")))
+            _u_ft = meta.get("universo_desejo", "geral")
+            _p_ft = _fechamento_camada2_presenca(_u_ft)
+            _q_ft = _PERGUNTA_DESEJO_POR_UNIVERSO.get(_u_ft, _PERGUNTA_DESEJO_POR_UNIVERSO["geral"])
+            _append_node3_ancora(meta, f"{_p_ft} {_q_ft}"[:1200].strip())
+            # Duas bolhas: acolhimento + uma pergunta (evita repetir pedido no meio).
             ft_blocos: List[Acao] = [
                 Acao(tipo="delay", segundos=random.randint(10, 16)),
-                Acao(tipo="text", conteudo=_fechamento_camada2_presenca(meta.get("universo_desejo", "geral"))),
-                Acao(tipo="delay", segundos=random.randint(10, 18)),
-                Acao(tipo="text", conteudo=_FECHAMENTO_CAMADA2_DIRECAO),
+                Acao(tipo="text", conteudo=_p_ft),
+                Acao(tipo="delay", segundos=random.randint(8, 14)),
+                Acao(tipo="text", conteudo=_q_ft),
             ]
             acoes_iniciais.extend(ft_blocos)
             ctx.metadata = meta
@@ -866,12 +875,15 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             meta["universo_desejo"] = universo
             meta["node3_estado"] = "aguardando_desejo"
             ctx.estado_coleta = "node3_camada2_desejo"
-            _append_node3_ancora(meta, _fechamento_camada2_presenca(meta.get("universo_desejo", "geral")))
+            _u_c2 = meta.get("universo_desejo", "geral")
+            _p_c2 = _fechamento_camada2_presenca(_u_c2)
+            _q_c2 = _PERGUNTA_DESEJO_POR_UNIVERSO.get(_u_c2, _PERGUNTA_DESEJO_POR_UNIVERSO["geral"])
+            _append_node3_ancora(meta, f"{_p_c2} {_q_c2}"[:1200].strip())
             acoes_c2: List[Acao] = [
                 Acao(tipo="delay", segundos=random.randint(6, 10)),
-                Acao(tipo="text", conteudo=_fechamento_camada2_presenca(meta.get("universo_desejo", "geral"))),
+                Acao(tipo="text", conteudo=_p_c2),
                 Acao(tipo="delay", segundos=random.randint(6, 10)),
-                Acao(tipo="text", conteudo=_FECHAMENTO_CAMADA2_DIRECAO),
+                Acao(tipo="text", conteudo=_q_c2),
             ]
             ctx.metadata = meta
             return _normalizar_acoes_texto_node3(acoes_c2), proximo_node
@@ -963,12 +975,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
         ctx.metadata = meta
         u = meta.get("universo_desejo", "geral")
+        # Duas bolhas: acolhimento alinhado ao universo + uma pergunta (sem terceira bolha que repete o pedido).
         return [
             Acao(tipo="delay", segundos=random.randint(6, 10)),
-            Acao(
-                tipo="text",
-                conteudo="Eu li o que você mandou e guardo com respeito. Pra eu não chutar direção na leitura, preciso que você nomeie o foco com mais corpo.",
-            ),
+            Acao(tipo="text", conteudo=_fechamento_camada2_presenca(u)),
             Acao(tipo="delay", segundos=random.randint(6, 10)),
             Acao(tipo="text", conteudo=_PERGUNTA_DESEJO_POR_UNIVERSO.get(u, _PERGUNTA_DESEJO_POR_UNIVERSO["geral"])),
         ], proximo_node
@@ -1003,9 +1013,9 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 Acao(
                     tipo="text",
                     conteudo=(
-                        f"Eu entendo, {nome_fmt}… o que você trouxe combina com o que as linhas já sussurravam. "
-                        "Pra eu cruzar isso com cuidado no mapa da sua mão: qual é a dúvida principal "
-                        "que você quer que eu olhe nas linhas agora?"
+                        f"{nome_fmt}, o que você trouxe fecha com o que as linhas já sussurravam. "
+                        "Antes de eu abrir o Instagram pra você ver o terreno onde trabalho: "
+                        "qual é a pergunta principal que você quer que eu olhe nas linhas agora?"
                     ),
                 ),
             ]

@@ -35,7 +35,7 @@ _RE_BURST_DESEJO_DOR = re.compile(
     r"(?i)\b("
     r"quero\s+saber|gostaria|preciso|volta|voltar|ex|amor|namor|casamento|"
     r"trai|traiu|separ|dinheiro|dívida|divida|família|familia|filho|filha|mãe|mae|"
-    r"medo|ansiedade|desespero|dor|sofre|ajuda"
+    r"medo|ansiedade|desespero|dor|sofre|ajuda|sinto|peito|perdi|falei|coração|coraçao"
     r")\b"
 )
 
@@ -138,7 +138,20 @@ def resolver_avanco_node_fase1(lead: Any, ctx: Any, meta: Dict[str, Any]) -> Non
         return
     ideal = primeiro_node_pendente_fase1(meta, lead)
     i_cur, i_ideal = idx_fase1_ordem(cur), idx_fase1_ordem(ideal)
-    if i_ideal < 0 or i_cur < 0 or i_ideal <= i_cur:
+    if i_ideal < 0 or i_cur < 0:
+        return
+    # Checklist pede um passo *antes* do nó atual (ex.: metadata resetada): não retrocede automaticamente.
+    if i_ideal < i_cur:
+        logger.warning(
+            "⚠️ [FUNNEL] Descompasso: checklist indica %s (idx=%s) mas node_atual=%s (idx=%s) lead=%s — não retrocede",
+            ideal,
+            i_ideal,
+            cur,
+            i_cur,
+            getattr(lead, "id", "?"),
+        )
+        return
+    if i_ideal <= i_cur:
         return
     lead.node_atual = ideal
     ctx.node_atual = ideal

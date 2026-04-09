@@ -44,6 +44,21 @@ class TestAvanco(unittest.TestCase):
         self.assertEqual(ctx.node_atual, "3_coleta_profunda")
         self.assertEqual(meta.get("funnel_resolvido_para"), "3_coleta_profunda")
 
+    def test_nao_retrocede_quando_checklist_atras_do_node_atual(self):
+        """Metadata inconsistente: não puxa o lead de 4 de volta para 3 (evita loop/repetição)."""
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=9, node_atual="4_instagram", nome="Ana")
+        ctx = SimpleNamespace(node_atual="4_instagram")
+        meta: dict = {
+            "nome_lead": "Ana",
+            "node2_vcard_despachado": True,
+            "node3_estado": "inicial",
+        }
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "4_instagram")
+        self.assertIsNone(meta.get("funnel_resolvido_para"))
+
 
 class TestBurstLongo(unittest.TestCase):
     def test_burst_coleta_completa_com_45_palavras(self):
