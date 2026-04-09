@@ -49,6 +49,7 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
 _RE_URL_AUDIO = re.compile(r"(?i)^https?://\S+\.(mp3|m4a|ogg|opus|wav|aac)(\?\S*)?$")
+_RE_RUIDO_CURTO_HIST = re.compile(r"(?i)^(ok|sim|oi|opa|pronto|blz|beleza|ta|tá|show|feito|entendi|combinado|👍|🙏|👀)$")
 
 def _delay_digitacao(texto: str, eh_audio: bool = False) -> int:
     if not texto: return 8
@@ -177,6 +178,7 @@ DADOS DA HIVE MIND:
 RITMO WHATSAPP: cada BLOCO_N deve ser CURTO (no máximo ~3 frases ou ~160 caracteres). O sistema pode fatiar, mas escreva já pensando em balão de celular.
 
 MISSÃO (7 BLOCOS, prefixo BLOCO_1:: … BLOCO_7::; pode continuar o texto nas linhas abaixo até o próximo BLOCO_N::; nunca coloque BLOCO_2::, BLOCO_3:: etc. no meio da mesma linha do texto anterior):
+0. CONTEXTO INTERNO (CRÍTICO): use o histórico só como base interna. PROIBIDO reproduzir texto bruto do histórico, PROIBIDO citar mensagens literais entre aspas, e PROIBIDO imprimir separadores técnicos (ex.: "|", "||", "->").
 1. VALIDAÇÃO DE IMPACTO: Acolha a reação ({msg_lead}). Se a pessoa confirmou a leitura, mostre que o que veio nas linhas ressoa com o que ela sente.
 2. ALÍVIO DE CULPA: O fato de sofrer com {dor} há {tempo} não é fraqueza nem "castigo merecido". Fale em nó ou padrão antigo, sem humilhar.
 3. URGÊNCIA SENSATA: O tempo aperta o nó; sem terrorismo vazio, mostre que postergar também tem custo.
@@ -288,9 +290,10 @@ def executar_v2(ctx) -> tuple:
             max_tent = max(1, min(int(ie.get("max_tentativas_ia_por_node", 2) or 2), 3))
             for tentativa in range(max_tent):
                 try:
+                    hist_ia = _historico_limpo_para_ia(ctx)
                     resposta = ctx.personalizer.gerar_resposta(
                         system_prompt=sys_f,
-                        historico_lista=slice_historico_para_ia(ctx),
+                        historico_lista=hist_ia,
                         mensagem_lead=prompt_ia,
                         metadata=meta_ia,
                         max_output_tokens=6144,
@@ -438,3 +441,22 @@ def executar_v2(ctx) -> tuple:
     )
     logger.info(f"🔥 [NODE 7 v17] Agitação finalizada para {nome_fmt}.")
     return acoes, "8_oferta_principal"
+
+
+def _historico_limpo_para_ia(ctx, limite: int = 20) -> list:
+    base = slice_historico_para_ia(ctx, limite)
+    if not base:
+        return []
+    out = []
+    for h in base:
+        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
+        t = str(txt).replace("|", " ").strip()
+        t = re.sub(r"\s+", " ", t).strip()
+        if not t:
+            continue
+        if len(t.split()) <= 3 and _RE_RUIDO_CURTO_HIST.match(t.lower()):
+            continue
+        rem = getattr(h, "remetente", None) if not isinstance(h, dict) else h.get("remetente")
+        tip = getattr(h, "tipo", "text") if not isinstance(h, dict) else h.get("tipo", "text")
+        out.append({"remetente": rem or "", "texto": t, "tipo": tip or "text"})
+    return out

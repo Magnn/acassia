@@ -378,6 +378,7 @@ def extrair_evidencias_conversa(
     txt = (texto_atual or "").strip().lower()
     tp_atual = (tipo_mensagem_atual or "").strip().lower()
     nome_ok = nome_util_para_checklist_fase1(nome_lead or "")
+    nome_confirmado_chat = bool(m.get("nome_confirmado_chat"))
     contato_ritual_ok = contato_salvo_ou_declarado(m, texto_atual or "")
     confirmou_agora = bool(
         re.search(r"\b(ok|sim|pronto|feito|salvei|t[áa]\s+salvo|já\s+salvei|ja\s+salvei|isso\s+mesmo)\b", txt, re.I)
@@ -410,6 +411,7 @@ def extrair_evidencias_conversa(
 
     return {
         "nome_ok": nome_ok,
+        "nome_confirmado_chat": bool(nome_confirmado_chat),
         "contato_ritual_ok": bool(contato_ritual_ok),
         "tem_foto": bool(tem_foto),
         "tem_desabafo": bool(tem_desabafo),
@@ -428,7 +430,7 @@ def motivo_redundancia_texto(texto_balao: str, evidencias: Mapping[str, bool]) -
     low = (texto_balao or "").strip().lower()
     if not low:
         return ""
-    if evidencias.get("nome_ok") and re.search(
+    if evidencias.get("nome_ok") and evidencias.get("nome_confirmado_chat") and re.search(
         r"\b(como\s+você\s+se\s+chama|qual\s+seu\s+nome|me\s+diz\s+seu\s+nome|meu\s+nome\s+[eé])\b",
         low,
         re.I,

@@ -194,7 +194,8 @@ class LeadInboxManager:
             et = str(extra["texto_recebido"]).strip()
             if et:
                 pt = str(p.get("texto_recebido") or "").strip()
-                p["texto_recebido"] = f"{pt} | {et}".strip(" |") if pt else et
+                # Não usar "|" como separador: esse símbolo já vazou em prompts/copy.
+                p["texto_recebido"] = f"{pt}. {et}".strip(" .") if pt else et
         if extra.get("imagem_url"):
             p["imagem_url"] = extra["imagem_url"]
             p["tipo_mensagem"] = "image"
@@ -309,7 +310,7 @@ class LeadInboxManager:
     def _auditar_batch_pronto(self, telefone: str, payload: dict) -> None:
         """Regista batch processado com sucesso pelo motor (debounce já aplicado). Sem texto completo nos dados."""
         tx = str(payload.get("texto_recebido") or "").strip()
-        partes = max(1, tx.count(" | ") + 1) if tx else 1
+        partes = max(1, len([s for s in re.split(r"[.!?]\s+", tx) if s.strip()])) if tx else 1
         self._auditar_busy_por_telefone(
             telefone,
             "inbox_batch_pronto",

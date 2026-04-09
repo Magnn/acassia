@@ -37,6 +37,7 @@ class TestNode4Regressoes(unittest.TestCase):
         acoes, prox = node_4_instagram.executar_v2(ctx)
         self.assertEqual(prox, "5_processa_leitura")
         self.assertEqual(len(acoes), 0)
+        self.assertTrue(ctx.metadata.get("node4_contrato_enviado"))
 
     def test_quando_insta_nao_confirmado_envia_link_sem_pergunta_e_avanca(self):
         ctx = _ctx("vamos")
@@ -45,8 +46,25 @@ class TestNode4Regressoes(unittest.TestCase):
         joined = " ".join(t.lower() for t in textos)
         self.assertEqual(prox, "5_processa_leitura")
         self.assertTrue(ctx.metadata.get("insta_enviado"))
+        self.assertTrue(ctx.metadata.get("node4_contrato_enviado"))
         self.assertNotIn("?", joined)
         self.assertTrue(any("instagram.com" in t.lower() for t in textos))
+
+    def test_quando_link_quebrado_apos_envio_insta_envia_orientacao_e_avanca(self):
+        ctx = _ctx("o link do instagram não abre", meta_extra={"insta_enviado": True})
+        acoes, prox = node_4_instagram.executar_v2(ctx)
+        textos = _textos(acoes)
+        joined = " ".join(t.lower() for t in textos)
+        self.assertEqual(prox, "5_processa_leitura")
+        self.assertTrue(any("link" in t.lower() or "instagram" in t.lower() for t in textos))
+        self.assertIn("abre", joined)
+
+    def test_quando_reporta_mensagem_cortada_fica_no_node4_para_reparo(self):
+        ctx = _ctx("tá atropelado, não deu pra ver")
+        acoes, prox = node_4_instagram.executar_v2(ctx)
+        textos = _textos(acoes)
+        self.assertEqual(prox, "4_instagram")
+        self.assertTrue(any("avisa" in t.lower() or "continuo" in t.lower() for t in textos))
 
 
 if __name__ == "__main__":

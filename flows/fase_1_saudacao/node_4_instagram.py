@@ -173,6 +173,21 @@ def _acoes_texto_e_url_instagram(link_ig: str, imagem_perfil_ig: str = "") -> Li
     ])
     return out
 
+
+def _texto_relevante_para_node5(texto: str) -> bool:
+    t = (texto or "").strip().lower()
+    if not t:
+        return False
+    if t in _CONFIRMACOES:
+        return False
+    if len(t.split()) <= 1:
+        return False
+    if _RE_TEXTO_LINK_IG_QUEBRADO.search(t):
+        return False
+    if _RE_PROBLEMA_ENTREGA.search(t):
+        return False
+    return True
+
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     """Executa o nó de antecâmara e prova social."""
     meta = getattr(ctx, "metadata", {}) or {}
@@ -181,30 +196,16 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     texto_puro = str(ctx.texto_recebido or "").strip()
     genero = genero_efetivo_para_copy(ctx.nome_lead or "", meta, texto_discurso=texto_puro or None)
     meta["genero_lead"] = genero
-    genero_hint = genero_hint_para_prompt(meta)
 
     config = meta.get("__config__", {})
     link_ig = _normalizar_link_ig(str(config.get("link_prova_social") or ""))
     imagem_perfil_ig = str(config.get("imagem_perfil_instagram") or "").strip()
-    desabafo_prompt = (_seg["desabafo_prompt"] or "esse peso que você trouxe").strip()
+    if _texto_relevante_para_node5(texto_puro):
+        meta["contexto_extra_final"] = texto_puro
 
-    # ── NOVO PADRÃO NODE4 (espelho do node2) ──
-    # 1) Se já está confirmado que o lead viu/visitou o insta: não dispara nada e segue.
-    # 2) Se não está confirmado: envia insta em contexto afirmativo (sem pergunta) e segue.
-    if bool(meta.get("lead_declarou_visita_insta") or meta.get("insta_enviado")):
-        meta["insta_enviado"] = True
-        meta["node4_bypass_insta_confirmado"] = True
-        ctx.estado_coleta = "node4_bypass_para_node5"
-        ctx.metadata = meta
-        return [], "5_processa_leitura"
-    acoes_instagram = _acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig)
-    meta["insta_enviado"] = True
-    meta["node5_ignorar_ruido_um_turno"] = True
-    ctx.estado_coleta = "node4_envio_insta_sem_pergunta"
-    ctx.metadata = meta
-    return acoes_instagram, "5_processa_leitura"
-
+    # 1) Reparo explícito quando lead relata entrega ruim/cortada.
     if lead_reportou_problema_entrega(texto_puro):
+        meta["node4_contrato_enviado"] = True
         acoes_reparo = [
             Acao(tipo="delay", segundos=random.randint(3, 5)),
             Acao(
@@ -223,141 +224,42 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         ctx.metadata = meta
         return acoes_reparo, "4_instagram"
 
-    # 1. VERIFICAÇÃO DE ESTADO (Handoff para o Maestro - Node 5)
-    if meta.get("insta_enviado") is True:
-        if ctx.intencao != "opt_out":
-            logger.info(f"🚀 [NODE 4] Handoff para Maestro (Node 5). Lead: {nome_fmt}")
-            acoes_pre: List[Acao] = []
-            if _RE_TEXTO_LINK_IG_QUEBRADO.search(texto_puro):
-                handle = _handle_instagram_para_fallback(link_ig)
-                voc = (
-                    nome_fmt
-                    if nome_fmt and not nome_eh_placeholder(str(nome_fmt))
-                    else "você"
+    # 2) Se o lead já confirmou/bateu no insta, só fazemos reparo se link quebrou; caso contrário, handoff direto.
+    if bool(meta.get("lead_declarou_visita_insta") or meta.get("insta_enviado")):
+        meta["node4_contrato_enviado"] = True
+        acoes_pre: List[Acao] = []
+        if _RE_TEXTO_LINK_IG_QUEBRADO.search(texto_puro):
+            handle = _handle_instagram_para_fallback(link_ig)
+            voc = nome_fmt if nome_fmt and not nome_eh_placeholder(str(nome_fmt)) else "você"
+            if handle:
+                linha = (
+                    f"{voc}, às vezes o app torce o link. Abre com calma de novo, "
+                    f"ou busca no Instagram pelo perfil {handle}, é o mesmo lugar."
                 )
-                if handle:
-                    linha = (
-                        f"{voc}, às vezes o app torce o link. Abre com calma de novo, "
-                        f"ou busca no Instagram pelo perfil {handle}, é o mesmo lugar."
-                    )
-                else:
-                    exib = (
-                        (config.get("perfil_negocio") or {}).get("nome_exibicao")
-                        or "Cigana Esmeralda"
-                    )
-                    linha = (
-                        f"{voc}, às vezes o WhatsApp corta o link. Busca pelo nome {exib} no Instagram "
-                        "ou me diz aqui que te ajudo a achar."
-                    )
-                acoes_pre = [
-                    Acao(tipo="delay", segundos=random.randint(4, 7)),
-                    Acao(
-                        tipo="text",
-                        conteudo=linha,
-                        metadata={"skip_gancho_final": True},
-                    ),
-                ]
-            if len(texto_puro.split()) > 1 and texto_puro.lower() not in _CONFIRMACOES:
-                meta["contexto_extra_final"] = texto_puro
-            ctx.metadata = meta
-            ctx.estado_coleta = "node4_handoff_node5"
-            acoes_m, prox = maestro.executar_v2(ctx)
-            return acoes_pre + acoes_m, prox
-
-    # 2. GERAÇÃO DINÂMICA COM IA
-    if ctx.personalizer:
-        logger.info(f"🧠 [NODE 4 v15] Antecâmara para {nome_fmt} (gênero={genero_hint}).")
-        try:
-            prompt_ia = _SYSTEM_ANTECAMARA.format(
-                nome=nome_fmt,
-                genero_hint=genero_hint,
-                desabafo=desabafo_prompt,
-            )
-
-            _ml4 = (
-                f"Última mensagem do lead: '{texto_puro}'. "
-                "Gere só os 2 balões do sistema; link e pergunta final são outra mensagem. Tom leitura, não anúncio."
-            )
-            _ml4 += sufixo_ancoras_node3_para_prompt(ctx.metadata)
-            baloes_limpos: List[str] = []
-            resp_ia = ""
-            _temps = (0.62, 0.68, 0.74)
-            ie = ((ctx.metadata or {}).get("__config__", {}) or {}).get("ia_economia", {}) or {}
-            max_tent = max(1, min(int(ie.get("max_tentativas_ia_por_node", 2) or 2), 3))
-            for tentativa in range(max_tent):
-                resp_ia = ctx.personalizer.gerar_resposta(
-                    system_prompt=prompt_ia,
-                    historico_lista=slice_historico_para_ia(ctx),
-                    mensagem_lead=_ml4,
-                    metadata=ctx.metadata,
-                    max_output_tokens=1400,
-                    temperature=_temps[min(tentativa, len(_temps) - 1)],
-                )
-                baloes_limpos = _tratar_frases_ia(resp_ia)
-                if len(baloes_limpos) >= 2:
-                    break
-                baloes_limpos = _baloes_node4_de_paragrafos(resp_ia)
-                if len(baloes_limpos) >= 2:
-                    break
-
-            if len(baloes_limpos) >= 2:
-                acoes = [Acao(tipo="delay", segundos=max(5, min(len(desabafo_prompt) // 24, 8)))]
-                
-                for b in baloes_limpos:
-                    acoes.append(Acao(tipo="delay", segundos=max(5, _delay_digitacao(b) - 2)))
-                    b_seguro = _encurtar_balao_node4(b)
-                    acoes.append(
-                        Acao(
-                            tipo="text",
-                            conteudo=b_seguro,
-                            metadata={"skip_gancho_final": True},
-                        )
-                    )
-
-                acoes.extend(_acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig))
-
-                hook = _encurtar_balao_node4(
-                    f"Quando passar por lá, {nome_fmt}, o que bateu mais forte no teu peito?"
-                )
-                acoes.append(Acao(tipo="delay", segundos=random.randint(7, 12)))
-                acoes.append(Acao(tipo="text", conteudo=hook, metadata={"skip_gancho_final": True}))
-
-                meta["insta_enviado"] = True
-                meta["node5_ignorar_ruido_um_turno"] = True
-                logger.info("✅ [NODE 4] Transição gerada com sucesso.")
-                ctx.estado_coleta = "node4_antecamara_ig"
-                ctx.metadata = meta
-                return acoes, "4_instagram"
-            
             else:
-                raise ValueError("IA gerou balões insuficientes/instáveis para Node 4.")
+                exib = ((config.get("perfil_negocio") or {}).get("nome_exibicao") or "Cigana Esmeralda")
+                linha = (
+                    f"{voc}, às vezes o WhatsApp corta o link. Busca pelo nome {exib} no Instagram "
+                    "ou me diz aqui que te ajudo a achar."
+                )
+            acoes_pre = [
+                Acao(tipo="delay", segundos=random.randint(4, 7)),
+                Acao(tipo="text", conteudo=linha, metadata={"skip_gancho_final": True}),
+            ]
+        meta["insta_enviado"] = True
+        meta["node4_bypass_insta_confirmado"] = True
+        ctx.estado_coleta = "node4_handoff_para_node5"
+        ctx.metadata = meta
+        return acoes_pre, "5_processa_leitura"
 
-        except Exception as e:
-            logger.error(f"🚨 [NODE 4] Erro na IA: {e}. Usando Fallback.")
-
-    # 3. FALLBACK DE SEGURANÇA (CADÊNCIA DE OURO)
-    logger.info(f"✨ [NODE 4 v15] Fallback para {nome_fmt}.")
-    acoes_fallback = [
-        Acao(tipo="delay", segundos=random.randint(6, 10)),
-        Acao(
-            tipo="text",
-            conteudo=f"Acalma o coração, {nome_fmt}. Vou me concentrar nas suas linhas com calma. 🙏",
-            metadata={"skip_gancho_final": True},
-        ),
-        *_acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig),
-        Acao(tipo="delay", segundos=random.randint(12, 20)),
-        Acao(
-            tipo="text",
-            conteudo=f"Quando passar por lá, {nome_fmt}, o que bateu mais forte no teu peito?",
-            metadata={"skip_gancho_final": True},
-        ),
-    ]
-
+    # 3) Padrão fixo: envia perfil sem perguntar e avança para leitura.
+    acoes_instagram = _acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig)
+    meta["node4_contrato_enviado"] = True
     meta["insta_enviado"] = True
     meta["node5_ignorar_ruido_um_turno"] = True
-    ctx.estado_coleta = "node4_antecamara_fallback"
+    ctx.estado_coleta = "node4_envio_insta_sem_pergunta"
     ctx.metadata = meta
-    return acoes_fallback, "4_instagram"
+    return acoes_instagram, "5_processa_leitura"
 
 def _balao_node4_aceito(c: str) -> bool:
     if len(c) < 5:

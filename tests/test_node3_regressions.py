@@ -83,6 +83,24 @@ class TestNode3Regressoes(unittest.TestCase):
         textos = _textos(acoes)
         self.assertTrue(textos)
         self.assertNotIn("deixei meu cartão", textos[0].lower())
+        self.assertNotIn("calma", textos[0].lower())
+
+    def test_aguardando_dados_com_preflight_completo_avanca_para_node4(self):
+        ctx = _ctx(
+            "",
+            estado="aguardando_dados",
+            meta_extra={
+                "foto_recebida": True,
+                "desabafo_recebido": True,
+                "desabafo_original": "já sofro com isso há dois anos",
+                "desejo_declarado": "quero virar essa fase e ter paz no amor",
+                "aprofundamento_texto": "há dois anos, já tentei conversa, terapia e oração",
+            },
+        )
+        acoes, prox = node_3_coleta_profunda.executar_v2(ctx)
+        self.assertEqual(prox, "4_instagram")
+        self.assertEqual(ctx.metadata.get("node3_estado"), "coleta_completa")
+        self.assertTrue(_textos(acoes))
 
 
 if __name__ == "__main__":

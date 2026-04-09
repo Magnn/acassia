@@ -52,7 +52,7 @@ class TestNode1Regressoes(unittest.TestCase):
         Lei fundamental do Node 1 (com nome):
         mantém saudação + apresentação + vaga/consulta e fecha em convite de início.
         """
-        ctx = _ctx("oi", nome="Magno")
+        ctx = _ctx("oi", nome="Magno", meta_extra={"nome_confirmado_chat": True})
         acoes, prox = node_1_apresentacao.executar_v2(ctx)
         txt = _textos(acoes)
         joined = " ".join(t.lower() for t in txt)
@@ -101,7 +101,7 @@ class TestNode1Regressoes(unittest.TestCase):
         self.assertTrue("como você se chama" in joined or "me diz como você se chama" in joined)
 
     def test_com_nome_fechamento_tem_convite_e_sem_pedir_nome(self):
-        ctx = _ctx("quero entender melhor", nome="Magno")
+        ctx = _ctx("quero entender melhor", nome="Magno", meta_extra={"nome_confirmado_chat": True})
         acoes, prox = node_1_apresentacao.executar_v2(ctx)
         txt = _textos(acoes)
         joined = " ".join(t.lower() for t in txt)
@@ -133,6 +133,32 @@ class TestNode1Regressoes(unittest.TestCase):
         _acoes, prox = node_1_apresentacao.executar_v2(ctx)
         self.assertEqual(prox, "3_coleta_profunda")
         self.assertTrue(ctx.metadata.get("node1_pulou_para_coleta"))
+
+    def test_saneador_remove_balao_nome_truncado(self):
+        baloes = [
+            "Ah, Magno, que bom que me permite iniciar.",
+            "Seu nome, Mag…",
+            "podemos iniciar?",
+        ]
+        out = node_1_apresentacao._sanear_baloes_saida_node1(baloes)  # noqa: SLF001
+        joined = " ".join(t.lower() for t in out)
+        self.assertIn("podemos iniciar", joined)
+        self.assertNotIn("seu nome, mag", joined)
+
+    def test_nome_de_perfil_sem_confirmacao_no_chat_nao_pode_ser_usado(self):
+        ctx = _ctx("oi", nome="Magnus")
+        acoes, _prox = node_1_apresentacao.executar_v2(ctx)
+        joined = " ".join(t.lower() for t in _textos(acoes))
+        self.assertNotIn("magnus", joined)
+        self.assertTrue("como você se chama" in joined or "me diz como você se chama" in joined)
+
+    def test_quero_minha_consulta_sem_nome_confirmado_deve_perguntar_nome(self):
+        ctx = _ctx("quero minha consulta", nome="Magnus")
+        acoes, prox = node_1_apresentacao.executar_v2(ctx)
+        joined = " ".join(t.lower() for t in _textos(acoes))
+        self.assertEqual(prox, "2_salvar_contato")
+        self.assertNotIn("magnus", joined)
+        self.assertTrue("como você se chama" in joined or "me diz como você se chama" in joined)
 
 
 if __name__ == "__main__":

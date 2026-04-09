@@ -46,6 +46,7 @@ from flows.fase_1_preflight import (
     enriquecer_dados_node3_precoce,
     promover_burst_fase1_meta,
     resolver_avanco_node_fase1,
+    sniffer_nome_confirmado_meta,
     sniffer_instagram_meta,
 )
 from flows.funnel_gates import (
@@ -390,6 +391,13 @@ class Engine:
                         "⏸️ [HANDOFF] Lead pós-funil/comprador (%s) desviado para atendimento silencioso.",
                         telefone,
                     )
+                    logger.info(
+                        "event=entrada_handoff_pos_funil lead=%s node=%s convertido=%s produto=%s",
+                        lead.id,
+                        str(getattr(lead, "node_atual", "") or ""),
+                        bool(getattr(lead, "convertido", False)),
+                        str(getattr(lead, "produto_comprado", "") or "")[:80],
+                    )
                     db.commit()
                     with self._lock_proc:
                         self._leads_em_processamento.pop(lead.id, None)
@@ -470,6 +478,13 @@ class Engine:
                 ctx.metadata = meta
 
                 _tf_fase1 = concat_texto_usuario(ctx, texto_sniff)
+                sniffer_nome_confirmado_meta(meta, _tf_fase1, lead.id)
+                if not bool(meta.get("nome_confirmado_chat")):
+                    logger.info(
+                        "event=entrada_nome_pendente lead=%s node=%s",
+                        lead.id,
+                        str(getattr(lead, "node_atual", "") or ""),
+                    )
                 sniffer_instagram_meta(meta, _tf_fase1, lead.id)
                 enriquecer_dados_node3_precoce(meta, _tf_fase1, lead.id)
                 promover_burst_fase1_meta(meta, _tf_fase1, lead.id, lead)
@@ -1203,6 +1218,8 @@ class Engine:
             meta.get("ja_passou_funil")
             or meta.get("cliente_existente")
             or meta.get("atendimento_pos_funil")
+            or meta.get("ja_recebeu_atendimento")
+            or meta.get("departamento_humano_ativo")
         )
 
     def _rotear_state_machine(self, db, lead, ctx: ContextoConversa) -> list[Acao]:

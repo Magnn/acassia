@@ -57,6 +57,7 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
+_RE_RUIDO_CURTO_HIST = re.compile(r"(?i)^(ok|sim|oi|opa|pronto|blz|beleza|ta|tá|show|feito|entendi|combinado|👍|🙏|👀)$")
 
 def _delay_digitacao(texto: str, eh_audio: bool = False, tom: str = "Maternal") -> int:
     if not texto: return 8
@@ -187,6 +188,7 @@ DADOS DA HIVE MIND (use tudo com respeito):
 {instrucao_eco_esforco}
 
 MISSÃO: Leitura "raio-X" ancorada no que a mão mostra, ecoando a dor ({dor}) sem humilhar a pessoa.
+0. CONTEXTO INTERNO (CRÍTICO): use histórico apenas como base interna. PROIBIDO reproduzir texto bruto do lead/histórico, PROIBIDO citar aspas literais do histórico, e PROIBIDO imprimir separadores técnicos (ex.: "|", "||", "->").
 1. MÃO EM NARRATIVA: fale do que a leitura revela como história vivida. PROIBIDO aula de quiromancia (ex.: descrever "Linha do Coração" como manual, traço contínuo vs interrompido, glossário de livro). Isso destrói autoridade.
 2. ALÍVIO DE CULPA: interferências ou padrões antigos sem culpar com crueldade; tom de mesa, não acusação.
 3. ANTIBARNUM: evite frases genéricas. Se houver {tempo_exato} e/ou {evento_gatilho}, use de forma natural.
@@ -273,7 +275,7 @@ def executar_v2(ctx) -> tuple:
         or meta.get("node5_tentativas_previas")
         or meta.get("desejo_declarado")
         or ""
-    ).strip(), 180)
+    ).replace("|", " ").strip(), 180)
     nome_pessoa_envolvida = nome_pessoa_envolvida_raw or "INDEFINIDO"
     tempo_exato = tempo_exato_raw or "INDEFINIDO"
     evento_gatilho = evento_gatilho_raw or "INDEFINIDO"
@@ -341,9 +343,10 @@ def executar_v2(ctx) -> tuple:
             max_tent = max(1, min(int(ie.get("max_tentativas_ia_por_node", 2) or 2), 3))
             for tentativa in range(max_tent):
                 try:
+                    hist_ia = _historico_limpo_para_ia(ctx)
                     resposta = ctx.personalizer.gerar_resposta(
                         system_prompt=sys_f,
-                        historico_lista=slice_historico_para_ia(ctx),
+                        historico_lista=hist_ia,
                         mensagem_lead=prompt_ia,
                         metadata=meta_ia,
                         max_output_tokens=_MAX_OUT_TOKENS_NODE6,
@@ -488,3 +491,22 @@ def executar_v2(ctx) -> tuple:
     )
     logger.info(f"🔮 [NODE 6 v15] Leitura enviada para {nome_fmt}.")
     return acoes, "7_interesse_desejo"
+
+
+def _historico_limpo_para_ia(ctx, limite: int = 20) -> list:
+    base = slice_historico_para_ia(ctx, limite)
+    if not base:
+        return []
+    out = []
+    for h in base:
+        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
+        t = str(txt).replace("|", " ").strip()
+        t = re.sub(r"\s+", " ", t).strip()
+        if not t:
+            continue
+        if len(t.split()) <= 2 and _RE_RUIDO_CURTO_HIST.match(t.lower()):
+            continue
+        rem = getattr(h, "remetente", None) if not isinstance(h, dict) else h.get("remetente")
+        tip = getattr(h, "tipo", "text") if not isinstance(h, dict) else h.get("tipo", "text")
+        out.append({"remetente": rem or "", "texto": t, "tipo": tip or "text"})
+    return out

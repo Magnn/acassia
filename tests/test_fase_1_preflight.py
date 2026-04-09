@@ -18,8 +18,15 @@ class TestChecklist(unittest.TestCase):
         from flows.fase_1_preflight import primeiro_node_pendente_fase1
 
         lead = SimpleNamespace(nome="Ana")
-        meta: dict = {"nome_lead": "Ana"}
+        meta: dict = {"nome_lead": "Ana", "nome_confirmado_chat": True}
         self.assertEqual(primeiro_node_pendente_fase1(meta, lead), "2_salvar_contato")
+
+    def test_nome_de_perfil_sem_confirmacao_chat_permanece_node1(self):
+        from flows.fase_1_preflight import primeiro_node_pendente_fase1
+
+        lead = SimpleNamespace(nome="Ana")
+        meta: dict = {"nome_lead": "Ana"}
+        self.assertEqual(primeiro_node_pendente_fase1(meta, lead), "1_apresentacao")
 
     def test_vcard_satisfez_contato_para_node3(self):
         from flows.fase_1_preflight import primeiro_node_pendente_fase1
@@ -27,9 +34,53 @@ class TestChecklist(unittest.TestCase):
         lead = SimpleNamespace(nome="Ana")
         meta: dict = {
             "nome_lead": "Ana",
+            "nome_confirmado_chat": True,
             "node2_vcard_despachado": True,
         }
         self.assertEqual(primeiro_node_pendente_fase1(meta, lead), "3_coleta_profunda")
+
+    def test_node4_sem_contrato_permanece_node4(self):
+        from flows.fase_1_preflight import primeiro_node_pendente_fase1
+
+        lead = SimpleNamespace(nome="Ana")
+        meta: dict = {
+            "nome_lead": "Ana",
+            "nome_confirmado_chat": True,
+            "node2_vcard_despachado": True,
+            "node3_contrato_enviado": True,
+            "node3_estado": "coleta_completa",
+            "lead_declarou_visita_insta": True,
+        }
+        self.assertEqual(primeiro_node_pendente_fase1(meta, lead), "4_instagram")
+
+    def test_node4_com_contrato_sem_insta_permanece_node4(self):
+        from flows.fase_1_preflight import primeiro_node_pendente_fase1
+
+        lead = SimpleNamespace(nome="Ana")
+        meta: dict = {
+            "nome_lead": "Ana",
+            "nome_confirmado_chat": True,
+            "node2_vcard_despachado": True,
+            "node3_contrato_enviado": True,
+            "node3_estado": "coleta_completa",
+            "node4_contrato_enviado": True,
+        }
+        self.assertEqual(primeiro_node_pendente_fase1(meta, lead), "4_instagram")
+
+    def test_node5_so_quando_node4_contrato_e_insta_ok(self):
+        from flows.fase_1_preflight import primeiro_node_pendente_fase1
+
+        lead = SimpleNamespace(nome="Ana")
+        meta: dict = {
+            "nome_lead": "Ana",
+            "nome_confirmado_chat": True,
+            "node2_vcard_despachado": True,
+            "node3_contrato_enviado": True,
+            "node3_estado": "coleta_completa",
+            "node4_contrato_enviado": True,
+            "insta_enviado": True,
+        }
+        self.assertEqual(primeiro_node_pendente_fase1(meta, lead), "5_processa_leitura")
 
 
 class TestAvanco(unittest.TestCase):
@@ -38,7 +89,7 @@ class TestAvanco(unittest.TestCase):
 
         lead = SimpleNamespace(id=10, node_atual="1_apresentacao", nome="Bia")
         ctx = SimpleNamespace(node_atual="1_apresentacao")
-        meta: dict = {"nome_lead": "Bia", "node2_vcard_despachado": True}
+        meta: dict = {"nome_lead": "Bia", "nome_confirmado_chat": True, "node2_vcard_despachado": True}
         resolver_avanco_node_fase1(lead, ctx, meta)
         self.assertEqual(lead.node_atual, "1_apresentacao")
         self.assertEqual(ctx.node_atual, "1_apresentacao")
@@ -50,6 +101,7 @@ class TestAvanco(unittest.TestCase):
         ctx = SimpleNamespace(node_atual="1_apresentacao")
         meta: dict = {
             "nome_lead": "Bia",
+            "nome_confirmado_chat": True,
             "node2_vcard_despachado": True,
             "node1_contrato_enviado": True,
         }
@@ -62,7 +114,7 @@ class TestAvanco(unittest.TestCase):
 
         lead = SimpleNamespace(id=12, node_atual="2_salvar_contato", nome="Bia")
         ctx = SimpleNamespace(node_atual="2_salvar_contato")
-        meta: dict = {"nome_lead": "Bia", "node2_vcard_despachado": True}
+        meta: dict = {"nome_lead": "Bia", "nome_confirmado_chat": True, "node2_vcard_despachado": True}
         resolver_avanco_node_fase1(lead, ctx, meta)
         self.assertEqual(lead.node_atual, "2_salvar_contato")
         self.assertEqual(ctx.node_atual, "2_salvar_contato")
@@ -74,12 +126,80 @@ class TestAvanco(unittest.TestCase):
         ctx = SimpleNamespace(node_atual="2_salvar_contato")
         meta: dict = {
             "nome_lead": "Bia",
+            "nome_confirmado_chat": True,
             "node2_vcard_despachado": True,
             "node2_contrato_enviado": True,
         }
         resolver_avanco_node_fase1(lead, ctx, meta)
         self.assertEqual(lead.node_atual, "3_coleta_profunda")
         self.assertEqual(ctx.node_atual, "3_coleta_profunda")
+
+    def test_node3_nao_pula_antes_do_contrato_enviado(self):
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=14, node_atual="3_coleta_profunda", nome="Bia")
+        ctx = SimpleNamespace(node_atual="3_coleta_profunda")
+        meta: dict = {
+            "nome_lead": "Bia",
+            "nome_confirmado_chat": True,
+            "node2_vcard_despachado": True,
+            "node3_estado": "coleta_completa",
+            "lead_declarou_visita_insta": True,
+        }
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "3_coleta_profunda")
+        self.assertEqual(ctx.node_atual, "3_coleta_profunda")
+
+    def test_node3_pode_avancar_apos_contrato_enviado(self):
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=15, node_atual="3_coleta_profunda", nome="Bia")
+        ctx = SimpleNamespace(node_atual="3_coleta_profunda")
+        meta: dict = {
+            "nome_lead": "Bia",
+            "nome_confirmado_chat": True,
+            "node2_vcard_despachado": True,
+            "node3_contrato_enviado": True,
+            "node3_estado": "coleta_completa",
+            "lead_declarou_visita_insta": True,
+        }
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "4_instagram")
+        self.assertEqual(ctx.node_atual, "4_instagram")
+
+    def test_node4_nao_pula_antes_do_contrato_enviado(self):
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=16, node_atual="4_instagram", nome="Bia")
+        ctx = SimpleNamespace(node_atual="4_instagram")
+        meta: dict = {
+            "nome_lead": "Bia",
+            "nome_confirmado_chat": True,
+            "node2_vcard_despachado": True,
+            "node3_contrato_enviado": True,
+            "node3_estado": "coleta_completa",
+        }
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "4_instagram")
+        self.assertEqual(ctx.node_atual, "4_instagram")
+
+    def test_node4_pode_avancar_apos_contrato_enviado(self):
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=17, node_atual="4_instagram", nome="Bia")
+        ctx = SimpleNamespace(node_atual="4_instagram")
+        meta: dict = {
+            "nome_lead": "Bia",
+            "nome_confirmado_chat": True,
+            "node2_vcard_despachado": True,
+            "node3_contrato_enviado": True,
+            "node3_estado": "coleta_completa",
+            "node4_contrato_enviado": True,
+            "insta_enviado": True,
+        }
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "5_processa_leitura")
+        self.assertEqual(ctx.node_atual, "5_processa_leitura")
 
     def test_avanca_para_primeiro_pendente(self):
         from flows.fase_1_preflight import resolver_avanco_node_fase1
@@ -88,6 +208,7 @@ class TestAvanco(unittest.TestCase):
         ctx = SimpleNamespace(node_atual="1_apresentacao")
         meta: dict = {
             "nome_lead": "Bia",
+            "nome_confirmado_chat": True,
             "node2_vcard_despachado": True,
             "node1_contrato_enviado": True,
         }
@@ -104,6 +225,7 @@ class TestAvanco(unittest.TestCase):
         ctx = SimpleNamespace(node_atual="4_instagram")
         meta: dict = {
             "nome_lead": "Ana",
+            "nome_confirmado_chat": True,
             "node2_vcard_despachado": True,
             "node3_estado": "inicial",
         }
@@ -119,6 +241,7 @@ class TestBurstLongo(unittest.TestCase):
         lead = SimpleNamespace(id=1, nome="Lu")
         meta: dict = {
             "nome_lead": "Lu",
+            "nome_confirmado_chat": True,
             "foto_recebida": True,
             "desabafo_recebido": True,
             "lead_contato_salvo_declarado": True,
@@ -171,6 +294,16 @@ class TestEnriquecimentoPrecoceNode3(unittest.TestCase):
         enriquecer_dados_node3_precoce(meta, texto, lead_id=13)
         self.assertFalse((meta.get("desejo_declarado") or "").strip())
         self.assertFalse((meta.get("aprofundamento_texto") or "").strip())
+
+
+class TestNomeConfirmadoPrecoce(unittest.TestCase):
+    def test_marca_nome_confirmado_quando_lead_se_apresenta(self):
+        from flows.fase_1_preflight import sniffer_nome_confirmado_meta
+
+        meta: dict = {}
+        sniffer_nome_confirmado_meta(meta, "oi, me chamo João", lead_id=21)
+        self.assertTrue(meta.get("nome_confirmado_chat"))
+        self.assertEqual(meta.get("nome_lead"), "João")
 
 
 if __name__ == "__main__":

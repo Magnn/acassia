@@ -730,7 +730,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             # Se o Node2 já verbalizou o contexto do cartão no turno imediatamente anterior,
             # não repetir a mesma âncora para evitar sensação de eco.
             if meta.get("node2_contexto_card_enviado"):
-                primeiro_balao = f"{nome_fmt}, seguimos com calma daqui. ✨"
+                primeiro_balao = f"{nome_fmt}, seguimos daqui. ✨"
             else:
                 # Node2 novo padrão pode enviar card sem confirmação explícita.
                 # Aqui não afirmamos "você salvou" para não gerar incoerência.
@@ -945,6 +945,47 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             else:
                 universo = _classificar_universo(ctx, meta, desabafo)
             meta["universo_desejo"] = universo
+
+            # Se o pré-flight já trouxe desejo/aprofundamento com substância, não repetir pedidos.
+            desejo_precoce = (meta.get("desejo_declarado") or "").strip()
+            aprofundamento_precoce = (meta.get("aprofundamento_texto") or "").strip()
+            if desejo_precoce and _tem_substancia_desejo(desejo_precoce):
+                if aprofundamento_precoce and _aprofundamento_resposta_suficiente(aprofundamento_precoce):
+                    _append_node3_ancora(meta, desejo_precoce[:240])
+                    _append_node3_ancora(meta, aprofundamento_precoce[:260])
+                    _extrair_dados_ricos_ia(ctx, meta)
+                    meta["node3_estado"] = "coleta_completa"
+                    ctx.estado_coleta = "node3_camada4_extracao_ok"
+                    fechar_ft = [
+                        Acao(tipo="delay", segundos=random.randint(8, 12)),
+                        Acao(
+                            tipo="text",
+                            conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção.",
+                        ),
+                        Acao(tipo="delay", segundos=random.randint(7, 11)),
+                        Acao(
+                            tipo="text",
+                            conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos.",
+                        ),
+                    ]
+                    ctx.metadata = meta
+                    return _normalizar_acoes_texto_node3(fechar_ft), "4_instagram"
+                meta["node3_estado"] = "aguardando_aprofundamento"
+                meta["node3_aprofundamento_acumulado"] = ""
+                ctx.estado_coleta = "node3_camada3_tempo_tentativas"
+                _append_node3_ancora(meta, desejo_precoce[:240])
+                acoes_ap: List[Acao] = [
+                    Acao(tipo="delay", segundos=random.randint(7, 11)),
+                    Acao(tipo="text", conteudo="Você foi bem claro no que deseja, isso ajuda muito."),
+                    Acao(tipo="delay", segundos=random.randint(8, 13)),
+                    Acao(
+                        tipo="text",
+                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
+                    ),
+                ]
+                ctx.metadata = meta
+                return _normalizar_acoes_texto_node3(acoes_ap), proximo_node
+
             meta["node3_estado"] = "aguardando_desejo"
             ctx.estado_coleta = "node3_camada2_desejo"
             _u_c2 = meta.get("universo_desejo", "geral")

@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from copy_sanitizer import preparar_texto_envio
+from copy_sanitizer import preparar_texto_envio, tentar_salvar_balao_ia_cortado, BALAO_IA_REGEX_CORTE_FINAL
 from schema import Acao, slice_historico_para_ia
 from flows.funnel_gates import (
     nome_eh_placeholder,
@@ -372,6 +372,13 @@ def _sanear_baloes_saida_node1(baloes: List[str]) -> List[str]:
     for b in baloes or []:
         t = preparar_texto_envio(str(b or ""), "node1_saida_final").strip()
         if not t:
+            continue
+        t = tentar_salvar_balao_ia_cortado(t, BALAO_IA_REGEX_CORTE_FINAL).strip()
+        # Se o texto ainda parece um vocativo/nome truncado (ex.: "Seu nome, Mag…"),
+        # descarta para não vazar mensagem quebrada no primeiro contato.
+        if re.search(r"(?i)\b(seu\s+nome|meu\s+nome|me\s+chamo)\b[^?!.…]{0,90}…\s*$", t):
+            continue
+        if re.search(r",\s*[A-Za-zÀ-ÿ]{1,4}…\s*$", t):
             continue
         t = _encurtar_balao_node1(t, _MAX_CHARS_BALAO_NODE1)
         t = _garantir_pontuacao_final(t)
@@ -878,10 +885,14 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     nome = VOCATIVO_SEM_NOME
     nome_extraido = _extrair_primeiro_nome(blob_ctx)
     nome_ctx = str(getattr(ctx, "nome_lead", "") or "").strip()
+    nome_confirmado_chat = bool((getattr(ctx, "metadata", {}) or {}).get("nome_confirmado_chat"))
     if nome_extraido:
         nome = nome_extraido
-    elif nome_ctx and not nome_eh_placeholder(nome_ctx):
-        # Reusa nome já conhecido do contexto para não perder burst/checklist.
+        if not hasattr(ctx, "metadata") or ctx.metadata is None:
+            ctx.metadata = {}
+        ctx.metadata["nome_confirmado_chat"] = True
+    elif nome_confirmado_chat and nome_ctx and not nome_eh_placeholder(nome_ctx):
+        # Só reutiliza nome de contexto se ele já foi confirmado em conversa.
         nome = nome_ctx.split()[0].capitalize()
     if nome != VOCATIVO_SEM_NOME:
         if not hasattr(ctx, "metadata") or ctx.metadata is None:

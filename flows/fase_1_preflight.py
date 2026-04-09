@@ -44,6 +44,9 @@ _RE_TEMPO = re.compile(
 )
 _RE_GATILHO = re.compile(r"(?i)\b(desde que|depois que|quando)\b")
 _RE_DESEJO = re.compile(r"(?i)\b(quero|gostaria|desejo|busco|sonho)\b")
+_RE_DECLARA_NOME = re.compile(
+    r"(?i)\b(me\s+chamo|meu\s+nome\s+[eé]|sou\s+[oa])\s+([a-zà-ú][a-zà-ú'\-]{1,24})\b"
+)
 _RE_RUIDO_OPERACIONAL = re.compile(
     r"(?i)\b(oi|ol[áa]|ok|pronto|vamos|sim|blz|beleza|"
     r"salvei|salvar|contato|n[uú]mero|numero|"
@@ -81,11 +84,39 @@ def concat_texto_usuario(ctx: Any, texto_atual: str) -> str:
 
 
 def nome_valido_checklist_fase1(lead: Any, meta: Dict[str, Any]) -> bool:
-    """True se há nome utilizável (DB ou metadata) — mesma regra que `nome_util_para_checklist_fase1`."""
+    """
+    True somente quando o nome já foi confirmado no chat.
+    Evita considerar nome de perfil/DB como "confirmado" no topo do funil.
+    """
+    if not bool(meta.get("nome_confirmado_chat")):
+        return False
     for cand in ((getattr(lead, "nome", None) or "").strip(), (meta.get("nome_lead") or "").strip()):
         if nome_util_para_checklist_fase1(cand):
             return True
     return False
+
+
+def sniffer_nome_confirmado_meta(meta: Dict[str, Any], texto_full: str, lead_id: int) -> None:
+    """
+    Marca confirmação de nome quando o próprio lead se apresenta no texto.
+    """
+    texto = (texto_full or "").strip()
+    if not texto:
+        return
+    if meta.get("nome_confirmado_chat"):
+        logger.info("event=entrada_nome_confirmado_chat_ja_ativo lead=%s", lead_id)
+        return
+    m = _RE_DECLARA_NOME.search(texto)
+    if not m:
+        return
+    nome = (m.group(2) or "").strip().capitalize()
+    if not nome_util_para_checklist_fase1(nome):
+        return
+    meta["nome_confirmado_chat"] = True
+    if not (meta.get("nome_lead") or "").strip():
+        meta["nome_lead"] = nome
+    logger.info("🧩 [PREFLIGHT] nome_confirmado_chat (lead=%s)", lead_id)
+    logger.info("event=entrada_nome_confirmado_chat lead=%s nome=%s", lead_id, nome)
 
 
 def primeiro_node_pendente_fase1(meta: Dict[str, Any], lead: Any) -> str:
@@ -94,8 +125,12 @@ def primeiro_node_pendente_fase1(meta: Dict[str, Any], lead: Any) -> str:
         return "1_apresentacao"
     if not (meta.get("lead_contato_salvo_declarado") or meta.get("node2_vcard_despachado")):
         return "2_salvar_contato"
+    if not bool(meta.get("node3_contrato_enviado")):
+        return "3_coleta_profunda"
     if (meta.get("node3_estado") or "").strip() != "coleta_completa":
         return "3_coleta_profunda"
+    if not bool(meta.get("node4_contrato_enviado")):
+        return "4_instagram"
     if not (meta.get("insta_enviado") or meta.get("lead_declarou_visita_insta")):
         return "4_instagram"
     return "5_processa_leitura"
@@ -202,6 +237,14 @@ def resolver_avanco_node_fase1(lead: Any, ctx: Any, meta: Dict[str, Any]) -> Non
     # Regra equivalente para o node2: não pular para node3 enquanto o contrato do node2
     # (higiene de contato/vcard) ainda não executou ao menos uma vez.
     if cur == "2_salvar_contato" and not bool(meta.get("node2_contrato_enviado")):
+        return
+    # Regra equivalente para o node3: mesmo com burst/preflight, o node3 precisa
+    # executar ao menos uma vez para consolidar contexto e evitar salto "seco".
+    if cur == "3_coleta_profunda" and not bool(meta.get("node3_contrato_enviado")):
+        return
+    # Regra equivalente para o node4: o contrato do node4 (envio/bypass de insta)
+    # precisa executar ao menos uma vez antes de liberar avanço automático para node5.
+    if cur == "4_instagram" and not bool(meta.get("node4_contrato_enviado")):
         return
     ideal = primeiro_node_pendente_fase1(meta, lead)
     i_cur, i_ideal = idx_fase1_ordem(cur), idx_fase1_ordem(ideal)

@@ -45,6 +45,7 @@ class TestSpacing(unittest.TestCase):
     def test_motivo_redundancia_contato_quando_ritual_ok(self):
         ev = {
             "nome_ok": True,
+            "nome_confirmado_chat": True,
             "contato_ritual_ok": True,
             "tem_foto": False,
             "tem_desabafo": False,
@@ -59,6 +60,44 @@ class TestSpacing(unittest.TestCase):
             ev,
         )
         self.assertEqual(m, "contato_ja_tratado")
+
+    def test_nome_sem_confirmacao_chat_nao_suprime_pergunta_nome(self):
+        ev = {
+            "nome_ok": True,
+            "nome_confirmado_chat": False,
+            "contato_ritual_ok": False,
+            "tem_foto": False,
+            "tem_desabafo": False,
+            "tem_desejo": False,
+            "tem_aprofundamento": False,
+            "confirmou_agora": False,
+            "confirmou_comercial_agora": False,
+            "node8_fase_esperando_firmo": False,
+        }
+        m = motivo_redundancia_texto(
+            "Pra iniciarmos com calma, me diz como você se chama?",
+            ev,
+        )
+        self.assertEqual(m, "")
+
+    def test_nome_confirmado_chat_suprime_pergunta_nome(self):
+        ev = {
+            "nome_ok": True,
+            "nome_confirmado_chat": True,
+            "contato_ritual_ok": False,
+            "tem_foto": False,
+            "tem_desabafo": False,
+            "tem_desejo": False,
+            "tem_aprofundamento": False,
+            "confirmou_agora": False,
+            "confirmou_comercial_agora": False,
+            "node8_fase_esperando_firmo": False,
+        }
+        m = motivo_redundancia_texto(
+            "Pra iniciarmos com calma, me diz como você se chama?",
+            ev,
+        )
+        self.assertEqual(m, "nome_ja_conhecido")
 
 
 if __name__ == "__main__":

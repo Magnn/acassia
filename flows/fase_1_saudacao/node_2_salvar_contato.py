@@ -380,7 +380,27 @@ def _executar_fast_track_para_coleta(
     return acoes, "3_coleta_profunda"
 
 
-def _acoes_vcard_sem_pergunta(numero_whatsapp: str) -> List[Acao]:
+def _bot_repetiu_termo_recente(ctx, termo: str, janela_msgs: int = 6) -> bool:
+    termo_l = (termo or "").strip().lower()
+    if not termo_l:
+        return False
+    hist = list(getattr(ctx, "historico", None) or [])
+    if not hist:
+        return False
+    candidatos = hist[-janela_msgs:]
+    for h in candidatos:
+        rem = getattr(h, "remetente", None)
+        if rem is None and isinstance(h, dict):
+            rem = h.get("remetente")
+        if rem != "bot":
+            continue
+        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
+        if termo_l in str(txt).lower():
+            return True
+    return False
+
+
+def _acoes_vcard_sem_pergunta(ctx, numero_whatsapp: str) -> List[Acao]:
     """
     Novo padrão do Node 2:
     envia card com contexto afirmativo (sem perguntar confirmação).
@@ -391,7 +411,11 @@ def _acoes_vcard_sem_pergunta(numero_whatsapp: str) -> List[Acao]:
             tipo="text",
             conteudo=(
                 "Perfeito, deixei meu cartão aqui embaixo para você conferir na agenda "
-                "e seguimos com calma na leitura."
+                + (
+                    "e seguimos na leitura."
+                    if _bot_repetiu_termo_recente(ctx, "calma")
+                    else "e seguimos com calma na leitura."
+                )
             ),
         ),
         Acao(tipo="delay", segundos=random.randint(4, 7)),
@@ -494,228 +518,9 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         ctx.estado_coleta = "node2_bypass_contato_confirmado"
         ctx.metadata = meta
         return [], "3_coleta_profunda"
-    acoes_padrao = _acoes_vcard_sem_pergunta(numero_whatsapp)
+    acoes_padrao = _acoes_vcard_sem_pergunta(ctx, numero_whatsapp)
     meta["node2_vcard_despachado"] = True
     meta["node2_contexto_card_enviado"] = True
     ctx.estado_coleta = "node2_vcard_sem_pergunta"
     ctx.metadata = meta
     return _normalizar_acoes_texto_node2(acoes_padrao), "3_coleta_profunda"
-
-    # Se o lead já chegou completo na fase 1, não precisa repetir nada no node2.
-    nome_ok = nome_util_para_checklist_fase1(str(meta.get("nome_lead") or ctx.nome_lead or ""))
-    if (
-        nome_ok
-        and bool(meta.get("lead_contato_salvo_declarado"))
-        and bool(meta.get("node2_vcard_despachado"))
-        and meta_tem_foto(meta)
-        and meta_tem_desabafo(meta)
-    ):
-        meta["node2_bypass_contexto_completo"] = True
-        ctx.estado_coleta = "node2_bypass_para_node3"
-        ctx.metadata = meta
-        return [], "3_coleta_profunda"
-
-    # 2. Decisão de Pista
-    tem_bagagem = any(g in msg_lower for g in _GATILHOS_DINAMICOS)
-    is_basic = not tem_bagagem and len(msg_lower.split()) <= 4
-    # Cenário objetivo: "já salvei" + "me chamo" no mesmo pacote.
-    # Não vale custo de IA; segue trilha curta/padrão para reduzir latência.
-    contexto_objetivo_contato_nome = bool(
-        texto_indica_contato_salvo(blob_sessao)
-        and re.search(r"(?i)\b(me\s+chamo|meu\s+nome\s+[eé]|sou\s+[oa])\b", blob_sessao)
-    )
-    if contexto_objetivo_contato_nome:
-        is_basic = True
-    node1_baloes_enviados = int(meta.get("node1_baloes_enviados", 0) or 0)
-    modo_curto_pos_node1 = node1_baloes_enviados >= 3
-
-    if meta.get("lead_contato_salvo_declarado") and meta.get("node2_vcard_despachado"):
-        # Só bypass silencioso após já termos enviado o cartão e recebido confirmação curta.
-        if _RE_CONFIRMACAO_CURTA.search(msg_lower):
-            meta["node2_bypass_contato_ja_ok"] = True
-            ctx.estado_coleta = "node2_bypass_contato_ok"
-            ctx.metadata = meta
-            elapsed = time.time() - t0_node
-            if elapsed > 3.5:
-                logger.warning("⏱️ [NODE 2] Bypass de contato lento: %.2fs", elapsed)
-            return [], "3_coleta_profunda"
-
-    acoes: List[Acao] = []
-    proximo_node = "3_coleta_profunda"
-
-    # ── ROTA A: REAÇÃO OMNISCIENTE (IA + Ultimate Guard v6) ──
-    if not is_basic and ctx.personalizer:
-        logger.info(f"🧠 [NODE 2 v15] Lead {nome} trouxe desabafo/dúvida. Gerando reação (gênero={genero_hint}).")
-        try:
-            tem_preco = _lead_pergunta_preco(ctx, msg_lead)
-            bloco_preco = ""
-            if tem_preco:
-                bloco_preco = (
-                    "\nPERGUNTA SOBRE VALOR OU PREÇO (responda sem ignorar): "
-                    "em uma frase clara, diga que ver as linhas na consulta inicial é gratuita; "
-                    "investimento de trabalhos mais completos entra depois, na hora certa, com tudo explicado. "
-                    "Integre isso a um dos balões, sem soar evasivo."
-                )
-            prompt_sistema = _SYSTEM_VCARD_DINAMICO.format(
-                nome=nome,
-                genero_hint=genero_hint,
-                bloco_preco=bloco_preco,
-                bloco_salvo=_bloco_sistema_salvo(meta),
-            )
-            extra_lead = ""
-            if tem_preco:
-                extra_lead = (
-                    " O lead perguntou quanto custa / valor: não deixe essa dúvida no ar "
-                    "(consulta inicial gratuita; detalhes de valores completos depois)."
-                )
-            if meta.get("lead_contato_salvo_declarado"):
-                instr_base = (
-                    f"Mensagem atual do lead (responda em cima disto, com vocativo adequado a {nome}): \"{msg_lead}\".{extra_lead} "
-                    "Acolha o que trouxe; fale de continuidade da leitura (áudios, linhas) sem pedir para salvar contato."
-                )
-            else:
-                instr_base = (
-                    f"Mensagem atual do lead (responda em cima disto, com vocativo adequado a {nome}): \"{msg_lead}\".{extra_lead} "
-                    "Acolha o que trouxe; explique que salvar seu contato no celular permite seguir com áudios e a consulta inicial (tom de leitura, não anúncio)."
-                )
-            resp_ia = ctx.personalizer.gerar_resposta(
-                system_prompt=prompt_sistema,
-                historico_lista=slice_historico_para_ia(ctx),
-                mensagem_lead=instr_base,
-                metadata=ctx.metadata,
-            )
-            
-            baloes_brutos = re.split(r"\[?BAL[AÃ]O\]?", resp_ia, flags=re.IGNORECASE)
-            baloes_limpos = []
-
-            for b in baloes_brutos:
-                c = re.sub(r"\[.*?\]", "", b).strip()
-                c = re.sub(r"[-–—*•]+", "", c).strip()
-                c = re.sub(r"\[[A-Z]*$", "", c).strip()
-                
-                if len(c) < 2: continue
-                
-                texto_puro = re.sub(r"[^\w\s\.\!\?…,:;\"\']+$", "", c).strip()
-                
-                # 🛡️ Aplicando o Regex Implacável Sincronizado
-                if len(texto_puro) > 15 and re.search(_REGEX_CORTE_FATAL, texto_puro, re.IGNORECASE):
-                    logger.warning(f"⚠️ [NODE 2] Balão descartado (Corte detectado/Regex Implacável): '{c}'")
-                    continue
-
-                _limpo = limpar_colagem_primeira_msg_whatsapp_em_texto(texto_puro)
-                if len(_limpo) < 2:
-                    continue
-                baloes_limpos.append(_limpo)
-
-            baloes_limpos = _sanear_textos_node2(baloes_limpos)
-            if baloes_limpos:
-                tempo_leitura = max(6, min(len(msg_lead) // 22, 12))
-                acoes.append(Acao(tipo="delay", segundos=tempo_leitura))
-                
-                for i, b in enumerate(baloes_limpos):
-                    delay = _delay_digitacao(b) if i > 0 else random.randint(6, 12)
-                    acoes.append(Acao(tipo="delay", segundos=delay))
-                    acoes.append(Acao(tipo="text", conteudo=b))
-                
-                logger.info("✅ [NODE 2] Reação dinâmica gerada com sucesso.")
-            else:
-                raise ValueError("Nenhum balão válido gerado após limpeza.")
-                    
-        except Exception as e:
-            logger.error(f"🚨 [NODE 2] Falha na IA: {e}")
-            is_basic = True
-
-    # ── ROTA B: CADÊNCIA DE OURO (Fast-Track) — mesmo ritmo do Node 1 (leitura, calma) ──
-    if is_basic or not acoes or modo_curto_pos_node1:
-        logger.info(f"👤 [NODE 2 v15] Rota padrão (fast-track) para {nome}.")
-        if meta.get("lead_contato_salvo_declarado"):
-            acoes = [
-                Acao(tipo="delay", segundos=random.randint(6, 10)),
-                Acao(
-                    tipo="text",
-                    conteudo="Então vamos com calma. O que você trouxe eu já guardo aqui comigo…",
-                ),
-            ]
-        elif modo_curto_pos_node1:
-            acoes = [
-                Acao(tipo="delay", segundos=random.randint(5, 8)),
-                Acao(
-                    tipo="text",
-                    conteudo=(
-                        "Pra gente seguir com fluidez, salva meu contato aí no seu celular. "
-                        "Assim eu te mando os áudios e continuo sua leitura por aqui. 🔮"
-                    ),
-                ),
-            ]
-        else:
-            acoes = [
-                Acao(tipo="delay", segundos=random.randint(6, 10)),
-                Acao(
-                    tipo="text",
-                    conteudo="Antes de eu abrir com calma o que as tuas linhas trazem pra você neste momento…",
-                ),
-                Acao(tipo="delay", segundos=random.randint(12, 16)),
-                Acao(
-                    tipo="text",
-                    conteudo=(
-                        "Salva meu contato aí no seu celular. "
-                        "Assim consigo mandar os áudios e seguir contigo com calma na leitura inicial. 🔮"
-                    ),
-                ),
-            ]
-
-    # 3. Entrega do VCard (O Elo)
-    if meta.get("lead_contato_salvo_declarado"):
-        meta["node2_contato_ja_reconhecido"] = True
-        if not meta.get("node2_vcard_despachado"):
-            meta["node2_vcard_despachado"] = True
-            acoes.extend(
-                [
-                    Acao(tipo="delay", segundos=random.randint(6, 8)),
-                    Acao(
-                        tipo="text",
-                        conteudo=(
-                            f"{nome if _nome_valido_guardado(nome) else 'Meu bem'}, segue meu cartão aqui embaixo só pra conferir na agenda."
-                        ),
-                    ),
-                    Acao(tipo="delay", segundos=random.randint(5, 8)),
-                    Acao(tipo="vcard", conteudo=numero_whatsapp),
-                    Acao(tipo="delay", segundos=random.randint(8, 12)),
-                    Acao(
-                        tipo="text",
-                        conteudo="Quando quiser, seguimos. Posso ir para a leitura das linhas? 👇",
-                    ),
-                ]
-            )
-        else:
-            acoes.extend(
-                [
-                    Acao(tipo="delay", segundos=random.randint(6, 10)),
-                    Acao(
-                        tipo="text",
-                        conteudo="Então vamos olhar tuas linhas com calma. Posso seguir? 👇",
-                    ),
-                ]
-            )
-    else:
-        acoes.extend(
-            [
-                Acao(tipo="delay", segundos=random.randint(6, 8)),
-                Acao(tipo="vcard", conteudo=numero_whatsapp),
-                Acao(tipo="delay", segundos=random.randint(8, 12)),
-                Acao(
-                    tipo="text",
-                    conteudo=(
-                        f"Conseguiu salvar, {nome}? Assim que estiver pronto, eu começo com calma por aqui. Posso seguir? 👇"
-                    ),
-                ),
-            ]
-        )
-        meta["node2_vcard_despachado"] = True
-
-    ctx.estado_coleta = "node2_aguardando_save_confirmado"
-    ctx.metadata = meta
-    elapsed = time.time() - t0_node
-    if elapsed > 3.5:
-        logger.warning("⏱️ [NODE 2] Tempo de execução alto: %.2fs", elapsed)
-    return _normalizar_acoes_texto_node2(acoes), proximo_node
