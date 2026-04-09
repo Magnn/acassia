@@ -698,6 +698,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     # aprofundamento e extração rica (Node 4/5 dependem desse contexto enriquecido).
     if estado == "inicial":
         meta["node3_iniciado_em"] = datetime.now(timezone.utc).isoformat()
+        meta["node3_contrato_enviado"] = True
         meta["node3_tentativas_c1"] = 0
         meta["node3_tentativas_c2"] = 0
         meta["node3_tentativas_c3"] = 0
@@ -725,6 +726,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
         if meta.get("node2_contato_ja_reconhecido"):
             primeiro_balao = f"{nome_fmt}, que bom te ver aqui comigo. ✨"
+        elif meta.get("node2_vcard_despachado"):
+            # Node2 novo padrão pode enviar card sem confirmação explícita.
+            # Aqui não afirmamos "você salvou" para não gerar incoerência.
+            primeiro_balao = f"{nome_fmt}, deixei meu cartão aqui no chat. Seguimos com calma. ✨"
         else:
             primeiro_balao = f"Que bom que você salvou meu contato, {nome_fmt}. ✨"
         acoes_iniciais.extend(
