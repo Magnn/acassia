@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import List, Dict, Any, Optional
 from google import genai  # ✨ Nova SDK oficial do Google
 from config_cliente import CONFIG_CLIENTE
@@ -78,6 +79,18 @@ class IntentClassifier:
         self.model_name = model_name or CONFIG_CLIENTE.get("modelo_ia", "gemini-1.5-pro")
         self.client = self._inicializar_cliente()
         self._cache: Dict[str, str] = {}
+        self._quota_cooldown_until = 0.0
+
+    @staticmethod
+    def _erro_e_quota_excedida(exc: Exception) -> bool:
+        t = str(exc or "").lower()
+        return ("resource_exhausted" in t) or ("quota" in t) or ("429" in t)
+
+    def _ativar_cooldown_quota(self, segundos: int = 75) -> None:
+        self._quota_cooldown_until = max(self._quota_cooldown_until, time.time() + max(15, segundos))
+
+    def em_cooldown_quota(self) -> bool:
+        return time.time() < float(self._quota_cooldown_until or 0.0)
 
     def _inicializar_cliente(self) -> genai.Client | None:
         """Inicializa o cliente da nova SDK google.genai."""
@@ -211,6 +224,8 @@ class IntentClassifier:
         """Classifica a intenção usando o novo método do Client."""
         if not self.client or not texto:
             return "indefinida"
+        if self.em_cooldown_quota():
+            return self._fallback(texto)
 
         lid = lead_id if lead_id is not None else "_"
         cache_key = f"{lid}|{node_atual}|{texto[:100]}"
@@ -275,6 +290,8 @@ class IntentClassifier:
             return intencao
 
         except Exception as e:
+            if self._erro_e_quota_excedida(e):
+                self._ativar_cooldown_quota(75)
             logger.error(f"🚨 [INTENT] Erro na nova SDK: {e}. Usando fallback.")
             return self._fallback(texto)
 

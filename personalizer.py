@@ -9,12 +9,12 @@ MEMÓRIA COMPLETA: Histórico + Metadados (Fatos do Lead)
 import logging
 import os
 import re
+import time
 import requests
 import json
 from PIL import Image
 from io import BytesIO
 from google import genai
-from google.genai import errors as genai_errors
 from config_cliente import CONFIG_CLIENTE
 from typing import Any, Dict, List, Optional, Tuple, Union
 from copy_sanitizer import (
@@ -30,6 +30,7 @@ class Personalizer:
         self.api_key = os.getenv("GEMINI_API_KEY") or api_key
         self.model_name = model_name or CONFIG_CLIENTE.get("modelo_ia", "gemini-2.5-flash")
         self.client = self._inicializar_gemini()
+        self._quota_cooldown_until = 0.0
 
     def _inicializar_gemini(self):
         """Inicializa o cliente Gemini e trata possíveis erros."""
@@ -393,6 +394,17 @@ class Personalizer:
         gastos += self._aprox_tokens(prompt) + self._aprox_tokens(resposta)
         metadata["_ia_tokens_gastos_aprox"] = gastos
 
+    @staticmethod
+    def _erro_e_quota_excedida(exc: Exception) -> bool:
+        t = str(exc or "").lower()
+        return ("resource_exhausted" in t) or ("quota" in t) or ("429" in t)
+
+    def _ativar_cooldown_quota(self, segundos: int = 75) -> None:
+        self._quota_cooldown_until = max(self._quota_cooldown_until, time.time() + max(15, segundos))
+
+    def em_cooldown_quota(self) -> bool:
+        return time.time() < float(self._quota_cooldown_until or 0.0)
+
     def gerar_resposta(
         self,
         *,
@@ -406,6 +418,8 @@ class Personalizer:
         """Gera resposta textual com histórico e metadados."""
         if not self.client:
             return "Oráculo offline."
+        if self.em_cooldown_quota():
+            return ""
 
         try:
             contexto_dialogo = self._formatar_historico(historico_lista, mensagem_lead=mensagem_lead)
@@ -446,12 +460,16 @@ class Personalizer:
             self._registrar_consumo_ia(metadata, prompt_final, saida)
             return saida
 
-        except genai_errors.GenerativeModelError as e:
-            logger.error(f"❌ Erro na geração de texto: {e}")
-            return "As cartas se embaralharam. Sinto uma névoa, tente novamente em instantes."
         except Exception as e:
+            if self._erro_e_quota_excedida(e):
+                self._ativar_cooldown_quota(75)
+                logger.warning("⚠️ [PERSONALIZER] Quota Gemini excedida: %s", e)
+                # Não vaza erro técnico/quota para o lead.
+                # O node chamador decide o fallback canônico da etapa.
+                return ""
             logger.error(f"🚨 Erro inesperado: {e}")
-            return "🙏 Algo se moveu no astral... me dê mais um instante."
+            # Mantém fallback no próprio node para preservar tom e objetivo da etapa.
+            return ""
 
     def gerar_node1_json(
         self,
@@ -466,6 +484,8 @@ class Personalizer:
         Evita truncamento tipo 'Eu sou Esmer' típico de texto livre com [BALAO].
         """
         if not self.client:
+            return {}
+        if self.em_cooldown_quota():
             return {}
         try:
             contexto_dialogo = self._formatar_historico(historico_lista, mensagem_lead=mensagem_lead)
@@ -508,12 +528,16 @@ class Personalizer:
             data = self._parsear_node1_dict(raw)
             return data if isinstance(data, dict) else {}
         except Exception as e:
+            if self._erro_e_quota_excedida(e):
+                self._ativar_cooldown_quota(75)
             logger.error(f"🚨 [NODE1 JSON] {e}")
             return {}
 
     def gerar_resposta_com_imagem(self, system_prompt: str, imagem_url: str, mensagem_lead: str, metadata: dict = None) -> str:
         """Analisa imagem (palma da mão) integrando com a memória completa do lead."""
         if not self.client:
+            return ""
+        if self.em_cooldown_quota():
             return ""
 
         try:
@@ -557,5 +581,7 @@ class Personalizer:
             logger.error(f"❌ Erro ao obter imagem: {e}")
             return ""
         except Exception as e:
+            if self._erro_e_quota_excedida(e):
+                self._ativar_cooldown_quota(75)
             logger.error(f"🚨 [VISION] Erro na análise multimodal: {e}")
             return ""

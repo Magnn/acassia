@@ -3217,6 +3217,15 @@ def _triagem_meta(data):
         texto_recebido = ""
         img_url = ""
         media_url = ""
+        nome_perfil_whatsapp = ""
+
+        # Nome de perfil enviado pela Meta (quando disponível em contacts[*].profile.name)
+        contatos = value.get("contacts") or []
+        if isinstance(contatos, list) and contatos:
+            c0 = contatos[0] or {}
+            prof = c0.get("profile") if isinstance(c0, dict) else None
+            if isinstance(prof, dict):
+                nome_perfil_whatsapp = str(prof.get("name") or "").strip()
         
         # ── PROCESSAMENTO POR TIPO ──
         if tipo == "text":
@@ -3254,6 +3263,7 @@ def _triagem_meta(data):
             "tipo_mensagem": tipo,
             "imagem_url": img_url,
             "media_url": media_url,
+            "nome_perfil_whatsapp": nome_perfil_whatsapp,
         }
         inbox_manager.enqueue(telefone, payload)
 

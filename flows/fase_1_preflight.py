@@ -38,6 +38,12 @@ _RE_BURST_DESEJO_DOR = re.compile(
     r"medo|ansiedade|desespero|dor|sofre|ajuda|sinto|peito|perdi|falei|coração|coraçao"
     r")\b"
 )
+_RE_TENTATIVA = re.compile(r"(?i)\b(j[aá]\s+tentei|tentei|fiz\s+de\s+tudo|ja\s+fiz\s+de\s+tudo)\b")
+_RE_TEMPO = re.compile(
+    r"(?i)\b(h[aá]\s*\d{1,2}\s*(?:anos?|mes(?:es)?|semanas?|dias?)|\d{1,2}\s*(?:anos?|mes(?:es)?|semanas?|dias?)\b)"
+)
+_RE_GATILHO = re.compile(r"(?i)\b(desde que|depois que|quando)\b")
+_RE_DESEJO = re.compile(r"(?i)\b(quero|gostaria|desejo|busco|sonho)\b")
 
 
 def concat_texto_usuario(ctx: Any, texto_atual: str) -> str:
@@ -130,6 +136,40 @@ def promover_burst_fase1_meta(meta: Dict[str, Any], texto_full: str, lead_id: in
         logger.info("⚡ [SNIFFER] Burst → coleta_completa + insta (lead=%s, ~%s palavras)", lead_id, palavras)
     else:
         logger.info("⚡ [SNIFFER] Burst → coleta_completa (lead=%s, ~%s palavras)", lead_id, palavras)
+
+
+def enriquecer_dados_node3_precoce(meta: Dict[str, Any], texto_full: str, lead_id: int) -> None:
+    """
+    Extrai sinais de coleta profunda já no início da conversa para o node3 aproveitar.
+    Não marca coleta completa sozinho; apenas preenche campos úteis.
+    """
+    texto = (texto_full or "").strip()
+    if not texto:
+        return
+    low = texto.lower()
+
+    if _RE_DESEJO.search(low) and not (meta.get("desejo_declarado") or "").strip():
+        meta["desejo_declarado"] = texto[:900]
+        logger.info("🧩 [PREFLIGHT] desejo_declarado precoce (lead=%s)", lead_id)
+
+    if (_RE_TEMPO.search(low) or _RE_TENTATIVA.search(low) or _RE_GATILHO.search(low)) and not (
+        meta.get("aprofundamento_texto") or ""
+    ).strip():
+        meta["aprofundamento_texto"] = texto[:2000]
+        logger.info("🧩 [PREFLIGHT] aprofundamento_texto precoce (lead=%s)", lead_id)
+
+    if _RE_TEMPO.search(low) and not (meta.get("tempo_exato") or "").strip():
+        m = _RE_TEMPO.search(texto)
+        if m:
+            meta["tempo_exato"] = m.group(0)[:120]
+
+    if _RE_GATILHO.search(low) and not (meta.get("evento_gatilho") or "").strip():
+        m = _RE_GATILHO.search(texto)
+        if m:
+            idx = m.start()
+            trecho = texto[idx : idx + 220].strip()
+            if trecho:
+                meta["evento_gatilho"] = trecho
 
 
 def resolver_avanco_node_fase1(lead: Any, ctx: Any, meta: Dict[str, Any]) -> None:

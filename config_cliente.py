@@ -131,6 +131,19 @@ def carregar() -> dict:
     )
     link_prova_social = _normalizar_url_https(_ig_raw) if _ig_raw else ""
 
+    # Foto do perfil (Node 4): .env explícito OU, se existir ficheiro em assets/, URL = PUBLIC_URL + caminho.
+    # A Meta só aceita https acessível publicamente (não use 127.0.0.1 em produção).
+    _img_ig_raw = (
+        _obter_limpo("CLIENTE_IMAGEM_PERFIL_INSTAGRAM", "IMAGEM_PERFIL_INSTAGRAM_URL", "")
+        or _obter_limpo("CLIENTE_IMAGEM_INSTAGRAM", "INSTAGRAM_PROFILE_IMAGE_URL", "")
+        or _obter_limpo("CLIENTE_FOTO_PERFIL_INSTAGRAM", None, "")
+    ).strip()
+    _bundled_ig_profile = os.path.join(_ROOT, "assets", "instagram", "perfil_meumisterio.png")
+    if not _img_ig_raw and os.path.isfile(_bundled_ig_profile):
+        _pub_base = (_obter_limpo("PUBLIC_URL", None, "") or "").strip().rstrip("/")
+        if _pub_base.startswith(("http://", "https://")):
+            _img_ig_raw = f"{_pub_base}/assets/instagram/perfil_meumisterio.png"
+
     # Cakto API (OAuth2 + recursos products/offers/orders/webhooks)
     cakto_base_url = _obter_limpo("CAKTO_BASE_URL", None, "https://api.cakto.com.br")
     cakto_client_id = _obter_limpo("CAKTO_CLIENT_ID", None, "")
@@ -258,11 +271,7 @@ def carregar() -> dict:
         "checkout_urls":     checkout_urls,
         "link_downsell":     link_downsell,
         "link_prova_social": link_prova_social,
-        "imagem_perfil_instagram": (
-            _obter_limpo("CLIENTE_IMAGEM_PERFIL_INSTAGRAM", "IMAGEM_PERFIL_INSTAGRAM_URL", "")
-            or _obter_limpo("CLIENTE_IMAGEM_INSTAGRAM", "INSTAGRAM_PROFILE_IMAGE_URL", "")
-            or _obter_limpo("CLIENTE_FOTO_PERFIL_INSTAGRAM", None, "")
-        ),
+        "imagem_perfil_instagram": _img_ig_raw,
         "imagem_altar":      _obter_limpo("CLIENTE_IMAGEM_ALTAR", None, ""),
         "depoimentos_urls":  depoimentos,
         "cakto": {
@@ -299,6 +308,9 @@ def carregar() -> dict:
             in ("true", "1", "yes", "sim"),
             "texto_override": _obter_limpo("CLIENTE_NODE1_COPY_VAGA_GRATIS", None, ""),
         },
+        # Node 1: estratégia de abertura (safe|adaptive|auto)
+        "node1_modo_abertura": (_obter_limpo("NODE1_MODO_ABERTURA", None, "safe") or "safe").strip().lower(),
+        "node1_adaptive_min_chars": max(4, min(_int_seguro("NODE1_ADAPTIVE_MIN_CHARS", 10), 240)),
         # Controle de custo de IA por lead (aproximação por caracteres/tokens)
         "ia_economia": {
             "orcamento_tokens_por_lead": _int_seguro("IA_ORCAMENTO_TOKENS_POR_LEAD", 12000),
@@ -358,6 +370,18 @@ def carregar() -> dict:
         logger.warning(
             "⚠️ [CONFIG] LINK_INSTAGRAM / CLIENTE_LINK_PROVA_SOCIAL vazio — Node 4 não enviará URL até configurar no .env."
         )
+    elif not (config.get("imagem_perfil_instagram") or "").strip():
+        if os.path.isfile(os.path.join(_ROOT, "assets", "instagram", "perfil_meumisterio.png")):
+            logger.warning(
+                "⚠️ [CONFIG] Há assets/instagram/perfil_meumisterio.png mas imagem_perfil_instagram vazio — "
+                "defina PUBLIC_URL com o teu domínio/https público (ex.: túnel ngrok) para o WhatsApp poder buscar a imagem, "
+                "ou defina CLIENTE_IMAGEM_PERFIL_INSTAGRAM com URL completa."
+            )
+        else:
+            logger.warning(
+                "⚠️ [CONFIG] Instagram com link ok, mas IMAGEM_PERFIL_INSTAGRAM* vazio — Node 4 envia só texto + link, "
+                "sem foto do perfil antes (defina CLIENTE_IMAGEM_PERFIL_INSTAGRAM ou IMAGEM_PERFIL_INSTAGRAM_URL: URL https pública acessível pela API do WhatsApp)."
+            )
 
     return config
 

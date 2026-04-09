@@ -38,6 +38,7 @@ from copy_sanitizer import (
     nome_lead_para_exibicao,
 )
 from flows.funnel_gates import (
+    mensagem_user_eh_midia_visual,
     meta_node3_forcar_camada1_completa,
     nome_eh_placeholder,
     VOCATIVO_SEM_NOME,
@@ -53,12 +54,16 @@ _MAX_CHARS_NODE3_PERGUNTA = 120
 
 def _historico_tem_midia_usuario(ctx) -> bool:
     """Mídia do usuário já gravada no histórico (webhook de imagem pode ter corrido antes do texto)."""
+    return _historico_conta_midia_usuario(ctx) > 0
+
+
+def _historico_conta_midia_usuario(ctx) -> int:
+    """Quantas mensagens do user são mídia visual (tipo ou URL; alinhado ao sniffer de fase 1)."""
+    n = 0
     for hm in getattr(ctx, "historico", None) or []:
-        if getattr(hm, "remetente", "") != "user":
-            continue
-        if str(getattr(hm, "tipo", "") or "").lower() in ("image", "video"):
-            return True
-    return False
+        if mensagem_user_eh_midia_visual(hm):
+            n += 1
+    return n
 
 
 _SINAIS_ENVIO_FOTO = re.compile(
@@ -70,6 +75,10 @@ _RE_ASSUNTO_OPERACIONAL = re.compile(
     re.I,
 )
 _RE_PRECO_DIRETO = re.compile(r"\b(pre[cç]o|valor|quanto|custa|pix|pagamento)\b", re.I)
+_RE_VALOR_AFETIVO = re.compile(
+    r"\b(?:homem|mulher|parceir[oa]|relacionamento|amor)\s+de\s+valor\b|\bde\s+valor\b",
+    re.I,
+)
 _RE_MARCADORES_DOR_OU_DESEJO = re.compile(
     r"\b(d[oó]i|pesa|aperta|trav|n[oã]o\s+consigo|medo|ansiedade|sofr|ang[uú]st|"
     r"quero|preciso|gostaria|sonho|mudar|voltar|reconcil|vender|prosper|dinheiro|relacionamento|fam[ií]lia|"
@@ -173,7 +182,7 @@ def _tem_substancia_dor(texto: str) -> bool:
         return False
     if _RE_ASSUNTO_OPERACIONAL.search(limpo):
         return False
-    if _RE_PRECO_DIRETO.search(limpo):
+    if _RE_PRECO_DIRETO.search(limpo) and not _RE_VALOR_AFETIVO.search(limpo):
         return False
     if _RE_MARCADORES_DOR_OU_DESEJO.search(limpo):
         return True
@@ -197,7 +206,8 @@ def _tem_substancia_desejo(texto: str) -> bool:
         return False
     if _SINAIS_ENVIO_FOTO.search(limpo) or _RE_ASSUNTO_OPERACIONAL.search(limpo):
         return False
-    if _RE_PRECO_DIRETO.search(limpo):
+    # "mulher de valor"/"homem de valor" é desejo afetivo, não objeção de preço.
+    if _RE_PRECO_DIRETO.search(limpo) and not _RE_VALOR_AFETIVO.search(limpo):
         return False
     if re.search(r"\?$", limpo) and not _RE_MARCADORES_DOR_OU_DESEJO.search(limpo):
         return False
@@ -729,10 +739,55 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             desabafo = (meta.get("desabafo_original") or msg_lead or "").strip()
             if desabafo:
                 meta["desabafo_original"] = desabafo[:2000]
-            meta["node3_estado"] = "aguardando_desejo"
             meta["universo_desejo"] = _classificar_universo(ctx, meta, meta.get("desabafo_original", ""))
+            desejo_precoce = (meta.get("desejo_declarado") or "").strip()
+            aprofundamento_precoce = (meta.get("aprofundamento_texto") or "").strip()
+            logger.info(
+                "⚡ [NODE 3] Fast-track (foto+dor via Sniffer). Lead=%s universo=%s desejo_precoce=%s aprofundamento_precoce=%s",
+                nome_fmt,
+                meta.get("universo_desejo"),
+                bool(desejo_precoce),
+                bool(aprofundamento_precoce),
+            )
+
+            if desejo_precoce and _tem_substancia_desejo(desejo_precoce):
+                if aprofundamento_precoce and _aprofundamento_resposta_suficiente(aprofundamento_precoce):
+                    _append_node3_ancora(meta, desejo_precoce[:240])
+                    _append_node3_ancora(meta, aprofundamento_precoce[:260])
+                    _extrair_dados_ricos_ia(ctx, meta)
+                    meta["node3_estado"] = "coleta_completa"
+                    ctx.estado_coleta = "node3_camada4_extracao_ok"
+                    acoes_iniciais.extend(
+                        [
+                            Acao(tipo="delay", segundos=random.randint(9, 14)),
+                            Acao(tipo="text", conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção."),
+                            Acao(tipo="delay", segundos=random.randint(8, 12)),
+                            Acao(tipo="text", conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos."),
+                        ]
+                    )
+                    ctx.metadata = meta
+                    return _normalizar_acoes_texto_node3(acoes_iniciais), "4_instagram"
+
+                meta["node3_estado"] = "aguardando_aprofundamento"
+                meta["node3_aprofundamento_acumulado"] = ""
+                ctx.estado_coleta = "node3_camada3_tempo_tentativas"
+                _append_node3_ancora(meta, desejo_precoce[:240])
+                acoes_iniciais.extend(
+                    [
+                        Acao(tipo="delay", segundos=random.randint(8, 12)),
+                        Acao(tipo="text", conteudo="Você foi bem claro no que deseja, isso ajuda muito."),
+                        Acao(tipo="delay", segundos=random.randint(8, 14)),
+                        Acao(
+                            tipo="text",
+                            conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
+                        ),
+                    ]
+                )
+                ctx.metadata = meta
+                return _normalizar_acoes_texto_node3(acoes_iniciais), proximo_node
+
+            meta["node3_estado"] = "aguardando_desejo"
             ctx.estado_coleta = "node3_camada2_desejo"
-            logger.info("⚡ [NODE 3] Fast-track (foto+dor via Sniffer). Lead=%s universo=%s", nome_fmt, meta.get("universo_desejo"))
             _u_ft = meta.get("universo_desejo", "geral")
             _p_ft = _fechamento_camada2_presenca(_u_ft)
             _q_ft = _PERGUNTA_DESEJO_POR_UNIVERSO.get(_u_ft, _PERGUNTA_DESEJO_POR_UNIVERSO["geral"])
@@ -802,6 +857,11 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     if estado == "aguardando_dados":
         ctx.estado_coleta = "node3_camada1_foto_desabafo"
 
+        # Reforço: 2+ mídias no fio (ex.: mão no node 1 + nova tentativa no 3) — mantém `foto_recebida`
+        # se um envio falhar na validação Gemini. Não usar com 1 só (evita marcar foto após única imagem ruim + texto depois).
+        if _historico_conta_midia_usuario(ctx) >= 2:
+            meta["foto_recebida"] = True
+
         if "encerrar" in msg_lower:
             meta["opt_out"] = True
             ctx.metadata = meta
@@ -816,8 +876,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             if img_u and meta.get("node3_foto_validacao_ok_url") == img_u:
                 meta["foto_recebida"] = True
             elif not _validar_foto_mao_com_gemini(ctx):
-                # Mantém exigência de mão visível para seguir no funil.
-                meta["foto_recebida"] = False
+                # Só zera `foto_recebida` quando esta é a única mídia no fio (primeira tentativa falhou).
+                # Se já houve foto antes (ex.: node 1), não apagar a prova do sniffer — pede outra imagem sem “esquecer” a primeira.
+                if _historico_conta_midia_usuario(ctx) <= 1:
+                    meta["foto_recebida"] = False
                 voc = vocativo_cigana(nome_db, genero, meta)
                 ctx.metadata = meta
                 return [

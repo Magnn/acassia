@@ -78,5 +78,39 @@ class TestBurstLongo(unittest.TestCase):
         self.assertEqual(meta.get("node3_estado"), "coleta_completa")
 
 
+class TestEnriquecimentoPrecoceNode3(unittest.TestCase):
+    def test_preenche_campos_precoce_quando_lead_ja_traz_contexto(self):
+        from flows.fase_1_preflight import enriquecer_dados_node3_precoce
+
+        meta: dict = {}
+        texto = (
+            "Quero encontrar um amor de valor, ja tentei de tudo, "
+            "ha 2 anos isso me machuca e desde que ele foi embora eu nao consigo dormir."
+        )
+        enriquecer_dados_node3_precoce(meta, texto, lead_id=11)
+
+        self.assertTrue((meta.get("desejo_declarado") or "").strip())
+        self.assertTrue((meta.get("aprofundamento_texto") or "").strip())
+        self.assertIn("2 anos", (meta.get("tempo_exato") or "").lower())
+        self.assertIn("desde que", (meta.get("evento_gatilho") or "").lower())
+
+    def test_nao_sobrescreve_campos_ja_preenchidos(self):
+        from flows.fase_1_preflight import enriquecer_dados_node3_precoce
+
+        meta: dict = {
+            "desejo_declarado": "quero reconciliar",
+            "aprofundamento_texto": "ja tentei conversar por meses",
+            "tempo_exato": "6 meses",
+            "evento_gatilho": "desde que brigamos",
+        }
+        texto = "quero mudar tudo, ha 1 ano, desde que ela saiu de casa"
+        enriquecer_dados_node3_precoce(meta, texto, lead_id=12)
+
+        self.assertEqual(meta.get("desejo_declarado"), "quero reconciliar")
+        self.assertEqual(meta.get("aprofundamento_texto"), "ja tentei conversar por meses")
+        self.assertEqual(meta.get("tempo_exato"), "6 meses")
+        self.assertEqual(meta.get("evento_gatilho"), "desde que brigamos")
+
+
 if __name__ == "__main__":
     unittest.main()

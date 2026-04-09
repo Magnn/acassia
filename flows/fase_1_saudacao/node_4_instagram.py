@@ -153,6 +153,10 @@ def _acoes_texto_e_url_instagram(link_ig: str, imagem_perfil_ig: str = "") -> Li
                 Acao(tipo="delay", segundos=random.randint(4, 7)),
             ]
         )
+    else:
+        logger.debug(
+            "[NODE 4] imagem_perfil_instagram vazio — só texto+link (CLIENTE_IMAGEM_PERFIL_INSTAGRAM / IMAGEM_PERFIL_INSTAGRAM_URL no .env)."
+        )
     out.extend([
         Acao(
             tipo="text",

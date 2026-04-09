@@ -27,6 +27,24 @@ class TestSnifferFoto(unittest.TestCase):
         )
         self.assertTrue(meta.get("foto_recebida"))
 
+    def test_marca_foto_por_media_url_quando_tipo_veio_texto(self):
+        from flows.funnel_gates import sniffer_aplicar_foto_recebida
+
+        meta: dict = {}
+        hist = [
+            {
+                "remetente": "user",
+                "tipo": "text",
+                "texto": "",
+                "media_url": "https://cdn.exemplo.com/mao.jpg",
+            }
+        ]
+        self.assertEqual(
+            sniffer_aplicar_foto_recebida(meta, tipo_mensagem="text", historico=hist),
+            "foto_historico",
+        )
+        self.assertTrue(meta.get("foto_recebida"))
+
 
 class TestSnifferContato(unittest.TestCase):
     def test_marca_contato_texto_atual(self):

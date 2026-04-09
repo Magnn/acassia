@@ -759,6 +759,96 @@ def _montar_baloes_contrato_node1(periodo: str, nome: str, metadata: Optional[di
     return _deduplicar_baloes_node1(out)[:_MAX_BALOES_NODE1]
 
 
+def _ponte_duvida_breve_node1(msg_raw: str) -> str:
+    """
+    Se o lead abriu com dúvida/pergunta, acolhe em 1 frase curta
+    e volta para o checklist fixo do node1 (sem quebrar o roteiro).
+    """
+    t = (msg_raw or "").strip().lower()
+    if not t:
+        return ""
+    if "?" in t or any(k in t for k in ("como", "funciona", "duvida", "dúvida", "explica", "explicar")):
+        return "Eu te explico direitinho, sem enrolar. Primeiro eu te guio no comecinho pra ficar tudo certo."
+    if any(k in t for k in ("preço", "preco", "valor", "quanto", "custa", "pix", "pagar")):
+        return "A consulta inicial pra ver as linhas é gratuita. Já te explico os próximos passos com calma."
+    return ""
+
+
+def _deve_tentar_adaptive_node1(ctx, msg_raw: str, msg_lead: str) -> bool:
+    """
+    Decide se tenta a trilha IA JSON do Node 1.
+    - safe: nunca
+    - adaptive: sempre (se houver personalizer)
+    - auto: só quando há contexto mínimo (evita custo em "oi" curto)
+    """
+    meta = getattr(ctx, "metadata", {}) or {}
+    cfg = (meta.get("__config__") or {}) if isinstance(meta, dict) else {}
+    modo = str(cfg.get("node1_modo_abertura") or "auto").strip().lower()
+    if modo not in {"safe", "adaptive", "auto"}:
+        modo = "auto"
+    p = getattr(ctx, "personalizer", None)
+    if not p:
+        return False
+    if hasattr(p, "em_cooldown_quota") and p.em_cooldown_quota():
+        return False
+    if modo == "safe":
+        return False
+    if modo == "adaptive":
+        return True
+    min_chars = int(cfg.get("node1_adaptive_min_chars") or 10)
+    texto = (msg_raw or "").strip()
+    if len(texto) >= min_chars:
+        return True
+    low = (msg_lead or "").lower()
+    if any(g in low for g in _GATILHOS_DINAMICOS):
+        return True
+    if _RE_DOR_OU_SOFRIMENTO.search(low):
+        return True
+    # Em saudações muito curtas, mantém contrato determinístico (mais rápido e previsível).
+    return False
+
+
+def _garantir_fechamento_checklist_node1(
+    baloes: List[str],
+    nome: str,
+    msg_raw: str,
+    msg_lead: str,
+    metadata: Optional[dict],
+) -> List[str]:
+    """
+    Garante o fechamento mínimo do Node 1:
+    - sem nome: terminar pedindo nome;
+    - com nome: terminar com convite de avanço (não ficar só institucional).
+    """
+    out = [str(b or "").strip() for b in (baloes or []) if str(b or "").strip()]
+    if nome_eh_placeholder(nome):
+        pergunta_nome = "Pra iniciarmos com calma, me diz como você se chama?"
+        joined = " ".join(out).lower()
+        if "como você se chama" not in joined and "me diz como você se chama" not in joined:
+            if len(out) >= _MAX_BALOES_NODE1:
+                out[-1] = pergunta_nome
+            else:
+                out.append(pergunta_nome)
+    else:
+        convites = ("podemos iniciar", "posso seguir", "posso continuar", "próximo passo", "proximo passo")
+        joined = " ".join(out).lower()
+        if not any(c in joined for c in convites):
+            convite = _fallback_d_confirmacao(
+                nome,
+                msg_raw,
+                msg_lead,
+                metadata,
+                ja_mencionou_vaga_no_turno=_ja_mencionou_vaga_ou_consulta(joined),
+            )
+            if len(out) >= _MAX_BALOES_NODE1:
+                out[-1] = convite
+            else:
+                out.append(convite)
+    out = _sanear_baloes_saida_node1(out)
+    out = _aplicar_cap_hierarquico_node1(out, nome)
+    return _deduplicar_baloes_node1(out)[:_MAX_BALOES_NODE1]
+
+
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     """Executa o nó de apresentação blindado contra cortes."""
     t0_node = time.time()
@@ -785,14 +875,32 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         ctx.metadata["nome_lead"] = nome
         ctx.nome_lead = nome
 
-    # ── 3. Contrato determinístico do node1 ──
+    # ── 3. Abertura: adaptive JSON (quando possível) -> contrato determinístico (fallback seguro) ──
     if not hasattr(ctx, "metadata") or ctx.metadata is None:
         ctx.metadata = {}
-    textos_node1 = _montar_baloes_contrato_node1(periodo, nome, ctx.metadata)
+    textos_node1: List[str] = _montar_baloes_contrato_node1(periodo, nome, ctx.metadata)
+    modo_usado = "safe_contract"
+    ponte = _ponte_duvida_breve_node1(msg_raw)
+    if ponte:
+        textos_node1 = [ponte] + textos_node1
+        textos_node1 = _sanear_baloes_saida_node1(textos_node1)
+        textos_node1 = _aplicar_cap_hierarquico_node1(textos_node1, nome)
+        textos_node1 = _deduplicar_baloes_node1(textos_node1)[:_MAX_BALOES_NODE1]
     if not textos_node1:
         textos_node1 = [f"{periodo}! É bom te receber por aqui. ✨"]
         if nome_eh_placeholder(nome):
             textos_node1.append("Me diz como você se chama, meu bem? Assim eu te falo direito.")
+    if (msg_limpa or "").strip() in _RUIDO_INICIAL:
+        textos_node1 = _ajustar_abertura_curta_node1(textos_node1, nome)
+        if len(textos_node1) > 3:
+            textos_node1 = textos_node1[:2] + [textos_node1[-1]]
+    textos_node1 = _garantir_fechamento_checklist_node1(
+        textos_node1,
+        nome,
+        msg_raw,
+        msg_lead,
+        ctx.metadata,
+    )
     acoes_fb: List[Acao] = [Acao(tipo="delay", segundos=random.randint(2, 4))]
     for t in textos_node1:
         acoes_fb.append(Acao(tipo="delay", segundos=max(3, _delay_digitacao(t) - 1)))
@@ -805,6 +913,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         )
     ctx.estado_coleta = "node1_recepcao_contrato"
     ctx.metadata["node1_baloes_enviados"] = int(len(textos_node1))
+    ctx.metadata["node1_modo_abertura_usado"] = modo_usado
     if _pode_ir_direto_coleta_sem_node2(ctx, nome, blob_ctx):
         ctx.metadata["node1_pulou_para_coleta"] = True
         ctx.metadata["node2_contato_ja_reconhecido"] = True

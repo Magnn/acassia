@@ -366,7 +366,7 @@ def executar_v2(ctx) -> tuple:
                 continue
             delay_pre = _delay_digitacao(pedaco, eh_audio and j == 0)
             if num_bloco in _INDICES_IMPACTO:
-                delay_pre += random.randint(5, 10)
+                delay_pre += random.randint(3, 6)
 
             acoes.append(Acao(tipo="delay", segundos=delay_pre))
 
@@ -375,31 +375,31 @@ def executar_v2(ctx) -> tuple:
                 acoes.append(Acao(tipo="delay", segundos=12))
             else:
                 acoes.append(Acao(tipo="text", conteudo=pedaco))
-                pausa_pos = 15 if num_bloco in _INDICES_IMPACTO else 8
+                pausa_pos = 9 if num_bloco in _INDICES_IMPACTO else 5
                 acoes.append(Acao(tipo="delay", segundos=pausa_pos))
 
         if num_bloco == 4 and depos:
             depo_url = random.choice(depos)
             if _depoimento_audio_valido(depo_url):
                 acoes += [
-                    Acao(tipo="delay", segundos=8),
+                    Acao(tipo="delay", segundos=5),
                     Acao(
                         tipo="text",
                         conteudo="Escuta o que vou te mandar agora… é um áudio de alguém que passava pela mesma provação que você:",
                     ),
-                    Acao(tipo="delay", segundos=6),
+                    Acao(tipo="delay", segundos=4),
                     Acao(tipo="audio", url=depo_url),
-                    Acao(tipo="delay", segundos=22),
+                    Acao(tipo="delay", segundos=12),
                     Acao(
                         tipo="text",
                         conteudo=f"É essa leveza que eu quero ver o {mecanismo} trazer pros seus dias, {nome_fmt}. ✨",
                     ),
-                    Acao(tipo="delay", segundos=10),
+                    Acao(tipo="delay", segundos=6),
                 ]
             else:
                 logger.warning("event=node7_depoimento_invalido url=%s", str(depo_url)[:140])
                 acoes += [
-                    Acao(tipo="delay", segundos=6),
+                    Acao(tipo="delay", segundos=4),
                     Acao(
                         tipo="text",
                         conteudo=(

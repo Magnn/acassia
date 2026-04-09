@@ -43,6 +43,7 @@ from tts.audio_engine import AudioEngine
 from config_cliente import CONFIG_CLIENTE
 from flows.fase_1_preflight import (
     concat_texto_usuario,
+    enriquecer_dados_node3_precoce,
     promover_burst_fase1_meta,
     resolver_avanco_node_fase1,
     sniffer_instagram_meta,
@@ -249,8 +250,7 @@ class Engine:
                 self._envio_locks[lead_id] = lk
             return lk
 
-    @staticmethod
-    def _pular_nlu_ia(texto: str, tipo_msg: str) -> bool:
+    def _pular_nlu_ia(self, texto: str, tipo_msg: str) -> bool:
         """
         Curto-circuito para alto volume:
         evita chamar intent/sentiment em ruído curto e confirmações triviais.
@@ -264,6 +264,14 @@ class Engine:
             return True
         if len(t.split()) <= 2 and re.search(r"\b(ok|sim|pronto|beleza|blz|ta|tá|show|fechado)\b", t, re.I):
             return True
+        # Cooldown de quota: evita insistir na API quando intent/sentiment já sinalizaram 429.
+        try:
+            if hasattr(self.intent_classifier, "em_cooldown_quota") and self.intent_classifier.em_cooldown_quota():
+                return True
+            if hasattr(self.sentiment_analyzer, "em_cooldown_quota") and self.sentiment_analyzer.em_cooldown_quota():
+                return True
+        except Exception:
+            pass
         return False
 
     # ══════════════════════════════════════════════════════════════════
@@ -275,6 +283,20 @@ class Engine:
         try:
             lead     = self._obter_ou_criar_lead(db, telefone)
             tipo_msg = kwargs.get("tipo_mensagem", "text")
+            nome_perfil = str(kwargs.get("nome_perfil_whatsapp") or "").strip()
+
+            # Primeira ancoragem de nome via perfil WhatsApp (quando o lead ainda está sem nome útil).
+            # Evita node 1 perguntar "como você se chama?" quando a Meta já trouxe um nome válido.
+            if nome_perfil and nome_eh_placeholder(str(getattr(lead, "nome", "") or "")):
+                toks = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ]{2,24}", nome_perfil)
+                lixo = {
+                    "oi", "ola", "olá", "sim", "ok", "pronto", "cigana", "esmeralda",
+                    "meu", "bem", "anjo", "contato", "whatsapp",
+                }
+                if toks:
+                    cand = toks[0].strip()
+                    if cand and cand.lower() not in lixo:
+                        lead.nome = cand.capitalize()
             # Há URL de imagem neste request → tratar como mídia (fila fundida ou payload legado)
             if (kwargs.get("imagem_url") or kwargs.get("media_url")) and tipo_msg not in ("image", "video", "audio"):
                 tipo_msg = "image"
@@ -449,6 +471,7 @@ class Engine:
 
                 _tf_fase1 = concat_texto_usuario(ctx, texto_sniff)
                 sniffer_instagram_meta(meta, _tf_fase1, lead.id)
+                enriquecer_dados_node3_precoce(meta, _tf_fase1, lead.id)
                 promover_burst_fase1_meta(meta, _tf_fase1, lead.id, lead)
                 resolver_avanco_node_fase1(lead, ctx, meta)
                 ctx.metadata = meta
@@ -507,6 +530,22 @@ class Engine:
                         sent = self.sentiment_analyzer.analisar(ctx.texto_recebido, ctx.historico)
                     ctx.sentimento = sent.get("sentimento", "padrao")
                     ctx.score_engajamento = sent.get("score", 0.5)
+
+                # Modo de degradação inteligente para alta concorrência/quota:
+                # se qualquer submódulo IA entrou em cooldown, evita novas chamadas caras dos nodes.
+                _ia_cooldown = False
+                try:
+                    _ia_cooldown = bool(
+                        (hasattr(self.intent_classifier, "em_cooldown_quota") and self.intent_classifier.em_cooldown_quota())
+                        or (hasattr(self.sentiment_analyzer, "em_cooldown_quota") and self.sentiment_analyzer.em_cooldown_quota())
+                        or (hasattr(ctx.personalizer, "em_cooldown_quota") and ctx.personalizer.em_cooldown_quota())
+                    )
+                except Exception:
+                    _ia_cooldown = False
+                if _ia_cooldown:
+                    ctx.metadata["_ia_quota_cooldown_ativo"] = True
+                    ctx.personalizer = None
+                    logger.info("event=ia_quota_cooldown_ativo lead=%s node=%s", lead.id, ctx.node_atual)
 
                 # Inteligência por etapa (copy / funil — não altera FSM)
                 enriquecer_contexto_stage(
@@ -1040,7 +1079,7 @@ class Engine:
         alvo = self._normalizar_para_dedup(texto)
         if not alvo or len(alvo) < 10:
             return False
-        janela = datetime.now(timezone.utc) - timedelta(seconds=90)
+        janela = datetime.now(timezone.utc) - timedelta(seconds=45)
         recentes = (
             db.query(Mensagem)
             .filter(

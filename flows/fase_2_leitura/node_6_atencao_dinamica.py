@@ -79,7 +79,7 @@ def _resolver_pausa_ritual_por_periodo(config: dict, hora: int) -> int:
         val = tarde
     else:
         val = noite
-    return max(45, min(val, 300))
+    return max(25, min(val, 120))
 
 
 def _extrair_blocos_fallback(texto: str, max_blocos: int = 12, min_len: int = 8) -> list[str]:
@@ -408,16 +408,16 @@ def executar_v2(ctx) -> tuple:
     
     # Ritual de leitura: pausa perceptível antes de entregar os blocos (por janela horária).
     pausa_leitura = _resolver_pausa_ritual_por_periodo(config, agora.hour)
-    acoes.append(Acao(tipo="delay", segundos=random.randint(7, 10)))
+    acoes.append(Acao(tipo="delay", segundos=random.randint(5, 8)))
     acoes.append(Acao(tipo="text", conteudo=saudacao_temporal))
     acoes.append(Acao(tipo="delay", segundos=random.randint(5, 8)))
     acoes.append(
         Acao(
             tipo="text",
-            conteudo="Me dá 3 minutinhos rapidinho, que eu já te entrego a leitura completa. 🔮",
+            conteudo="Me dá um minutinho, que eu já te entrego a leitura completa. 🔮",
         )
     )
-    acoes.append(Acao(tipo="delay", segundos=pausa_leitura))
+    acoes.append(Acao(tipo="delay", segundos=min(pausa_leitura, 90)))
 
     # Expressão Regular Expandida contra QUALQUER palavra de conexão que fique pendurada no final
     regex_corte_fatal = r'([,;:-]|\b(e|mas|ou|que|de|da|do|em|no|na|seu|sua|meu|minha|o|a|os|as|um|uma|com|por|para|se|é|são|sao|foi|vai|como|quando|onde|porque|qual|quem|pelo|pela|dos|das|nos|nas|este|esta|esse|essa|isso|isto|aquilo|aquele|aquela|sendo|tendo|estando))\s*$'
@@ -464,7 +464,7 @@ def executar_v2(ctx) -> tuple:
                 continue
             delay_pre = _delay_digitacao(pedaco, eh_audio and j == 0, tom)
             if num_bloco in _INDICES_IMPACTO:
-                delay_pre += random.randint(6, 12)
+                delay_pre += random.randint(3, 7)
 
             acoes.append(Acao(tipo="delay", segundos=delay_pre))
 
@@ -473,7 +473,7 @@ def executar_v2(ctx) -> tuple:
                 acoes.append(Acao(tipo="delay", segundos=14))
             else:
                 acoes.append(Acao(tipo="text", conteudo=pedaco))
-                pausa_pos = 12 if num_bloco in _INDICES_IMPACTO else 7
+                pausa_pos = 8 if num_bloco in _INDICES_IMPACTO else 5
                 acoes.append(Acao(tipo="delay", segundos=pausa_pos))
 
     ctx.estado_coleta = "node6_leitura_enviada"

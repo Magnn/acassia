@@ -31,6 +31,7 @@ def run() -> int:
     cenarios = {
         "oi": _ctx("oi"),
         "preco": _ctx("qual o valor?"),
+        "duvida_pergunta": _ctx("como funciona?"),
         "amor": _ctx("quero trazer meu ex de volta"),
         "nome": _ctx("me chamo Magno"),
         "nome_meu_nome_e": _ctx("meu nome é Ana"),
@@ -50,6 +51,10 @@ def run() -> int:
             erros.append(f"{nome}: proximo node invalido {prox}")
         if nome == "oi" and len(txt) > 3:
             erros.append("oi: abertura curta deveria ter no maximo 3 baloes")
+        if nome in ("preco", "duvida_pergunta"):
+            joined = " ".join(t.lower() for t in txt)
+            if "como você se chama" not in joined and "me diz como você se chama" not in joined:
+                erros.append(f"{nome}: perdeu pergunta de nome no fechamento do checklist")
     if erros:
         print("NODE1 GUARDRAILS FAIL")
         for e in erros:

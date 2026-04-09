@@ -1,0 +1,86 @@
+"""Regressões críticas do Node 1 (abertura/checklist/roteamento)."""
+
+from __future__ import annotations
+
+import unittest
+
+from config_cliente import CONFIG_CLIENTE
+from flows.fase_1_saudacao import node_1_apresentacao
+from schema import ContextoConversa
+
+
+def _ctx(texto: str, *, nome: str = "", meta_extra: dict | None = None) -> ContextoConversa:
+    meta = {"__config__": CONFIG_CLIENTE}
+    if meta_extra:
+        meta.update(meta_extra)
+    return ContextoConversa(
+        lead_id=555001,
+        telefone="+5592999999999",
+        node_atual="1_apresentacao",
+        texto_recebido=texto,
+        nome_lead=nome,
+        metadata=meta,
+        personalizer=None,
+    )
+
+
+def _textos(acoes) -> list[str]:
+    return [a.conteudo for a in acoes if getattr(a, "tipo", "") == "text"]
+
+
+class TestNode1Regressoes(unittest.TestCase):
+    def test_duvida_nao_perde_pergunta_de_nome(self):
+        ctx = _ctx("como funciona isso?")
+        acoes, prox = node_1_apresentacao.executar_v2(ctx)
+        txt = _textos(acoes)
+        joined = " ".join(t.lower() for t in txt)
+        self.assertEqual(prox, "2_salvar_contato")
+        self.assertLessEqual(len(txt), 4)
+        self.assertTrue("como você se chama" in joined or "me diz como você se chama" in joined)
+
+    def test_preco_nao_perde_pergunta_de_nome(self):
+        ctx = _ctx("qual o valor?")
+        acoes, prox = node_1_apresentacao.executar_v2(ctx)
+        txt = _textos(acoes)
+        joined = " ".join(t.lower() for t in txt)
+        self.assertEqual(prox, "2_salvar_contato")
+        self.assertLessEqual(len(txt), 4)
+        self.assertTrue("como você se chama" in joined or "me diz como você se chama" in joined)
+
+    def test_com_nome_fechamento_tem_convite_e_sem_pedir_nome(self):
+        ctx = _ctx("quero entender melhor", nome="Magno")
+        acoes, prox = node_1_apresentacao.executar_v2(ctx)
+        txt = _textos(acoes)
+        joined = " ".join(t.lower() for t in txt)
+        self.assertEqual(prox, "2_salvar_contato")
+        self.assertLessEqual(len(txt), 4)
+        self.assertFalse("como você se chama" in joined or "me diz como você se chama" in joined)
+        self.assertTrue(
+            any(
+                k in joined
+                for k in (
+                    "podemos iniciar",
+                    "posso seguir",
+                    "posso continuar",
+                    "próximo passo",
+                    "proximo passo",
+                )
+            )
+        )
+
+    def test_burst_completo_pula_para_node3(self):
+        ctx = _ctx(
+            "me chamo ana, ja salvei seu contato e preciso da sua ajuda",
+            meta_extra={
+                "foto_recebida": True,
+                "desabafo_recebido": True,
+                "lead_contato_salvo_declarado": True,
+            },
+        )
+        _acoes, prox = node_1_apresentacao.executar_v2(ctx)
+        self.assertEqual(prox, "3_coleta_profunda")
+        self.assertTrue(ctx.metadata.get("node1_pulou_para_coleta"))
+
+
+if __name__ == "__main__":
+    unittest.main()

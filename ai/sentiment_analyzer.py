@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import List, Dict, Any
 from google import genai  # ✨ Nova SDK oficial
 from config_cliente import CONFIG_CLIENTE
@@ -69,6 +70,18 @@ class SentimentAnalyzer:
         except Exception as e:
             logger.error(f"🚨 Erro na inicialização da API Gemini: {e}")
             self.client = None
+        self._quota_cooldown_until = 0.0
+
+    @staticmethod
+    def _erro_e_quota_excedida(exc: Exception) -> bool:
+        t = str(exc or "").lower()
+        return ("resource_exhausted" in t) or ("quota" in t) or ("429" in t)
+
+    def _ativar_cooldown_quota(self, segundos: int = 75) -> None:
+        self._quota_cooldown_until = max(self._quota_cooldown_until, time.time() + max(15, segundos))
+
+    def em_cooldown_quota(self) -> bool:
+        return time.time() < float(self._quota_cooldown_until or 0.0)
 
     @staticmethod
     def _limpar_json_sujo(texto: str) -> str:
@@ -81,6 +94,8 @@ class SentimentAnalyzer:
     def analisar(self, texto: str, historico: list) -> dict:
         """Executa a análise profunda da mensagem do lead."""
         if not self.client or not texto:
+            return self._retorno_padrao()
+        if self.em_cooldown_quota():
             return self._retorno_padrao()
 
         # ── Formatação do Histórico (Blindagem contra Dicionários/Objetos) ──
@@ -129,6 +144,8 @@ class SentimentAnalyzer:
             return resultado
 
         except Exception as e:
+            if self._erro_e_quota_excedida(e):
+                self._ativar_cooldown_quota(75)
             logger.error(f"🚨 [SENTIMENT] Falha na chamada Gemini: {e}")
             return self._retorno_padrao()
 
@@ -146,6 +163,8 @@ class SentimentAnalyzer:
         )
 
         try:
+            if self.em_cooldown_quota():
+                return "padrao"
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=prompt_prever,
@@ -154,6 +173,8 @@ class SentimentAnalyzer:
             sentimento = response.text.strip().lower()
             return sentimento if sentimento in SENTIMENTOS_VALIDOS else "padrao"
         except Exception as e:
+            if self._erro_e_quota_excedida(e):
+                self._ativar_cooldown_quota(75)
             logger.error(f"🚨 [PREDICT] Falha na previsão: {e}")
             return "padrao"
 

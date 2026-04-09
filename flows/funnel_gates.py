@@ -200,6 +200,26 @@ def _sniffer_hist_texto(hm: Any) -> str:
     return str(t or "")
 
 
+def _sniffer_hist_media_url(hm: Any) -> str:
+    u = getattr(hm, "media_url", None)
+    if u is None and isinstance(hm, dict):
+        u = hm.get("media_url")
+    return str(u or "").strip()
+
+
+def mensagem_user_eh_midia_visual(hm: Any) -> bool:
+    """
+    True se a mensagem do user é imagem/vídeo pelo tipo OU por URL de mídia (fallback quando tipo veio como text).
+    Usado pelo sniffer e pelo node 3 para não perder foto do node 1.
+    """
+    if _sniffer_hist_remetente(hm) != "user":
+        return False
+    if _sniffer_hist_tipo(hm) in ("image", "video"):
+        return True
+    u = _sniffer_hist_media_url(hm)
+    return bool(u and (u.startswith("http://") or u.startswith("https://")))
+
+
 def sniffer_aplicar_foto_recebida(
     meta: MutableMapping[str, Any],
     *,
@@ -216,9 +236,7 @@ def sniffer_aplicar_foto_recebida(
         return "foto_atual"
     if not meta.get("foto_recebida"):
         for hm in historico or []:
-            if _sniffer_hist_remetente(hm) != "user":
-                continue
-            if _sniffer_hist_tipo(hm) in ("image", "video"):
+            if mensagem_user_eh_midia_visual(hm):
                 meta["foto_recebida"] = True
                 return "foto_historico"
     return ""
