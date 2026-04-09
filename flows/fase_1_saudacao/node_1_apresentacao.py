@@ -726,7 +726,13 @@ def _gerar_fallback(
     return acoes
 
 
-def _montar_baloes_contrato_node1(periodo: str, nome: str, metadata: Optional[dict]) -> List[str]:
+def _montar_baloes_contrato_node1(
+    periodo: str,
+    nome: str,
+    metadata: Optional[dict],
+    msg_raw: str = "",
+    msg_lead: str = "",
+) -> List[str]:
     """
     Contrato fixo do node1:
     1) saudação
@@ -734,6 +740,11 @@ def _montar_baloes_contrato_node1(periodo: str, nome: str, metadata: Optional[di
     3) última consulta grátis
     4) pergunta de nome (somente se nome ausente)
     """
+    low = (msg_lead or "").lower()
+    tem_dor = bool(_RE_DOR_OU_SOFRIMENTO.search(low))
+    tem_preco = any(x in low for x in ("preço", "preco", "valor", "custa", "quanto", "pix", "pagar", "gratis", "grátis"))
+    tem_amor = any(x in low for x in ("amor", "namor", "relacio", "voltar", "ex", "saudade", "trai"))
+
     baloes: List[str] = [
         (
             f"{periodo}! É um prazer te receber no nosso instituto de luz chamado Meu Mistério. "
@@ -744,16 +755,32 @@ def _montar_baloes_contrato_node1(periodo: str, nome: str, metadata: Optional[di
             "respeito e presença de verdade."
         ),
     ]
-    vaga_txt = _frase_vaga_curta_fallback(metadata)
-    if vaga_txt:
-        if not nome_eh_placeholder(nome):
-            baloes.append(f"{nome}, {vaga_txt[:1].lower() + vaga_txt[1:]}" if len(vaga_txt) > 1 else f"{nome}, {vaga_txt}")
-        else:
-            baloes.append(vaga_txt)
+    vaga_txt = _frase_vaga_curta_fallback(metadata) or (
+        "Você conseguiu garantir a última vaga gratuita pra consulta inicial, pra gente ver as tuas linhas."
+    )
+    if tem_preco:
+        vaga_txt = "Sobre valor, fica em paz: você garantiu a última vaga gratuita pra consulta inicial."
+    elif tem_dor or tem_amor:
+        vaga_txt = (
+            "Você garantiu a última vaga gratuita pra consulta inicial, e eu vou conduzir com calma e verdade no teu caso."
+        )
+    if not nome_eh_placeholder(nome):
+        baloes.append(f"{nome}, {vaga_txt[:1].lower() + vaga_txt[1:]}" if len(vaga_txt) > 1 else f"{nome}, {vaga_txt}")
+    else:
+        baloes.append(vaga_txt)
+
     if nome_eh_placeholder(nome):
         baloes.append("Pra iniciarmos com calma, me diz como você se chama?")
     else:
-        baloes.append("Vamos aproveitar com calma, podemos iniciar?")
+        baloes.append(
+            _fallback_d_confirmacao(
+                nome,
+                msg_raw,
+                msg_lead,
+                metadata,
+                ja_mencionou_vaga_no_turno=True,
+            )
+        )
     out = _sanear_baloes_saida_node1(baloes)
     out = _aplicar_cap_hierarquico_node1(out, nome)
     return _deduplicar_baloes_node1(out)[:_MAX_BALOES_NODE1]
@@ -878,22 +905,21 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     # ── 3. Abertura: adaptive JSON (quando possível) -> contrato determinístico (fallback seguro) ──
     if not hasattr(ctx, "metadata") or ctx.metadata is None:
         ctx.metadata = {}
-    textos_node1: List[str] = _montar_baloes_contrato_node1(periodo, nome, ctx.metadata)
+    textos_node1: List[str] = _montar_baloes_contrato_node1(
+        periodo,
+        nome,
+        ctx.metadata,
+        msg_raw=msg_raw,
+        msg_lead=msg_lead,
+    )
     modo_usado = "safe_contract"
-    ponte = _ponte_duvida_breve_node1(msg_raw)
-    if ponte:
-        textos_node1 = [ponte] + textos_node1
-        textos_node1 = _sanear_baloes_saida_node1(textos_node1)
-        textos_node1 = _aplicar_cap_hierarquico_node1(textos_node1, nome)
-        textos_node1 = _deduplicar_baloes_node1(textos_node1)[:_MAX_BALOES_NODE1]
     if not textos_node1:
         textos_node1 = [f"{periodo}! É bom te receber por aqui. ✨"]
         if nome_eh_placeholder(nome):
             textos_node1.append("Me diz como você se chama, meu bem? Assim eu te falo direito.")
-    if (msg_limpa or "").strip() in _RUIDO_INICIAL:
-        textos_node1 = _ajustar_abertura_curta_node1(textos_node1, nome)
-        if len(textos_node1) > 3:
-            textos_node1 = textos_node1[:2] + [textos_node1[-1]]
+    # Contrato rígido do node1: não comprimir para 3 balões em "oi".
+    # Mantemos a sequência completa (saudação, apresentação, vaga, nome/início),
+    # que foi a regra validada do funil.
     textos_node1 = _garantir_fechamento_checklist_node1(
         textos_node1,
         nome,

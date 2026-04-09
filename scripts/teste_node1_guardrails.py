@@ -49,8 +49,14 @@ def run() -> int:
             erros.append(f"{nome}: balao acima de 210 chars")
         if prox not in ("2_salvar_contato", "3_coleta_profunda"):
             erros.append(f"{nome}: proximo node invalido {prox}")
-        if nome == "oi" and len(txt) > 3:
-            erros.append("oi: abertura curta deveria ter no maximo 3 baloes")
+        if nome == "oi":
+            if len(txt) > 4:
+                erros.append("oi: node1 deve manter no maximo 4 baloes")
+            joined = " ".join(t.lower() for t in txt)
+            if "última vaga" not in joined and "vaga gratuita" not in joined and "consulta inicial" not in joined:
+                erros.append("oi: perdeu menção de vaga/consulta inicial")
+            if "como você se chama" not in joined and "me diz como você se chama" not in joined:
+                erros.append("oi: perdeu pergunta de nome")
         if nome in ("preco", "duvida_pergunta"):
             joined = " ".join(t.lower() for t in txt)
             if "como você se chama" not in joined and "me diz como você se chama" not in joined:

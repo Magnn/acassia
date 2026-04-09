@@ -29,6 +29,47 @@ def _textos(acoes) -> list[str]:
 
 
 class TestNode1Regressoes(unittest.TestCase):
+    def test_lei_fundamental_sem_nome(self):
+        """
+        Lei fundamental do Node 1 (sem nome):
+        1) saudação
+        2) apresentação
+        3) vaga/consulta inicial gratuita
+        4) pergunta de nome
+        """
+        ctx = _ctx("oi")
+        acoes, prox = node_1_apresentacao.executar_v2(ctx)
+        txt = _textos(acoes)
+        joined = " ".join(t.lower() for t in txt)
+        self.assertEqual(prox, "2_salvar_contato")
+        self.assertGreaterEqual(len(txt), 4)
+        self.assertIn("me chamo esmeralda", joined)
+        self.assertTrue("última vaga" in joined or "vaga gratuita" in joined or "consulta inicial" in joined)
+        self.assertTrue("como você se chama" in joined or "me diz como você se chama" in joined)
+
+    def test_lei_fundamental_com_nome(self):
+        """
+        Lei fundamental do Node 1 (com nome):
+        mantém saudação + apresentação + vaga/consulta e fecha em convite de início.
+        """
+        ctx = _ctx("oi", nome="Magno")
+        acoes, prox = node_1_apresentacao.executar_v2(ctx)
+        txt = _textos(acoes)
+        joined = " ".join(t.lower() for t in txt)
+        self.assertEqual(prox, "2_salvar_contato")
+        self.assertGreaterEqual(len(txt), 4)
+        self.assertIn("me chamo esmeralda", joined)
+        self.assertTrue("última vaga" in joined or "vaga gratuita" in joined or "consulta inicial" in joined)
+        self.assertFalse("como você se chama" in joined or "me diz como você se chama" in joined)
+        self.assertTrue(
+            "podemos iniciar" in joined
+            or "posso seguir" in joined
+            or "proximo passo" in joined
+            or "próximo passo" in joined
+            or "posso te guiar" in joined
+            or "posso continuar" in joined
+        )
+
     def test_duvida_nao_perde_pergunta_de_nome(self):
         ctx = _ctx("como funciona isso?")
         acoes, prox = node_1_apresentacao.executar_v2(ctx)
@@ -45,6 +86,18 @@ class TestNode1Regressoes(unittest.TestCase):
         joined = " ".join(t.lower() for t in txt)
         self.assertEqual(prox, "2_salvar_contato")
         self.assertLessEqual(len(txt), 4)
+        self.assertTrue("vaga gratuita" in joined or "consulta inicial" in joined)
+        self.assertTrue("como você se chama" in joined or "me diz como você se chama" in joined)
+
+    def test_dor_preserva_lei_e_contexto_no_balao_de_vaga(self):
+        ctx = _ctx("estou com dor no peito e ansiedade")
+        acoes, prox = node_1_apresentacao.executar_v2(ctx)
+        txt = _textos(acoes)
+        joined = " ".join(t.lower() for t in txt)
+        self.assertEqual(prox, "2_salvar_contato")
+        self.assertGreaterEqual(len(txt), 4)
+        self.assertIn("me chamo esmeralda", joined)
+        self.assertTrue("vaga gratuita" in joined or "consulta inicial" in joined)
         self.assertTrue("como você se chama" in joined or "me diz como você se chama" in joined)
 
     def test_com_nome_fechamento_tem_convite_e_sem_pedir_nome(self):
