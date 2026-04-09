@@ -305,11 +305,18 @@ def executar_v2(ctx) -> tuple:
                         blocos_gerados = _extrair_blocos_fallback(resposta, max_blocos=7, min_len=8)
                     if len(blocos_gerados) >= _MIN_BLOCOS_OK:
                         break
+                    if len(blocos_gerados) >= 2:
+                        logger.info(
+                            "event=node7_resposta_parcial_aproveitada blocos=%s tentativa=%s",
+                            len(blocos_gerados),
+                            tentativa + 1,
+                        )
+                        break
                     raise ValueError("Agitação inconsistente.")
                 except Exception as ex:
                     ultima_exc = ex
                     blocos_gerados = []
-            if len(blocos_gerados) < _MIN_BLOCOS_OK:
+            if len(blocos_gerados) < 2:
                 raise ValueError(str(ultima_exc) if ultima_exc else "Agitação inconsistente.")
         else:
             raise ValueError("IA Offline.")

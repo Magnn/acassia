@@ -248,7 +248,14 @@ def _strip_colagem_whatsapp_em_dor(s: str) -> str:
     t = _RE_TOKENS_ABERTURA_NAO_DOR.sub("", t)
     t = re.sub(r"(?is)\bcigana\s+esmeralda\s*[,.]?\s*", "", t)
     t = re.sub(r"(?is)me\s+chamo\s+[A-Za-zÀ-ú']{2,24}\s*[,.]?\s*", "", t)
-    t = _RE_CORTA_PRECO_CONSULTA.sub("", t).strip(" ,.;")
+    # Operacional típico no meio da colagem (Node 6 fallback / eco de dado_concreto)
+    t = re.sub(r"(?is)\b(essa\s+)?consulta\s+(é\s+)?paga\??\b", "", t)
+    t = re.sub(r"(?is)\btudo\s+bem\??\b", "", t)
+    t = re.sub(r"(?is)\bcomo\s+vai\??\b", "", t)
+    t = re.sub(r"(?is)\b(tá|ta)\s+(bom|bem)\??\b", "", t)
+    t = re.sub(r"(?is)\b(bom|boa)\s+(dia|tarde|noite)\b\s*[,.!]?\s*", "", t)
+    t = _RE_CORTA_PRECO_CONSULTA.sub("", t)
+    t = re.sub(r"\s+", " ", t).strip(" ,.;:?!")
     return t
 
 
@@ -481,6 +488,25 @@ def motivo_redundancia_texto(texto_balao: str, evidencias: Mapping[str, bool]) -
     # Não usar tem_foto aqui: no funil a foto é quase sempre a palma (Node 3), não comprovante
     # de PIX — isso suprimia o primeiro pedido legítimo de comprovante na oferta.
     return ""
+
+
+_RE_ECO_OPERACIONAL_RESIDUAL = re.compile(
+    r"(?is)\b(consulta\s+(é\s+)?paga|essa\s+consulta|quanto\s+custa|me\s+chamo|"
+    r"cigana\s+esmeralda|pix|comprovante)\b"
+)
+
+
+def fragmento_seguro_para_eco_fallback(texto: str, *, max_len: int = 100) -> str:
+    """
+    Trecho para eco no fallback do Node 6: mesmo pipeline da dor, sem colar abertura comercial
+    nem pergunta de preço. Retorna vazio se só sobrar lixo operacional.
+    """
+    s = resumo_dor_para_copy((texto or "").strip(), max_len=max_len)
+    if not s or s == "esse peso que você trouxe":
+        return ""
+    if _RE_ECO_OPERACIONAL_RESIDUAL.search(s):
+        return ""
+    return s
 
 
 def frase_dor_contextualizada(

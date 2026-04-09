@@ -53,6 +53,7 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
+_RE_RUIDO_CURTO_HIST = re.compile(r"(?i)^(ok|sim|oi|opa|pronto|blz|beleza|ta|tá|show|feito|entendi|combinado|👍|🙏|👀)$")
 
 
 def _bloco_e_somente_link(texto: str) -> bool:
@@ -95,6 +96,25 @@ def _cadencia_oferta(num_bloco: int, delay_pre: int, pausa_pos: int, score: floa
         pos += 2
 
     return pre, pos
+
+
+def _historico_limpo_para_ia(ctx, limite: int = 20) -> list:
+    base = slice_historico_para_ia(ctx, limite)
+    if not base:
+        return []
+    out = []
+    for h in base:
+        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
+        t = str(txt).replace("|", " ").strip()
+        t = re.sub(r"\s+", " ", t).strip()
+        if not t:
+            continue
+        if len(t.split()) <= 3 and _RE_RUIDO_CURTO_HIST.match(t.lower()):
+            continue
+        rem = getattr(h, "remetente", None) if not isinstance(h, dict) else h.get("remetente")
+        tip = getattr(h, "tipo", "text") if not isinstance(h, dict) else h.get("tipo", "text")
+        out.append({"remetente": rem or "", "texto": t, "tipo": tip or "text"})
+    return out
 
 
 def _extrair_blocos_fallback(texto: str, max_blocos: int = 9, min_len: int = 8) -> list[str]:
@@ -328,6 +348,7 @@ def _resolver_link_ticket(meta: dict, config: dict, link_fallback: str, ticket: 
 _SYSTEM_OFERTA_SUPREMA = """Você é Esmeralda Ácassia (Cigana Esmeralda), mesma voz da leitura: firme, acolhedora, transparente no que custa e no que vem depois.
 
 IMPORTANTE: Não escreva tags de estágio, [COLCHETES] técnicos nem metadados na resposta. Não inclua URL nem link na resposta.
+CONTEXTO INTERNO (CRÍTICO): use histórico apenas como base interna. PROIBIDO reproduzir texto bruto do histórico, PROIBIDO citar mensagens literais entre aspas, e PROIBIDO imprimir separadores técnicos (ex.: "|", "||", "->").
 
 {norte_venda_fria}
 
@@ -696,9 +717,10 @@ def executar_v2(ctx) -> tuple:
             max_tent = max(1, min(int(ie.get("max_tentativas_ia_por_node", 2) or 2), 3))
             for tentativa in range(max_tent):
                 try:
+                    hist_ia = _historico_limpo_para_ia(ctx)
                     resposta = ctx.personalizer.gerar_resposta(
                         system_prompt=sys_oferta,
-                        historico_lista=slice_historico_para_ia(ctx),
+                        historico_lista=hist_ia,
                         mensagem_lead=prompt_ia,
                         metadata=meta_ia,
                         max_output_tokens=6144,
@@ -712,11 +734,18 @@ def executar_v2(ctx) -> tuple:
                         blocos_gerados = [b for b in blocos_gerados if not _bloco_e_somente_link(b)]
                     if len(blocos_gerados) >= 4:
                         break
+                    if len(blocos_gerados) >= 3:
+                        logger.info(
+                            "event=node8_resposta_parcial_aproveitada blocos=%s tentativa=%s",
+                            len(blocos_gerados),
+                            tentativa + 1,
+                        )
+                        break
                     raise ValueError("Copy insuficiente.")
                 except Exception as ex:
                     ultima_exc = ex
                     blocos_gerados = []
-            if len(blocos_gerados) < 4:
+            if len(blocos_gerados) < 3:
                 raise ValueError(str(ultima_exc) if ultima_exc else "Copy insuficiente.")
         else:
             raise ValueError("IA Offline.")

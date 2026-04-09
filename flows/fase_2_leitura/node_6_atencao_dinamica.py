@@ -22,6 +22,7 @@ from copy_sanitizer import (
     aplicar_substituicoes_proibidas,
     contexto_lead_para_nodes,
     fatiar_texto_ritmo_celular,
+    fragmento_seguro_para_eco_fallback,
     frase_dor_contextualizada,
     genero_efetivo_para_copy,
     genero_hint_para_prompt,
@@ -270,12 +271,13 @@ def executar_v2(ctx) -> tuple:
     nome_pessoa_envolvida_raw = _limpar_meta_textual(str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO"), 80)
     tempo_exato_raw = _limpar_meta_textual(str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO"), 60)
     evento_gatilho_raw = _limpar_meta_textual(str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO"), 120)
-    dado_concreto = _limpar_meta_textual(str(
+    _raw_dado_concreto = str(
         meta.get("node5_dado_concreto")
         or meta.get("node5_tentativas_previas")
         or meta.get("desejo_declarado")
         or ""
-    ).replace("|", " ").strip(), 180)
+    ).replace("|", " ").strip()
+    dado_concreto = _limpar_meta_textual(_raw_dado_concreto, 180)
     nome_pessoa_envolvida = nome_pessoa_envolvida_raw or "INDEFINIDO"
     tempo_exato = tempo_exato_raw or "INDEFINIDO"
     evento_gatilho = evento_gatilho_raw or "INDEFINIDO"
@@ -302,7 +304,7 @@ def executar_v2(ctx) -> tuple:
     blocos_gerados = []
 
     # Leitura fria: mais tokens e mais tentativas que nodes curtos — precisa fechar 12 blocos com densidade.
-    _MIN_BLOCOS_OK = 5
+    _MIN_BLOCOS_OK = 4
     _MAX_OUT_TOKENS_NODE6 = 8192
     try:
         if ctx.personalizer:
@@ -358,11 +360,18 @@ def executar_v2(ctx) -> tuple:
                         blocos_gerados = _extrair_blocos_fallback(resposta, max_blocos=12, min_len=8)
                     if len(blocos_gerados) >= _MIN_BLOCOS_OK:
                         break
+                    if len(blocos_gerados) >= 2:
+                        logger.info(
+                            "event=node6_resposta_parcial_aproveitada blocos=%s tentativa=%s",
+                            len(blocos_gerados),
+                            tentativa + 1,
+                        )
+                        break
                     raise ValueError("Leitura muito curta ou formato inválido.")
                 except Exception as ex:
                     ultima_exc = ex
                     blocos_gerados = []
-            if len(blocos_gerados) < _MIN_BLOCOS_OK:
+            if len(blocos_gerados) < 2:
                 raise ValueError(str(ultima_exc) if ultima_exc else "Leitura muito curta ou formato inválido.")
         else:
             raise ValueError("IA Offline.")
@@ -379,9 +388,10 @@ def executar_v2(ctx) -> tuple:
             if evento_gatilho.upper() != "INDEFINIDO"
             else ""
         )
+        eco_frag = fragmento_seguro_para_eco_fallback(_raw_dado_concreto, max_len=90)
         eco_dado = (
-            f"Você mesma(o) trouxe isso com clareza: {dado_concreto}."
-            if dado_concreto
+            f"Você mesma(o) trouxe isso com clareza: {eco_frag}."
+            if eco_frag
             else ""
         )
         blocos_gerados = [

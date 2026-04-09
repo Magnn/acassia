@@ -2,7 +2,10 @@ import unittest
 
 from copy_sanitizer import (
     extrair_evidencias_conversa,
+    fragmento_seguro_para_eco_fallback,
+    frase_dor_contextualizada,
     motivo_redundancia_texto,
+    resumo_dor_para_copy,
     sanitizar_anti_ia,
 )
 
@@ -98,6 +101,41 @@ class TestSpacing(unittest.TestCase):
             ev,
         )
         self.assertEqual(m, "nome_ja_conhecido")
+
+
+class TestNode6FallbackSanitize(unittest.TestCase):
+    def test_resumo_dor_remove_consulta_paga_e_tudo_bem(self):
+        blob = (
+            "Bom dia tudo bem? essa consulta é paga? "
+            "quero saber se vou voltar com minha ex, já faz 2 anos"
+        )
+        r = resumo_dor_para_copy(blob, max_len=120)
+        self.assertNotIn("consulta", r.lower())
+        self.assertNotIn("paga", r.lower())
+        self.assertNotIn("tudo bem", r.lower())
+        self.assertIn("ex", r.lower())
+
+    def test_frase_dor_nao_ecoa_abertura_comercial(self):
+        blob = "Bom dia cigana Esmeralda, tudo bem? me chamo Magno, essa consulta é paga?"
+        f = frase_dor_contextualizada(resumo_dor_para_copy(blob, max_len=90))
+        self.assertNotIn("consulta", f.lower())
+        self.assertNotIn("paga", f.lower())
+        self.assertNotIn("me chamo", f.lower())
+
+    def test_fragmento_eco_fallback_vazio_para_colagem_operacional(self):
+        self.assertEqual(
+            "",
+            fragmento_seguro_para_eco_fallback(
+                "Bom dia cigana Esmeralda tudo bem me chamo Magno essa consulta é paga"
+            ),
+        )
+
+    def test_fragmento_eco_fallback_mantem_desejo_emocional(self):
+        s = fragmento_seguro_para_eco_fallback(
+            "quero saber se volto com minha ex faz dois anos que a gente se separou"
+        )
+        self.assertTrue(s)
+        self.assertNotIn("consulta", s.lower())
 
 
 if __name__ == "__main__":
