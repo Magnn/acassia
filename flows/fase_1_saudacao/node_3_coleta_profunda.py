@@ -949,9 +949,9 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 )
             acoes_c3.extend(
                 [
-                    Acao(tipo="delay", segundos=random.randint(14, 24)),
+                    Acao(tipo="delay", segundos=random.randint(8, 14)),
                     Acao(tipo="text", conteudo="O que você me disse agora eu guardei com respeito. 🙏"),
-                    Acao(tipo="delay", segundos=random.randint(18, 32)),
+                    Acao(tipo="delay", segundos=random.randint(10, 18)),
                     Acao(
                         tipo="text",
                         conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",

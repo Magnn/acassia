@@ -40,7 +40,7 @@ class TemplateRegistry:
         try:
             if self.api_key:
                 self.client = genai.Client(api_key=self.api_key)
-                logger.info(f"📜 Template Registry v3.5 Ativo: {self.model_name}")
+                logger.info("[template_registry] v3.5 ativo model=%s", self.model_name)
             else:
                 self.client = None
                 logger.error("⚠️ GEMINI_API_KEY ausente para o TemplateRegistry.")

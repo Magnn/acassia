@@ -653,7 +653,8 @@ def delay_entre_baloes() -> int:
 
 
 def delay_dramatico() -> int:
-    return random.randint(18, 28)
+    """Pausa “teatral” entre blocos — faixa mais curta evita ~90s+ só em delays no Node 3."""
+    return random.randint(10, 18)
 
 
 # Protege URLs em sanitizar_anti_ia: inserir espaço após "." quebra https://www.instagram.com no WhatsApp.
@@ -865,6 +866,12 @@ def preview_url_flag_para_whatsapp(texto: str) -> bool:
 
 def preparar_texto_envio(texto: str, contexto: str = "") -> str:
     """Pipeline único: substituições + anti-IA + URLs + log de risco."""
+    raw = (texto or "").strip()
+    # Mensagem só com URL: não passar por sanitizar_anti_ia (regras de espaço após "." podem degradar o link).
+    if raw and re.match(r"^https?://\S+$", raw, re.I):
+        x = normalizar_urls_para_whatsapp(raw)
+        registrar_frases_proibidas(x, contexto)
+        return x
     x = aplicar_substituicoes_proibidas(texto)
     x = normalizar_urls_para_whatsapp(x)
     registrar_frases_proibidas(x, contexto)
@@ -1005,6 +1012,9 @@ def tentar_salvar_balao_ia_cortado(texto: str, regex_corte_fatal: str) -> str:
     t = (texto or "").strip()
     t = re.sub(r"^[,;:\s]+", "", t)
     if len(t) < 6:
+        return t
+    # Nunca “cortar” no último ponto de um URL — rfind('.') pegava o . de instagram.com e eliminava o path.
+    if re.match(r"^https?://\S+$", t, re.I):
         return t
     low = t.lower()
     aberto = bool(re.search(regex_corte_fatal, low))

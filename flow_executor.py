@@ -40,6 +40,9 @@ def document_to_acoes(doc: Mapping[str, Any]) -> List[Acao]:
     return steps_to_acoes(steps)
 
 
+_MAX_CONTEUDO_CARDS = 5  # alinhado ao Flow Builder (Meta / WhatsApp + métricas)
+
+
 def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
     """Lista ordenada do bloco Conteúdo (texto, mídia, delay) → ações do motor.
 
@@ -50,7 +53,7 @@ def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
     items = cfg.get("contents")
     if not isinstance(items, list):
         return out
-    for it in items:
+    for it in items[:_MAX_CONTEUDO_CARDS]:
         if not isinstance(it, dict):
             continue
         t = str(it.get("type") or "text").lower()
@@ -85,7 +88,11 @@ def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
                 cap = str(it.get("caption") or "").strip()
             if not url:
                 continue
-            meta = {"source": "flow_builder", "conteudo_item": t}
+            meta: Dict[str, Any] = {"source": "flow_builder", "conteudo_item": t}
+            if isinstance(val, dict) and t == "audio":
+                meta["send_as_voice"] = bool(val.get("send_as_voice", True))
+            elif t == "audio":
+                meta["send_as_voice"] = True
             if t == "image":
                 out.append(Acao(tipo="image", url=url, conteudo=cap[:900], metadata=meta))
             elif t == "video":

@@ -43,6 +43,14 @@ if _ROOT not in sys.path:
 
 load_dotenv()
 
+# Consola Windows: evita linhas de log partidas com emojis (UTF-8).
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # ── INFRAESTRUTURA DE BANCO E MODELOS ────────────────────────────────
 from sqlalchemy import func, case, text
 from db import database, models

@@ -235,7 +235,7 @@ def carregar() -> dict:
         # Legado: micro-espera (ainda usada só se inbox_silence_seconds=0 em alguns fluxos internos).
         "inbox_coalesce_seconds": max(1, min(_int_seguro("INBOX_COALESCE_SECONDS", 3), 12)),
         # Sem silêncio do lead por N segundos, não dispara o motor (lê o lote completo antes).
-        "inbox_silence_seconds": max(0, min(_int_seguro("INBOX_SILENCE_SECONDS", 25), 120)),
+        "inbox_silence_seconds": max(0, min(_int_seguro("INBOX_SILENCE_SECONDS", 18), 120)),
         # Após o lote principal: espera extra só para texto longo (imagem costuma chegar em webhook separado).
         "inbox_after_text_grace_seconds": max(0, min(_int_seguro("INBOX_AFTER_TEXT_GRACE_SECONDS", 20), 60)),
         "inbox_after_text_grace_min_chars": max(20, min(_int_seguro("INBOX_AFTER_TEXT_GRACE_MIN_CHARS", 40), 2000)),

@@ -1068,6 +1068,8 @@ class Engine:
         t = (texto or "").strip()
         if not t:
             return ""
+        if re.match(r"^https?://\S+$", t, re.I):
+            return t
         t2 = tentar_salvar_balao_ia_cortado(t, BALAO_IA_REGEX_CORTE_FINAL).strip()
         t2 = normalizar_enxerto_dor_sem_contexto(t2)
         # Se ainda termina em conectivo/pontuação aberta, suprime.
@@ -1229,8 +1231,8 @@ class Engine:
 
     def _executar_node(self, node_id: str, ctx: ContextoConversa, db, lead) -> list[Acao]:
         """
-        Executa o módulo do node. Se o próximo passo for `6_atencao_dinamica` (Hive Mind → leitura),
-        encadeia na mesma requisição — senão o lead ficava só com o delay do Node 5 até a próxima mensagem.
+        Executa o módulo do node. Encadeia na mesma requisição para `4_instagram` e `6_atencao_dinamica`
+        (regras distintas dentro do loop), para o lead não ficar sem mensagens até o próximo envio.
         """
         acum: list[Acao] = []
         current_id = node_id
@@ -1331,8 +1333,17 @@ class Engine:
                 logger.warning("⚠️ [AUDIT] node_transition: %s", e)
             db.commit()
 
-            # Só encadeia o Node 6 (leitura) no mesmo webhook quando o bloco atual
-            # NÃO termina em pergunta. Pergunta precisa pausa real de conversa.
+            # Encadeamento no mesmo webhook (senão o lead muda de nó na DB mas não recebe mensagens até o próximo envio dele).
+            # - 4_instagram: só ao sair do Node 3 (o próprio Node 4 também devolve prox=4_instagram — não repetir).
+            # - 6_atencao_dinamica: só se a última fala não for pergunta (pausa natural antes da leitura longa).
+            if prox == "4_instagram" and current_id == "3_coleta_profunda":
+                logger.info(
+                    "🔗 [ENGINE] Encadeando 4_instagram na mesma requisição (depth=%s) lead_id=%s",
+                    depth,
+                    lead.id,
+                )
+                current_id = prox
+                continue
             if prox != "6_atencao_dinamica":
                 break
             if self._ultima_fala_do_bot_e_pergunta(res or []):

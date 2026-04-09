@@ -933,8 +933,8 @@
             cursor: crosshair !important;
         }
         /* Tons por tipo — só acento fino (borda / ícone / foco) */
-        .flow-tone-violet  { --flow-accent: #6366f1; --flow-accent-soft: rgba(99, 102, 241, 0.14); }
-        .flow-tone-blue     { --flow-accent: #4f46e5; --flow-accent-soft: rgba(79, 70, 229, 0.12); }
+        .flow-tone-violet  { --flow-accent: #3b82f6; --flow-accent-soft: rgba(59, 130, 246, 0.16); }
+        .flow-tone-blue     { --flow-accent: #2563eb; --flow-accent-soft: rgba(37, 99, 235, 0.14); }
         .flow-tone-emerald  { --flow-accent: #059669; --flow-accent-soft: rgba(5, 150, 105, 0.12); }
         .flow-tone-amber    { --flow-accent: #d97706; --flow-accent-soft: rgba(217, 119, 6, 0.12); }
         .flow-tone-rose     { --flow-accent: #e11d48; --flow-accent-soft: rgba(225, 29, 72, 0.1); }
@@ -944,8 +944,8 @@
         }
         .flow-node {
             position: absolute;
-            --flow-accent: #6366f1;
-            --flow-accent-soft: rgba(99, 102, 241, 0.14);
+            --flow-accent: #3b82f6;
+            --flow-accent-soft: rgba(59, 130, 246, 0.16);
             background: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 16px;
@@ -953,7 +953,7 @@
             font-size: 12px;
             z-index: 10;
             overflow: hidden;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
             transition: box-shadow 0.2s ease, transform 0.2s ease;
             cursor: grab;
             user-select: none;
@@ -980,9 +980,9 @@
         }
         .flow-node.flow-node--selected {
             box-shadow:
-                0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 20px 25px -5px rgba(0, 0, 0, 0.1),
                 0 0 0 2px var(--flow-accent),
-                0 16px 28px -8px rgba(99, 102, 241, 0.18);
+                0 16px 28px -8px rgba(59, 130, 246, 0.22);
             z-index: 22;
         }
         /* Missão 3.2 — lint visual (grafo): pulsação âmbar/vermelho sem sobrescrever sombra do cartão/seleção */
@@ -1031,7 +1031,7 @@
             cursor: help;
         }
         .flow-node-lint-flag:focus {
-            outline: 2px solid rgba(99, 102, 241, 0.45);
+            outline: 2px solid rgba(59, 130, 246, 0.5);
             outline-offset: 1px;
         }
         .flow-lint-status {
@@ -1167,6 +1167,202 @@
             line-height: 1.35;
             word-break: break-word;
         }
+        .flow-node-conteudo-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .flow-node-conteudo-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 2px dashed;
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+        .flow-node-conteudo-card__ico {
+            flex-shrink: 0;
+            width: 16px;
+            text-align: center;
+            margin-top: 1px;
+            opacity: 0.95;
+        }
+        .flow-node-conteudo-card__txt {
+            flex: 1;
+            min-width: 0;
+            word-break: break-word;
+        }
+        .flow-node-conteudo-card--text .flow-node-conteudo-card__txt {
+            display: -webkit-box;
+            -webkit-line-clamp: 14;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            font-weight: 500;
+        }
+        .flow-node-conteudo-card--text {
+            border-color: #93c5fd;
+            background: rgba(219, 234, 254, 0.55);
+            color: #1e3a8a;
+        }
+        .flow-node-conteudo-card--delay {
+            border-color: #f9a8d4;
+            background: rgba(252, 231, 243, 0.65);
+            color: #9d174d;
+        }
+        .flow-node-conteudo-card--image {
+            border-color: #7dd3fc;
+            background: rgba(224, 242, 254, 0.65);
+            color: #0369a1;
+        }
+        .flow-node-conteudo-card--video {
+            border-color: #86efac;
+            background: rgba(220, 252, 231, 0.7);
+            color: #166534;
+        }
+        .flow-node-conteudo-card--audio {
+            border-color: #c4b5fd;
+            background: rgba(237, 233, 254, 0.75);
+            color: #5b21b6;
+        }
+        .flow-node-conteudo-card--document {
+            border-color: #fdba74;
+            background: rgba(255, 237, 213, 0.75);
+            color: #c2410c;
+        }
+        .flow-node-conteudo-card--empty {
+            border-color: #e2e8f0;
+            background: #f8fafc;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+        .flow-node-conteudo-card--has-media {
+            flex-direction: column;
+            align-items: stretch;
+            padding: 8px;
+        }
+        .flow-node-conteudo-card__media-fill {
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f1f5f9;
+            line-height: 0;
+        }
+        .flow-node-conteudo-card__thumb {
+            display: block;
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            vertical-align: middle;
+        }
+        .flow-node-conteudo-card__thumb--video {
+            max-height: 140px;
+            background: #0f172a;
+        }
+        .flow-node-conteudo-card__media-caption {
+            margin-top: 8px;
+            font-size: 10px;
+            font-weight: 600;
+            text-align: center;
+            color: #64748b;
+        }
+        .flow-node-conteudo-card__media-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-align: center;
+            width: 100%;
+            padding: 6px 4px;
+        }
+        .flow-node-conteudo-card__ico--block {
+            font-size: 22px;
+            opacity: 0.9;
+        }
+        .flow-node-conteudo-card__media-fill--video {
+            position: relative;
+        }
+        .flow-node-conteudo-card__play-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.42) 100%);
+            pointer-events: none;
+        }
+        .flow-node-conteudo-card__play-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.96);
+            color: #2563eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            padding-left: 3px;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+        }
+        .flow-node-conteudo-card--audio-rich .flow-node-conteudo-card__wave-svg {
+            display: block;
+            width: 100%;
+            height: 40px;
+            color: #3b82f6;
+        }
+        .flow-node-conteudo-card__wave-path {
+            stroke: currentColor;
+            fill: none;
+        }
+        .flow-node-conteudo-card__audio-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 4px;
+            width: 100%;
+        }
+        .flow-node-conteudo-card__play-mini {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #3b82f6;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 11px;
+            padding-left: 2px;
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.45);
+        }
+        .flow-node-conteudo-card__txt--audio {
+            flex: 1;
+            min-width: 0;
+        }
+        .flow-node[data-node-type='conteudo'] {
+            width: 300px;
+        }
+        .flow-node[data-node-type='conteudo'] .flow-node-head {
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%) !important;
+            border-bottom: none !important;
+        }
+        .flow-node[data-node-type='conteudo'] .flow-node-head-label {
+            color: #fff !important;
+        }
+        .flow-node[data-node-type='conteudo'] .flow-node-head-label > i:first-child {
+            color: #2563eb !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            border-color: rgba(255, 255, 255, 0.35) !important;
+        }
+        .flow-node[data-node-type='conteudo'] .flow-node-head-actions .icon-btn i {
+            color: #fff !important;
+        }
+        .flow-node[data-node-type='conteudo'] .flow-node-head-actions .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.18) !important;
+        }
         .flow-node.flow-node--editing {
             z-index: 35;
             border-radius: 16px;
@@ -1194,6 +1390,76 @@
         #flow-inspector-overlay.flow-inspector-overlay.flow-inspector-overlay--visible {
             opacity: 1;
             pointer-events: auto;
+        }
+        /* Modal alterações não salvas (bloco Conteúdo) */
+        .flow-modal-ct-unsaved__panel {
+            width: 100%;
+            max-width: 400px;
+            padding: 28px 24px 22px;
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.14);
+            text-align: center;
+        }
+        .flow-modal-ct-unsaved__icon {
+            margin-bottom: 14px;
+        }
+        .flow-modal-ct-unsaved__icon-ring {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 999px;
+            border: 2px solid #fdba74;
+            color: #fdba74;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .flow-modal-ct-unsaved__title {
+            margin: 0 0 10px;
+            font-size: 17px;
+            font-weight: 700;
+            color: #334155;
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        }
+        .flow-modal-ct-unsaved__text {
+            margin: 0 0 22px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #64748b;
+        }
+        .flow-modal-ct-unsaved__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .flow-modal-ct-unsaved__btn {
+            flex: 1;
+            min-width: 136px;
+            padding: 10px 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            transition: filter 0.15s;
+        }
+        .flow-modal-ct-unsaved__btn--discard {
+            background: #a000ff;
+            color: #fff;
+        }
+        .flow-modal-ct-unsaved__btn--discard:hover {
+            filter: brightness(1.06);
+        }
+        .flow-modal-ct-unsaved__btn--stay {
+            background: #707885;
+            color: #fff;
+        }
+        .flow-modal-ct-unsaved__btn--stay:hover {
+            filter: brightness(1.06);
         }
         #flow-inspector.flow-inspector-drawer {
             position: fixed;
@@ -1243,7 +1509,11 @@
             min-height: 0;
         }
         body.flow-canvas-locked #flow-canvas-area {
-            pointer-events: none;
+            pointer-events: none !important;
+        }
+        /* Sem isto, filhos com pointer-events:auto (.flow-node, .conn-dot, #flow-builder-toolbar, SVG…) continuam a receber o clique; o overlay fica por baixo e o “clique fora” não corre. */
+        body.flow-canvas-locked #flow-canvas-area * {
+            pointer-events: none !important;
         }
         body.flow-canvas-locked #flow-inspector {
             pointer-events: auto !important;
@@ -1671,7 +1941,56 @@
             align-items: center;
             gap: 8px;
             min-width: 0;
+            flex: 1;
             font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        }
+        .flow-inspector-heading-label {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #0f172a;
+        }
+        .flow-inspector-heading-input {
+            flex: 1;
+            min-width: 80px;
+            max-width: min(280px, 56vw);
+            padding: 5px 10px;
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .flow-inspector-heading-input:focus {
+            outline: none;
+            border-color: #a78bfa;
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+        }
+        .flow-node-inspector-title-edit {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            background: #7c3aed;
+            color: #fff;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            box-shadow: 0 1px 2px rgba(124, 58, 237, 0.25);
+            transition: background 0.15s, transform 0.12s;
+        }
+        .flow-node-inspector-title-edit:hover {
+            background: #6d28d9;
+        }
+        .flow-node-inspector-title-edit:active {
+            transform: scale(0.97);
         }
         .flow-node-inspector-sub {
             font-weight: 400;
@@ -2190,44 +2509,14 @@
             padding-top: 0;
             margin-top: 0;
         }
-        /* Inspector — Conteúdo rico / WhatsApp (Missão 5.4) */
+        /* Inspector — Conteúdo (layout alinhado ao mockup: grelha → Conteúdos → cartões) */
         .flow-inspector-conteudo {
             border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            background: linear-gradient(165deg, #fafbfc 0%, #f4f4f5 55%, #eef2ff 100%);
-            padding: 14px 14px 12px;
+            border: 1px solid #eef2f7;
+            background: #ffffff;
+            padding: 18px 18px 16px;
             margin: 0;
-        }
-        .flow-inspector-conteudo__head {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-        }
-        .flow-inspector-conteudo__head-ico {
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #6d28d9, #6366f1);
-            color: #fff;
-            font-size: 12px;
-        }
-        .flow-inspector-conteudo__title {
-            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            color: #334155;
-        }
-        .flow-inspector-conteudo__sub {
-            font-size: 11px;
-            color: #64748b;
-            margin-top: 2px;
-            line-height: 1.35;
+            box-shadow: none;
         }
         .flow-inspector-conteudo__field {
             margin-bottom: 10px;
@@ -2389,6 +2678,116 @@
             border-color: rgba(99, 102, 241, 0.45);
             color: #4338ca;
         }
+        .flow-inspector-conteudo__notice-wrap {
+            margin-top: 0;
+            margin-bottom: 12px;
+        }
+        .flow-inspector-conteudo__notice-wrap[hidden] {
+            display: none !important;
+        }
+        .flow-inspector-conteudo__notice {
+            padding: 16px 14px;
+            border-radius: 10px;
+            background: #fef2f2;
+            border: 1px solid rgba(153, 27, 27, 0.12);
+        }
+        .flow-inspector-conteudo__notice-head {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .flow-inspector-conteudo__notice-ico {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            background: #991b1b;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+        }
+        .flow-inspector-conteudo__notice-lead {
+            margin: 0 0 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #991b1b;
+            line-height: 1.45;
+        }
+        .flow-inspector-conteudo__notice-list {
+            margin: 0;
+            padding-left: 18px;
+            font-size: 11.5px;
+            color: #7f1d1d;
+            line-height: 1.5;
+        }
+        .flow-inspector-conteudo__notice-list li {
+            margin-bottom: 4px;
+        }
+        .flow-inspector-conteudo__notice-foot {
+            margin: 10px 0 0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: rgba(254, 202, 202, 0.35);
+            border: 1px solid rgba(185, 28, 28, 0.22);
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #991b1b;
+            line-height: 1.45;
+        }
+        .flow-inspector-conteudo__divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 16px 0 10px;
+        }
+        .flow-inspector-conteudo__divider::before,
+        .flow-inspector-conteudo__divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0;
+        }
+        .flow-inspector-conteudo__divider span {
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            letter-spacing: 0.02em;
+        }
+        .flow-inspector-conteudo__list-shell {
+            min-height: 0;
+        }
+        .flow-inspector-conteudo__list-shell:has([data-flow-ct-list-empty]:not([hidden])) {
+            padding-bottom: 28px;
+            min-height: 100px;
+        }
+        .flow-inspector-conteudo__empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin: 4px 0 8px;
+            padding: 11px 16px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            color: #fff;
+            background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+            text-align: center;
+        }
+        .flow-inspector-conteudo__empty[hidden] {
+            display: none !important;
+        }
+        .flow-inspector-conteudo__divider--below-add {
+            margin-top: 14px;
+            margin-bottom: 10px;
+        }
+        .flow-inspector-conteudo__section-add {
+            margin: 0 0 12px;
+        }
         /* Construtor sequencial de conteúdo */
         .flow-content-builder {
             font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
@@ -2397,7 +2796,7 @@
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
-            margin-bottom: 8px;
+            margin-bottom: 2px;
         }
         @media (max-width: 420px) {
             .flow-content-type-grid {
@@ -2409,39 +2808,81 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-            padding: 10px 8px;
+            gap: 5px;
+            padding: 11px 6px;
             font-size: 11px;
-            font-weight: 600;
-            color: #475569;
-            background: #fafafa;
-            border: 1px solid #e2e8f0;
+            font-weight: 700;
             border-radius: 10px;
             cursor: pointer;
-            transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+            color: #64748b;
+            background: #f3f4f6;
+            border: 1px solid #e8eaee;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+            transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.12s;
         }
-        .flow-content-type-btn:hover {
-            background: #fff;
-            border-color: #c7d2fe;
-            color: #4338ca;
+        .flow-content-type-btn--text span {
+            color: #2563eb;
+        }
+        .flow-content-type-btn--text i {
+            color: #2563eb;
+        }
+        .flow-content-type-btn--image span {
+            color: #ea580c;
+        }
+        .flow-content-type-btn--image i {
+            color: #ea580c;
+        }
+        .flow-content-type-btn--audio span {
+            color: #9333ea;
+        }
+        .flow-content-type-btn--audio i {
+            color: #9333ea;
+        }
+        .flow-content-type-btn--video span {
+            color: #16a34a;
+        }
+        .flow-content-type-btn--video i {
+            color: #16a34a;
+        }
+        .flow-content-type-btn--document span {
+            color: #1e3a8a;
+        }
+        .flow-content-type-btn--document i {
+            color: #1e40af;
+        }
+        .flow-content-type-btn--delay span {
+            color: #db2777;
+        }
+        .flow-content-type-btn--delay i {
+            color: #e11d48;
+        }
+        .flow-content-type-btn:hover:not(:disabled) {
+            background: #eceff2;
+            border-color: #dde1e8;
             box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+            transform: translateY(-1px);
+        }
+        .flow-content-type-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
         }
         .flow-content-type-btn i {
-            font-size: 14px;
-            opacity: 0.9;
+            font-size: 17px;
         }
         #flow-content-list {
             display: flex;
             flex-direction: column;
-            gap: 16px;
-            margin-top: 4px;
+            gap: 14px;
+            margin-top: 2px;
         }
         .flow-content-card {
             position: relative;
-            background: #fafafa;
+            background: #ffffff;
             border-radius: 12px;
-            border: 1px solid #e8ecf1;
-            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
             padding: 12px 12px 12px 16px;
             overflow: hidden;
         }
@@ -2449,29 +2890,47 @@
             content: '';
             position: absolute;
             left: 0;
-            top: 8px;
-            bottom: 8px;
+            top: 6px;
+            bottom: 6px;
             width: 4px;
             border-radius: 4px;
-            background: #cbd5e1;
+            background: #94a3b8;
+        }
+        .flow-content-card--text {
+            border-color: rgba(37, 99, 235, 0.28);
         }
         .flow-content-card--text::before {
-            background: #a5b4fc;
+            background: #3b82f6;
+        }
+        .flow-content-card--image {
+            border-color: rgba(234, 88, 12, 0.38);
         }
         .flow-content-card--image::before {
-            background: #7dd3fc;
+            background: #f97316;
+        }
+        .flow-content-card--video {
+            border-color: rgba(22, 163, 74, 0.32);
         }
         .flow-content-card--video::before {
-            background: #c4b5fd;
+            background: #22c55e;
+        }
+        .flow-content-card--audio {
+            border-color: rgba(147, 51, 234, 0.32);
         }
         .flow-content-card--audio::before {
-            background: #fcd34d;
+            background: #a855f7;
+        }
+        .flow-content-card--document {
+            border-color: rgba(59, 130, 246, 0.35);
         }
         .flow-content-card--document::before {
-            background: #fdba74;
+            background: #3b82f6;
+        }
+        .flow-content-card--delay {
+            border-color: rgba(236, 72, 153, 0.38);
         }
         .flow-content-card--delay::before {
-            background: #86efac;
+            background: #ec4899;
         }
         .flow-content-card__toolbar {
             display: flex;
@@ -2479,6 +2938,12 @@
             justify-content: space-between;
             gap: 8px;
             margin-bottom: 10px;
+        }
+        .flow-content-card__toolbar-start {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
         }
         .flow-content-card__badge {
             font-size: 10px;
@@ -2513,8 +2978,26 @@
             border-color: #fecdd3;
             background: #fff1f2;
         }
-        .flow-content-card[draggable='true'] {
+        .flow-content-card__drag-handle {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            margin-right: 4px;
+            border-radius: 8px;
+            color: #94a3b8;
             cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .flow-content-card__drag-handle:active {
+            cursor: grabbing;
+        }
+        .flow-content-card__drag-handle:hover {
+            color: #64748b;
+            background: rgba(148, 163, 184, 0.15);
         }
         .flow-content-card.flow-content-card--dragging {
             opacity: 0.48;
@@ -2549,16 +3032,168 @@
             font-weight: 600;
             color: #475569;
         }
+        .flow-content-card__upload-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            margin: 0;
+            padding: 20px 14px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            background: #f8fafc;
+            color: #64748b;
+            cursor: pointer;
+            font: inherit;
+            text-align: center;
+            transition:
+                border-color 0.15s,
+                background 0.15s,
+                color 0.15s;
+        }
+        .flow-content-card__upload-zone:focus-visible {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+        }
+        .flow-content-card__upload-zone:hover,
+        .flow-content-card__upload-zone.flow-content-card__upload-zone--dropping {
+            border-color: #94a3b8;
+            background: #f1f5f9;
+            color: #475569;
+        }
+        .flow-content-card--image .flow-content-card__upload-zone:hover,
+        .flow-content-card--image .flow-content-card__upload-zone.flow-content-card__upload-zone--dropping {
+            border-color: #7dd3fc;
+            color: #0369a1;
+        }
+        .flow-content-card--video .flow-content-card__upload-zone:hover,
+        .flow-content-card--video .flow-content-card__upload-zone.flow-content-card__upload-zone--dropping {
+            border-color: #c4b5fd;
+            color: #5b21b6;
+        }
+        .flow-content-card--audio .flow-content-card__upload-zone:hover,
+        .flow-content-card--audio .flow-content-card__upload-zone.flow-content-card__upload-zone--dropping {
+            border-color: #fcd34d;
+            color: #b45309;
+        }
+        .flow-content-card--document .flow-content-card__upload-zone:hover,
+        .flow-content-card--document .flow-content-card__upload-zone.flow-content-card__upload-zone--dropping {
+            border-color: #fdba74;
+            color: #c2410c;
+        }
+        .flow-content-card__upload-ico {
+            font-size: 28px;
+            line-height: 1;
+            opacity: 0.92;
+        }
+        .flow-content-card__upload-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            line-height: 1.35;
+        }
+        .flow-content-card__upload-formats {
+            font-size: 11px;
+            font-weight: 500;
+            color: #94a3b8;
+            letter-spacing: 0.04em;
+        }
+        .flow-content-card__media-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .flow-content-card__preview-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            border: 2px dashed #e2e8f0;
+            border-radius: 12px;
+            background: #fafafa;
+        }
+        .flow-content-card__preview-shell.flow-content-card__upload-zone--dropping {
+            border-color: #94a3b8;
+            background: #f1f5f9;
+        }
+        .flow-content-card__preview-wrap {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .flow-content-card__preview-img {
+            display: block;
+            width: 100%;
+            max-height: 220px;
+            object-fit: contain;
+            vertical-align: middle;
+        }
+        .flow-content-card__preview-video,
+        .flow-content-card__preview-audio {
+            display: block;
+            width: 100%;
+        }
+        .flow-content-card__preview-audio {
+            min-height: 40px;
+        }
+        .flow-content-card__preview-doc {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px 12px;
+            text-align: center;
+        }
+        .flow-content-card__preview-doc-ico {
+            font-size: 32px;
+            color: #94a3b8;
+        }
+        .flow-content-card__preview-doc-link {
+            font-size: 12px;
+            font-weight: 600;
+            color: #4338ca;
+            text-decoration: none;
+        }
+        .flow-content-card__preview-doc-link:hover {
+            text-decoration: underline;
+        }
+        .flow-content-card__replace-btn {
+            align-self: center;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition:
+                background 0.12s,
+                border-color 0.12s;
+        }
+        .flow-content-card__replace-btn:hover {
+            border-color: #c7d2fe;
+            color: #4338ca;
+            background: #f8fafc;
+        }
+        .flow-content-card__voice-toggle.flow-inspector-conteudo__toggle {
+            margin-top: 4px;
+        }
         .flow-node-inspector-body .flow-inspector-btn-save--seq-builder {
             border-radius: 12px;
-            background: linear-gradient(180deg, #10b981 0%, #059669 100%);
-            box-shadow: 0 2px 12px rgba(16, 185, 129, 0.35);
-            font-weight: 600;
-            letter-spacing: 0.02em;
+            background: linear-gradient(180deg, #bef264 0%, #84cc16 55%, #65a30d 100%);
+            box-shadow: 0 2px 12px rgba(101, 163, 13, 0.35);
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            color: #fff;
         }
         .flow-node-inspector-body .flow-inspector-btn-save--seq-builder:hover {
-            filter: brightness(1.03);
-            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+            filter: brightness(1.04);
+            box-shadow: 0 4px 16px rgba(101, 163, 13, 0.42);
         }
         .flow-sim-conteudo-pack {
             max-width: 100%;
@@ -2670,42 +3305,55 @@
         }
         .conn-dot {
             position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 15px;
-            height: 15px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
-            background: linear-gradient(145deg, #ffffff, var(--c-surface2));
+            background: #3b82f6;
+            border: 2px solid #ffffff;
             z-index: 25;
             cursor: grab;
             pointer-events: auto;
+            box-shadow:
+                0 0 0 1px rgba(59, 130, 246, 0.35),
+                0 0 10px rgba(59, 130, 246, 0.45);
             transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
         }
         .conn-dot:active { cursor: grabbing; }
+        /* Entrada: canto superior esquerdo */
         .conn-left {
-            left: -8px;
-            border: 2px solid #94a3b8;
-            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.15);
+            left: -6px;
+            top: 12px;
+            transform: none;
         }
         .conn-left:hover {
-            transform: translateY(-50%) scale(1.1);
-            border-color: #94a3b8;
-            box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2);
+            transform: scale(1.12);
+            box-shadow:
+                0 0 0 1px rgba(59, 130, 246, 0.5),
+                0 0 14px rgba(59, 130, 246, 0.55);
         }
+        /* Saída padrão (IA, Pergunta, etc.): canto inferior direito */
         .conn-right {
-            right: -8px;
-            border: 2px solid #cbd5e1;
-            box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.12);
+            right: -6px;
+            bottom: 12px;
+            top: auto;
+            transform: none;
         }
         .conn-right:hover {
-            transform: translateY(-50%) scale(1.12);
-            border-color: #6366f1;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.22);
+            transform: scale(1.14);
+            box-shadow:
+                0 0 0 1px rgba(59, 130, 246, 0.55),
+                0 0 14px rgba(59, 130, 246, 0.55);
+        }
+        /* Conteúdo: saída no canto superior direito */
+        .flow-node[data-node-type='conteudo'] .conn-right {
+            top: 12px;
+            bottom: auto;
+            right: -6px;
         }
         .flow-cont-add-btn:hover {
-            border-color: rgba(99, 102, 241, 0.45) !important;
+            border-color: rgba(59, 130, 246, 0.45) !important;
             background: #ffffff !important;
-            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14);
         }
         #svg-connections { z-index: 5; }
         .conn-path {
@@ -2715,9 +3363,20 @@
             transition: stroke 0.12s ease, stroke-width 0.12s ease, opacity 0.12s ease;
         }
         .conn-path-selected {
-            stroke: #3b82f6 !important;
-            stroke-width: 3px !important;
-            filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.45));
+            stroke: #2563eb !important;
+            stroke-width: 4px !important;
+            filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.55));
+        }
+        .flow-edge-cp {
+            fill: #ffffff;
+            stroke: #3b82f6;
+            stroke-width: 2px;
+            cursor: grab;
+            pointer-events: all;
+            filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5));
+        }
+        .flow-edge-cp:hover {
+            fill: #eff6ff;
         }
         /* Cliques nas linhas passam pelo container vazio até ao SVG */
         #flow-canvas-viewport #flow-viewport #nodes-container,
@@ -2741,7 +3400,7 @@
             pointer-events: stroke;
             cursor: pointer;
         }
-        #flow-temp-wire-path { filter: drop-shadow(0 0 3px rgba(99, 102, 241, 0.25)); }
+        #flow-temp-wire-path { filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.35)); }
         .flow-builder-toolbar {
             position: sticky; top: 0; z-index: 35;
             display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
@@ -2767,14 +3426,14 @@
         }
         /** Drop da paleta (Missão 2.1) */
         #flow-canvas-viewport.flow-canvas--palette-drag-over {
-            outline: 2px dashed rgba(99, 102, 241, 0.35);
+            outline: 2px dashed rgba(59, 130, 246, 0.4);
             outline-offset: -2px;
-            background-color: rgba(99, 102, 241, 0.04);
+            background-color: rgba(59, 130, 246, 0.05);
         }
         .flow-toolbar-btn--on {
-            background: #eef2ff !important;
-            border: 1px solid rgba(99, 102, 241, 0.3) !important;
-            color: #4338ca !important;
+            background: #eff6ff !important;
+            border: 1px solid rgba(59, 130, 246, 0.35) !important;
+            color: #1d4ed8 !important;
         }
         #flow-save-status {
             font-size: 10px;
@@ -4817,7 +5476,7 @@
                     <div class="flow-palette-ico" aria-hidden="true"><i class="fas fa-info-circle"></i></div>
                     <div class="min-w-0 flex-1">
                         <h4 class="flow-palette-title">Como usar</h4>
-                        <p class="flow-palette-desc" style="margin-top:4px">Toque para adicionar ou arraste para o canvas · ligue ● direito → ● esquerdo</p>
+                        <p class="flow-palette-desc" style="margin-top:4px">Toque para adicionar ou arraste para o canvas · ligue saída (inferior ou superior direito) → entrada (superior esquerdo)</p>
                     </div>
                 </div>
 
@@ -5022,7 +5681,7 @@
             <div>
                 <div id="builder-title" style="font-family:var(--f-display);font-weight:700;font-size:14px;text-align:center;display:flex;align-items:center;gap:8px;justify-content:center"><i class="fab fa-whatsapp" style="color:var(--c-emerald)"></i> AcassIA CRM</div>
                 <div id="flow-publish-status" style="font-size:10px;color:var(--c-muted);text-align:center;margin-top:2px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">Publicado: —</div>
-                <div class="flow-builder-hint" style="text-align:center;margin-top:2px;max-width:320px">Ligações: arraste do ● direito até o ● esquerdo, ou clique saída → entrada.</div>
+                <div class="flow-builder-hint" style="text-align:center;margin-top:2px;max-width:360px">Ligações: arraste da saída (canto direito) até o ● de entrada (canto superior esquerdo), ou clique saída → entrada.</div>
                 <div class="flow-builder-tab-strip">
                     <button type="button" id="btn-flow-tab-logs" class="flow-builder-tab-btn" onclick="setFlowBuilderTab('logs')">Logs</button>
                     <button type="button" id="btn-flow-tab-automacao" class="flow-builder-tab-btn flow-builder-tab-btn--active" onclick="setFlowBuilderTab('automacao')">Automação</button>
@@ -5120,47 +5779,6 @@
             <button class="fab" style="position:absolute;bottom:24px;right:24px;z-index:50" onclick="openNodeMenu()" title="Adicionar Bloco">
                 <i class="fas fa-plus"></i>
             </button>
-            <div
-                id="flow-inspector-overlay"
-                class="flow-inspector-overlay"
-                hidden
-                aria-hidden="true"
-                role="presentation"
-                onclick="closeFlowInspector()"
-            ></div>
-            <div
-                id="flow-inspector"
-                class="flow-inspector-panel flow-inspector-drawer"
-                hidden
-                aria-hidden="true"
-                style="display:none"
-                onclick="event.stopPropagation()"
-            >
-                <div id="flow-inspector-mode-node" class="flow-inspector-drawer__mode flow-inspector-drawer__mode--node">
-                    <div id="flow-inspector-node-mount" class="flow-inspector-drawer__node-mount"></div>
-                </div>
-                <div id="flow-inspector-mode-edge" class="flow-inspector-drawer__mode flow-inspector-drawer__mode--edge">
-                    <div class="flow-node-inspector-toolbar flow-inspector-drawer__edge-toolbar">
-                        <span class="flow-node-inspector-title" id="flow-inspector-edge-heading"
-                            ><i class="fas fa-link flow-node-inspector-ic"></i> Conexão
-                            <span class="flow-node-inspector-sub">transição entre blocos</span></span
-                        >
-                        <button
-                            type="button"
-                            class="icon-btn flow-node-inspector-close"
-                            onclick="event.stopPropagation(); closeFlowInspector()"
-                            title="Fechar (Esc)"
-                        >
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="flow-inspector-body" class="flow-inspector-panel__scroll" style="display:none"></div>
-                    <div id="flow-inspector-edge-footer" class="flow-node-inspector-footer" style="display:none">
-                        <button type="button" class="flow-inspector-btn-save" onclick="event.stopPropagation(); flowInspectorFooterApply()"><i class="fas fa-check"></i> Salvar dados</button>
-                        <button type="button" class="flow-inspector-btn-json" onclick="event.stopPropagation(); flowRemoveSelectedEdge()" title="Remover ligação"><i class="fas fa-unlink"></i></button>
-                    </div>
-                </div>
-            </div>
 
             <!-- Missão 3.3 — simulador local (lead + chat) -->
             <div id="flow-sim-lead-modal" class="flow-sim-lead-modal hidden" aria-hidden="true" onclick="if(event.target===this) flowSimLeadCancel()">
@@ -5237,6 +5855,49 @@
                 </div>
             </div>
         </div>
+
+        <!-- Inspetor fora de #flow-canvas-area: evita pointer-events:none do canvas locked a bloquear inputs (alguns browsers) -->
+        <div
+            id="flow-inspector-overlay"
+            class="flow-inspector-overlay"
+            hidden
+            aria-hidden="true"
+            role="presentation"
+            onmousedown="if(event.button===0){ event.stopPropagation(); closeFlowInspector(); }"
+        ></div>
+        <div
+            id="flow-inspector"
+            class="flow-inspector-panel flow-inspector-drawer"
+            hidden
+            aria-hidden="true"
+            style="display:none"
+            onclick="event.stopPropagation()"
+        >
+            <div id="flow-inspector-mode-node" class="flow-inspector-drawer__mode flow-inspector-drawer__mode--node">
+                <div id="flow-inspector-node-mount" class="flow-inspector-drawer__node-mount"></div>
+            </div>
+            <div id="flow-inspector-mode-edge" class="flow-inspector-drawer__mode flow-inspector-drawer__mode--edge">
+                <div class="flow-node-inspector-toolbar flow-inspector-drawer__edge-toolbar">
+                    <span class="flow-node-inspector-title" id="flow-inspector-edge-heading"
+                        ><i class="fas fa-link flow-node-inspector-ic"></i> Conexão
+                        <span class="flow-node-inspector-sub">transição entre blocos</span></span
+                    >
+                    <button
+                        type="button"
+                        class="icon-btn flow-node-inspector-close"
+                        onclick="event.stopPropagation(); closeFlowInspector()"
+                        title="Fechar (Esc)"
+                    >
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="flow-inspector-body" class="flow-inspector-panel__scroll" style="display:none"></div>
+                <div id="flow-inspector-edge-footer" class="flow-node-inspector-footer" style="display:none">
+                    <button type="button" class="flow-inspector-btn-save" onclick="event.stopPropagation(); flowInspectorFooterApply()"><i class="fas fa-check"></i> Salvar dados</button>
+                    <button type="button" class="flow-inspector-btn-json" onclick="event.stopPropagation(); flowRemoveSelectedEdge()" title="Remover ligação"><i class="fas fa-unlink"></i></button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="modal-flow-shortcuts" class="modal-overlay hidden fixed inset-0 z-[75] bg-black/50 flex items-center justify-center p-4" onclick="if(event.target===this) closeFlowShortcutsModal()">
@@ -5256,6 +5917,20 @@
                 <li><strong style="color:var(--c-text)">Botão do meio</strong> do rato — arrastar vista</li>
                 <li><strong style="color:var(--c-text)">?</strong> — esta ajuda</li>
             </ul>
+        </div>
+    </div>
+
+    <div id="modal-flow-conteudo-unsaved" class="flow-modal-ct-unsaved modal-overlay hidden fixed inset-0 z-[1100] bg-black/50 flex items-center justify-center p-4" aria-modal="true" role="dialog" aria-labelledby="flow-conteudo-unsaved-title" onclick="if(event.target===this) flowConteudoUnsavedStay()">
+        <div class="flow-modal-ct-unsaved__panel" onclick="event.stopPropagation()">
+            <div class="flow-modal-ct-unsaved__icon" aria-hidden="true">
+                <span class="flow-modal-ct-unsaved__icon-ring"><i class="fas fa-exclamation"></i></span>
+            </div>
+            <h3 id="flow-conteudo-unsaved-title" class="flow-modal-ct-unsaved__title">Alterações não salvas</h3>
+            <p class="flow-modal-ct-unsaved__text">Existem mudanças pendentes. Deseja sair e ignorar?</p>
+            <div class="flow-modal-ct-unsaved__actions">
+                <button type="button" class="flow-modal-ct-unsaved__btn flow-modal-ct-unsaved__btn--discard" onclick="flowConteudoUnsavedDiscard()">Descartar alterações</button>
+                <button type="button" class="flow-modal-ct-unsaved__btn flow-modal-ct-unsaved__btn--stay" onclick="flowConteudoUnsavedStay()">Permanecer na página</button>
+            </div>
         </div>
     </div>
 
@@ -6426,17 +7101,20 @@ const FLOW_NOTIFY_CHANNELS = [
     { value: 'webhook', label: 'Webhook HTTP' },
 ];
 const FLOW_TIMEZONES = ['America/Sao_Paulo', 'America/Fortaleza', 'America/Manaus', 'America/Recife', 'Europe/Lisbon', 'UTC'];
+/** Modelos Gemini (Google AI Studio — chave gratuita GEMINI_API_KEY; mesmo stack do motor Python). */
+const FLOW_DEFAULT_LLM_MODEL = 'gemini-2.5-flash';
 const FLOW_GPT_MODELS = [
-    { value: 'gpt-4o-mini', label: 'GPT-4o mini (rápido)' },
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (recomendado)' },
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
 ];
-/** Modelos do painel Cérebro IA (Missão 5.1) — valores estáveis para blueprint / motor */
+/** Modelos do painel Cérebro IA — nomes aceites pela API generateContent (Gemini). */
 const FLOW_INSPECTOR_AI_MODELS = [
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'gpt-3.5-turbo', label: 'GPT-3.5-Turbo' },
-    { value: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
-    { value: 'gemini-1.5-pro', label: 'Gemini Pro' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
 ];
 /** Operadores do Rule Builder — Condição (Missão 5.2) */
 const FLOW_COND_OPERATORS = [
@@ -6457,15 +7135,24 @@ const FLOW_CONTEUDO_MEDIA_KINDS = [
     { value: 'audio', label: 'Áudio' },
     { value: 'document', label: 'Documento' },
 ];
-/** Botões do construtor sequencial (ordem = passos no fluxo). */
+/** Botões do construtor (grelha 2×3 — mesma ordem que o mockup: Texto, Imagem, Áudio | Vídeo, Documento, Delay). */
 const FLOW_CONTEUDO_SEQ_GRID = [
     { type: 'text', label: 'Texto', icon: 'fa-font' },
     { type: 'image', label: 'Imagem', icon: 'fa-image' },
-    { type: 'video', label: 'Vídeo', icon: 'fa-video' },
     { type: 'audio', label: 'Áudio', icon: 'fa-microphone' },
+    { type: 'video', label: 'Vídeo', icon: 'fa-video' },
     { type: 'document', label: 'Documento', icon: 'fa-file-alt' },
-    { type: 'delay', label: 'Delay', icon: 'fa-hourglass-half' },
+    { type: 'delay', label: 'Delay', icon: 'fa-clock' },
 ];
+/** Máximo de passos (cards) por bloco Conteúdo — políticas Meta/WhatsApp e métricas internas. */
+const FLOW_CONTEUDO_MAX_CARDS = 5;
+/** UI da zona de envio (cards de mídia no construtor sequencial). */
+const FLOW_CONTEUDO_MEDIA_UPLOAD_COPY = {
+    image: { icon: 'fa-image', title: 'Clique para enviar uma imagem', formats: 'JPG, PNG, GIF, WebP' },
+    video: { icon: 'fa-video', title: 'Clique para enviar um vídeo', formats: 'MP4, MOV, WebM' },
+    audio: { icon: 'fa-music', title: 'Clique para enviar um áudio', formats: 'WAV, MP3, M4A, OGG' },
+    document: { icon: 'fa-file-alt', title: 'Clique para enviar um documento', formats: 'PDF, DOC, DOCX' },
+};
 const FLOW_PERGUNTA_MODOS = [
     { value: 'texto_livre', label: 'Resposta em texto livre' },
     { value: 'lista_opcoes', label: 'Lista de opções (estilo WhatsApp)' },
@@ -6508,6 +7195,70 @@ function flowNodePreviewBodyInnerHtml() {
             <div class="flow-node-preview-label">Resumo</div>
             <div class="flow-node-pills" data-flow-node-pills></div>
         </div>`;
+}
+
+function flowConteudoCanvasPreviewHtml(cfg) {
+    const c = cfg && typeof cfg === 'object' ? cfg : {};
+    const items = flowConteudoSeqItemsFromConfig(c);
+    const mediaUrlFromItem = (it) => {
+        const v = it.value && typeof it.value === 'object' ? it.value : {};
+        return String(v.url || '').trim();
+    };
+    const stack = (() => {
+        if (!items.length) {
+            return `<div class="flow-node-conteudo-card flow-node-conteudo-card--empty"><span class="flow-node-conteudo-card__txt">Sem passos</span></div>`;
+        }
+        return items
+            .map((raw) => {
+                const it = flowConteudoSeqNormalizeItem(raw);
+                const t = it.type;
+                if (t === 'text') {
+                    const txt = String(it.value || '').trim();
+                    const show = txt ? flowTruncatePill(txt, 480) : 'Texto vazio';
+                    return `<div class="flow-node-conteudo-card flow-node-conteudo-card--text"><i class="fas fa-font flow-node-conteudo-card__ico" aria-hidden="true"></i><span class="flow-node-conteudo-card__txt">${flowEsc(show)}</span></div>`;
+                }
+                if (t === 'delay') {
+                    const sec = typeof it.value === 'number' ? it.value : parseFloat(it.value) || 0;
+                    const n = Math.round(sec);
+                    const word = n === 1 ? 'Segundo' : 'Segundos';
+                    return `<div class="flow-node-conteudo-card flow-node-conteudo-card--delay"><i class="fas fa-stopwatch flow-node-conteudo-card__ico" aria-hidden="true"></i><span class="flow-node-conteudo-card__txt">Delay de ${n} ${word}</span></div>`;
+                }
+                if (t === 'image') {
+                    const u = mediaUrlFromItem(it);
+                    if (u && /^https?:\/\//i.test(u)) {
+                        const su = flowEsc(u);
+                        return `<div class="flow-node-conteudo-card flow-node-conteudo-card--image flow-node-conteudo-card--has-media"><div class="flow-node-conteudo-card__media-fill"><img src="${su}" alt="" class="flow-node-conteudo-card__thumb" loading="lazy" referrerpolicy="no-referrer" decoding="async" onerror="this.style.visibility='hidden'" /></div></div>`;
+                    }
+                    return `<div class="flow-node-conteudo-card flow-node-conteudo-card--image"><i class="fas fa-image flow-node-conteudo-card__ico" aria-hidden="true"></i><span class="flow-node-conteudo-card__txt">Enviando um arquivo de imagem</span></div>`;
+                }
+                if (t === 'video') {
+                    const u = mediaUrlFromItem(it);
+                    if (u && /^https?:\/\//i.test(u)) {
+                        const su = flowEsc(u);
+                        return `<div class="flow-node-conteudo-card flow-node-conteudo-card--video flow-node-conteudo-card--has-media"><div class="flow-node-conteudo-card__media-fill flow-node-conteudo-card__media-fill--video"><video class="flow-node-conteudo-card__thumb flow-node-conteudo-card__thumb--video" muted playsinline preload="metadata" src="${su}"></video><div class="flow-node-conteudo-card__play-overlay" aria-hidden="true"><span class="flow-node-conteudo-card__play-btn"><i class="fas fa-play"></i></span></div></div><div class="flow-node-conteudo-card__media-caption">Enviando um arquivo de Video</div></div>`;
+                    }
+                    return `<div class="flow-node-conteudo-card flow-node-conteudo-card--video"><div class="flow-node-conteudo-card__media-placeholder"><i class="fas fa-video flow-node-conteudo-card__ico--block" aria-hidden="true"></i><span class="flow-node-conteudo-card__txt">Enviando um arquivo de Video</span></div></div>`;
+                }
+                if (t === 'audio') {
+                    const u = mediaUrlFromItem(it);
+                    const waveSvg = `<svg class="flow-node-conteudo-card__wave-svg" viewBox="0 0 140 36" preserveAspectRatio="none" aria-hidden="true"><path class="flow-node-conteudo-card__wave-path" d="M0 18 Q10 6 20 18 T40 18 T60 10 T80 22 T100 14 T120 20 T140 18" fill="none" stroke-width="2" stroke-linecap="round"/></svg>`;
+                    if (u && /^https?:\/\//i.test(u)) {
+                        return `<div class="flow-node-conteudo-card flow-node-conteudo-card--audio flow-node-conteudo-card--has-media flow-node-conteudo-card--audio-rich">${waveSvg}<div class="flow-node-conteudo-card__audio-row"><span class="flow-node-conteudo-card__play-mini"><i class="fas fa-play"></i></span><span class="flow-node-conteudo-card__txt flow-node-conteudo-card__txt--audio">Enviando um arquivo de áudio</span></div></div>`;
+                    }
+                    return `<div class="flow-node-conteudo-card flow-node-conteudo-card--audio flow-node-conteudo-card--audio-rich">${waveSvg}<div class="flow-node-conteudo-card__audio-row"><span class="flow-node-conteudo-card__play-mini"><i class="fas fa-play"></i></span><span class="flow-node-conteudo-card__txt flow-node-conteudo-card__txt--audio">Enviando um arquivo de áudio</span></div></div>`;
+                }
+                if (t === 'document') {
+                    return `<div class="flow-node-conteudo-card flow-node-conteudo-card--document"><i class="fas fa-file-alt flow-node-conteudo-card__ico" aria-hidden="true"></i><span class="flow-node-conteudo-card__txt">Enviando um documento</span></div>`;
+                }
+                return '';
+            })
+            .filter(Boolean)
+            .join('');
+    })();
+    return `<div class="flow-node-preview flow-node-preview--conteudo" title="Pré-visualização · duplo clique para editar">
+        <div class="flow-node-preview-label">Conteúdos</div>
+        <div class="flow-node-conteudo-stack" data-flow-conteudo-preview="1">${stack}</div>
+    </div>`;
 }
 
 function flowTruncatePill(str, max) {
@@ -6635,7 +7386,7 @@ function flowNodePillItems(nodeType, cfg) {
             if (c.note) push(String(c.note));
             break;
         case 'gpt': {
-            const model = c.ai_model || c.model || 'gpt-4o';
+            const model = c.ai_model || c.model || FLOW_DEFAULT_LLM_MODEL;
             push(String(model));
             const temp = c.ai_temperature != null ? c.ai_temperature : c.temperature;
             if (temp != null && String(temp) !== '') push('temp ' + String(temp));
@@ -6645,7 +7396,7 @@ function flowNodePillItems(nodeType, cfg) {
             const agentLabel =
                 c.step_name != null && String(c.step_name).trim() !== '' ? String(c.step_name).trim() : 'Sem nome';
             push('Agente: ' + flowTruncatePill(agentLabel, 24));
-            push('Modelo: ' + flowTruncatePill(String(c.model || 'gpt-4o-mini'), 22));
+            push('Modelo: ' + flowTruncatePill(String(c.model || FLOW_DEFAULT_LLM_MODEL), 22));
             if (c.temperature != null && String(c.temperature) !== '') push('Temp: ' + String(c.temperature));
             break;
         }
@@ -6694,8 +7445,6 @@ function flowNodePillItems(nodeType, cfg) {
 
 function flowRefreshNodePreview(nodeEl) {
     if (!nodeEl || !nodeEl.querySelector) return;
-    const wrap = nodeEl.querySelector('[data-flow-node-pills]');
-    if (!wrap) return;
     const typ = String(nodeEl.getAttribute('data-node-type') || 'generic');
     let cfg = {};
     try {
@@ -6703,6 +7452,13 @@ function flowRefreshNodePreview(nodeEl) {
     } catch (_) {
         cfg = {};
     }
+    if (typ === 'conteudo') {
+        const body = nodeEl.querySelector('.flow-node-body');
+        if (body) body.innerHTML = flowConteudoCanvasPreviewHtml(cfg);
+        return;
+    }
+    const wrap = nodeEl.querySelector('[data-flow-node-pills]');
+    if (!wrap) return;
     wrap.textContent = '';
     flowNodePillItems(typ, cfg).forEach((text) => {
         const sp = document.createElement('span');
@@ -6715,7 +7471,8 @@ function flowRefreshNodePreview(nodeEl) {
 function hydrateFlowNodePreviewFromConfig() {
     document.querySelectorAll('#nodes-container .flow-node').forEach((el) => {
         const body = el.querySelector('.flow-node-body');
-        if (body && !body.querySelector('[data-flow-node-pills]')) {
+        const ntyp = String(el.getAttribute('data-node-type') || '');
+        if (body && !body.querySelector('[data-flow-node-pills]') && !body.querySelector('[data-flow-conteudo-preview]')) {
             body.innerHTML = flowNodePreviewBodyInnerHtml();
         }
         flowRefreshNodePreview(el);
@@ -7529,10 +8286,33 @@ function flowClearEdgeSelection() {
     redrawFlowEdges();
 }
 
-function flowSelectEdge(edgeId) {
+/** Seleção silenciosa: só destaca a aresta (sem abrir painel). */
+function flowSelectEdgeOnly(edgeId) {
     const eid = String(edgeId || '').trim();
     if (!eid || !flowGetEdgeById(eid)) return;
+    if (flowConteudoShouldWarnUnsaved()) {
+        flowConteudoOpenUnsavedModal();
+        return;
+    }
+    closeFlowInspectorImmediate({ preserveEdgeSelection: true });
+    _flowSelectedNodeId = null;
+    flowSetSelectedNode(null);
+    flowResetEdgeInspectorDom();
+    _flowSelectedEdgeId = eid;
+    redrawFlowEdges();
+}
+
+/** Duplo clique na linha: abre inspetor para label / transição. */
+function flowSelectEdgeAndOpenInspector(edgeId) {
+    const eid = String(edgeId || '').trim();
+    if (!eid || !flowGetEdgeById(eid)) return;
+    if (flowConteudoShouldWarnUnsaved()) {
+        flowConteudoOpenUnsavedModal();
+        return;
+    }
     closeFlowInspectorImmediate();
+    _flowSelectedNodeId = null;
+    flowSetSelectedNode(null);
     _flowSelectedEdgeId = eid;
     redrawFlowEdges();
     openFlowEdgeInspector(eid);
@@ -7624,8 +8404,10 @@ function flowHandleWorldCenter(dotEl) {
 function flowNodeEdgeFallbackWorld(fromEl, toEl) {
     const fr = fromEl.getBoundingClientRect();
     const tr = toEl.getBoundingClientRect();
-    const o = flowViewportClientToWorld(fr.right, fr.top + fr.height / 2);
-    const i = flowViewportClientToWorld(tr.left, tr.top + tr.height / 2);
+    const fromType = String(fromEl.getAttribute('data-node-type') || '');
+    const outY = fromType === 'conteudo' ? fr.top + 12 + 6 : fr.bottom - 12 - 6;
+    const o = flowViewportClientToWorld(fr.right - 6, outY);
+    const i = flowViewportClientToWorld(tr.left + 6, tr.top + 12 + 6);
     return { x1: o.x, y1: o.y, x2: i.x, y2: i.y };
 }
 
@@ -7721,6 +8503,55 @@ function flowBezierCubicControlPoints(x1, y1, x2, y2) {
     return { kind: 'cubic', x0: x1, y0: y1, x1: c1x, y1: y1, x2: c2x, y2: y2, x3: x2, y3: y2 };
 }
 
+function flowEdgeControlDeltas(e) {
+    if (!e || typeof e !== 'object') return { dc1x: 0, dc1y: 0, dc2x: 0, dc2y: 0 };
+    return {
+        dc1x: Number(e.dc1x) || 0,
+        dc1y: Number(e.dc1y) || 0,
+        dc2x: Number(e.dc2x) || 0,
+        dc2y: Number(e.dc2y) || 0,
+    };
+}
+
+/** Curva da aresta com deltas persistidos + pontos de controlo para handles SVG */
+function flowEdgeBezierCompute(edge, x1, y1, x2, y2) {
+    const base = flowBezierCubicControlPoints(x1, y1, x2, y2);
+    const dDel = flowEdgeControlDeltas(edge);
+    if (base.kind === 'line') {
+        return {
+            d: `M ${base.x0} ${base.y0} L ${base.x3} ${base.y3}`,
+            cp: base,
+            c1: null,
+            c2: null,
+        };
+    }
+    if (base.kind === 'cubic') {
+        const c1x = base.x1 + dDel.dc1x;
+        const c1y = base.y1 + dDel.dc1y;
+        const c2x = base.x2 + dDel.dc2x;
+        const c2y = base.y2 + dDel.dc2y;
+        const d = `M ${base.x0} ${base.y0} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${base.x3} ${base.y3}`;
+        const cp = {
+            kind: 'cubic',
+            x0: base.x0,
+            y0: base.y0,
+            x1: c1x,
+            y1: c1y,
+            x2: c2x,
+            y2: c2y,
+            x3: base.x3,
+            y3: base.y3,
+        };
+        return { d, cp, c1: { x: c1x, y: c1y }, c2: { x: c2x, y: c2y } };
+    }
+    return {
+        d: flowSmoothBezierPathD(x1, y1, x2, y2),
+        cp: base,
+        c1: null,
+        c2: null,
+    };
+}
+
 function flowCubicBezierPoint(x0, y0, x1, y1, x2, y2, x3, y3, t) {
     const u = 1 - t;
     const uu = u * u;
@@ -7742,9 +8573,9 @@ function flowCubicBezierTangent(x0, y0, x1, y1, x2, y2, x3, y3, t) {
 }
 
 /** Ponto médio (t=0.5) com offset ao longo da normal “para cima” no ecrã */
-function flowEdgeLabelAnchor(x1, y1, x2, y2) {
+function flowEdgeLabelAnchor(x1, y1, x2, y2, edge) {
     const pad = 14;
-    const cp = flowBezierCubicControlPoints(x1, y1, x2, y2);
+    const cp = edge ? flowEdgeBezierCompute(edge, x1, y1, x2, y2).cp : flowBezierCubicControlPoints(x1, y1, x2, y2);
     if (cp.kind === 'line') {
         const mx = (cp.x0 + cp.x3) / 2;
         const my = (cp.y0 + cp.y3) / 2;
@@ -7860,8 +8691,8 @@ function initFlowWireDrag() {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.id = 'flow-temp-wire-path';
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', '#7c5af5');
-        path.setAttribute('stroke-width', '3');
+        path.setAttribute('stroke', '#3b82f6');
+        path.setAttribute('stroke-width', '3.5');
         path.setAttribute('stroke-dasharray', '8 5');
         path.setAttribute('pointer-events', 'none');
         path.setAttribute('marker-end', 'url(#flow-arrow)');
@@ -7869,7 +8700,7 @@ function initFlowWireDrag() {
         area.classList.add('flow-connecting');
         document.addEventListener('pointermove', flowWireMove);
         document.addEventListener('pointerup', flowWireUp, true);
-        toast('Solte no ● esquerdo do bloco destino.', 'purple');
+        toast('Solte no ● de entrada (canto superior esquerdo) do bloco destino.', 'emerald');
     }, true);
 }
 
@@ -8175,6 +9006,25 @@ function flowEnhanceInspectorVariableButtons(root) {
     });
 }
 
+function flowMigrateInlineInspectorHostIfNeeded(host) {
+    if (!host || host.getAttribute('data-flow-inspector-v') === '2') return;
+    const close = host.querySelector('.flow-node-inspector-close');
+    if (close) {
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'flow-node-inspector-title-edit';
+        edit.title = 'Editar nome do bloco · Esc fecha o painel';
+        edit.addEventListener('click', (e) => {
+            e.stopPropagation();
+            flowInspectorStartTitleEdit();
+        });
+        edit.innerHTML = '<i class="fas fa-pen"></i>';
+        close.replaceWith(edit);
+    }
+    host.querySelectorAll('.flow-inspector-btn-json').forEach((b) => b.remove());
+    host.setAttribute('data-flow-inspector-v', '2');
+}
+
 function flowEnsureInlineInspectorHost(nodeEl) {
     if (!nodeEl) return null;
     const mount = document.getElementById('flow-inspector-node-mount');
@@ -8188,19 +9038,19 @@ function flowEnsureInlineInspectorHost(nodeEl) {
         host.innerHTML = `
             <div class="flow-node-inspector-toolbar">
                 <span class="flow-node-inspector-title" id="flow-inspector-node-heading"><i class="fas fa-sliders-h flow-node-inspector-ic"></i> <span class="flow-inspector-heading-label">Configuração</span> <span class="flow-node-inspector-sub">ajuste este bloco</span></span>
-                <button type="button" class="icon-btn flow-node-inspector-close" onclick="event.stopPropagation(); closeFlowInspector()" title="Fechar (Esc)"><i class="fas fa-times"></i></button>
+                <button type="button" class="flow-node-inspector-title-edit" onclick="event.stopPropagation(); flowInspectorStartTitleEdit()" title="Editar nome do bloco · Esc fecha o painel"><i class="fas fa-pen"></i></button>
             </div>
             <div class="flow-node-inspector-main">
                 <div class="flow-node-inspector-body"></div>
                 <div class="flow-node-inspector-footer">
                     <button type="button" class="flow-inspector-btn-save" onclick="event.stopPropagation(); flowInspectorFooterApply()" title="Guardar alterações neste bloco"><i class="fas fa-check"></i> Salvar dados</button>
-                    <button type="button" class="flow-inspector-btn-json" onclick="event.stopPropagation(); openRawFlowInspectorJson()" title="Editar JSON (avançado)"><i class="fas fa-code"></i></button>
                 </div>
             </div>`;
         mount.appendChild(host);
     } else if (host.parentElement !== mount) {
         mount.appendChild(host);
     }
+    flowMigrateInlineInspectorHostIfNeeded(host);
     const modeNode = document.getElementById('flow-inspector-mode-node');
     const modeEdge = document.getElementById('flow-inspector-mode-edge');
     if (modeNode) {
@@ -8235,19 +9085,19 @@ function flowConteudoSeqNormalizeItem(raw) {
     if (['image', 'video', 'audio', 'document'].includes(type)) {
         const val = raw.value;
         if (val && typeof val === 'object') {
-            return {
-                type,
-                value: {
-                    url: String(val.url != null ? val.url : ''),
-                    caption: String(val.caption != null ? val.caption : ''),
-                },
+            const o = {
+                url: String(val.url != null ? val.url : ''),
+                caption: String(val.caption != null ? val.caption : ''),
             };
+            if (type === 'audio') o.send_as_voice = val.send_as_voice !== false;
+            return { type, value: o };
         }
         return {
             type,
             value: {
                 url: String(raw.url != null ? raw.url : ''),
                 caption: String(raw.caption != null ? raw.caption : ''),
+                ...(type === 'audio' ? { send_as_voice: true } : {}),
             },
         };
     }
@@ -8257,7 +9107,8 @@ function flowConteudoSeqNormalizeItem(raw) {
 function flowConteudoSeqDefaultItem(type) {
     const t = String(type || 'text').toLowerCase();
     if (t === 'delay') return { type: 'delay', value: 3 };
-    if (['image', 'video', 'audio', 'document'].includes(t)) return { type: t, value: { url: '', caption: '' } };
+    if (t === 'audio') return { type: t, value: { url: '', caption: '', send_as_voice: true } };
+    if (['image', 'video', 'document'].includes(t)) return { type: t, value: { url: '', caption: '' } };
     return { type: 'text', value: '' };
 }
 
@@ -8285,10 +9136,13 @@ function flowConteudoSeqMigrateLegacy(c) {
 
 function flowConteudoSeqItemsFromConfig(cfg) {
     const c = cfg && typeof cfg === 'object' ? cfg : {};
-    if (Array.isArray(c.contents) && c.contents.length) {
-        return c.contents.map(flowConteudoSeqNormalizeItem);
+    let arr;
+    if (Array.isArray(c.contents)) {
+        arr = c.contents.length ? c.contents.map(flowConteudoSeqNormalizeItem) : [];
+    } else {
+        arr = flowConteudoSeqMigrateLegacy(c);
     }
-    return flowConteudoSeqMigrateLegacy(c);
+    return arr.slice(0, FLOW_CONTEUDO_MAX_CARDS);
 }
 
 function flowConteudoSeqLabelForType(type) {
@@ -8315,27 +9169,162 @@ function flowConteudoSeqCollectFromDom(wrap) {
         } else if (['image', 'video', 'audio', 'document'].includes(type)) {
             const url = card.querySelector('[data-flow-ct-seq-field="url"]');
             const cap = card.querySelector('[data-flow-ct-seq-field="caption"]');
-            out.push({
-                type,
-                value: {
-                    url: url ? String(url.value || '').trim() : '',
-                    caption: cap ? String(cap.value || '') : '',
-                },
-            });
+            const vo = {
+                url: url ? String(url.value || '').trim() : '',
+                caption: cap ? String(cap.value || '') : '',
+            };
+            if (type === 'audio') {
+                const sw = card.querySelector('[data-flow-ct-seq-field="send_as_voice"]');
+                vo.send_as_voice = sw ? !!sw.checked : true;
+            }
+            out.push({ type, value: vo });
         }
     });
     return out;
 }
 
+function flowConteudoSeqNoticeStaticHtml() {
+    const max = FLOW_CONTEUDO_MAX_CARDS;
+    return `<div class="flow-inspector-conteudo__notice-wrap" data-flow-ct-notice-wrap hidden>
+        <div class="flow-inspector-conteudo__notice" data-flow-ct-notice="1" role="alert">
+            <div class="flow-inspector-conteudo__notice-head">
+                <span class="flow-inspector-conteudo__notice-ico" aria-hidden="true"><i class="fas fa-info"></i></span>
+                <div class="flow-inspector-conteudo__notice-body">
+                    <p class="flow-inspector-conteudo__notice-lead">A fim de otimizar a performance e análise de seus blocos de conteúdo, sugerimos as seguintes práticas:</p>
+                    <ul class="flow-inspector-conteudo__notice-list">
+                        <li>Divida blocos extensos em unidades menores.</li>
+                        <li>Evite textos longos; fragmente-os para tornar a comunicação mais acessível e humanizada.</li>
+                    </ul>
+                    <p class="flow-inspector-conteudo__notice-foot">Atingiu o <strong>${max} passos</strong> permitidos neste bloco (regras Meta / WhatsApp e métricas). Guarde e use outro bloco «Conteúdo» na sequência, ou remova um passo para continuar a editar aqui.</p>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function flowConteudoSeqSyncEmptyUi(body) {
+    if (!body || !body.querySelector) return;
+    const list = body.querySelector('#flow-content-list');
+    const empty = body.querySelector('[data-flow-ct-list-empty]');
+    if (!list || !empty) return;
+    const n = list.querySelectorAll('[data-flow-ct-seq-card]').length;
+    const show = n === 0;
+    empty.hidden = !show;
+    empty.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+function flowConteudoSeqUpdateLimitUi(body) {
+    if (!body || !body.querySelector) return;
+    const list = body.querySelector('#flow-content-list');
+    const n = list ? list.querySelectorAll('[data-flow-ct-seq-card]').length : 0;
+    const noticeWrap = body.querySelector('[data-flow-ct-notice-wrap]');
+    if (noticeWrap) {
+        if (n === FLOW_CONTEUDO_MAX_CARDS) {
+            noticeWrap.removeAttribute('hidden');
+            noticeWrap.style.display = '';
+        } else {
+            noticeWrap.setAttribute('hidden', '');
+            noticeWrap.style.display = 'none';
+        }
+    }
+    const grid = body.querySelector('.flow-content-type-grid');
+    if (grid) {
+        const atMax = n >= FLOW_CONTEUDO_MAX_CARDS;
+        grid.querySelectorAll('[data-flow-ct-add]').forEach((btn) => {
+            btn.disabled = atMax;
+            btn.setAttribute('aria-disabled', atMax ? 'true' : 'false');
+            btn.style.opacity = atMax ? '0.5' : '';
+            btn.style.cursor = atMax ? 'not-allowed' : '';
+            const baseTitle = btn.getAttribute('data-flow-ct-add-title') || btn.title || '';
+            btn.title = atMax
+                ? `Limite de ${FLOW_CONTEUDO_MAX_CARDS} passos (WhatsApp / métricas). Adicione outro bloco Conteúdo.`
+                : baseTitle;
+        });
+    }
+    flowConteudoSeqSyncEmptyUi(body);
+}
+
 function flowConteudoSeqFillList(body, items) {
     const list = body.querySelector('#flow-content-list');
-    if (!list || !window._flowConteudo) return;
-    const id = window._flowConteudo._meta && window._flowConteudo._meta.id ? window._flowConteudo._meta.id : 'n';
-    const safeId = String(id).replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
-    list.innerHTML = items.map((it, i) => flowConteudoSeqCardHtml(it, i, safeId)).join('');
+    if (!list) return;
+    flowConteudoEnsureBrainState();
+    let useItems = Array.isArray(items) ? items : [];
+    if (useItems.length > FLOW_CONTEUDO_MAX_CARDS) {
+        useItems = useItems.slice(0, FLOW_CONTEUDO_MAX_CARDS);
+        toast(
+            `Este bloco tinha mais de ${FLOW_CONTEUDO_MAX_CARDS} passos; apenas os primeiros ${FLOW_CONTEUDO_MAX_CARDS} foram mantidos (limite WhatsApp / métricas).`,
+            'amber',
+        );
+    }
+    const rawId =
+        (window._flowConteudo && window._flowConteudo._meta && window._flowConteudo._meta.id) ||
+        (window._flowConteudo && window._flowConteudo.nodeId) ||
+        _flowSelectedNodeId ||
+        'n';
+    const safeId = String(rawId).replace(/[^a-zA-Z0-9_-]/g, '') || 'n';
+    list.innerHTML = useItems.map((it, i) => flowConteudoSeqCardHtml(it, i, safeId)).join('');
     flowConteudoSeqEnsureDnDLine(list);
     flowConteudoSeqBindDelayLabels(list);
     flowConteudoSeqBindDnD(list);
+    flowConteudoSeqUpdateLimitUi(body);
+}
+
+function flowConteudoSeqMediaBodyHtml(mediaType, urlRaw, sendAsVoice) {
+    const t = String(mediaType || 'image').toLowerCase();
+    const mu = FLOW_CONTEUDO_MEDIA_UPLOAD_COPY[t] || FLOW_CONTEUDO_MEDIA_UPLOAD_COPY.image;
+    const ico = mu.icon || 'fa-file';
+    const url = String(urlRaw || '').trim();
+    const attrUrl = flowEsc(url);
+    const uploadBtn = `
+            <button type="button" class="flow-content-card__upload-zone" onclick="event.stopPropagation();void flowConteudoBrainUpload(this)" ondragover="flowConteudoSeqMediaZoneDragOver(event,this)" ondragleave="flowConteudoSeqMediaZoneDragLeave(event,this)" ondrop="flowConteudoSeqMediaZoneDrop(event,this)" title="Enviar ficheiro ou arrastar para aqui">
+                <i class="fas ${ico} flow-content-card__upload-ico" aria-hidden="true"></i>
+                <span class="flow-content-card__upload-title">${flowEsc(mu.title)}</span>
+                <span class="flow-content-card__upload-formats">${flowEsc(mu.formats)}</span>
+            </button>`;
+    if (!url) {
+        return `<div class="flow-content-card__media-body" data-flow-ct-media-body="1">${uploadBtn}</div><input type="hidden" data-flow-ct-seq-field="url" value="" autocomplete="off" />`;
+    }
+    let previewInner = '';
+    if (t === 'image') {
+        previewInner = `<img src="${attrUrl}" alt="" class="flow-content-card__preview-img" loading="lazy" />`;
+    } else if (t === 'video') {
+        previewInner = `<video class="flow-content-card__preview-video" controls preload="metadata" playsinline src="${attrUrl}"></video>`;
+    } else if (t === 'audio') {
+        previewInner = `<audio class="flow-content-card__preview-audio" controls preload="metadata" src="${attrUrl}"></audio>`;
+    } else {
+        previewInner = `<div class="flow-content-card__preview-doc"><i class="fas fa-file-alt flow-content-card__preview-doc-ico" aria-hidden="true"></i><a href="${attrUrl}" target="_blank" rel="noopener noreferrer" class="flow-content-card__preview-doc-link">Abrir documento</a></div>`;
+    }
+    const voiceHtml =
+        t === 'audio'
+            ? `<div class="flow-inspector-conteudo__toggle flow-content-card__voice-toggle">
+                <span>Enviar como áudio gravado?</span>
+                <label class="flow-inspector-conteudo__switch">
+                    <input type="checkbox" data-flow-ct-seq-field="send_as_voice"${sendAsVoice ? ' checked' : ''} />
+                    <span class="flow-inspector-conteudo__switch-slider"></span>
+                </label>
+            </div>`
+            : '';
+    return `<div class="flow-content-card__media-body" data-flow-ct-media-body="1">
+            <div class="flow-content-card__preview-shell" ondragover="flowConteudoSeqMediaZoneDragOver(event,this)" ondragleave="flowConteudoSeqMediaZoneDragLeave(event,this)" ondrop="flowConteudoSeqMediaZoneDrop(event,this)">
+                <div class="flow-content-card__preview-wrap">${previewInner}</div>
+                <button type="button" class="flow-content-card__replace-btn" onclick="event.stopPropagation();void flowConteudoBrainUpload(this)">Substituir ficheiro</button>
+            </div>${voiceHtml}
+        </div><input type="hidden" data-flow-ct-seq-field="url" value="${attrUrl}" autocomplete="off" />`;
+}
+
+function flowConteudoSeqRefreshMediaCardPreview(card) {
+    if (!card) return;
+    const t = String(card.getAttribute('data-flow-ct-seq-type') || 'image').toLowerCase();
+    const urlInp = card.querySelector('[data-flow-ct-seq-field="url"]');
+    const url = urlInp ? String(urlInp.value || '').trim() : '';
+    let sendAsVoice = true;
+    const prevVoice = card.querySelector('[data-flow-ct-seq-field="send_as_voice"]');
+    if (prevVoice) sendAsVoice = !!prevVoice.checked;
+    const html = flowConteudoSeqMediaBodyHtml(t, url, sendAsVoice);
+    const toolbar = card.querySelector('.flow-content-card__toolbar');
+    if (!toolbar) return;
+    while (toolbar.nextSibling) card.removeChild(toolbar.nextSibling);
+    card.insertAdjacentHTML('beforeend', html);
 }
 
 function flowConteudoSeqCardHtml(item, idx, safeId) {
@@ -8357,7 +9346,7 @@ function flowConteudoSeqCardHtml(item, idx, safeId) {
     let inner = '';
     if (t === 'text') {
         const v = String(it.value != null ? it.value : '');
-        inner = `<textarea class="input-field flow-inspector-conteudo__textarea" data-flow-ct-seq-field="text" rows="4" placeholder="Mensagem…">${flowEsc(
+        inner = `<textarea class="input-field flow-inspector-conteudo__textarea" data-flow-ct-seq-field="text" rows="4" placeholder="Digite seu texto aqui">${flowEsc(
             v,
         )}</textarea>`;
     } else if (t === 'delay') {
@@ -8370,21 +9359,18 @@ function flowConteudoSeqCardHtml(item, idx, safeId) {
                 <span style="font-size:10px;color:#94a3b8">0–600s · pausa antes do próximo passo</span>
             </div>`;
     } else {
-        const url = it.value && it.value.url != null ? String(it.value.url) : '';
-        const cap = it.value && it.value.caption != null ? String(it.value.caption) : '';
-        inner = `
-            <label class="flow-inspector-conteudo__label"><i class="fas fa-link"></i> URL</label>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-                <input type="text" class="input-field flow-inspector-conteudo__input" data-flow-ct-seq-field="url" value="${flowEsc(url)}" style="flex:1;min-width:0" placeholder="https://…" autocomplete="off" />
-                <button type="button" class="btn btn-ghost" style="font-size:11px;padding:8px 12px;border-radius:10px;white-space:nowrap" onclick="event.stopPropagation();void flowConteudoBrainUpload(this)"><i class="fas fa-cloud-upload-alt"></i> Upload</button>
-            </div>
-            <label class="flow-inspector-conteudo__label"><i class="fas fa-align-left"></i> Legenda</label>
-            <textarea class="input-field flow-inspector-conteudo__textarea" data-flow-ct-seq-field="caption" rows="2" placeholder="Legenda opcional…">${flowEsc(cap)}</textarea>`;
+        const v = it.value && typeof it.value === 'object' ? it.value : {};
+        const url = v.url != null ? String(v.url) : '';
+        const sendAsVoice = t === 'audio' ? v.send_as_voice !== false : true;
+        inner = flowConteudoSeqMediaBodyHtml(t, url, sendAsVoice);
     }
     return `
-        <div class="flow-content-card flow-content-card--${modClass}" data-flow-ct-seq-card="1" data-flow-ct-seq-type="${flowEsc(t)}" draggable="true">
+        <div class="flow-content-card flow-content-card--${modClass}" data-flow-ct-seq-card="1" data-flow-ct-seq-type="${flowEsc(t)}" draggable="false">
             <div class="flow-content-card__toolbar">
+                <div class="flow-content-card__toolbar-start">
+                <span class="flow-content-card__drag-handle" draggable="true" title="Arrastar para reordenar" aria-label="Arrastar para reordenar"><i class="fas fa-grip-vertical" aria-hidden="true"></i></span>
                 <span class="flow-content-card__badge">${flowEsc(badge)} · ${idx + 1}</span>
+                </div>
                 <div class="flow-content-card__actions">
                     <button type="button" onclick="event.stopPropagation(); flowConteudoSeqMove(this,-1)" title="Mover para cima"><i class="fas fa-chevron-up"></i></button>
                     <button type="button" onclick="event.stopPropagation(); flowConteudoSeqMove(this,1)" title="Mover para baixo"><i class="fas fa-chevron-down"></i></button>
@@ -8408,14 +9394,19 @@ function flowConteudoSeqBindDelayLabels(list) {
 
 function flowConteudoSeqMove(btn, dir) {
     const card = btn && btn.closest('[data-flow-ct-seq-card]');
-    const list = document.getElementById('flow-content-list');
-    if (!card || !list || list.id !== 'flow-content-list') return;
+    const list = card && card.closest('#flow-content-list');
+    if (!card || !list || list.id !== 'flow-content-list' || !list.contains(card)) return;
     const cards = Array.from(list.querySelectorAll('[data-flow-ct-seq-card]'));
     const i = cards.indexOf(card);
     if (i < 0) return;
     if (dir < 0 && i > 0) list.insertBefore(card, cards[i - 1]);
     else if (dir > 0 && i < cards.length - 1) list.insertBefore(cards[i + 1], card);
     flowConteudoSeqRenumberCards(list);
+    const st = window._flowConteudo;
+    const node = st && flowCanvasNodeById(st.nodeId);
+    const wrap = node && flowGetNodeInspectorBody(node);
+    if (node && wrap) flowConteudoSeqPersistFromDom(wrap, node, { toast: false });
+    if (wrap) flowConteudoSeqUpdateLimitUi(wrap);
 }
 
 function flowConteudoSeqRenumberCards(list) {
@@ -8483,6 +9474,11 @@ function flowConteudoSeqDnDOnDragStart(e) {
         e.preventDefault();
         return;
     }
+    const fromHandle = e.target && e.target.closest && e.target.closest('.flow-content-card__drag-handle');
+    if (!fromHandle) {
+        e.preventDefault();
+        return;
+    }
     const card = e.target && e.target.closest ? e.target.closest('[data-flow-ct-seq-card]') : null;
     if (!card || !list.contains(card)) return;
     window._flowCtDnD.dragEl = card;
@@ -8528,6 +9524,7 @@ function flowConteudoSeqDnDOnDrop(e) {
     const node = st && flowCanvasNodeById(st.nodeId);
     const wrap = node && flowGetNodeInspectorBody(node);
     if (node && wrap) flowConteudoSeqPersistFromDom(wrap, node, { toast: false });
+    if (wrap) flowConteudoSeqUpdateLimitUi(wrap);
 }
 
 function flowConteudoSeqDnDOnDragEnd(e) {
@@ -8558,24 +9555,79 @@ function flowConteudoSeqBindDnD(list) {
 
 function flowConteudoSeqRemove(btn) {
     const card = btn && btn.closest('[data-flow-ct-seq-card]');
-    const list = document.getElementById('flow-content-list');
+    const list = card && card.closest('#flow-content-list');
     if (!card || !list) return;
-    if (list.querySelectorAll('[data-flow-ct-seq-card]').length <= 1) {
-        toast('Mantenha pelo menos um passo na sequência.', 'amber');
-        return;
-    }
     card.remove();
     flowConteudoSeqRenumberCards(list);
+    const st = window._flowConteudo;
+    const node = st && flowCanvasNodeById(st.nodeId);
+    const wrap = node && flowGetNodeInspectorBody(node);
+    if (node && wrap) flowConteudoSeqPersistFromDom(wrap, node, { toast: false });
+    if (wrap) flowConteudoSeqUpdateLimitUi(wrap);
+}
+
+function flowConteudoEnsureBrainState() {
+    if (window._flowConteudo && window._flowConteudo.nodeId) return true;
+    const nid = _flowSelectedNodeId;
+    const node = nid ? flowCanvasNodeById(nid) : null;
+    if (!node || String(node.getAttribute('data-node-type') || '') !== 'conteudo') return false;
+    const id = String(node.getAttribute('data-flow-id') || '');
+    const head = node.querySelector('.flow-node-head');
+    const title = head ? String(head.innerText || '').trim() : 'Conteúdo';
+    const incom = (_flowEdges || []).filter((e) => e.to === id).length;
+    const outgo = (_flowEdges || []).filter((e) => e.from === id).length;
+    window._flowConteudo = { nodeId: id, _meta: { typ: 'conteudo', title, incom, outgo, id } };
+    return true;
+}
+
+/** Corpo do inspetor que contém o construtor sequencial (evita flowGetInspectorBodyEl errado). */
+function flowConteudoResolveInspectorBody() {
+    const wrapIfHasList = (el) => (el && el.querySelector && el.querySelector('#flow-content-list') ? el : null);
+    let b = wrapIfHasList(flowGetInspectorBodyEl());
+    if (b) return b;
+    b = wrapIfHasList(document.querySelector('#flow-inspector-node-mount .flow-node-inspector-body'));
+    if (b) return b;
+    const list = document.getElementById('flow-content-list');
+    return list ? list.closest('.flow-node-inspector-body') : null;
+}
+
+function flowConteudoInitTypeGridDelegation() {
+    const root = document.getElementById('flow-inspector-node-mount');
+    if (!root || root.getAttribute('data-flow-ct-add-deleg') === '1') return;
+    root.setAttribute('data-flow-ct-add-deleg', '1');
+    root.addEventListener(
+        'click',
+        function (e) {
+            const btn = e.target && e.target.closest && e.target.closest('[data-flow-ct-add]');
+            if (!btn || !root.contains(btn)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const t = btn.getAttribute('data-flow-ct-add');
+            if (t) flowConteudoSeqAddCard(t);
+        },
+        true,
+    );
 }
 
 function flowConteudoSeqAddCard(type) {
-    const body = flowGetInspectorBodyEl();
-    if (!body) return;
+    if (!flowConteudoEnsureBrainState()) return;
+    const body = flowConteudoResolveInspectorBody();
+    if (!body) {
+        toast('Não foi possível localizar o painel do bloco. Fecha e volta a abrir «Conteúdo».', 'amber');
+        return;
+    }
     const items = flowConteudoSeqCollectFromDom(body);
+    if (items.length >= FLOW_CONTEUDO_MAX_CARDS) {
+        toast(
+            `Limite de ${FLOW_CONTEUDO_MAX_CARDS} passos por bloco (regras Meta / WhatsApp e métricas). Guarde ou adicione outro bloco «Conteúdo».`,
+            'amber',
+        );
+        flowConteudoSeqUpdateLimitUi(body);
+        return;
+    }
     items.push(flowConteudoSeqDefaultItem(type));
     flowConteudoSeqFillList(body, items);
-    const wrap = body;
-    flowEnhanceInspectorVariableButtons(wrap);
+    flowEnhanceInspectorVariableButtons(body);
 }
 
 /** Agrega primeiro texto/mídia/delay para compat (pré-visualização / legado). */
@@ -8647,35 +9699,31 @@ function flowConteudoBrainRenderInspector(meta, bodyEl) {
     try {
         cfg = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
-    const r = flowConteudoResolvedBrain(cfg);
+    if (Array.isArray(cfg.contents) && cfg.contents.length > FLOW_CONTEUDO_MAX_CARDS) {
+        toast(
+            `Este bloco tinha mais de ${FLOW_CONTEUDO_MAX_CARDS} passos guardados; apenas os primeiros ${FLOW_CONTEUDO_MAX_CARDS} são usados (regras Meta / WhatsApp e métricas). Guarde para consolidar.`,
+            'amber',
+        );
+    }
     const items = flowConteudoSeqItemsFromConfig(cfg);
-    const btnRows = (r.buttons.length ? r.buttons : [{ label: '', value: '' }]).map((b) => flowConteudoBrainButtonRowHtml(b)).join('');
-    const gridBtns = FLOW_CONTEUDO_SEQ_GRID.map(
-        (g) =>
-            `<button type="button" class="flow-content-type-btn" onclick="event.stopPropagation();flowConteudoSeqAddCard(${JSON.stringify(
-                g.type,
-            )})" title="Adicionar ${flowEsc(g.label)}"><i class="fas ${g.icon}"></i><span>${flowEsc(g.label)}</span></button>`,
-    ).join('');
+    const gridBtns = FLOW_CONTEUDO_SEQ_GRID.map((g) => {
+        const t = String(g.type || '').replace(/"/g, '&quot;');
+        const ty = String(g.type || 'text').replace(/[^a-z0-9_-]/gi, '');
+        const addTitle = `Adicionar ${g.label}`;
+        return `<button type="button" class="flow-content-type-btn flow-content-type-btn--${ty}" data-flow-ct-add="${t}" data-flow-ct-add-title="${flowEsc(addTitle)}" title="${flowEsc(addTitle)}"><i class="fas ${g.icon}"></i><span>${flowEsc(g.label)}</span></button>`;
+    }).join('');
     targetBody.innerHTML = `
-        ${flowInspectorSummaryHtml(meta)}
         <div class="flow-inspector-stack flow-content-builder">
         <div class="flow-inspector-conteudo">
-            <div class="flow-inspector-conteudo__head">
-                <div class="flow-inspector-conteudo__head-ico" aria-hidden="true"><i class="fab fa-whatsapp"></i></div>
-                <div>
-                    <div class="flow-inspector-conteudo__title">Construtor de conteúdo</div>
-                    <div class="flow-inspector-conteudo__sub">Monte a sequência de mensagens (texto, mídia, pausa). Ordem = ordem de envio.</div>
-                </div>
+            ${flowConteudoSeqNoticeStaticHtml()}
+            <div class="flow-inspector-conteudo__section-add">
+                <div class="flow-content-type-grid" role="toolbar" aria-label="Tipos de passo">${gridBtns}</div>
             </div>
-            <div class="flow-inspector-section__title" style="margin-top:2px">Adicionar passo</div>
-            <div class="flow-content-type-grid" role="toolbar" aria-label="Tipos de passo">${gridBtns}</div>
+            <div class="flow-inspector-conteudo__divider flow-inspector-conteudo__divider--below-add"><span>Conteúdos</span></div>
+            <div class="flow-inspector-conteudo__list-shell">
             <div id="flow-content-list" aria-live="polite"></div>
-            <div class="flow-inspector-section__title" style="margin-top:8px;padding-top:16px;border-top:1px solid rgba(148,163,184,0.22)">Botões de resposta rápida (após a sequência)</div>
-            <div class="flow-inspector-conteudo__table-wrap">
-                <div class="flow-inspector-conteudo__table-head"><span>Texto do botão</span><span>Valor da resposta</span><span></span></div>
-                <div data-flow-ct-buttons-table>${btnRows}</div>
+            <div class="flow-inspector-conteudo__empty" data-flow-ct-list-empty hidden>Nenhum conteúdo foi adicionado.</div>
             </div>
-            <button type="button" class="flow-inspector-conteudo__btn-add" onclick="event.stopPropagation(); flowConteudoBrainAddButton(this)"><i class="fas fa-plus"></i> Adicionar botão</button>
         </div>
         </div>
     `;
@@ -8690,6 +9738,49 @@ function flowConteudoBrainRenderInspector(meta, bodyEl) {
 
 function flowConteudoRenderInspector(meta, bodyEl) {
     flowConteudoBrainRenderInspector(meta, bodyEl);
+}
+
+function flowConteudoSeqMediaZoneDragOver(e, el) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (el && el.classList) el.classList.add('flow-content-card__upload-zone--dropping');
+}
+
+function flowConteudoSeqMediaZoneDragLeave(e, el) {
+    e.stopPropagation();
+    const rel = e.relatedTarget;
+    if (rel && el && el.contains && el.contains(rel)) return;
+    if (el && el.classList) el.classList.remove('flow-content-card__upload-zone--dropping');
+}
+
+function flowConteudoSeqMediaZoneDrop(e, el) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (el && el.classList) el.classList.remove('flow-content-card__upload-zone--dropping');
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) void flowConteudoBrainUploadWithFile(el, f);
+}
+
+async function flowConteudoBrainUploadWithFile(anchorEl, file) {
+    if (!file || !anchorEl) return;
+    const card = anchorEl.closest && anchorEl.closest('[data-flow-ct-seq-card]');
+    if (!card) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    if (typeof setAppBusy === 'function') setAppBusy(true, 'A enviar ficheiro…');
+    try {
+        const res = await fetch(`${API}/api/media/upload`, { method: 'POST', body: fd });
+        const j = await res.json();
+        if (!res.ok || !j.ok) throw new Error(j.error || 'Falha no upload');
+        const urlInp = card.querySelector('[data-flow-ct-seq-field="url"]');
+        if (urlInp) urlInp.value = j.url || '';
+        flowConteudoSeqRefreshMediaCardPreview(card);
+        toast('Ficheiro enviado; URL preenchida.', 'emerald');
+    } catch (e) {
+        toast(String(e.message || e), 'rose');
+    } finally {
+        if (typeof setAppBusy === 'function') setAppBusy(false);
+    }
 }
 
 async function flowConteudoBrainUpload(btn) {
@@ -8707,35 +9798,34 @@ async function flowConteudoBrainUpload(btn) {
     inp.onchange = async () => {
         const file = inp.files && inp.files[0];
         if (!file) return;
-        const fd = new FormData();
-        fd.append('file', file);
-        if (typeof setAppBusy === 'function') setAppBusy(true, 'A enviar ficheiro…');
-        try {
-            const res = await fetch(`${API}/api/media/upload`, { method: 'POST', body: fd });
-            const j = await res.json();
-            if (!res.ok || !j.ok) throw new Error(j.error || 'Falha no upload');
-            const urlInp = card && card.querySelector('[data-flow-ct-seq-field="url"]');
-            if (urlInp) urlInp.value = j.url || '';
-            toast('Ficheiro enviado; URL preenchida.', 'emerald');
-        } catch (e) {
-            toast(String(e.message || e), 'rose');
-        } finally {
-            if (typeof setAppBusy === 'function') setAppBusy(false);
-        }
+        await flowConteudoBrainUploadWithFile(btn, file);
     };
     inp.click();
 }
 
-function flowConteudoSeqPersistFromDom(wrap, node, opts) {
-    const o = opts && typeof opts === 'object' ? opts : {};
-    const showToast = o.toast !== false;
-    if (!wrap || !node) return;
+function flowConteudoStableStringify(val) {
+    if (val === null || typeof val !== 'object') {
+        return JSON.stringify(val);
+    }
+    if (Array.isArray(val)) {
+        return '[' + val.map(flowConteudoStableStringify).join(',') + ']';
+    }
+    const keys = Object.keys(val).sort();
+    return '{' + keys.map((k) => JSON.stringify(k) + ':' + flowConteudoStableStringify(val[k])).join(',') + '}';
+}
+
+/** Mesmo objeto que seria gravado em `data-flow-config` (sem efeitos colaterais). */
+function flowConteudoComputeConfigFromDom(wrap, node) {
+    if (!wrap || !node) return {};
     let base = {};
     try {
         base = JSON.parse(node.getAttribute('data-flow-config') || '{}');
     } catch (_) {}
     if (typeof base !== 'object' || base === null) base = {};
-    const contents = flowConteudoSeqCollectFromDom(wrap);
+    let contents = flowConteudoSeqCollectFromDom(wrap);
+    if (contents.length > FLOW_CONTEUDO_MAX_CARDS) {
+        contents = contents.slice(0, FLOW_CONTEUDO_MAX_CARDS);
+    }
     base.contents = contents;
     const textJoined = contents
         .filter((x) => x && x.type === 'text')
@@ -8753,16 +9843,136 @@ function flowConteudoSeqPersistFromDom(wrap, node, opts) {
     }
     const lastDelay = [...contents].reverse().find((x) => x && x.type === 'delay');
     base.content_delay_sec = lastDelay && lastDelay.type === 'delay' ? Number(lastDelay.value) || 0 : 0;
-    const btns = [];
-    wrap.querySelectorAll('[data-flow-ct-btn="1"]').forEach((row) => {
-        const l = row.querySelector('[data-flow-ct-btn-label]');
-        const v = row.querySelector('[data-flow-ct-btn-value]');
-        if (!l) return;
-        const lab = String(l.value || '').trim();
-        const val = v ? String(v.value || '').trim() : '';
-        if (lab || val) btns.push({ label: lab, value: val });
-    });
-    base.api_buttons = btns;
+    const btnRows = wrap.querySelectorAll('[data-flow-ct-btn="1"]');
+    if (btnRows.length) {
+        const btns = [];
+        btnRows.forEach((row) => {
+            const l = row.querySelector('[data-flow-ct-btn-label]');
+            const v = row.querySelector('[data-flow-ct-btn-value]');
+            if (!l) return;
+            const lab = String(l.value || '').trim();
+            const val = v ? String(v.value || '').trim() : '';
+            if (lab || val) btns.push({ label: lab, value: val });
+        });
+        base.api_buttons = btns;
+    } else if (Array.isArray(base.api_buttons)) {
+        base.api_buttons = base.api_buttons.map((b) => ({
+            label: String((b && b.label) || ''),
+            value: String((b && b.value) || ''),
+        }));
+    } else {
+        base.api_buttons = [];
+    }
+    return base;
+}
+
+function flowConteudoInspectorIsDirty() {
+    const st = window._flowConteudo;
+    if (!st || !st.nodeId || !_flowSelectedNodeId || st.nodeId !== _flowSelectedNodeId) return false;
+    const node = flowCanvasNodeById(st.nodeId);
+    if (!node || String(node.getAttribute('data-node-type') || '') !== 'conteudo') return false;
+    const wrap = flowGetNodeInspectorBody(node);
+    if (!wrap) return false;
+    const snap = window._flowConteudoSnapshotAtOpen;
+    if (snap == null) return false;
+    let prev;
+    try {
+        prev = JSON.parse(snap || '{}');
+    } catch (_) {
+        prev = {};
+    }
+    let cur;
+    try {
+        cur = flowConteudoComputeConfigFromDom(wrap, node);
+    } catch (_) {
+        return true;
+    }
+    return flowConteudoStableStringify(cur) !== flowConteudoStableStringify(prev);
+}
+
+/** Aviso ao sair só quando há alteração relevante (passos/conteúdo ou cards no DOM); só título com lista vazia fecha sem modal. */
+function flowConteudoShouldWarnUnsaved() {
+    if (!flowConteudoInspectorIsDirty()) return false;
+    const st = window._flowConteudo;
+    if (!st || !st.nodeId || !_flowSelectedNodeId || st.nodeId !== _flowSelectedNodeId) return false;
+    const node = flowCanvasNodeById(st.nodeId);
+    if (!node || String(node.getAttribute('data-node-type') || '') !== 'conteudo') return false;
+    const wrap = flowGetNodeInspectorBody(node);
+    if (!wrap) return true;
+    let prev = {};
+    try {
+        prev = JSON.parse(window._flowConteudoSnapshotAtOpen || '{}');
+    } catch (_) {
+        prev = {};
+    }
+    let cur = {};
+    try {
+        cur = flowConteudoComputeConfigFromDom(wrap, node);
+    } catch (_) {
+        return true;
+    }
+    if (flowConteudoStableStringify(prev.contents || []) !== flowConteudoStableStringify(cur.contents || [])) return true;
+    if (flowConteudoStableStringify(prev.api_buttons || []) !== flowConteudoStableStringify(cur.api_buttons || [])) return true;
+    const nCards = wrap.querySelectorAll('#flow-content-list [data-flow-ct-seq-card]').length;
+    return nCards > 0;
+}
+
+function flowConteudoOpenUnsavedModal() {
+    const m = document.getElementById('modal-flow-conteudo-unsaved');
+    if (!m) return;
+    m.classList.remove('hidden');
+    m.style.display = 'flex';
+    m.setAttribute('aria-hidden', 'false');
+}
+
+function flowConteudoCloseUnsavedModal() {
+    const m = document.getElementById('modal-flow-conteudo-unsaved');
+    if (!m) return;
+    m.classList.add('hidden');
+    m.style.display = 'none';
+    m.setAttribute('aria-hidden', 'true');
+}
+
+function flowConteudoUnsavedStay() {
+    flowConteudoCloseUnsavedModal();
+}
+
+function flowConteudoUnsavedCancel() {
+    flowConteudoUnsavedStay();
+}
+
+function flowConteudoUnsavedSave() {
+    flowConteudoCloseUnsavedModal();
+    flowConteudoBrainSave();
+}
+
+function flowConteudoUnsavedDiscard() {
+    const st = window._flowConteudo;
+    const snap = window._flowConteudoSnapshotAtOpen;
+    if (st && snap != null) {
+        const node = flowCanvasNodeById(st.nodeId);
+        if (node) {
+            try {
+                node.setAttribute('data-flow-config', snap);
+                flowRefreshNodePreview(node);
+                pushFlowHistory();
+            } catch (_) {}
+        }
+    }
+    try {
+        delete window._flowConteudoSnapshotAtOpen;
+    } catch (_) {
+        window._flowConteudoSnapshotAtOpen = null;
+    }
+    flowConteudoCloseUnsavedModal();
+    closeFlowInspectorProceed();
+}
+
+function flowConteudoSeqPersistFromDom(wrap, node, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const showToast = o.toast !== false;
+    if (!wrap || !node) return;
+    const base = flowConteudoComputeConfigFromDom(wrap, node);
     try {
         node.setAttribute('data-flow-config', JSON.stringify(base));
     } catch (_) {}
@@ -8779,6 +9989,12 @@ function flowConteudoBrainSave() {
     const wrap = node && flowGetNodeInspectorBody(node);
     if (!node || !wrap) return;
     flowConteudoSeqPersistFromDom(wrap, node, { toast: true });
+    try {
+        delete window._flowConteudoSnapshotAtOpen;
+    } catch (_) {
+        window._flowConteudoSnapshotAtOpen = null;
+    }
+    closeFlowInspectorProceed();
 }
 
 async function ensureFlowSchemaCatalog() {
@@ -8940,8 +10156,10 @@ function flowInspectorRenderGeneric(meta, cfg, spec, bodyEl) {
 function flowGptResolvedAiConfig(cfg) {
     const c = cfg && typeof cfg === 'object' ? cfg : {};
     let model =
-        c.ai_model != null && String(c.ai_model).trim() !== '' ? String(c.ai_model).trim() : String(c.model || 'gpt-4o').trim();
-    if (!model) model = 'gpt-4o';
+        c.ai_model != null && String(c.ai_model).trim() !== ''
+            ? String(c.ai_model).trim()
+            : String(c.model || FLOW_DEFAULT_LLM_MODEL).trim();
+    if (!model) model = FLOW_DEFAULT_LLM_MODEL;
     const systemPrompt =
         c.ai_system_prompt != null ? String(c.ai_system_prompt) : c.prompt != null ? String(c.prompt) : '';
     let temp = 0.7;
@@ -8980,7 +10198,7 @@ function flowInspectorRenderGpt(meta, cfg, bodyEl) {
                 <div class="flow-inspector-ai__head-ico" aria-hidden="true"><i class="fas fa-brain"></i></div>
                 <div class="flow-inspector-ai__head-text">
                     <div class="flow-inspector-ai__title">Cérebro de IA</div>
-                    <div class="flow-inspector-ai__sub">Modelo, personalidade (system), criatividade, variável de saída e memória de curto prazo.</div>
+                    <div class="flow-inspector-ai__sub">Modelos Gemini (Google AI Studio, chave GEMINI_API_KEY). Personalidade (system), criatividade, variável de saída e memória de curto prazo.</div>
                 </div>
             </div>
             <div class="flow-inspector-ai__field">
@@ -9043,7 +10261,7 @@ function applyFlowInspectorAiBrain() {
     const tempEl = wrap.querySelector('[data-flow-inspector-key="ai_temperature"]');
     const outEl = wrap.querySelector('[data-flow-inspector-key="ai_output_var"]');
     const memEl = wrap.querySelector('[data-flow-inspector-key="ai_memory"]');
-    if (modelEl) obj.ai_model = String(modelEl.value || '').trim() || 'gpt-4o';
+    if (modelEl) obj.ai_model = String(modelEl.value || '').trim() || FLOW_DEFAULT_LLM_MODEL;
     if (sysEl) obj.ai_system_prompt = String(sysEl.value || '');
     if (tempEl) {
         const n = parseFloat(String(tempEl.value));
@@ -9567,6 +10785,10 @@ function flowSetSelectedNode(nodeEl) {
 }
 
 function flowInspectorIsOpen() {
+    /* Fonte de verdade do modo “gaveta”: flow-canvas-locked é definido em flowFocusDrawerOpen e removido ao fechar — não depender só de .flow-node--editing (pode perder-se em re-renders do canvas, ex. Conteúdo). */
+    if (document.body.classList.contains('flow-canvas-locked')) return true;
+    const panel = document.getElementById('flow-inspector');
+    if (panel && panel.classList.contains('flow-inspector-drawer--open')) return true;
     const edgeBody = document.getElementById('flow-inspector-body');
     const edgeOpen =
         !!_flowSelectedEdgeId &&
@@ -9637,8 +10859,8 @@ function flowEnsureNodeActionButtons() {
         bar.className = 'flow-node-head-actions';
         bar.addEventListener('mousedown', (e) => e.stopPropagation());
         bar.innerHTML = `
-            <button type="button" class="icon-btn" title="Configuração avançada" aria-label="Avançado" onclick="event.stopPropagation(); flowEditNode(this)"><i class="fas fa-sliders-h"></i></button>
-            <button type="button" class="icon-btn" title="Duplicar" aria-label="Duplicar" onclick="event.stopPropagation(); flowDuplicateNode(this)"><i class="fas fa-copy"></i></button>
+            <button type="button" class="icon-btn" title="Duplicar bloco" aria-label="Duplicar" onclick="event.stopPropagation(); flowDuplicateNode(this)"><i class="fas fa-copy"></i></button>
+            <button type="button" class="icon-btn" title="Editar bloco" aria-label="Editar" onclick="event.stopPropagation(); flowEditNode(this)"><i class="fas fa-pen"></i></button>
             <button type="button" class="icon-btn" title="Eliminar" aria-label="Eliminar" onclick="event.stopPropagation(); flowRemoveNode(this)"><i class="fas fa-trash"></i></button>
         `;
         head.appendChild(bar);
@@ -9665,7 +10887,78 @@ function initFlowNodeSelection() {
         if (e.target.closest('.conn-dot')) return;
         flowClearEdgeSelection();
         flowSetSelectedNode(node);
+        const skipOpen = !!window._flowSkipOpenInspectorFromClick;
+        if (window._flowSkipOpenInspectorFromClick) window._flowSkipOpenInspectorFromClick = false;
+        if (!skipOpen) void openFlowInspector(node);
     });
+}
+
+let _flowEdgeCpDrag = null;
+
+function initFlowEdgeControlDrag() {
+    const svg = document.getElementById('svg-connections');
+    if (!svg || svg.getAttribute('data-flow-cp-bound') === '1') return;
+    svg.setAttribute('data-flow-cp-bound', '1');
+    svg.addEventListener(
+        'pointerdown',
+        function flowEdgeCpPointerDown(ev) {
+            const t = ev.target;
+            if (!t || !t.closest) return;
+            const h = t.closest('.flow-edge-cp');
+            if (!h) return;
+            const eid = h.getAttribute('data-flow-edge-id');
+            const cp = h.getAttribute('data-cp');
+            if (!eid || !cp) return;
+            ev.stopPropagation();
+            ev.preventDefault();
+            const edge = flowGetEdgeById(eid);
+            if (!edge) return;
+            const world = flowViewportClientToWorld(ev.clientX, ev.clientY);
+            _flowEdgeCpDrag = {
+                edgeId: eid,
+                cp: cp === '2' ? 2 : 1,
+                startX: world.x,
+                startY: world.y,
+                o1x: Number(edge.dc1x) || 0,
+                o1y: Number(edge.dc1y) || 0,
+                o2x: Number(edge.dc2x) || 0,
+                o2y: Number(edge.dc2y) || 0,
+            };
+            document.addEventListener('pointermove', flowEdgeCpPointerMove);
+            document.addEventListener('pointerup', flowEdgeCpPointerUp, true);
+            try {
+                h.setPointerCapture(ev.pointerId);
+            } catch (_) {}
+        },
+        true
+    );
+}
+
+function flowEdgeCpPointerMove(e) {
+    if (!_flowEdgeCpDrag) return;
+    const edge = flowGetEdgeById(_flowEdgeCpDrag.edgeId);
+    if (!edge) return;
+    const w = flowViewportClientToWorld(e.clientX, e.clientY);
+    const dx = w.x - _flowEdgeCpDrag.startX;
+    const dy = w.y - _flowEdgeCpDrag.startY;
+    if (_flowEdgeCpDrag.cp === 1) {
+        edge.dc1x = _flowEdgeCpDrag.o1x + dx;
+        edge.dc1y = _flowEdgeCpDrag.o1y + dy;
+    } else {
+        edge.dc2x = _flowEdgeCpDrag.o2x + dx;
+        edge.dc2y = _flowEdgeCpDrag.o2y + dy;
+    }
+    scheduleRedrawFlowEdges();
+}
+
+function flowEdgeCpPointerUp() {
+    if (_flowEdgeCpDrag) {
+        pushFlowHistory();
+        requestFlowAutoSave();
+    }
+    _flowEdgeCpDrag = null;
+    document.removeEventListener('pointermove', flowEdgeCpPointerMove);
+    document.removeEventListener('pointerup', flowEdgeCpPointerUp, true);
 }
 
 function initFlowEdgeSelection() {
@@ -9675,11 +10968,21 @@ function initFlowEdgeSelection() {
     svg.addEventListener('click', function (e) {
         const vb = document.getElementById('view-builder');
         if (!vb || vb.style.display === 'none') return;
+        if (e.target && e.target.closest && e.target.closest('.flow-edge-cp')) return;
         const path = e.target && e.target.closest && e.target.closest('path[data-flow-edge-id].conn-path');
         if (!path) return;
         e.stopPropagation();
         const eid = path.getAttribute('data-flow-edge-id');
-        if (eid) flowSelectEdge(eid);
+        if (eid) flowSelectEdgeOnly(eid);
+    });
+    svg.addEventListener('dblclick', function (e) {
+        const vb = document.getElementById('view-builder');
+        if (!vb || vb.style.display === 'none') return;
+        const path = e.target && e.target.closest && e.target.closest('path[data-flow-edge-id].conn-path');
+        if (!path) return;
+        e.stopPropagation();
+        const eid = path.getAttribute('data-flow-edge-id');
+        if (eid) flowSelectEdgeAndOpenInspector(eid);
     });
 }
 
@@ -9690,6 +10993,11 @@ function initFlowBuilderGlobalHandlers() {
         const vb = document.getElementById('view-builder');
         if (!vb || vb.style.display === 'none') return;
         if (e.key === 'Escape') {
+            const unsavedCt = document.getElementById('modal-flow-conteudo-unsaved');
+            if (unsavedCt && !unsavedCt.classList.contains('hidden')) {
+                flowConteudoUnsavedCancel();
+                return;
+            }
             if (flowInspectorIsOpen()) closeFlowInspector();
             closeFlowShortcutsModal();
             return;
@@ -9769,11 +11077,18 @@ function initFlowBuilderGlobalHandlers() {
         if (el.closest('.flow-canvas-fab-stack') || el.closest('.fab')) return;
         if (el.closest('#flow-builder-tab-panels')) return;
         if (el.closest('#flow-sim-lead-modal, #flow-simulator-chat, #flow-sim-replay-modal')) return;
+        if (el.closest('#modal-flow-conteudo-unsaved')) return;
+        /* Com flow-canvas-locked o #flow-canvas-area tem pointer-events:none: o clique no vazio vai para o overlay, não para o canvas — não usar só area.contains(el). */
+        if (el.closest('#flow-inspector-overlay')) {
+            closeFlowInspector();
+            return;
+        }
         const area = document.getElementById('flow-canvas-area');
         if (!area || !area.contains(el)) return;
         closeFlowInspector();
     });
     flowBindInspectorShellPropagation();
+    flowConteudoInitTypeGridDelegation();
 }
 
 function redrawFlowEdges() {
@@ -9785,10 +11100,10 @@ function redrawFlowEdges() {
     const markerDef = `
         <defs>
             <marker id="flow-arrow" viewBox="0 0 12 12" refX="10.2" refY="6" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse">
-                <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="rgba(124, 90, 245, 0.88)"/>
+                <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="#3b82f6"/>
             </marker>
             <marker id="flow-arrow-sel" viewBox="0 0 12 12" refX="10.2" refY="6" markerWidth="10" markerHeight="10" orient="auto" markerUnits="userSpaceOnUse">
-                <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="#3b82f6"/>
+                <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="#2563eb"/>
             </marker>
             <marker id="flow-arrow-sim" viewBox="0 0 12 12" refX="10.2" refY="6" markerWidth="11" markerHeight="11" orient="auto" markerUnits="userSpaceOnUse">
                 <path d="M0,1.2 L0,10.8 L10.5,6 z" fill="#38bdf8"/>
@@ -9799,19 +11114,21 @@ function redrawFlowEdges() {
         </defs>`;
     const paths = [];
     const labels = [];
+    const cpHandles = [];
     const ext = flowFlowWorldExtent();
     (_flowEdges || []).forEach((e) => {
         const fromEl = flowCanvasNodeById(e.from);
         const toEl = flowCanvasNodeById(e.to);
         if (!fromEl || !toEl) return;
         const { x1, y1, x2, y2 } = flowGetEdgeAnchorWorldPoints(fromEl, toEl);
-        const d = flowSmoothBezierPathD(x1, y1, x2, y2);
+        const bez = flowEdgeBezierCompute(e, x1, y1, x2, y2);
+        const d = bez.d;
         const sel = _flowSelectedEdgeId && String(_flowSelectedEdgeId) === String(e.id);
         const simTr = _flowSimTraceEdgeId && String(_flowSimTraceEdgeId) === String(e.id);
         let cls = 'conn-path';
         let mk = 'url(#flow-arrow)';
-        let sw = '2.25';
-        let sc = 'rgba(124, 90, 245, 0.5)';
+        let sw = '3.5';
+        let sc = '#3b82f6';
         if (simTr) {
             cls = 'conn-path conn-path--sim-trace';
             mk = 'url(#flow-arrow-sim)';
@@ -9820,22 +11137,31 @@ function redrawFlowEdges() {
         } else if (sel) {
             cls = 'conn-path conn-path-selected';
             mk = 'url(#flow-arrow-sel)';
-            sw = '3';
-            sc = '#3b82f6';
+            sw = '4';
+            sc = '#2563eb';
         }
         paths.push(
             `<path class="${cls}" data-flow-edge-id="${flowEsc(e.id)}" d="${d}" stroke="${sc}" stroke-width="${sw}" marker-end="${mk}"/>`
         );
         const lab = e.label != null ? String(e.label).trim() : '';
         if (lab) {
-            const anchor = flowEdgeLabelAnchor(x1, y1, x2, y2);
+            const anchor = flowEdgeLabelAnchor(x1, y1, x2, y2, e);
             const badge = flowEdgeLabelBadgeSvg(e.id, lab, anchor.x, anchor.y);
             if (badge) labels.push(badge);
+        }
+        if (sel && bez.c1 && bez.c2) {
+            const eid = flowEsc(e.id);
+            cpHandles.push(
+                `<circle class="flow-edge-cp" data-flow-edge-id="${eid}" data-cp="1" cx="${bez.c1.x.toFixed(2)}" cy="${bez.c1.y.toFixed(2)}" r="5" />`
+            );
+            cpHandles.push(
+                `<circle class="flow-edge-cp" data-flow-edge-id="${eid}" data-cp="2" cx="${bez.c2.x.toFixed(2)}" cy="${bez.c2.y.toFixed(2)}" r="5" />`
+            );
         }
     });
     svg.style.width = ext.w + 'px';
     svg.style.height = ext.h + 'px';
-    svg.innerHTML = markerDef + paths.join('') + labels.join('') + tempHtml;
+    svg.innerHTML = markerDef + paths.join('') + cpHandles.join('') + labels.join('') + tempHtml;
 }
 
 function wireFlowCanvasConnections() {
@@ -9869,11 +11195,156 @@ function wireFlowCanvasConnections() {
     initFlowWireDrag();
 }
 
+function flowNodeDefaultLabelForType(typ) {
+    const t = String(typ || 'generic');
+    const m = {
+        trigger: 'Gatilho',
+        webhook: 'Webhook',
+        engine: 'Engine',
+        nucleo_ia: 'Núcleo IA',
+        motor_ref: 'Motor Python',
+        end: 'Fim',
+        conteudo: 'Conteúdo',
+        pergunta: 'Pergunta',
+        acao: 'Ação',
+        delay: 'Delay',
+        condicao: 'Condição',
+        expediente: 'Expediente',
+        notificar: 'Notificar Atendente',
+        divisao: 'Divisão',
+        api: 'API Request',
+        gpt: 'Cérebro IA',
+        agente_ia: 'Agente IA',
+        voice_studio: 'Voice Studio',
+        anotacao: 'Anotação',
+        generic: 'Nova Ação',
+    };
+    return m[t] || m.generic;
+}
+
+function flowNodeInspectorDisplayTitle(nodeEl) {
+    if (!nodeEl) return '';
+    let cfg = {};
+    try {
+        cfg = JSON.parse(nodeEl.getAttribute('data-flow-config') || '{}');
+    } catch (_) {
+        cfg = {};
+    }
+    if (cfg && typeof cfg === 'object' && cfg.step_name != null && String(cfg.step_name).trim() !== '') {
+        return String(cfg.step_name).trim();
+    }
+    const lab = nodeEl.querySelector('.flow-node-head-label');
+    if (!lab) return flowNodeDefaultLabelForType(nodeEl.getAttribute('data-node-type'));
+    const clone = lab.cloneNode(true);
+    const ic = clone.querySelector('i');
+    if (ic) ic.remove();
+    const t = String(clone.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (t) return t;
+    return flowNodeDefaultLabelForType(String(nodeEl.getAttribute('data-node-type') || ''));
+}
+
+function flowInspectorApplyNodeTitle(nodeEl, raw) {
+    if (!nodeEl) return;
+    const typ = String(nodeEl.getAttribute('data-node-type') || '');
+    const def = flowNodeDefaultLabelForType(typ);
+    const t = String(raw || '').trim();
+    let cfg = {};
+    try {
+        cfg = JSON.parse(nodeEl.getAttribute('data-flow-config') || '{}');
+    } catch (_) {
+        cfg = {};
+    }
+    if (typeof cfg !== 'object' || cfg === null) cfg = {};
+    cfg.step_name = !t || t === def ? '' : t;
+    nodeEl.setAttribute('data-flow-config', JSON.stringify(cfg));
+    const display = t || def;
+    const lab = nodeEl.querySelector('.flow-node-head-label');
+    if (lab) {
+        const ico = lab.querySelector('i');
+        const iclass = ico ? String(ico.getAttribute('class') || 'fas fa-cube').replace(/"/g, '') : 'fas fa-cube';
+        lab.innerHTML = `<i class="${iclass}"></i> ${display.replace(/</g, '')}`;
+    }
+    const nid = nodeEl.getAttribute('data-flow-id') || '';
+    if (window._flowConteudo && window._flowConteudo.nodeId === nid) {
+        window._flowConteudo._meta = window._flowConteudo._meta || {};
+        window._flowConteudo._meta.title = display;
+    }
+    flowRefreshNodePreview(nodeEl);
+    pushFlowHistory();
+}
+
+let _flowInspectorTitleEditActive = false;
+
+function flowInspectorCancelTitleEditIfAny() {
+    if (!_flowInspectorTitleEditActive) return;
+    const inp = document.querySelector('#flow-inspector-node-heading .flow-inspector-heading-input');
+    const node = _flowSelectedNodeId && flowCanvasNodeById(_flowSelectedNodeId);
+    if (inp && node) {
+        const span = document.createElement('span');
+        span.className = 'flow-inspector-heading-label';
+        span.textContent = flowNodeInspectorDisplayTitle(node);
+        inp.replaceWith(span);
+    }
+    _flowInspectorTitleEditActive = false;
+}
+
+function flowInspectorStartTitleEdit() {
+    if (_flowInspectorTitleEditActive) return;
+    const node = _flowSelectedNodeId && flowCanvasNodeById(_flowSelectedNodeId);
+    if (!node) return;
+    const labelEl = document.querySelector('#flow-inspector-node-heading .flow-inspector-heading-label');
+    if (!labelEl) return;
+    const cur = flowNodeInspectorDisplayTitle(node);
+    _flowInspectorTitleEditActive = true;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'flow-inspector-heading-input';
+    inp.value = cur;
+    inp.setAttribute('aria-label', 'Nome do bloco');
+    labelEl.replaceWith(inp);
+    try {
+        inp.focus();
+        inp.select();
+    } catch (_) {}
+    const finish = (apply) => {
+        if (!_flowInspectorTitleEditActive) return;
+        const v = String(inp.value || '');
+        if (apply) flowInspectorApplyNodeTitle(node, v);
+        const span = document.createElement('span');
+        span.className = 'flow-inspector-heading-label';
+        span.textContent = flowNodeInspectorDisplayTitle(node);
+        if (inp.parentNode) inp.replaceWith(span);
+        _flowInspectorTitleEditActive = false;
+    };
+    inp.addEventListener('blur', () => finish(true));
+    inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            inp.blur();
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            _flowInspectorTitleEditActive = false;
+            const span = document.createElement('span');
+            span.className = 'flow-inspector-heading-label';
+            span.textContent = flowNodeInspectorDisplayTitle(node);
+            if (inp.parentNode) inp.replaceWith(span);
+        }
+    });
+}
+
 async function openFlowInspector(nodeEl) {
     if (!nodeEl) return;
     const id = nodeEl.getAttribute('data-flow-id') || '';
+    /* Já aberto neste bloco: não fechar (evita 2.º clique do duplo-clique a fechar o painel). */
     if (nodeEl.classList.contains('flow-node--editing') && _flowSelectedNodeId === id) {
-        closeFlowInspector();
+        return;
+    }
+    if (flowConteudoShouldWarnUnsaved()) {
+        flowConteudoOpenUnsavedModal();
         return;
     }
     closeFlowInspectorImmediate();
@@ -9889,10 +11360,9 @@ async function openFlowInspector(nodeEl) {
         nodeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     } catch (_) {}
     const typ = nodeEl.getAttribute('data-node-type') || 'generic';
-    const head = nodeEl.querySelector('.flow-node-head');
-    const title = head ? String(head.innerText || '').trim() : typ;
+    const displayTitle = flowNodeInspectorDisplayTitle(nodeEl);
     const headingLabel = document.querySelector('#flow-inspector-node-heading .flow-inspector-heading-label');
-    if (headingLabel) headingLabel.textContent = title || typ;
+    if (headingLabel) headingLabel.textContent = displayTitle;
     let cfg = {};
     try {
         const raw = nodeEl.getAttribute('data-flow-config');
@@ -9901,9 +11371,15 @@ async function openFlowInspector(nodeEl) {
     const incom = (_flowEdges || []).filter((e) => e.to === id).length;
     const outgo = (_flowEdges || []).filter((e) => e.from === id).length;
     if (typ === 'conteudo') {
-        const meta = { typ, title, incom, outgo, id };
+        const meta = { typ, title: displayTitle, incom, outgo, id };
         window._flowConteudo = { nodeId: id, _meta: meta };
         flowConteudoRenderInspector(meta, bodyEl);
+        const nOpen = flowCanvasNodeById(id);
+        try {
+            window._flowConteudoSnapshotAtOpen = nOpen ? nOpen.getAttribute('data-flow-config') || '{}' : '{}';
+        } catch (_) {
+            window._flowConteudoSnapshotAtOpen = '{}';
+        }
         redrawFlowEdges();
         updateFlowMinimap();
         flowFocusDrawerOpen();
@@ -9940,7 +11416,9 @@ async function openFlowInspector(nodeEl) {
 
 let _flowInspectorCloseTimer = null;
 
-function closeFlowInspectorImmediate() {
+function closeFlowInspectorImmediate(opts) {
+    const preserveEdgeSelection = opts && opts.preserveEdgeSelection;
+    flowInspectorCancelTitleEditIfAny();
     if (_flowInspectorCloseTimer) {
         clearTimeout(_flowInspectorCloseTimer);
         _flowInspectorCloseTimer = null;
@@ -9987,12 +11465,27 @@ function closeFlowInspectorImmediate() {
     } catch (_) {
         window._flowConteudo = null;
     }
-    _flowSelectedEdgeId = null;
+    try {
+        delete window._flowConteudoSnapshotAtOpen;
+    } catch (_) {
+        window._flowConteudoSnapshotAtOpen = null;
+    }
+    if (!preserveEdgeSelection) {
+        _flowSelectedEdgeId = null;
+    }
     flowResetEdgeInspectorDom();
     redrawFlowEdges();
 }
 
 function closeFlowInspector() {
+    if (flowConteudoShouldWarnUnsaved()) {
+        flowConteudoOpenUnsavedModal();
+        return;
+    }
+    closeFlowInspectorProceed();
+}
+
+function closeFlowInspectorProceed() {
     const panel = document.getElementById('flow-inspector');
     if (panel && panel.classList.contains('flow-inspector-drawer--open')) {
         if (_flowInspectorCloseTimer) {
@@ -10087,7 +11580,7 @@ function flowAnalyzeGraphStructure(doc) {
     const validEdges = edges.filter((e) => e && e.from && e.to && ids.has(e.from) && ids.has(e.to));
 
     if (nodes.length >= 2 && validEdges.length === 0) {
-        warnings.push('Vários blocos sem ligações. Ligue saída (● direito) → entrada (● esquerdo) para definir a ordem do fluxo.');
+        warnings.push('Vários blocos sem ligações. Ligue a saída do bloco ao ● de entrada (canto superior esquerdo do destino) para definir a ordem do fluxo.');
     }
 
     const indeg = {};
@@ -10200,10 +11693,10 @@ function flowValidateGraph() {
         const inC = indeg[n.id] || 0;
         const outC = outdeg[n.id] || 0;
         if (inC === 0 && !FLOW_LINT_ENTRY_TYPES.has(n.type)) {
-            addIssue(n.id, 'Bloco sem entrada — ligue um fio ao ● esquerdo (exceto gatilhos).');
+            addIssue(n.id, 'Bloco sem entrada — ligue um fio ao ● de entrada (canto superior esquerdo) (exceto gatilhos).');
         }
         if (outC === 0 && !FLOW_LINT_TERMINAL_TYPES.has(n.type)) {
-            addIssue(n.id, 'Bloco sem saída — ligue o ● direito ao próximo passo (exceto fim ou anotação).');
+            addIssue(n.id, 'Bloco sem saída — ligue o ● de saída (canto direito do bloco) ao próximo passo (exceto fim ou anotação).');
         }
     });
 
@@ -10247,6 +11740,20 @@ function flowValidateGraph() {
     return { alertCount, issuesByNode };
 }
 
+function flowEdgeToPersist(e) {
+    if (!e || typeof e !== 'object') return {};
+    const o = { id: e.id, from: e.from, to: e.to };
+    if (e.label != null && String(e.label).trim() !== '') o.label = e.label;
+    const d = flowEdgeControlDeltas(e);
+    if (d.dc1x || d.dc1y || d.dc2x || d.dc2y) {
+        o.dc1x = d.dc1x;
+        o.dc1y = d.dc1y;
+        o.dc2x = d.dc2x;
+        o.dc2y = d.dc2y;
+    }
+    return o;
+}
+
 function extractFlowGraphFromDom() {
     const nodes = [];
     document.querySelectorAll('#nodes-container .flow-node').forEach((el) => {
@@ -10268,14 +11775,7 @@ function extractFlowGraphFromDom() {
         });
         nodes.push({ id, type, label, x, y, config });
     });
-    const edges = Array.isArray(_flowEdges)
-        ? _flowEdges.map((e) => ({
-              id: e.id,
-              from: e.from,
-              to: e.to,
-              ...(e.label != null && String(e.label).trim() !== '' ? { label: e.label } : {}),
-          }))
-        : [];
+    const edges = Array.isArray(_flowEdges) ? _flowEdges.map((e) => flowEdgeToPersist(e)) : [];
     return { nodes, edges };
 }
 
@@ -10309,6 +11809,10 @@ function deserializeFlowCanvas(doc) {
             from: e.from,
             to: e.to,
             label: e.label != null ? String(e.label) : '',
+            dc1x: e.dc1x != null ? Number(e.dc1x) : 0,
+            dc1y: e.dc1y != null ? Number(e.dc1y) : 0,
+            dc2x: e.dc2x != null ? Number(e.dc2x) : 0,
+            dc2y: e.dc2y != null ? Number(e.dc2y) : 0,
         }));
     }
     if (doc.graph && Array.isArray(doc.graph.nodes)) {
@@ -14800,7 +16304,7 @@ let _flowPaletteDragType = null;
 
 function initDragAndDrop() {
     document.querySelectorAll('.flow-node-head').forEach((head) => {
-        head.setAttribute('title', 'Arrastar para mover · duplo clique para abrir o inspetor');
+        head.setAttribute('title', 'Clique para abrir configuração · arrastar para mover');
         if (head.getAttribute('data-flow-head-ui') !== '1') {
             head.setAttribute('data-flow-head-ui', '1');
             head.addEventListener('dblclick', function (e) {
@@ -14830,7 +16334,7 @@ function initDragAndDrop() {
     document.querySelectorAll('.flow-node-body').forEach((bodyEl) => {
         if (bodyEl.getAttribute('data-flow-preview-dbl') === '1') return;
         bodyEl.setAttribute('data-flow-preview-dbl', '1');
-        bodyEl.setAttribute('title', 'Pré-visualização · duplo clique para editar no inspetor');
+        bodyEl.setAttribute('title', 'Clique para configurar · pré-visualização do bloco');
         bodyEl.addEventListener('dblclick', function (e) {
             e.stopPropagation();
             e.preventDefault();
@@ -14840,6 +16344,7 @@ function initDragAndDrop() {
     flowEnsureNodeActionButtons();
     initFlowNodeSelection();
     initFlowEdgeSelection();
+    initFlowEdgeControlDrag();
     initFlowBuilderGlobalHandlers();
     initFlowPaletteDnD();
     wireFlowCanvasConnections();
@@ -14866,6 +16371,7 @@ function stopDrag() {
     const moved = _flowDragMoved;
     const nodeEl = draggedNode;
     if (nodeEl) nodeEl.classList.remove('flow-node--dragging');
+    if (moved) window._flowSkipOpenInspectorFromClick = true;
     if (nodeEl && moved) pushFlowHistory();
     draggedNode = null;
     _flowDragStart = null;
@@ -15131,7 +16637,7 @@ function flowDefaultConfigByType(type) {
     if (t === 'conteudo') {
         return {
             body: '',
-            contents: [{ type: 'text', value: '' }],
+            contents: [],
             content_media_kind: 'text',
             content_media_url: '',
             content_text: '',
@@ -15162,17 +16668,17 @@ function flowDefaultConfigByType(type) {
     }
     if (t === 'gpt') {
         return {
-            ai_model: 'gpt-4o',
+            ai_model: FLOW_DEFAULT_LLM_MODEL,
             ai_system_prompt: '',
             ai_temperature: 0.7,
             ai_output_var: 'resposta_ia',
             ai_memory: false,
-            model: 'gpt-4o',
+            model: FLOW_DEFAULT_LLM_MODEL,
             prompt: '',
             temperature: '0.7',
         };
     }
-    if (t === 'agente_ia') return { instructions: '', model: 'gpt-4o-mini', temperature: '0.5' };
+    if (t === 'agente_ia') return { instructions: '', model: FLOW_DEFAULT_LLM_MODEL, temperature: '0.5' };
     if (t === 'voice_studio') return { script: '', voice_profile: 'padrao' };
     if (t === 'anotacao') return { note: '' };
     return {};
@@ -15328,7 +16834,7 @@ function addSpecificNode(type, pos) {
         icon = 'fas fa-stop-circle';
         title = 'Fim';
     } else if (type === 'conteudo') {
-        icon = 'fas fa-window-maximize';
+        icon = 'fas fa-book-open';
         title = 'Conteúdo';
     } else if (type === 'pergunta') {
         icon = 'fas fa-question';
