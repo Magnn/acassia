@@ -1373,8 +1373,17 @@ class Engine:
             db.commit()
 
             # Encadeamento no mesmo webhook (senão o lead muda de nó na DB mas não recebe mensagens até o próximo envio dele).
+            # - 3_coleta_profunda: ao sair do Node 2 (novo padrão sem pergunta de confirmação no Node 2).
             # - 4_instagram: só ao sair do Node 3 (o próprio Node 4 também devolve prox=4_instagram — não repetir).
             # - 6_atencao_dinamica: só se a última fala não for pergunta (pausa natural antes da leitura longa).
+            if prox == "3_coleta_profunda" and current_id == "2_salvar_contato":
+                logger.info(
+                    "🔗 [ENGINE] Encadeando 3_coleta_profunda na mesma requisição (depth=%s) lead_id=%s",
+                    depth,
+                    lead.id,
+                )
+                current_id = prox
+                continue
             if prox == "4_instagram" and current_id == "3_coleta_profunda":
                 logger.info(
                     "🔗 [ENGINE] Encadeando 4_instagram na mesma requisição (depth=%s) lead_id=%s",
