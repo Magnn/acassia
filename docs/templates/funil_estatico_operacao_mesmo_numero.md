@@ -43,7 +43,26 @@ No template salvo:
 
 Copie a imagem para esse caminho no ambiente de deploy, ou ajuste para URL publica/CDN.
 
-## 5) Bloco 2 — audio PTT (gravado na hora)
+## 5) Testar o fluxo (sem WhatsApp)
+
+No repositorio:
+
+```bash
+python scripts/simulate_static_flow_template.py
+```
+
+Isso valida o JSON, imprime o trace do `simulate_flow` e lista as acoes geradas por `document_to_acoes` (texto, delay, imagem, audio). Nao envia mensagem.
+
+## 6) Testar ao vivo (API)
+
+1. Subir o app (`app.py`) com o mesmo tenant do lead.
+2. Importar o blueprint: `POST /api/flows/blueprints/import` com o corpo do JSON (ou colar no dashboard e salvar).
+3. Publicar o fluxo se o produto exigir blueprint publicado.
+4. `POST /api/flows/blueprints/<id>/execute` com `{"lead_id": N}` — enfileira as acoes na fila WhatsApp do motor.
+
+Variavel opcional: `FLOW_BLUEPRINT_MAX_DELAY_S` (padrao no executor: ate 900s) para delays longos entre blocos.
+
+## 7) Bloco 2 — audio PTT (gravado na hora)
 
 - Arquivo no repositorio: `assets/funil_estatico_meu_misterio/audio/bloco2_ptt.ogg`
 - Origem local copiada de: `WhatsApp Ptt 2026-03-04 at 14.23.16 (1).ogg` (Downloads)

@@ -98,6 +98,27 @@ def _abs_media_url_for_fetch(url: str) -> str:
         return base + u
     return u
 
+
+def _public_whatsapp_media_link(url: str) -> str:
+    """
+    URL pública para envio por link (image/audio/video) na API do WhatsApp.
+    Aceita https completo ou caminho relativo ao app (`assets/...` servido em /assets/).
+    """
+    u = (url or "").strip()
+    if not u:
+        return ""
+    low = u.lower()
+    if low.startswith("http://") or low.startswith("https://"):
+        return u
+    base = os.getenv("PUBLIC_URL", "http://127.0.0.1:5000").rstrip("/")
+    path = u.replace("\\", "/").lstrip("/")
+    if path.startswith("assets/"):
+        rel = path[len("assets/") :]
+    else:
+        rel = path
+    return f"{base}/assets/{rel}"
+
+
 MAX_RETRY          = 3
 CIRCUIT_THRESHOLD  = 5
 CIRCUIT_RESET_TIME = 60    # segundos
@@ -908,7 +929,7 @@ class Engine:
                                     pendentes_db = 0
 
                 elif acao.tipo == "audio":
-                    payload_url = acao.url or acao.conteudo
+                    payload_url = _public_whatsapp_media_link(acao.url or acao.conteudo or "")
                     if payload_url and self._enviar_com_retry(ctx.telefone, "audio", payload_url):
                         self._salvar_mensagem(db, lead_id, "bot", "[audio]", "audio", auto_commit=False)
                         enviados += 1
@@ -922,7 +943,7 @@ class Engine:
                         falhas += 1
 
                 else:
-                    payload_url = acao.url or acao.conteudo
+                    payload_url = _public_whatsapp_media_link(acao.url or acao.conteudo or "")
                     if acao.tipo in ("image", "video") and ultimo_tipo_enviado == "text":
                         time.sleep(random.uniform(1.4, 2.4))
                     if payload_url and self._enviar_com_retry(ctx.telefone, acao.tipo, payload_url):
