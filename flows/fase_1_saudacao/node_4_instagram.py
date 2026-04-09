@@ -188,6 +188,22 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     imagem_perfil_ig = str(config.get("imagem_perfil_instagram") or "").strip()
     desabafo_prompt = (_seg["desabafo_prompt"] or "esse peso que você trouxe").strip()
 
+    # ── NOVO PADRÃO NODE4 (espelho do node2) ──
+    # 1) Se já está confirmado que o lead viu/visitou o insta: não dispara nada e segue.
+    # 2) Se não está confirmado: envia insta em contexto afirmativo (sem pergunta) e segue.
+    if bool(meta.get("lead_declarou_visita_insta") or meta.get("insta_enviado")):
+        meta["insta_enviado"] = True
+        meta["node4_bypass_insta_confirmado"] = True
+        ctx.estado_coleta = "node4_bypass_para_node5"
+        ctx.metadata = meta
+        return [], "5_processa_leitura"
+    acoes_instagram = _acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig)
+    meta["insta_enviado"] = True
+    meta["node5_ignorar_ruido_um_turno"] = True
+    ctx.estado_coleta = "node4_envio_insta_sem_pergunta"
+    ctx.metadata = meta
+    return acoes_instagram, "5_processa_leitura"
+
     if lead_reportou_problema_entrega(texto_puro):
         acoes_reparo = [
             Acao(tipo="delay", segundos=random.randint(3, 5)),

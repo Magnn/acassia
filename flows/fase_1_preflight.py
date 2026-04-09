@@ -44,6 +44,18 @@ _RE_TEMPO = re.compile(
 )
 _RE_GATILHO = re.compile(r"(?i)\b(desde que|depois que|quando)\b")
 _RE_DESEJO = re.compile(r"(?i)\b(quero|gostaria|desejo|busco|sonho)\b")
+_RE_RUIDO_OPERACIONAL = re.compile(
+    r"(?i)\b(oi|ol[áa]|ok|pronto|vamos|sim|blz|beleza|"
+    r"salvei|salvar|contato|n[uú]mero|numero|"
+    r"instagram|insta|link|perfil|card|cart[aã]o|"
+    r"manda|mandei|enviei|foto|imagem)\b"
+)
+_RE_RELEVANCIA_LEITURA = re.compile(
+    r"(?i)\b(amor|relacion|ex|voltar|sofr|dor|ansiedade|medo|"
+    r"trai|fam[ií]lia|dinheiro|d[ií]vida|trabalho|"
+    r"quero|gostaria|sonho|preciso|desde que|depois que|h[aá]\s+\d+|"
+    r"\d+\s+(?:anos?|mes(?:es)?|semanas?|dias?))\b"
+)
 
 
 def concat_texto_usuario(ctx: Any, texto_atual: str) -> str:
@@ -147,6 +159,13 @@ def enriquecer_dados_node3_precoce(meta: Dict[str, Any], texto_full: str, lead_i
     if not texto:
         return
     low = texto.lower()
+    palavras = len(low.split())
+
+    # Evita poluir metadata com ruído operacional/confirmatório.
+    if palavras <= 5 and _RE_RUIDO_OPERACIONAL.search(low):
+        return
+    if not _RE_RELEVANCIA_LEITURA.search(low):
+        return
 
     if _RE_DESEJO.search(low) and not (meta.get("desejo_declarado") or "").strip():
         meta["desejo_declarado"] = texto[:900]

@@ -163,6 +163,15 @@ class TestEnriquecimentoPrecoceNode3(unittest.TestCase):
         self.assertEqual(meta.get("tempo_exato"), "6 meses")
         self.assertEqual(meta.get("evento_gatilho"), "desde que brigamos")
 
+    def test_nao_preenche_com_ruido_operacional_curto(self):
+        from flows.fase_1_preflight import enriquecer_dados_node3_precoce
+
+        meta: dict = {}
+        texto = "ok já salvei seu contato"
+        enriquecer_dados_node3_precoce(meta, texto, lead_id=13)
+        self.assertFalse((meta.get("desejo_declarado") or "").strip())
+        self.assertFalse((meta.get("aprofundamento_texto") or "").strip())
+
 
 if __name__ == "__main__":
     unittest.main()

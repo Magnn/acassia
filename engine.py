@@ -1392,6 +1392,14 @@ class Engine:
                 )
                 current_id = prox
                 continue
+            if prox == "5_processa_leitura" and current_id == "4_instagram":
+                logger.info(
+                    "🔗 [ENGINE] Encadeando 5_processa_leitura na mesma requisição (depth=%s) lead_id=%s",
+                    depth,
+                    lead.id,
+                )
+                current_id = prox
+                continue
             if prox != "6_atencao_dinamica":
                 break
             if self._ultima_fala_do_bot_e_pergunta(res or []):
