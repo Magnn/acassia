@@ -57,6 +57,30 @@ class TestAvanco(unittest.TestCase):
         self.assertEqual(lead.node_atual, "3_coleta_profunda")
         self.assertEqual(ctx.node_atual, "3_coleta_profunda")
 
+    def test_node2_nao_pula_antes_do_contrato_enviado(self):
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=12, node_atual="2_salvar_contato", nome="Bia")
+        ctx = SimpleNamespace(node_atual="2_salvar_contato")
+        meta: dict = {"nome_lead": "Bia", "node2_vcard_despachado": True}
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "2_salvar_contato")
+        self.assertEqual(ctx.node_atual, "2_salvar_contato")
+
+    def test_node2_pode_avancar_apos_contrato_enviado(self):
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=13, node_atual="2_salvar_contato", nome="Bia")
+        ctx = SimpleNamespace(node_atual="2_salvar_contato")
+        meta: dict = {
+            "nome_lead": "Bia",
+            "node2_vcard_despachado": True,
+            "node2_contrato_enviado": True,
+        }
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "3_coleta_profunda")
+        self.assertEqual(ctx.node_atual, "3_coleta_profunda")
+
     def test_avanca_para_primeiro_pendente(self):
         from flows.fase_1_preflight import resolver_avanco_node_fase1
 

@@ -380,12 +380,34 @@ def _executar_fast_track_para_coleta(
     return acoes, "3_coleta_profunda"
 
 
+def _acoes_vcard_sem_pergunta(numero_whatsapp: str) -> List[Acao]:
+    """
+    Novo padrão do Node 2:
+    envia card com contexto afirmativo (sem perguntar confirmação).
+    """
+    return [
+        Acao(tipo="delay", segundos=random.randint(5, 8)),
+        Acao(
+            tipo="text",
+            conteudo=(
+                "Perfeito, deixei meu cartão aqui embaixo para você conferir na agenda "
+                "e seguimos com calma na leitura."
+            ),
+        ),
+        Acao(tipo="delay", segundos=random.randint(4, 7)),
+        Acao(tipo="vcard", conteudo=numero_whatsapp),
+    ]
+
+
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     """Executa o nó de salvamento de contato."""
     t0_node = time.time()
     meta = getattr(ctx, "metadata", {}) or {}
     if not ctx.metadata:
         ctx.metadata = meta
+    # Regra de ouro (fase 1): marca que o Node 2 executou ao menos uma vez
+    # para permitir avanços automáticos subsequentes do preflight sem pular o contrato.
+    meta["node2_contrato_enviado"] = True
 
     msg_lead = str(ctx.texto_recebido or "").strip()
     msg_lower = msg_lead.lower()
@@ -458,8 +480,26 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     numero_whatsapp = config.get("numero_whatsapp") or "+55 92 8497-9419"
 
     blob_sessao = blob_sessao_usuario(ctx, msg_lead)
-    if meta.get("lead_contato_salvo_declarado") or texto_indica_contato_salvo(blob_sessao):
+    contato_salvo_confirmado = bool(
+        meta.get("lead_contato_salvo_declarado") or texto_indica_contato_salvo(blob_sessao)
+    )
+    if contato_salvo_confirmado:
         meta["lead_contato_salvo_declarado"] = True
+
+    # ── NOVO PADRÃO NODE2 (sem pergunta "salvou?") ──
+    # 1) Se já confirmou contato salvo: não dispara textos no node2, vai direto ao node3.
+    # 2) Se não confirmou: envia vcard em contexto afirmativo e segue ao node3.
+    if contato_salvo_confirmado:
+        meta["node2_contato_ja_reconhecido"] = True
+        ctx.estado_coleta = "node2_bypass_contato_confirmado"
+        ctx.metadata = meta
+        return [], "3_coleta_profunda"
+    acoes_padrao = _acoes_vcard_sem_pergunta(numero_whatsapp)
+    meta["node2_vcard_despachado"] = True
+    ctx.estado_coleta = "node2_vcard_sem_pergunta"
+    ctx.metadata = meta
+    return _normalizar_acoes_texto_node2(acoes_padrao), "3_coleta_profunda"
+
     # Se o lead já chegou completo na fase 1, não precisa repetir nada no node2.
     nome_ok = nome_util_para_checklist_fase1(str(meta.get("nome_lead") or ctx.nome_lead or ""))
     if (
