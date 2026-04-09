@@ -103,6 +103,22 @@ def _assinar_semantica_curta(texto: str) -> str:
     return " ".join(toks[:8])
 
 
+def _sanear_citacoes_abertas(texto: str) -> str:
+    """
+    Evita balão com citação aberta (aspas sem fechamento), que passa sensação de mensagem truncada.
+    """
+    t = " ".join((texto or "").split()).strip()
+    if not t:
+        return ""
+    if t.count("'") % 2 != 0:
+        t = t.replace("'", "")
+    if t.count('"') % 2 != 0:
+        t = t.replace('"', "")
+    if (t.count("“") + t.count("”")) % 2 != 0:
+        t = t.replace("“", "").replace("”", "")
+    return t.strip()
+
+
 def _aplicar_framework_fechamento(blocos: list[str], nome_fmt: str) -> list[str]:
     base = [str(b or "").strip() for b in (blocos or []) if str(b or "").strip()]
     q1_opcoes = [
@@ -335,6 +351,7 @@ def executar_v2(ctx) -> tuple:
         conteudo_str = re.sub(r'\[.*?\]', '', str(conteudo_raw).strip())
         conteudo_str = re.sub(r'[-–—*•]+', '', conteudo_str).strip()
         conteudo_str = limpar_colagem_primeira_msg_whatsapp_em_texto(conteudo_str)
+        conteudo_str = _sanear_citacoes_abertas(conteudo_str)
         conteudo_str = normalizar_enxerto_dor_sem_contexto(conteudo_str)
         conteudo_str = remover_marcadores_bloco_ia_vazados(conteudo_str)
         conteudo_str = unificar_vocativos_por_genero(conteudo_str, genero, nome_fmt)

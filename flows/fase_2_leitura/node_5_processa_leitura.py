@@ -73,6 +73,18 @@ _RE_FEEDBACK_EXPERIENCIA = re.compile(
     r"(?i)(transi[cç][aã]o|humaniz|humani[sz]|rob[oô]|mais\s+natural|"
     r"soou\s+(?:a\s+)?sper|ficou\s+(?:meio\s+)?(?:frio|seco))"
 )
+_RE_RUIDO_CONTEXTO_IRRELEVANTE = re.compile(
+    r"(?i)\b(bom\s+dia|boa\s+tarde|boa\s+noite|tudo\s+bem|"
+    r"consulta\s+[ée]\s+paga|consulta\s+e\s+paga|quanto\s+custa|pre[cç]o|valor|pix|"
+    r"salvei|salvar|contato|n[uú]mero|numero|card|cart[aã]o|"
+    r"instagram|insta|link|perfil)\b"
+)
+_RE_SINAL_RELEVANTE_LEITURA = re.compile(
+    r"(?i)\b(amor|ex|voltar|relacion|sofr|dor|ansiedade|medo|trai|"
+    r"fam[ií]lia|dinheiro|d[ií]vida|trabalho|paz|respeito|"
+    r"quero|gostaria|preciso|há\s+\d+|ha\s+\d+|desde\s+que|depois\s+que|"
+    r"\d+\s+(?:anos?|mes(?:es)?|semanas?|dias?))\b"
+)
 
 # ── PROMPTS DE IA ──
 _SYSTEM_PROFILER = """Você é o analista silencioso que prepara a leitura para Esmeralda Ácassia (Cigana Esmeralda), quiromancia no WhatsApp.
@@ -231,12 +243,27 @@ def _normalizar_fragmento_ctx(s: str) -> str:
     return t
 
 
+def _fragmento_relevante_para_leitura(s: str) -> bool:
+    t = " ".join((s or "").split()).strip()
+    if not t:
+        return False
+    # Ruído curto típico de operação/saudação/preço não entra na personalização.
+    if len(t.split()) <= 14 and _RE_RUIDO_CONTEXTO_IRRELEVANTE.search(t):
+        return False
+    # Sem sinal de leitura, não poluir prompt.
+    if not _RE_SINAL_RELEVANTE_LEITURA.search(t):
+        return False
+    return True
+
+
 def _montar_texto_contexto_node5(desabafo_pre: str, contexto_extra: str, msg_lead: str) -> str:
     partes: List[str] = []
     vistos: set[str] = set()
     for raw in (desabafo_pre, contexto_extra, msg_lead):
         t = _normalizar_fragmento_ctx(str(raw or ""))
         if not t:
+            continue
+        if not _fragmento_relevante_para_leitura(t):
             continue
         k = re.sub(r"\s+", " ", t.lower()).strip(" .!?…")
         if k in vistos:

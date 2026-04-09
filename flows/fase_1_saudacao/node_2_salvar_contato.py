@@ -496,6 +496,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         return [], "3_coleta_profunda"
     acoes_padrao = _acoes_vcard_sem_pergunta(numero_whatsapp)
     meta["node2_vcard_despachado"] = True
+    meta["node2_contexto_card_enviado"] = True
     ctx.estado_coleta = "node2_vcard_sem_pergunta"
     ctx.metadata = meta
     return _normalizar_acoes_texto_node2(acoes_padrao), "3_coleta_profunda"

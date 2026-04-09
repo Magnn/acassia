@@ -772,15 +772,8 @@ def _montar_baloes_contrato_node1(
     if nome_eh_placeholder(nome):
         baloes.append("Pra iniciarmos com calma, me diz como você se chama?")
     else:
-        baloes.append(
-            _fallback_d_confirmacao(
-                nome,
-                msg_raw,
-                msg_lead,
-                metadata,
-                ja_mencionou_vaga_no_turno=True,
-            )
-        )
+        # Fechamento fixo do contrato (sem repetir nome no último balão).
+        baloes.append("podemos iniciar?")
     out = _sanear_baloes_saida_node1(baloes)
     out = _aplicar_cap_hierarquico_node1(out, nome)
     return _deduplicar_baloes_node1(out)[:_MAX_BALOES_NODE1]
@@ -860,13 +853,7 @@ def _garantir_fechamento_checklist_node1(
         convites = ("podemos iniciar", "posso seguir", "posso continuar", "próximo passo", "proximo passo")
         joined = " ".join(out).lower()
         if not any(c in joined for c in convites):
-            convite = _fallback_d_confirmacao(
-                nome,
-                msg_raw,
-                msg_lead,
-                metadata,
-                ja_mencionou_vaga_no_turno=_ja_mencionou_vaga_ou_consulta(joined),
-            )
+            convite = "podemos iniciar?"
             if len(out) >= _MAX_BALOES_NODE1:
                 out[-1] = convite
             else:

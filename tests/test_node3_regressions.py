@@ -69,6 +69,21 @@ class TestNode3Regressoes(unittest.TestCase):
         self.assertIn("deixei meu cartão", textos[0].lower())
         self.assertNotIn("salvou meu contato", textos[0].lower())
 
+    def test_abertura_node3_nao_repete_contexto_card_quando_ja_falado_no_node2(self):
+        ctx = _ctx(
+            "estou sofrendo muito",
+            meta_extra={
+                "foto_recebida": True,
+                "desabafo_recebido": True,
+                "node2_vcard_despachado": True,
+                "node2_contexto_card_enviado": True,
+            },
+        )
+        acoes, _prox = node_3_coleta_profunda.executar_v2(ctx)
+        textos = _textos(acoes)
+        self.assertTrue(textos)
+        self.assertNotIn("deixei meu cartão", textos[0].lower())
+
 
 if __name__ == "__main__":
     unittest.main()

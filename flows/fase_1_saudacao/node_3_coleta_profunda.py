@@ -727,9 +727,14 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         if meta.get("node2_contato_ja_reconhecido"):
             primeiro_balao = f"{nome_fmt}, que bom te ver aqui comigo. ✨"
         elif meta.get("node2_vcard_despachado"):
-            # Node2 novo padrão pode enviar card sem confirmação explícita.
-            # Aqui não afirmamos "você salvou" para não gerar incoerência.
-            primeiro_balao = f"{nome_fmt}, deixei meu cartão aqui no chat. Seguimos com calma. ✨"
+            # Se o Node2 já verbalizou o contexto do cartão no turno imediatamente anterior,
+            # não repetir a mesma âncora para evitar sensação de eco.
+            if meta.get("node2_contexto_card_enviado"):
+                primeiro_balao = f"{nome_fmt}, seguimos com calma daqui. ✨"
+            else:
+                # Node2 novo padrão pode enviar card sem confirmação explícita.
+                # Aqui não afirmamos "você salvou" para não gerar incoerência.
+                primeiro_balao = f"{nome_fmt}, deixei meu cartão aqui no chat. Seguimos com calma. ✨"
         else:
             primeiro_balao = f"Que bom que você salvou meu contato, {nome_fmt}. ✨"
         acoes_iniciais.extend(
