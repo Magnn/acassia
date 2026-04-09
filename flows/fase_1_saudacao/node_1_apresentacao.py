@@ -940,6 +940,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     ctx.estado_coleta = "node1_recepcao_contrato"
     ctx.metadata["node1_baloes_enviados"] = int(len(textos_node1))
     ctx.metadata["node1_modo_abertura_usado"] = modo_usado
+    ctx.metadata["node1_contrato_enviado"] = True
     if _pode_ir_direto_coleta_sem_node2(ctx, nome, blob_ctx):
         ctx.metadata["node1_pulou_para_coleta"] = True
         ctx.metadata["node2_contato_ja_reconhecido"] = True

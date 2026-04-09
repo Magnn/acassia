@@ -176,6 +176,10 @@ def resolver_avanco_node_fase1(lead: Any, ctx: Any, meta: Dict[str, Any]) -> Non
     cur = (getattr(lead, "node_atual", "") or "").strip()
     if cur not in FASE1_ORDEM:
         return
+    # Regra de ouro: node1 precisa executar ao menos uma vez antes de qualquer avanço automático.
+    # Evita pular saudação/apresentação/vaga/pergunta de nome quando o sniffer já trouxe nome no primeiro batch.
+    if cur == "1_apresentacao" and not bool(meta.get("node1_contrato_enviado")):
+        return
     ideal = primeiro_node_pendente_fase1(meta, lead)
     i_cur, i_ideal = idx_fase1_ordem(cur), idx_fase1_ordem(ideal)
     if i_ideal < 0 or i_cur < 0:

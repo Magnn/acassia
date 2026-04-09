@@ -33,12 +33,40 @@ class TestChecklist(unittest.TestCase):
 
 
 class TestAvanco(unittest.TestCase):
+    def test_node1_nao_pula_antes_do_contrato_enviado(self):
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=10, node_atual="1_apresentacao", nome="Bia")
+        ctx = SimpleNamespace(node_atual="1_apresentacao")
+        meta: dict = {"nome_lead": "Bia", "node2_vcard_despachado": True}
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "1_apresentacao")
+        self.assertEqual(ctx.node_atual, "1_apresentacao")
+
+    def test_node1_pode_avancar_apos_contrato_enviado(self):
+        from flows.fase_1_preflight import resolver_avanco_node_fase1
+
+        lead = SimpleNamespace(id=11, node_atual="1_apresentacao", nome="Bia")
+        ctx = SimpleNamespace(node_atual="1_apresentacao")
+        meta: dict = {
+            "nome_lead": "Bia",
+            "node2_vcard_despachado": True,
+            "node1_contrato_enviado": True,
+        }
+        resolver_avanco_node_fase1(lead, ctx, meta)
+        self.assertEqual(lead.node_atual, "3_coleta_profunda")
+        self.assertEqual(ctx.node_atual, "3_coleta_profunda")
+
     def test_avanca_para_primeiro_pendente(self):
         from flows.fase_1_preflight import resolver_avanco_node_fase1
 
         lead = SimpleNamespace(id=7, node_atual="1_apresentacao", nome="Bia")
         ctx = SimpleNamespace(node_atual="1_apresentacao")
-        meta: dict = {"nome_lead": "Bia", "node2_vcard_despachado": True}
+        meta: dict = {
+            "nome_lead": "Bia",
+            "node2_vcard_despachado": True,
+            "node1_contrato_enviado": True,
+        }
         resolver_avanco_node_fase1(lead, ctx, meta)
         self.assertEqual(lead.node_atual, "3_coleta_profunda")
         self.assertEqual(ctx.node_atual, "3_coleta_profunda")
