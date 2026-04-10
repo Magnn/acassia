@@ -323,7 +323,7 @@ def url_audio_b5(cfg: dict) -> str:
 
 
 def url_link_pagamento_b5(cfg: dict) -> str:
-    u = (cfg.get("link_pagamento_b5") or cfg.get("link_pagamento") or "").strip()
+    u = (cfg.get("link_pagamento_b5") or "").strip()
     if u.startswith("http"):
         return u.rstrip("/")
     return B5_LINK_PAGAMENTO_DEFAULT

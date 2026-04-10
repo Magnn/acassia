@@ -266,6 +266,8 @@ def carregar() -> dict:
         "audio_bloco4_d1": (_obter_limpo("CLIENTE_AUDIO_BLOCO4_D1", None, "") or "").strip(),
         "audio_bloco4_d2": (_obter_limpo("CLIENTE_AUDIO_BLOCO4_D2", None, "") or "").strip(),
         "audio_bloco4_d3": (_obter_limpo("CLIENTE_AUDIO_BLOCO4_D3", None, "") or "").strip(),
+        "audio_bloco5_url": (_obter_limpo("CLIENTE_AUDIO_BLOCO5_URL", None, "") or "").strip(),
+        "link_pagamento_b5": (_obter_limpo("LINK_PAGAMENTO_B5", "CLIENTE_LINK_PAGAMENTO_B5", "") or "").strip(),
         # Indicadores typing na API Cloud (muitas contas devolvem #100 — default desligado)
         "whatsapp_typing_enabled": (
             _obter_limpo("WHATSAPP_TYPING_ENABLED", None, "0").lower() in ("1", "true", "yes", "sim")
