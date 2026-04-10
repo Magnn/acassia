@@ -138,6 +138,25 @@ B4_TEXTO_PERGUNTA_FINAL = (
 META_B4_PHASE = "static_mm_b4_phase"
 META_B4_SEQ = "static_mm_b4_seq_dispatched"
 
+# ── Bloco 5 ─────────────────────────────────────────────────────────────────
+B5_DELAY_PRE_AUDIO_S = 45
+B5_DELAY_APOS_AUDIO_S = 14
+B5_DELAY_APOS_TEXTO_INTRO_S = 12
+B5_DELAY_APOS_LINK_S = 26
+B5_DELAY_APOS_TEXTO_DETALHE_S = 16
+B5_DELAY_ANTES_B6_S = 15
+
+B5_AUDIO_DEFAULT = "https://meumisterio.com/assets/funil_estatico_meu_misterio/audio/bloco5.ogg"
+B5_LINK_PAGAMENTO_DEFAULT = "https://pay.cakto.com.br/37fuusy"
+
+B5_TEXTO_INTRO_PAGAMENTO = """Irei te enviar o link de pagamento do Nosso Fornecedor, ok
+aperta no link e escolhe opção de pix ou cartão👇👇👇"""
+
+B5_TEXTO_PERGUNTA_GARANTIA = "Quer saber qual será a Garantia que você irá ter?"
+
+META_B5_PHASE = "static_mm_b5_phase"
+META_B5_SEQ = "static_mm_b5_seq_dispatched"
+
 
 def cfg(ctx) -> dict:
     return (getattr(ctx, "metadata", None) or {}).get("__config__") or {}
@@ -287,6 +306,102 @@ def montar_acoes_bloco4(cfg: dict) -> List[Acao]:
             B4_TEXTO_PERGUNTA_FINAL,
             source="static_meumisterio_b4",
             kind="pergunta_continuidade_leitura",
+        )
+    )
+    return acoes
+
+
+def url_audio_b5(cfg: dict) -> str:
+    u = (cfg.get("audio_bloco5_url") or "").strip()
+    if u.startswith("http"):
+        return u
+    base = (cfg.get("public_url") or "").strip().rstrip("/")
+    rel = "assets/funil_estatico_meu_misterio/audio/bloco5.ogg"
+    if base.startswith("http"):
+        return f"{base}/{rel}"
+    return B5_AUDIO_DEFAULT
+
+
+def url_link_pagamento_b5(cfg: dict) -> str:
+    u = (cfg.get("link_pagamento_b5") or cfg.get("link_pagamento") or "").strip()
+    if u.startswith("http"):
+        return u.rstrip("/")
+    return B5_LINK_PAGAMENTO_DEFAULT
+
+
+def texto_detalhe_pagamento_b5(cfg: dict) -> str:
+    lk = url_link_pagamento_b5(cfg)
+    return (
+        "Aqui está o link de pagamento com seu desconto exclusivo de hoje:\n"
+        "Está em nome Cackto Pay LTD no valor de 100 reais\n\n"
+        "⚠️ Ele é válido apenas HOJE, pois as vagas com esse valor são limitadas:\n\n"
+        f"👉 {lk}\n"
+        "✅ Clica no link e gera seu pix ou cartão.\n"
+        "➖➖➖➖➖➖➖➖\n"
+        "✅ Plataforma de pagamento segura e confiável\n"
+        "✅ Pode ser pix ou cartão\n"
+        "✅ Acesso imediato após a compra\n"
+        "➖➖➖➖➖➖➖➖"
+    )
+
+
+def montar_acoes_bloco5(cfg: dict) -> List[Acao]:
+    typing_on = bool(cfg.get("whatsapp_typing_enabled"))
+    au = url_audio_b5(cfg)
+    acoes: List[Acao] = [Acao(tipo="delay", segundos=B5_DELAY_PRE_AUDIO_S)]
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("audio", source="static_meumisterio_b5", kind="typing_pre_audio"))
+    if au:
+        acoes.append(
+            Acao(
+                tipo="audio",
+                url=au,
+                conteudo=au,
+                metadata={
+                    "source": "static_meumisterio_b5",
+                    "kind": "ptt_bloco5",
+                    "whatsapp_voice": True,
+                },
+            )
+        )
+    acoes.append(Acao(tipo="delay", segundos=B5_DELAY_APOS_AUDIO_S))
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("text", source="static_meumisterio_b5", kind="typing_pos_audio"))
+    acoes.append(
+        acao_texto_copy_exata(
+            B5_TEXTO_INTRO_PAGAMENTO,
+            source="static_meumisterio_b5",
+            kind="intro_link_fornecedor",
+        )
+    )
+    acoes.append(Acao(tipo="delay", segundos=B5_DELAY_APOS_TEXTO_INTRO_S))
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("text", source="static_meumisterio_b5", kind="typing_pre_link"))
+    acoes.append(
+        acao_texto_copy_exata(
+            url_link_pagamento_b5(cfg),
+            source="static_meumisterio_b5",
+            kind="link_pagamento_cakto",
+        )
+    )
+    acoes.append(Acao(tipo="delay", segundos=B5_DELAY_APOS_LINK_S))
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("text", source="static_meumisterio_b5", kind="typing_pre_detalhe"))
+    acoes.append(
+        acao_texto_copy_exata(
+            texto_detalhe_pagamento_b5(cfg),
+            source="static_meumisterio_b5",
+            kind="detalhe_pagamento_desconto",
+        )
+    )
+    acoes.append(Acao(tipo="delay", segundos=B5_DELAY_APOS_TEXTO_DETALHE_S))
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("text", source="static_meumisterio_b5", kind="typing_pre_garantia"))
+    acoes.append(
+        acao_texto_copy_exata(
+            B5_TEXTO_PERGUNTA_GARANTIA,
+            source="static_meumisterio_b5",
+            kind="pergunta_garantia",
         )
     )
     return acoes
