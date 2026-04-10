@@ -1,0 +1,7 @@
+Coloque aqui os ficheiros de áudio do funil estático Meu Mistério.
+
+Ordem de uso no Bloco 2 (roteiro.py → AUDIO_B2_PRIORIDADE):
+  1) bloco2_interpretacao_ptt.ogg  (o teu PTT exportado do WhatsApp — renomeia para este nome)
+  2) bloco2_ptt.ogg                (fallback se o anterior não existir)
+
+O servidor precisa de PUBLIC_URL=https://... para a API WhatsApp fazer GET ao ficheiro.
