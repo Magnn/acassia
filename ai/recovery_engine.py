@@ -264,6 +264,8 @@ class RecoveryEngine:
     def _avaliar_lead(self, db, lead: Lead, agora: datetime, sinais: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """Avalia se o lead está elegível para uma nova recuperação."""
         sinais = sinais or {}
+        if (lead.node_atual or "").startswith("static_meumisterio_"):
+            return None
         etapa_atual = lead.recovery_stage or 0
         if etapa_atual >= len(SEQUENCIA_RECOVERY):
             return None

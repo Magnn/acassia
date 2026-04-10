@@ -248,6 +248,7 @@ def carregar() -> dict:
         # Legado: micro-espera (ainda usada só se inbox_silence_seconds=0 em alguns fluxos internos).
         "inbox_coalesce_seconds": max(1, min(_int_seguro("INBOX_COALESCE_SECONDS", 3), 12)),
         # Sem silêncio do lead por N segundos, não dispara o motor (lê o lote completo antes).
+        # Funil estático: controla a espera após a última mensagem antes de avançar (ex.: B3→B4).
         "inbox_silence_seconds": max(0, min(_int_seguro("INBOX_SILENCE_SECONDS", 18), 120)),
         # Após o lote principal: espera extra só para texto longo (imagem costuma chegar em webhook separado).
         "inbox_after_text_grace_seconds": max(0, min(_int_seguro("INBOX_AFTER_TEXT_GRACE_SECONDS", 20), 60)),
@@ -257,6 +258,23 @@ def carregar() -> dict:
             2.0,
             min(_float_seguro("NODE_EXEC_SLA_WARN_SECONDS", 6.0), 60.0),
         ),
+        # URL pública do app (https) — mídias em /assets/... para WhatsApp Cloud API
+        "public_url": (_obter_limpo("PUBLIC_URL", None, "") or "").strip().rstrip("/"),
+        # Funil estático B3: URL completa do .ogg (opcional; senão usa PUBLIC_URL + path do roteiro)
+        "audio_bloco3_url": (_obter_limpo("CLIENTE_AUDIO_BLOCO3_URL", None, "") or "").strip(),
+        "audio_bloco4_principal": (_obter_limpo("CLIENTE_AUDIO_BLOCO4", "CLIENTE_AUDIO_BLOCO4_PRINCIPAL", "") or "").strip(),
+        "audio_bloco4_d1": (_obter_limpo("CLIENTE_AUDIO_BLOCO4_D1", None, "") or "").strip(),
+        "audio_bloco4_d2": (_obter_limpo("CLIENTE_AUDIO_BLOCO4_D2", None, "") or "").strip(),
+        "audio_bloco4_d3": (_obter_limpo("CLIENTE_AUDIO_BLOCO4_D3", None, "") or "").strip(),
+        "audio_bloco5_url": (_obter_limpo("CLIENTE_AUDIO_BLOCO5_URL", None, "") or "").strip(),
+        "link_pagamento_b5": (_obter_limpo("LINK_PAGAMENTO_B5", "CLIENTE_LINK_PAGAMENTO_B5", "") or "").strip(),
+        # Indicadores typing na API Cloud (muitas contas devolvem #100 — default desligado)
+        "whatsapp_typing_enabled": (
+            _obter_limpo("WHATSAPP_TYPING_ENABLED", None, "0").lower() in ("1", "true", "yes", "sim")
+        ),
+        # Novo lead: "1_apresentacao" (padrão Cigana) ou "static_meumisterio_b1" (funil estático Meu Mistério)
+        "funil_entrada_inicial": (_obter_limpo("FUNIL_ENTRADA_INICIAL", None, "") or "").strip(),
+
         # Identidade
         "numero_whatsapp": _obter_limpo("CLIENTE_NUMERO_WHATSAPP", None, "+55 92 8497-9419"),
 
@@ -331,6 +349,18 @@ def carregar() -> dict:
         },
     }
 
+    # Funil estático Meu Mistério no mesmo número WABA: novos leads entram em static_meumisterio_b1
+    # e o motor não chama NLU/Gemini nos nodes (personalizer=None). Desligue com FUNIL_ESTATICO_ATIVO=0.
+    _fe_raw = (_obter_limpo("FUNIL_ESTATICO_ATIVO", None, "") or "").strip().lower()
+    _funil_estatico_ativo = _fe_raw in ("1", "true", "yes", "sim", "on")
+    if _funil_estatico_ativo:
+        config["funil_estatico_meu_misterio_ativo"] = True
+        config["ia_motor_desligada"] = True
+        config["funil_entrada_inicial"] = "static_meumisterio_b1"
+    else:
+        config["funil_estatico_meu_misterio_ativo"] = False
+        config["ia_motor_desligada"] = False
+
     # ── LOGGING IMPERIAL DE BOOT ──
     _chk_ok = "[LINK" not in config["link_pagamento"]
     _ig_ok = bool((config.get("link_prova_social") or "").strip())
@@ -360,6 +390,11 @@ def carregar() -> dict:
         "ok" if config["cakto"]["offer_id"] else "vazio",
         "ok" if config["cakto"]["offer_slug"] else "vazio",
     )
+    if config.get("funil_estatico_meu_misterio_ativo"):
+        logger.info(
+            "🧭 [CONFIG] FUNIL_ESTATICO_ATIVO=1 — novos leads → static_meumisterio_b1; "
+            "NLU/personalizer do motor desligados. Volte ao funil IA com FUNIL_ESTATICO_ATIVO=0 e reinicie o processo."
+        )
 
     if not config["imagem_altar"]:
         logger.debug("CLIENTE_IMAGEM_ALTAR ausente — altar sem imagem (opcional).")
