@@ -711,13 +711,19 @@ class Engine:
             lead = self._obter_ou_criar_lead(db, telefone)
             node_antes = lead.node_atual
             lead.convertido = True
-            lead.node_atual = "14_confirmacao_entrega"
+            _na_prev = str(node_antes or "")
+            target_entrega = (
+                "static_meumisterio_b7"
+                if _na_prev.startswith("static_meumisterio_")
+                else "14_confirmacao_entrega"
+            )
+            lead.node_atual = target_entrega
             try:
                 registrar_node_transition(
                     db,
                     lead.id,
                     node_antes,
-                    "14_confirmacao_entrega",
+                    target_entrega,
                     intencao=None,
                     sentimento=None,
                     tipo_mensagem="system",
@@ -729,7 +735,7 @@ class Engine:
             db.commit()
 
             ctx = ContextoConversa(
-                lead_id=lead.id, telefone=telefone, node_atual="14_confirmacao_entrega",
+                lead_id=lead.id, telefone=telefone, node_atual=target_entrega,
                 historico=[], texto_recebido="SISTEMA_WEBHOOK", tipo_mensagem="system", 
                 interactive_reply_id=None, nome_lead=(getattr(lead, "nome", "") or ""), personalizer=self.personalizer
             )
@@ -747,7 +753,7 @@ class Engine:
             except Exception:
                 pass
             self._restaurar_memoria(lead, ctx)
-            acoes = self._executar_node("14_confirmacao_entrega", ctx, db, lead)
+            acoes = self._executar_node(target_entrega, ctx, db, lead)
             self._processar_fila(lead.id, ctx, acoes)
         finally:
             db.close()
@@ -1193,6 +1199,7 @@ class Engine:
             "aguardando_dados_altar",
             "fluxo_encerrado",
             "14_confirmacao_entrega",
+            "static_meumisterio_b7",
         }
     )
     _META_KEYS_EXCLUIR_PERSISTENCIA = frozenset(
@@ -1227,6 +1234,10 @@ class Engine:
         if n == "14_confirmacao_entrega":
             return (
                 "Recebi sua mensagem. Se for sobre a entrega ou o material, me conta com calma que eu alinho por aqui. 🔮"
+            )
+        if n == "static_meumisterio_b7":
+            return (
+                "Recebi sua mensagem. Se forem nomes, fotos ou dúvidas sobre o trabalho, pode mandar com calma que eu vejo por aqui. 🔮"
             )
         # fluxo_encerrado
         return (

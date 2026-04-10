@@ -1,4 +1,4 @@
-"""Bloco 6 — fecho do funil estático Meu Mistério (ver `roteiro.py`)."""
+"""Bloco 7 — pós-pagamento aprovado (Cakto); ver `roteiro.py`."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     meta = getattr(ctx, "metadata", None) or {}
-    if meta.get(R.META_B6_SEQ):
-        return [], "static_meumisterio_b6"
+    if meta.get(R.META_B7_SEQ):
+        return [], "static_meumisterio_b7"
 
-    meta[R.META_B6_SEQ] = True
-    return R.montar_acoes_bloco6(R.cfg(ctx)), "static_meumisterio_b6"
+    meta[R.META_B7_SEQ] = True
+    return R.montar_acoes_bloco7(R.cfg(ctx)), "static_meumisterio_b7"

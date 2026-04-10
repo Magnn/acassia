@@ -61,7 +61,7 @@ from analytics.personalizacao_audit import auditar_personalizacao
 # ── MOTOR DE PROCESSAMENTO E IA ──────────────────────────────────────
 from engine import Engine
 from personalizer import Personalizer
-from config_cliente import CONFIG_CLIENTE
+from config_cliente import CONFIG_CLIENTE, cakto_webhook_deve_iniciar_pos_venda
 from schema import Acao
 
 # ── CONFIGURAÇÃO DE LOGGING ESTRUTURADO ───────────────────────────────
@@ -3325,6 +3325,7 @@ def webhook_cakto():
     if not lead:
         lead = db.query(models.Lead).filter_by(telefone=f"+55{telefone}", tenant_id=_tid).first()
 
+    node_para_gate = None
     if lead:
         pedido_ref = (
             str(data.get("id") or "")
@@ -3355,14 +3356,27 @@ def webhook_cakto():
             lead.convertido = True
             if produto:
                 lead.produto_comprado = produto[:200]
+        node_para_gate = str(lead.node_atual or "")
         db.commit()
     db.close()
 
     # ── CENÁRIO A: Venda Aprovada ──────────
     if status in ["paid", "approved", "completed"]:
-        logger.info(f"💰 [CAKTO] Venda Aprovada para {telefone}. Iniciando Entrega.")
+        logger.info(f"💰 [CAKTO] Venda aprovada para {telefone}.")
         _emit_meta_event("Purchase", telefone, value=float((data.get("order") or {}).get("amount") or 0.0))
-        threading.Thread(target=motor.iniciar_fluxo_post_venda, args=(telefone,)).start()
+        _cakto = CONFIG_CLIENTE.get("cakto") or {}
+        if cakto_webhook_deve_iniciar_pos_venda(node_para_gate, _cakto):
+            logger.info("💰 [CAKTO] Disparando pós-venda (motor) para %s node_atual=%s", telefone, node_para_gate)
+            threading.Thread(target=motor.iniciar_fluxo_post_venda, args=(telefone,)).start()
+        else:
+            logger.info(
+                "event=cakto_pos_venda_motor_skipped telefone=%s node_atual=%s "
+                "webhook_dispara_pos_venda_ia=%s webhook_dispara_pos_venda_funil_estatico=%s",
+                telefone,
+                node_para_gate,
+                _cakto.get("webhook_dispara_pos_venda_ia"),
+                _cakto.get("webhook_dispara_pos_venda_funil_estatico"),
+            )
 
     # ── CENÁRIO B: Abandono de Checkout ──────────
     elif status in ["abandoned", "checkout_abandoned"]:

@@ -157,6 +157,76 @@ B5_TEXTO_PERGUNTA_GARANTIA = "Quer saber qual será a Garantia que você irá te
 META_B5_PHASE = "static_mm_b5_phase"
 META_B5_SEQ = "static_mm_b5_seq_dispatched"
 
+# ── Bloco 6 (FIM do funil estático) ───────────────────────────────────────────
+B6_DELAY_PRE_TEXTO_S = 36
+B6_DELAY_APOS_TEXTO_GARANTIA_S = 26
+B6_DELAY_APOS_AUDIO_A_S = 22
+B6_DELAY_APOS_AUDIO_B_S = 26
+B6_DELAY_APOS_AUDIO_C_S = 24
+B6_DELAY_APOS_AUDIO_D_S = 22
+
+_B6_BASE = "https://meumisterio.com/assets/funil_estatico_meu_misterio/audio"
+B6_AUDIO_A_DEFAULT = f"{_B6_BASE}/bloco6_a.ogg"
+B6_AUDIO_B_DEFAULT = f"{_B6_BASE}/bloco6_b.ogg"
+B6_AUDIO_C_DEFAULT = f"{_B6_BASE}/bloco6_c.ogg"
+B6_AUDIO_D_DEFAULT = f"{_B6_BASE}/bloco6_d.ogg"
+
+B6_TEXTO_GARANTIA = (
+    "💬Minha garantia é que eu vou te 👀acompanhar durante todo processo do trabalho, meu anjo😉, "
+    "sei que está sendo difícil pra você confiar em trabalhos espirituais hoje em dia devido ao "
+    "aumento de golpes na internet, por esse motivo eu deixei o valor bem abaixo do valor normal, "
+    "tenho certeza que você vai ✨😊amar o trabalho que vamos fazer por você.💖"
+)
+
+B6_TEXTO_FIM = "🔥 Posso segurar sua vaga? SIM ou NÃO, por favor! ⏳✨"
+
+META_B6_SEQ = "static_mm_b6_seq_dispatched"
+
+# ── Bloco 7 — pós-pagamento aprovado (webhook Cakto → `static_meumisterio_b7`) ───
+B7_DELAY_PRE_TEXTO_NOMES_S = 50
+B7_DELAY_APOS_TEXTO_NOMES_S = 35
+B7_DELAY_APOS_AUDIO_01_S = 20 * 60  # 20 min
+B7_DELAY_APOS_TEXTO_MATERIAL_S = 15 * 60  # 15 min
+B7_DELAY_APOS_AUDIO_02_S = 16
+B7_DELAY_APOS_AUDIO_03_S = 35
+B7_DELAY_APOS_AUDIO_04_S = 50
+B7_DELAY_APOS_AUDIO_05_S = 2 * 60 * 60  # 2 h
+B7_DELAY_APOS_TEXTO_TRABALHO_S = 60  # 1 min
+B7_DELAY_APOS_AUDIO_06_S = 36
+B7_DELAY_APOS_AUDIO_07_S = 2 * 60  # 2 min
+B7_DELAY_APOS_TEXTO_ORIENTACOES_S = 5 * 60  # 5 min
+B7_DELAY_APOS_AUDIO_08_S = 26
+B7_DELAY_APOS_AUDIO_09_S = 15
+
+_B7_BASE = "https://meumisterio.com/assets/funil_estatico_meu_misterio/audio"
+B7_AUDIO_01_DEFAULT = f"{_B7_BASE}/01%20do%20Entreg%C3%A1vel.ogg"
+B7_AUDIO_02_DEFAULT = f"{_B7_BASE}/02%20%20-%20Entrega.ogg"
+B7_AUDIO_03_DEFAULT = f"{_B7_BASE}/03%20-%20entregavel.ogg"
+B7_AUDIO_04_DEFAULT = f"{_B7_BASE}/04%20-%20Entreg%C3%A1vel.mp3"
+B7_AUDIO_05_DEFAULT = f"{_B7_BASE}/05%20-Entreg%C3%A1vel.mp3"
+B7_AUDIO_06_DEFAULT = f"{_B7_BASE}/06%20-%20Entregav%C3%A9l.ogg"
+B7_AUDIO_07_DEFAULT = f"{_B7_BASE}/07%20Entregav%C3%A9l.ogg"
+B7_AUDIO_08_DEFAULT = f"{_B7_BASE}/08%20-%20Entregav%C3%A9l.ogg"
+B7_AUDIO_09_DEFAULT = f"{_B7_BASE}/09%20-%20Entregav%C3%A9l.ogg"
+B7_AUDIO_10_DEFAULT = f"{_B7_BASE}/10%20-%20Entregav%C3%A9l.ogg"
+
+B7_TEXTO_NOMES_FOTOS = (
+    "Vou precisar dos nomes de vocês e se tiver fotos pode enviar também.."
+)
+B7_TEXTO_MATERIAL = "Acabamos de identificar seus materiais e já vamos dar início, tá bom?"
+B7_TEXTO_TRABALHO = (
+    "Acabei de iniciar seu trabalho, meu amor ❤️✨ e vou te passar suas orientações agora 📜🙏."
+)
+B7_TEXTO_ORIENTACOES_BANHO = """💢Preparação do ambiente: Escolha um local tranquilo onde você possa realizar o banho sem interrupções. Acenda velas e incensos, se desejar, para criar uma atmosfera relaxante e propícia pra limpeza espiritual.
+💢Preparação do banho: Ferva cerca de 2 litros de água e adicione erva, umas 10 gramas de alecrim, arruda, sal grosso. Deixe as ervas em infusão na água quente por alguns minutos.
+Coar e resfriar: Após a infusão, coe o líquido para remover as ervas ou cristais e deixe a água esfriar até uma temperatura agradável para o banho.
+Preparação pessoal: Tome um banho de chuveiro normal antes de começar o banho de limpeza espiritual. Isso ajuda a limpar o corpo físico e preparar você para a limpeza espiritual.
+Realização do banho: Despeje a água preparada sobre o corpo, começando pela cabeça e descendo até os pés. Concentre-se em visualizar a água removendo qualquer energia negativa ou impureza espiritual do seu corpo e aura.
+💢Intenção: Enquanto realiza o banho, concentre-se em suas intenções de limpeza espiritual. Pode ser útil recitar uma oração ou mantra que ressoe com você.
+💢Finalização: Após o banho, deixe o corpo secar naturalmente, se possível, para permitir que as energias negativas sejam removidas completamente. Você pode vestir roupas limpas e leves após o banho."""
+
+META_B7_SEQ = "static_mm_b7_seq_dispatched"
+
 
 def cfg(ctx) -> dict:
     return (getattr(ctx, "metadata", None) or {}).get("__config__") or {}
@@ -404,6 +474,180 @@ def montar_acoes_bloco5(cfg: dict) -> List[Acao]:
             kind="pergunta_garantia",
         )
     )
+    return acoes
+
+
+def _url_audio_b6(cfg: dict, chave_cfg: str, fallback: str) -> str:
+    u = (cfg.get(chave_cfg) or "").strip()
+    if u.startswith("http"):
+        return u
+    base = (cfg.get("public_url") or "").strip().rstrip("/")
+    name = fallback.rsplit("/", 1)[-1]
+    rel = f"assets/funil_estatico_meu_misterio/audio/{name}"
+    if base.startswith("http"):
+        return f"{base}/{rel}"
+    return fallback
+
+
+def montar_acoes_bloco6(cfg: dict) -> List[Acao]:
+    """Último bloco do funil estático — após enviar, o nó fica em espera (FIM)."""
+    typing_on = bool(cfg.get("whatsapp_typing_enabled"))
+    ua = _url_audio_b6(cfg, "audio_bloco6_a", B6_AUDIO_A_DEFAULT)
+    ub = _url_audio_b6(cfg, "audio_bloco6_b", B6_AUDIO_B_DEFAULT)
+    uc = _url_audio_b6(cfg, "audio_bloco6_c", B6_AUDIO_C_DEFAULT)
+    ud = _url_audio_b6(cfg, "audio_bloco6_d", B6_AUDIO_D_DEFAULT)
+
+    def _aud(url: str, kind: str) -> Acao:
+        return Acao(
+            tipo="audio",
+            url=url,
+            conteudo=url,
+            metadata={
+                "source": "static_meumisterio_b6",
+                "kind": kind,
+                "whatsapp_voice": True,
+            },
+        )
+
+    acoes: List[Acao] = [Acao(tipo="delay", segundos=B6_DELAY_PRE_TEXTO_S)]
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("text", source="static_meumisterio_b6", kind="typing_pre_garantia"))
+    acoes.append(
+        acao_texto_copy_exata(
+            B6_TEXTO_GARANTIA,
+            source="static_meumisterio_b6",
+            kind="texto_garantia",
+        )
+    )
+    acoes.append(Acao(tipo="delay", segundos=B6_DELAY_APOS_TEXTO_GARANTIA_S))
+    if ua:
+        acoes.append(_aud(ua, "audio_bloco6_a"))
+    acoes.append(Acao(tipo="delay", segundos=B6_DELAY_APOS_AUDIO_A_S))
+    if ub:
+        acoes.append(_aud(ub, "audio_bloco6_b"))
+    acoes.append(Acao(tipo="delay", segundos=B6_DELAY_APOS_AUDIO_B_S))
+    if uc:
+        acoes.append(_aud(uc, "audio_bloco6_c"))
+    acoes.append(Acao(tipo="delay", segundos=B6_DELAY_APOS_AUDIO_C_S))
+    if ud:
+        acoes.append(_aud(ud, "audio_bloco6_d"))
+    acoes.append(Acao(tipo="delay", segundos=B6_DELAY_APOS_AUDIO_D_S))
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("text", source="static_meumisterio_b6", kind="typing_pre_fim"))
+    acoes.append(
+        acao_texto_copy_exata(
+            B6_TEXTO_FIM,
+            source="static_meumisterio_b6",
+            kind="pergunta_segurar_vaga",
+        )
+    )
+    return acoes
+
+
+def _url_audio_b7(cfg: dict, chave_cfg: str, fallback: str) -> str:
+    u = (cfg.get(chave_cfg) or "").strip()
+    if u.startswith("http"):
+        return u
+    base = (cfg.get("public_url") or "").strip().rstrip("/")
+    name = fallback.rsplit("/", 1)[-1]
+    rel = f"assets/funil_estatico_meu_misterio/audio/{name}"
+    if base.startswith("http"):
+        return f"{base}/{rel}"
+    return fallback
+
+
+def montar_acoes_bloco7(cfg: dict) -> List[Acao]:
+    """Entrega pós-compra (Cakto aprovado). Uma execução por lead (`META_B7_SEQ`)."""
+    typing_on = bool(cfg.get("whatsapp_typing_enabled"))
+    u01 = _url_audio_b7(cfg, "audio_bloco7_01", B7_AUDIO_01_DEFAULT)
+    u02 = _url_audio_b7(cfg, "audio_bloco7_02", B7_AUDIO_02_DEFAULT)
+    u03 = _url_audio_b7(cfg, "audio_bloco7_03", B7_AUDIO_03_DEFAULT)
+    u04 = _url_audio_b7(cfg, "audio_bloco7_04", B7_AUDIO_04_DEFAULT)
+    u05 = _url_audio_b7(cfg, "audio_bloco7_05", B7_AUDIO_05_DEFAULT)
+    u06 = _url_audio_b7(cfg, "audio_bloco7_06", B7_AUDIO_06_DEFAULT)
+    u07 = _url_audio_b7(cfg, "audio_bloco7_07", B7_AUDIO_07_DEFAULT)
+    u08 = _url_audio_b7(cfg, "audio_bloco7_08", B7_AUDIO_08_DEFAULT)
+    u09 = _url_audio_b7(cfg, "audio_bloco7_09", B7_AUDIO_09_DEFAULT)
+    u10 = _url_audio_b7(cfg, "audio_bloco7_10", B7_AUDIO_10_DEFAULT)
+
+    def _aud(url: str, kind: str) -> Acao:
+        return Acao(
+            tipo="audio",
+            url=url,
+            conteudo=url,
+            metadata={
+                "source": "static_meumisterio_b7",
+                "kind": kind,
+                "whatsapp_voice": True,
+            },
+        )
+
+    acoes: List[Acao] = [Acao(tipo="delay", segundos=B7_DELAY_PRE_TEXTO_NOMES_S)]
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("text", source="static_meumisterio_b7", kind="typing_pre_nomes"))
+    acoes.append(
+        acao_texto_copy_exata(
+            B7_TEXTO_NOMES_FOTOS,
+            source="static_meumisterio_b7",
+            kind="texto_nomes_fotos",
+        )
+    )
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_TEXTO_NOMES_S))
+    if u01:
+        acoes.append(_aud(u01, "audio_bloco7_01"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_01_S))
+    if typing_on:
+        acoes.append(acao_typing_whatsapp("text", source="static_meumisterio_b7", kind="typing_pre_material"))
+    acoes.append(
+        acao_texto_copy_exata(
+            B7_TEXTO_MATERIAL,
+            source="static_meumisterio_b7",
+            kind="texto_materiais",
+        )
+    )
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_TEXTO_MATERIAL_S))
+    if u02:
+        acoes.append(_aud(u02, "audio_bloco7_02"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_02_S))
+    if u03:
+        acoes.append(_aud(u03, "audio_bloco7_03"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_03_S))
+    if u04:
+        acoes.append(_aud(u04, "audio_bloco7_04"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_04_S))
+    if u05:
+        acoes.append(_aud(u05, "audio_bloco7_05"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_05_S))
+    acoes.append(
+        acao_texto_copy_exata(
+            B7_TEXTO_TRABALHO,
+            source="static_meumisterio_b7",
+            kind="texto_trabalho_iniciado",
+        )
+    )
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_TEXTO_TRABALHO_S))
+    if u06:
+        acoes.append(_aud(u06, "audio_bloco7_06"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_06_S))
+    if u07:
+        acoes.append(_aud(u07, "audio_bloco7_07"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_07_S))
+    acoes.append(
+        acao_texto_copy_exata(
+            B7_TEXTO_ORIENTACOES_BANHO,
+            source="static_meumisterio_b7",
+            kind="texto_orientacoes_banho",
+        )
+    )
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_TEXTO_ORIENTACOES_S))
+    if u08:
+        acoes.append(_aud(u08, "audio_bloco7_08"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_08_S))
+    if u09:
+        acoes.append(_aud(u09, "audio_bloco7_09"))
+    acoes.append(Acao(tipo="delay", segundos=B7_DELAY_APOS_AUDIO_09_S))
+    if u10:
+        acoes.append(_aud(u10, "audio_bloco7_10"))
     return acoes
 
 
