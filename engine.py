@@ -98,27 +98,6 @@ def _abs_media_url_for_fetch(url: str) -> str:
         return base + u
     return u
 
-
-def _public_whatsapp_media_link(url: str) -> str:
-    """
-    URL pública para envio por link (image/audio/video) na API do WhatsApp.
-    Aceita https completo ou caminho relativo ao app (`assets/...` servido em /assets/).
-    """
-    u = (url or "").strip()
-    if not u:
-        return ""
-    low = u.lower()
-    if low.startswith("http://") or low.startswith("https://"):
-        return u
-    base = os.getenv("PUBLIC_URL", "http://127.0.0.1:5000").rstrip("/")
-    path = u.replace("\\", "/").lstrip("/")
-    if path.startswith("assets/"):
-        rel = path[len("assets/") :]
-    else:
-        rel = path
-    return f"{base}/assets/{rel}"
-
-
 MAX_RETRY          = 3
 CIRCUIT_THRESHOLD  = 5
 CIRCUIT_RESET_TIME = 60    # segundos
@@ -177,6 +156,7 @@ class ModuleCache:
         self._cache: dict[str, tuple[Any, float]] = {}
         self._lock  = threading.Lock()
         self._pastas = [
+            "funil_estatico_meu_misterio",
             "fase_1_saudacao",
             "fase_2_leitura",
             "fase_3_oferta",
@@ -427,20 +407,27 @@ class Engine:
                 # INJEÇÃO DA CONFIGURAÇÃO CENTRALIZADA
                 ctx.metadata["__config__"] = CONFIG_CLIENTE
                 ctx.metadata["tts_ativo"]  = self.tts_ativo
+                # Funil estático: nunca NLU/Gemini nem stage_intel — mesmo se FUNIL_ESTATICO_ATIVO=0 no .env.
+                _node_static_mm = str(getattr(lead, "node_atual", "") or "").startswith("static_meumisterio_")
+                if CONFIG_CLIENTE.get("ia_motor_desligada") or _node_static_mm:
+                    ctx.personalizer = None
+                    ctx.metadata["ia_motor_desligada"] = True
 
                 self._restaurar_memoria(lead, ctx)
-                try:
-                    from studio_runtime import inject_published_studio_into_metadata
+                _node_inject = str(getattr(lead, "node_atual", "") or "")
+                if not _node_inject.startswith("static_meumisterio_"):
+                    try:
+                        from studio_runtime import inject_published_studio_into_metadata
 
-                    inject_published_studio_into_metadata(ctx.metadata, tenant_id=self.tenant_id)
-                except Exception:
-                    pass
-                try:
-                    from flow_executor import inject_published_flow_metadata
+                        inject_published_studio_into_metadata(ctx.metadata, tenant_id=self.tenant_id)
+                    except Exception:
+                        pass
+                    try:
+                        from flow_executor import inject_published_flow_metadata
 
-                    inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
-                except Exception:
-                    pass
+                        inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
+                    except Exception:
+                        pass
 
                 # Nome do lead: coluna `lead.nome` é fonte de verdade quando preenchida;
                 # evita nodes usarem a primeira palavra da mensagem atual ("mandei", "foto") quando o JSON não tem nome_lead.
@@ -527,7 +514,11 @@ class Engine:
                     pass
 
                 # Enriquecimento IA (com curto-circuito para alta escala)
-                if self._pular_nlu_ia(ctx.texto_recebido, tipo_msg):
+                if CONFIG_CLIENTE.get("ia_motor_desligada") or _node_static_mm:
+                    ctx.intencao = "padrao"
+                    ctx.sentimento = "padrao"
+                    ctx.score_engajamento = 0.5
+                elif self._pular_nlu_ia(ctx.texto_recebido, tipo_msg):
                     ctx.intencao = "confirmacao" if re.search(
                         r"\b(ok|sim|pronto|beleza|blz|ta|tá|show|fechado)\b",
                         str(ctx.texto_recebido or "").lower(),
@@ -584,13 +575,14 @@ class Engine:
                     logger.info("event=ia_quota_cooldown_ativo lead=%s node=%s", lead.id, ctx.node_atual)
 
                 # Inteligência por etapa (copy / funil — não altera FSM)
-                enriquecer_contexto_stage(
-                    ctx,
-                    lead,
-                    texto_recebido=texto_recebido or "",
-                    intencao=ctx.intencao,
-                    sentimento=ctx.sentimento,
-                )
+                if not _node_static_mm:
+                    enriquecer_contexto_stage(
+                        ctx,
+                        lead,
+                        texto_recebido=texto_recebido or "",
+                        intencao=ctx.intencao,
+                        sentimento=ctx.sentimento,
+                    )
 
                 # Máquina de estados
                 acoes = self._rotear_state_machine(db, lead, ctx)
@@ -661,6 +653,10 @@ class Engine:
         Evita repetir perguntas em cadeia entre nodes.
         """
         if not acoes:
+            return acoes, {}
+
+        _na = str(getattr(ctx, "node_atual", "") or "")
+        if _na.startswith("static_meumisterio_"):
             return acoes, {}
 
         evid = extrair_evidencias_conversa(
@@ -844,18 +840,47 @@ class Engine:
                     jitter = acao.segundos * fator
                     time.sleep(max(0.5, acao.segundos + random.uniform(-jitter, jitter)))
 
+                elif acao.tipo == "typing":
+                    _meta_ty = getattr(acao, "metadata", None) or {}
+                    _kind = str(_meta_ty.get("whatsapp_typing") or "text").strip().lower()
+                    if _kind not in ("text", "audio"):
+                        _kind = "text"
+                    self._enviar_typing_indicator(ctx.telefone, _kind)
+                    time.sleep(random.uniform(0.35, 1.05))
+
                 elif acao.tipo == "text":
-                    fatiados = self._fatiar_texto_envio_seguro(acao.conteudo)
+                    _meta_ac = getattr(acao, "metadata", None) or {}
+                    # Roteiro estático: um único balão, sem fatiar nem pipeline que colapsa espaços.
+                    if _meta_ac.get("engine_texto_unico"):
+                        fatiados = [str(acao.conteudo or "").rstrip()]
+                    else:
+                        _mb = int(_meta_ac.get("engine_max_baloes") or 0)
+                        if _mb < 1:
+                            _na_txt = str(getattr(ctx, "node_atual", "") or "")
+                            # Funis estáticos: textos longos viram >6 pedaços; o cap global cortava o fim.
+                            _mb = 24 if _na_txt.startswith("static_meumisterio_") else 6
+                        _mb = max(1, min(_mb, 40))
+                        fatiados = self._fatiar_texto_envio_seguro(acao.conteudo, max_baloes=_mb)
                     for balao in fatiados:
-                        balao_limpo = self._blindar_texto_final_anti_corte(balao)
-                        if not balao_limpo:
-                            logger.warning(
-                                "⚠️ [ENGINE] Balão suprimido por truncamento irreparável. lead=%s node=%s",
-                                lead_id,
-                                getattr(ctx, "node_atual", ""),
+                        if _meta_ac.get("engine_copy_estatica"):
+                            balao_limpo = (
+                                (balao or "")
+                                .replace("\u200b", "")
+                                .replace("\u200c", "")
+                                .replace("\u200d", "")
+                                .replace("\ufeff", "")
                             )
-                            continue
-                        balao_limpo = preparar_texto_envio(balao_limpo, "engine_fila_text")
+                        else:
+                            balao_limpo = self._blindar_texto_final_anti_corte(balao)
+                            if not balao_limpo:
+                                logger.warning(
+                                    "⚠️ [ENGINE] Balão suprimido por truncamento irreparável. lead=%s node=%s",
+                                    lead_id,
+                                    getattr(ctx, "node_atual", ""),
+                                )
+                                continue
+                        if not _meta_ac.get("engine_copy_estatica"):
+                            balao_limpo = preparar_texto_envio(balao_limpo, "engine_fila_text")
                         chave_dedup = self._normalizar_para_dedup(balao_limpo)
                         if chave_dedup and chave_dedup in dedup_texto_neste_lote:
                             logger.info(
@@ -929,8 +954,11 @@ class Engine:
                                     pendentes_db = 0
 
                 elif acao.tipo == "audio":
-                    payload_url = _public_whatsapp_media_link(acao.url or acao.conteudo or "")
-                    if payload_url and self._enviar_com_retry(ctx.telefone, "audio", payload_url):
+                    payload_url = acao.url or acao.conteudo
+                    _voice = bool((getattr(acao, "metadata", None) or {}).get("whatsapp_voice"))
+                    if payload_url and self._enviar_com_retry(
+                        ctx.telefone, "audio", payload_url, audio_voice=_voice
+                    ):
                         self._salvar_mensagem(db, lead_id, "bot", "[audio]", "audio", auto_commit=False)
                         enviados += 1
                         pendentes_db += 1
@@ -943,7 +971,7 @@ class Engine:
                         falhas += 1
 
                 else:
-                    payload_url = _public_whatsapp_media_link(acao.url or acao.conteudo or "")
+                    payload_url = acao.url or acao.conteudo
                     if acao.tipo in ("image", "video") and ultimo_tipo_enviado == "text":
                         time.sleep(random.uniform(1.4, 2.4))
                     if payload_url and self._enviar_com_retry(ctx.telefone, acao.tipo, payload_url):
@@ -985,11 +1013,12 @@ class Engine:
             s = s[:-1]
         return s
 
-    def _fatiar_texto_envio_seguro(self, texto: str) -> list[str]:
+    def _fatiar_texto_envio_seguro(self, texto: str, *, max_baloes: int = 6) -> list[str]:
         """
         Fatiamento resiliente para WhatsApp:
         preserva sentenças, corta excesso e evita explosão de balões.
         Qualquer URL http(s) permanece em balão único (nunca fatiada no meio).
+        `max_baloes`: teto de sub-mensagens por um único Acao tipo text (antes truncava em 6).
         """
         def _emoji_ou_pontuacao_somente(s: str) -> bool:
             t = str(s or "").strip()
@@ -1031,7 +1060,7 @@ class Engine:
             else:
                 merged.append(p)
 
-        return merged[:6]
+        return merged[:max_baloes]
 
     @staticmethod
     def _normalizar_para_dedup(txt: str) -> str:
@@ -1438,6 +1467,39 @@ class Engine:
                 )
                 current_id = prox
                 continue
+            # Funil estático Meu Mistério: resposta ao bloco 1 → bloco 2 na mesma requisição
+            if prox == "static_meumisterio_b2" and current_id == "static_meumisterio_b1":
+                logger.info(
+                    "🔗 [ENGINE] Encadeando static_meumisterio_b2 na mesma requisição (depth=%s) lead_id=%s",
+                    depth,
+                    lead.id,
+                )
+                current_id = prox
+                continue
+            if prox == "static_meumisterio_b3" and current_id == "static_meumisterio_b2":
+                logger.info(
+                    "🔗 [ENGINE] Encadeando static_meumisterio_b3 na mesma requisição (depth=%s) lead_id=%s",
+                    depth,
+                    lead.id,
+                )
+                current_id = prox
+                continue
+            if prox == "static_meumisterio_b4" and current_id == "static_meumisterio_b3":
+                logger.info(
+                    "🔗 [ENGINE] Encadeando static_meumisterio_b4 na mesma requisição (depth=%s) lead_id=%s",
+                    depth,
+                    lead.id,
+                )
+                current_id = prox
+                continue
+            if prox == "static_meumisterio_b5" and current_id == "static_meumisterio_b4":
+                logger.info(
+                    "🔗 [ENGINE] Encadeando static_meumisterio_b5 na mesma requisição (depth=%s) lead_id=%s",
+                    depth,
+                    lead.id,
+                )
+                current_id = prox
+                continue
             if prox != "6_atencao_dinamica":
                 break
             if self._ultima_fala_do_bot_e_pergunta(res or []):
@@ -1456,7 +1518,55 @@ class Engine:
 
         return acum
 
-    def _enviar_com_retry(self, telefone: str, tipo: str, conteudo: str) -> bool:
+    def _enviar_typing_indicator(self, telefone: str, kind: str) -> bool:
+        """Indicador 'digitando' ou 'gravando áudio' (Cloud API `typing`)."""
+        if not self._circuit.pode_tentar():
+            return False
+        k = (kind or "text").strip().lower()
+        if k not in ("text", "audio"):
+            k = "text"
+        try:
+            payload = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": telefone,
+                "type": "typing",
+                "typing": {"type": k},
+            }
+            headers = {
+                "Authorization": f"Bearer {self.whatsapp_token}",
+                "Content-Type": "application/json",
+            }
+            r = requests.post(self.wa_url, json=payload, headers=headers, timeout=15)
+            if r.status_code == 200:
+                self._circuit.registrar_sucesso()
+                return True
+            if k == "audio" and r.status_code in (400, 403, 404):
+                payload["typing"] = {"type": "text"}
+                r2 = requests.post(self.wa_url, json=payload, headers=headers, timeout=15)
+                if r2.status_code == 200:
+                    self._circuit.registrar_sucesso()
+                    logger.info("event=wa_typing_audio_fallback_text ok")
+                    return True
+            logger.warning(
+                "event=wa_typing_fail status=%s kind=%s body=%s",
+                r.status_code,
+                k,
+                (r.text or "")[:220],
+            )
+            self._circuit.registrar_falha()
+        except Exception as e:
+            logger.warning("event=wa_typing_exception kind=%s err=%s", k, e)
+        return False
+
+    def _enviar_com_retry(
+        self,
+        telefone: str,
+        tipo: str,
+        conteudo: str,
+        *,
+        audio_voice: bool = False,
+    ) -> bool:
         if not self._circuit.pode_tentar():
             return False
 
@@ -1483,6 +1593,11 @@ class Engine:
                     }
                     payload.update({"type": "contacts", "contacts": [contato]})
 
+                elif tipo == "audio":
+                    audio_obj: dict = {"link": conteudo}
+                    if audio_voice:
+                        audio_obj["voice"] = True
+                    payload.update({"type": "audio", "audio": audio_obj})
                 else:
                     payload.update({"type": tipo, tipo: {"link": conteudo}})
 
@@ -1617,10 +1732,13 @@ class Engine:
         tid = getattr(self, "tenant_id", None) or "default"
         lead = db.query(Lead).filter_by(telefone=telefone, tenant_id=tid).first()
         if not lead:
+            _validos = frozenset({"1_apresentacao", "static_meumisterio_b1"})
+            _ini = (CONFIG_CLIENTE.get("funil_entrada_inicial") or "").strip()
+            _node0 = _ini if _ini in _validos else "1_apresentacao"
             lead = Lead(
                 telefone=telefone,
                 tenant_id=tid,
-                node_atual="1_apresentacao",
+                node_atual=_node0,
                 estado_coleta="inicial",
             )
             db.add(lead)
