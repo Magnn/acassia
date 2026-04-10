@@ -18,8 +18,7 @@ from flow_builder_runtime import NODE_SPECS, compile_flow_plan, validate_flow_do
 
 logger = logging.getLogger(__name__)
 
-# Delays longos (ex.: 4 min entre mensagens no funil estático) exigem FLOW_BLUEPRINT_MAX_DELAY_S alto o bastante.
-_MAX_DELAY_S = min(900.0, float(os.getenv("FLOW_BLUEPRINT_MAX_DELAY_S", "900") or 900))
+_MAX_DELAY_S = min(120.0, float(os.getenv("FLOW_BLUEPRINT_MAX_DELAY_S", "120") or 120))
 _ALLOW_HTTP = str(os.getenv("FLOW_BLUEPRINT_ALLOW_HTTP", "") or "").strip().lower() in (
     "1",
     "true",
@@ -132,40 +131,8 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
             if expanded:
                 acoes.extend(expanded)
                 continue
-            kind = str(cfg.get("content_media_kind") or "").strip().lower()
-            url_media = str(cfg.get("content_media_url") or "").strip()
-            caption = str(cfg.get("content_text") or cfg.get("body") or "").strip()
-            if kind in ("image", "video", "audio", "document") and url_media:
-                cmeta: Dict[str, Any] = {
-                    "source": "flow_builder",
-                    "node_type": "conteudo",
-                    "conteudo_item": kind,
-                }
-                wd = str(cfg.get("whatsapp_delivery") or "").strip()
-                if kind == "audio":
-                    cmeta["send_as_voice"] = True
-                    if wd == "ptt_as_recorded_now":
-                        cmeta["whatsapp_delivery"] = wd
-                if kind == "image":
-                    acoes.append(
-                        Acao(tipo="image", url=url_media, conteudo=caption[:900], metadata=cmeta)
-                    )
-                elif kind == "video":
-                    acoes.append(
-                        Acao(tipo="video", url=url_media, conteudo=caption[:900], metadata=cmeta)
-                    )
-                elif kind == "audio":
-                    acoes.append(
-                        Acao(tipo="audio", url=url_media, conteudo=url_media, metadata=cmeta)
-                    )
-                else:
-                    fn = str(cfg.get("document_filename") or "documento").strip()[:200] or "documento"
-                    acoes.append(
-                        Acao(tipo="document", url=url_media, conteudo=fn, metadata=cmeta)
-                    )
-                continue
             body = (
-                str(cfg.get("body") or cfg.get("content_text") or "").strip()
+                str(cfg.get("body") or "").strip()
                 or str(cfg.get("step_name") or "").strip()
             )
             if body:
@@ -173,12 +140,8 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
             continue
 
         if rk == "message" or rk == "action":
-            ak_wait = str(cfg.get("action_kind") or "").strip().lower()
-            if ntype == "acao" and ak_wait in ("wait_until", "wait_for_input"):
-                # Estado interno do builder: não enviar payload JSON como texto ao lead.
-                continue
             body = (
-                str(cfg.get("body") or cfg.get("question") or "").strip()
+                str(cfg.get("body") or cfg.get("question") or cfg.get("payload") or "").strip()
                 or str(cfg.get("step_name") or "").strip()
             )
             if body:

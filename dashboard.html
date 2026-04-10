@@ -1053,7 +1053,7 @@
             background: rgba(251, 146, 60, 0.1);
             border-color: rgba(234, 88, 12, 0.35);
         }
-
+        
         .flow-node-head {
             padding: 12px 12px 12px 14px;
             border-radius: 16px 16px 0 0;
@@ -1125,7 +1125,7 @@
             color: var(--flow-accent) !important;
         }
         .flow-node-head:active { cursor: grabbing; }
-
+        
         .flow-node-body {
             padding: 12px 14px 14px;
             display: flex;
@@ -4650,7 +4650,7 @@
     <header id="global-header">
         <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;min-width:0">
             <div class="header-title-stack">
-                <h1 class="header-title" id="page-title">Dashboard</h1>
+            <h1 class="header-title" id="page-title">Dashboard</h1>
                 <p class="header-subtitle" id="page-subtitle" hidden aria-live="polite"></p>
             </div>
             <span style="color:var(--c-border2);flex-shrink:0" aria-hidden="true">|</span>
@@ -4781,59 +4781,59 @@
                     </div>
                 </div>
                 <div class="dash-kpi-grid">
-                    <div class="kpi-card" style="border-top:2px solid var(--c-rose)">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                            <span class="kpi-label">Tokens Voice Studio</span>
-                            <i class="fas fa-microphone-alt" style="color:var(--c-rose);opacity:.7"></i>
-                        </div>
-                        <div class="kpi-value" style="color:var(--c-rose)" id="kpi-tokens-tts">0 <span style="font-size:14px;color:var(--c-muted);font-weight:400">/ 50k</span></div>
-                        <div class="progress-track"><div class="progress-fill fill-rose" id="bar-tokens-tts" style="width:0%"></div></div>
-                        <span class="kpi-sub" id="sub-tokens-tts">A carregar...</span>
-                    </div>
-                    <div class="kpi-card" style="border-top:2px solid var(--c-emerald)">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                            <span class="kpi-label">Tokens GPT / Gemini</span>
-                            <i class="fas fa-brain" style="color:var(--c-emerald);opacity:.7"></i>
-                        </div>
-                        <div class="kpi-value" style="color:var(--c-emerald)" id="kpi-tokens-gpt">0 <span style="font-size:14px;color:var(--c-muted);font-weight:400">/ 5M</span></div>
-                        <div class="progress-track"><div class="progress-fill fill-emerald" id="bar-tokens-gpt" style="width:0%"></div></div>
-                        <span class="kpi-sub" id="sub-tokens-gpt">A carregar...</span>
-                    </div>
-                    <div class="kpi-card" style="border-top:2px solid #60a5fa">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                            <span class="kpi-label">Fluxos API Oficial</span>
-                            <i class="fab fa-meta" style="color:#60a5fa;opacity:.7"></i>
-                        </div>
-                        <div class="kpi-value" style="color:#60a5fa" id="kpi-fluxos-api">0 <span style="font-size:14px;color:var(--c-muted);font-weight:400">/ 1.000</span></div>
-                        <div class="progress-track"><div class="progress-fill fill-blue" id="bar-fluxos-api" style="width:0%"></div></div>
-                        <span class="kpi-sub" id="sub-fluxos-api">A carregar...</span>
-                    </div>
-                    <div class="kpi-card" style="border-top:2px solid var(--c-purple)">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-                            <span class="kpi-label">Fluxos WA Business</span>
-                            <i class="fas fa-project-diagram" style="color:var(--c-purple);opacity:.7"></i>
-                        </div>
-                        <div class="kpi-value" style="color:var(--c-purple2)" id="kpi-fluxos-wa">0 <span style="font-size:14px;color:var(--c-muted);font-weight:400">/ 1.000</span></div>
-                        <div class="progress-track"><div class="progress-fill fill-purple" id="bar-fluxos-wa" style="width:0%"></div></div>
-                        <span class="kpi-sub" id="sub-fluxos-wa">A carregar...</span>
-                    </div>
+            <div class="kpi-card" style="border-top:2px solid var(--c-rose)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <span class="kpi-label">Tokens Voice Studio</span>
+                    <i class="fas fa-microphone-alt" style="color:var(--c-rose);opacity:.7"></i>
+                </div>
+                <div class="kpi-value" style="color:var(--c-rose)" id="kpi-tokens-tts">0 <span style="font-size:14px;color:var(--c-muted);font-weight:400">/ 50k</span></div>
+                <div class="progress-track"><div class="progress-fill fill-rose" id="bar-tokens-tts" style="width:0%"></div></div>
+                <span class="kpi-sub" id="sub-tokens-tts">A carregar...</span>
+            </div>
+            <div class="kpi-card" style="border-top:2px solid var(--c-emerald)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <span class="kpi-label">Tokens GPT / Gemini</span>
+                    <i class="fas fa-brain" style="color:var(--c-emerald);opacity:.7"></i>
+                </div>
+                <div class="kpi-value" style="color:var(--c-emerald)" id="kpi-tokens-gpt">0 <span style="font-size:14px;color:var(--c-muted);font-weight:400">/ 5M</span></div>
+                <div class="progress-track"><div class="progress-fill fill-emerald" id="bar-tokens-gpt" style="width:0%"></div></div>
+                <span class="kpi-sub" id="sub-tokens-gpt">A carregar...</span>
+            </div>
+            <div class="kpi-card" style="border-top:2px solid #60a5fa">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <span class="kpi-label">Fluxos API Oficial</span>
+                    <i class="fab fa-meta" style="color:#60a5fa;opacity:.7"></i>
+                </div>
+                <div class="kpi-value" style="color:#60a5fa" id="kpi-fluxos-api">0 <span style="font-size:14px;color:var(--c-muted);font-weight:400">/ 1.000</span></div>
+                <div class="progress-track"><div class="progress-fill fill-blue" id="bar-fluxos-api" style="width:0%"></div></div>
+                <span class="kpi-sub" id="sub-fluxos-api">A carregar...</span>
+            </div>
+            <div class="kpi-card" style="border-top:2px solid var(--c-purple)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <span class="kpi-label">Fluxos WA Business</span>
+                    <i class="fas fa-project-diagram" style="color:var(--c-purple);opacity:.7"></i>
+                </div>
+                <div class="kpi-value" style="color:var(--c-purple2)" id="kpi-fluxos-wa">0 <span style="font-size:14px;color:var(--c-muted);font-weight:400">/ 1.000</span></div>
+                <div class="progress-track"><div class="progress-fill fill-purple" id="bar-fluxos-wa" style="width:0%"></div></div>
+                <span class="kpi-sub" id="sub-fluxos-wa">A carregar...</span>
+            </div>
                     <div class="kpi-card" style="border-top:2px solid var(--c-amber)">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start">
                             <span class="kpi-label">Redundâncias filtradas</span>
                             <i class="fas fa-shield-alt" style="color:var(--c-amber);opacity:.7"></i>
-                        </div>
+        </div>
                         <div class="kpi-value" style="color:var(--c-amber)" id="kpi-redund-total">0</div>
                         <div class="progress-track"><div class="progress-fill" id="bar-redund-24h" style="width:0%;background:var(--c-amber)"></div></div>
                         <span class="kpi-sub" id="sub-redund">A carregar...</span>
                     </div>
                 </div>
                 <div class="dash-alert">
-                    <div style="display:flex;align-items:center;gap:12px;font-size:13px;color:var(--c-muted2)">
+            <div style="display:flex;align-items:center;gap:12px;font-size:13px;color:var(--c-muted2)">
                         <i class="fas fa-exclamation-triangle" style="color:var(--c-rose);flex-shrink:0"></i>
-                        <span id="alert-tokens-msg">Monitorização de tokens em tempo real iniciada.</span>
-                    </div>
+                <span id="alert-tokens-msg">Monitorização de tokens em tempo real iniciada.</span>
+            </div>
                     <button type="button" class="btn btn-rose" style="flex-shrink:0;font-size:12px"><i class="fas fa-plus"></i> Adicionar tokens</button>
-                </div>
+        </div>
             </section>
 
             <!-- 3 · IA: custo, tetos, economia -->
@@ -4906,42 +4906,42 @@
                                     <p style="font-size:11px;color:var(--c-muted);margin:4px 0 0">Atualização contínua do motor</p>
                                 </div>
                                 <span class="badge badge-emerald">Tempo real</span>
-                            </div>
-                            <div style="height:200px"><canvas id="funnelChart"></canvas></div>
-                        </div>
+                    </div>
+                    <div style="height:200px"><canvas id="funnelChart"></canvas></div>
+                </div>
                         <p class="dash-news-title">Novidades da plataforma</p>
                         <div class="dash-news-card" onmouseover="this.style.borderColor='rgba(124,90,245,0.45)'" onmouseout="this.style.borderColor='var(--c-border)'">
-                            <div style="width:36px;height:36px;border-radius:8px;background:var(--c-purple);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;flex-shrink:0"><i class="fas fa-image"></i></div>
-                            <div>
+                    <div style="width:36px;height:36px;border-radius:8px;background:var(--c-purple);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;flex-shrink:0"><i class="fas fa-image"></i></div>
+                    <div>
                                 <div style="font-weight:600;font-size:13px;margin-bottom:4px;color:var(--c-text)">Busca de imagens pelo bloco de API</div>
                                 <div style="font-size:12px;color:var(--c-muted);line-height:1.45">Envie imagens de forma mais simples e rápida pela API.</div>
-                                <span class="badge badge-purple" style="margin-top:8px"><i class="fas fa-arrow-right" style="font-size:9px"></i> Saiba mais</span>
-                            </div>
-                        </div>
+                        <span class="badge badge-purple" style="margin-top:8px"><i class="fas fa-arrow-right" style="font-size:9px"></i> Saiba mais</span>
+                    </div>
+                </div>
                         <div class="dash-news-card" onmouseover="this.style.borderColor='rgba(124,90,245,0.45)'" onmouseout="this.style.borderColor='var(--c-border)'">
-                            <div style="width:36px;height:36px;border-radius:8px;background:var(--c-surface2);border:1px solid var(--c-border);display:flex;align-items:center;justify-content:center;color:var(--c-purple2);font-size:14px;flex-shrink:0"><i class="fas fa-robot"></i></div>
-                            <div>
+                    <div style="width:36px;height:36px;border-radius:8px;background:var(--c-surface2);border:1px solid var(--c-border);display:flex;align-items:center;justify-content:center;color:var(--c-purple2);font-size:14px;flex-shrink:0"><i class="fas fa-robot"></i></div>
+                    <div>
                                 <div style="font-weight:600;font-size:13px;margin-bottom:4px;color:var(--c-text)">Envio de contactos para o agente IA</div>
                                 <div style="font-size:12px;color:var(--c-muted);line-height:1.45">Envie dados do contacto de forma fácil e rápida para o agente.</div>
-                                <span class="badge badge-purple" style="margin-top:8px"><i class="fas fa-arrow-right" style="font-size:9px"></i> Saiba mais</span>
-                            </div>
-                        </div>
+                        <span class="badge badge-purple" style="margin-top:8px"><i class="fas fa-arrow-right" style="font-size:9px"></i> Saiba mais</span>
                     </div>
+                </div>
+            </div>
                     <aside class="dash-split-side">
                         <div class="dash-plan-card">
                             <span class="plan-emoji" aria-hidden="true">🏅</span>
-                            <div class="kpi-label" style="color:var(--c-purple2)">Plano atual</div>
+                    <div class="kpi-label" style="color:var(--c-purple2)">Plano atual</div>
                             <h3 style="font-family:var(--f-display);font-weight:800;font-size:20px;margin:6px 0 4px;color:#f8fafc">AcassIA</h3>
                             <p style="font-size:12px;color:rgba(226,232,240,0.85);margin-bottom:16px;line-height:1.5">Precisa de mais tokens ou funcionalidades avançadas?</p>
                             <button type="button" class="btn" style="width:100%;background:white;color:#0d0f14;font-size:12px;justify-content:center">Fazer upgrade</button>
-                        </div>
+                </div>
                         <div class="card" style="padding:16px;display:flex;align-items:center;gap:14px;border-radius:12px">
-                            <div style="width:42px;height:42px;border-radius:10px;background:var(--c-purple);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;box-shadow:0 0 16px var(--c-purple-glow)"><i class="fas fa-bolt"></i></div>
-                            <div>
-                                <div class="kpi-value" style="font-size:22px" id="dash-execucoes">0</div>
-                                <div class="kpi-label">Leads com atividade hoje</div>
-                            </div>
-                        </div>
+                    <div style="width:42px;height:42px;border-radius:10px;background:var(--c-purple);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;box-shadow:0 0 16px var(--c-purple-glow)"><i class="fas fa-bolt"></i></div>
+                    <div>
+                        <div class="kpi-value" style="font-size:22px" id="dash-execucoes">0</div>
+                        <div class="kpi-label">Leads com atividade hoje</div>
+                    </div>
+                </div>
                         <div class="card" style="padding:16px;border-radius:12px">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                                 <div class="kpi-label" style="color:var(--c-amber)">Top motivos de redundância (24h)</div>
@@ -4961,23 +4961,23 @@
                             <div id="diag-red-events" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--c-muted)"></div>
                         </div>
                         <div class="card" style="border-radius:12px;overflow:hidden">
-                            <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--c-border);cursor:pointer" onclick="go('chat')">
-                                <div>
-                                    <div class="kpi-value" style="font-size:22px;color:var(--c-amber)" id="dash-aguardando">0</div>
-                                    <div class="kpi-label">Aguardando atendimento</div>
-                                </div>
-                                <i class="fas fa-comment-alt" style="color:var(--c-amber);font-size:22px;opacity:.6"></i>
-                            </div>
-                            <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="go('chat')">
-                                <div>
-                                    <div class="kpi-value" style="font-size:22px;color:var(--c-purple2)" id="dash-ia">0</div>
-                                    <div class="kpi-label">Em atendimento (IA)</div>
-                                </div>
-                                <div style="width:32px;height:32px;border-radius:8px;background:var(--c-purple);display:flex;align-items:center;justify-content:center;color:white;font-size:12px"><i class="fas fa-robot"></i></div>
-                            </div>
+                    <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--c-border);cursor:pointer" onclick="go('chat')">
+                        <div>
+                            <div class="kpi-value" style="font-size:22px;color:var(--c-amber)" id="dash-aguardando">0</div>
+                            <div class="kpi-label">Aguardando atendimento</div>
                         </div>
-                    </aside>
+                        <i class="fas fa-comment-alt" style="color:var(--c-amber);font-size:22px;opacity:.6"></i>
+                    </div>
+                    <div style="padding:16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="go('chat')">
+                        <div>
+                            <div class="kpi-value" style="font-size:22px;color:var(--c-purple2)" id="dash-ia">0</div>
+                            <div class="kpi-label">Em atendimento (IA)</div>
+                        </div>
+                        <div style="width:32px;height:32px;border-radius:8px;background:var(--c-purple);display:flex;align-items:center;justify-content:center;color:white;font-size:12px"><i class="fas fa-robot"></i></div>
+                    </div>
                 </div>
+                    </aside>
+            </div>
             </section>
         </div>
     </div>
@@ -5086,12 +5086,12 @@
                                 <button type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="quickReply('Entendi. Me confirma só esse ponto para eu seguir certo com você.')">Resposta rápida 2</button>
                                 <button type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="quickReply('Fechado. Já estou cuidando disso e te atualizo em instantes.')">Resposta rápida 3</button>
                             </div>
-                            <div class="input-field" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px">
+                        <div class="input-field" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px">
                                 <button type="button" class="icon-btn" style="flex-shrink:0" disabled title="Em breve"><i class="fas fa-paperclip"></i></button>
-                                <input id="msg-input" type="text" placeholder="Digite uma mensagem de intervenção..." class="input-field" style="flex:1;border:none;background:transparent;padding:0;font-size:13px" onkeydown="if(event.key==='Enter')sendMsg()">
+                            <input id="msg-input" type="text" placeholder="Digite uma mensagem de intervenção..." class="input-field" style="flex:1;border:none;background:transparent;padding:0;font-size:13px" onkeydown="if(event.key==='Enter')sendMsg()">
                                 <button type="button" onclick="sendMsg()" class="btn btn-primary" style="border-radius:999px;padding:6px 14px;font-size:12px">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
                             </div>
                         </div>
 
@@ -5194,8 +5194,8 @@
                         <div>
                             <div class="int-webhook-banner__t">Webhooks</div>
                             <div class="int-webhook-banner__d">Crie webhooks customizados para suas automações</div>
-                        </div>
-                    </div>
+            </div>
+        </div>
                     <button type="button" class="btn btn-primary int-webhook-cta" onclick="document.getElementById('int-webhooks-detail').scrollIntoView({ behavior: 'smooth', block: 'start' })">
                         Acessar Webhooks <i class="fas fa-arrow-right" style="margin-left:8px"></i>
                     </button>
@@ -5291,8 +5291,8 @@
                     <button type="button" class="btn btn-ghost" style="font-size:11px" onclick="go('chat'); toast('Use a barra lateral do Chat para operadores.', 'purple')">Ir ao chat</button>
                 </div>
             </div>
-        </div>
-    </div>
+                </div>
+            </div>
 
     <!-- ================================================================ -->
     <!-- VIEW: CONTATOS                                                  -->
@@ -5399,23 +5399,23 @@
     <!-- ================================================================ -->
     <div id="view-fluxos" class="view fluxos-wrap" style="overflow-y:auto;padding:24px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
-            <div>
+                        <div>
                 <h2 style="font-family:var(--f-display);font-weight:800;font-size:22px;display:flex;align-items:center;gap:10px"><i class="fas fa-code-branch" style="color:var(--c-purple)"></i> Fluxos de conversa</h2>
                 <p id="fluxos-subtitle" style="font-size:11px;color:var(--c-muted);margin-top:4px">0 fluxos cadastrados</p>
                 <p id="fluxos-catalog-hint" class="hidden" style="font-size:10px;color:var(--c-amber);margin-top:2px">Catálogo remoto indisponível — a mostrar dados de exemplo.</p>
-            </div>
+                        </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button type="button" class="btn btn-emerald" onclick="newFlow()"><i class="fas fa-plus"></i> Novo fluxo</button>
                 <button type="button" class="btn btn-ghost" onclick="openFluxImportFromDisk()"><i class="fas fa-file-import"></i> Importar fluxo</button>
-            </div>
-        </div>
+                    </div>
+                </div>
 
         <input type="file" id="flux-import-file" accept="application/json,.json" class="hidden" aria-hidden="true" onchange="handleFluxImportFile(event)">
 
         <div id="fluxos-folder-view">
             <div class="fluxos-section-h"><i class="fas fa-home"></i> Minhas pastas</div>
             <div id="fluxos-folders-grid" class="fluxos-grid"></div>
-        </div>
+                </div>
 
         <div id="fluxos-list-view" class="hidden">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -5433,8 +5433,8 @@
                         <option value="draft">Só neste browser</option>
                     </select>
                     <input type="search" id="fluxos-search" placeholder="Pesquisar..." autocomplete="off" oninput="renderFluxosList()" class="input-field" style="font-size:11px;padding:7px 8px;min-width:260px">
-                </div>
             </div>
+        </div>
 
             <div id="fluxos-list-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;margin-top:12px"></div>
             <div id="fluxos-list-empty" style="display:none;padding:18px;text-align:center;font-size:12px;color:var(--c-muted);border:1px dashed var(--c-border2);border-radius:var(--radius);background:var(--c-surface2)">Nenhum fluxo encontrado para este filtro.</div>
@@ -5489,7 +5489,7 @@
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Conteúdo</h4>
                                 <span class="flow-palette-pill">Popular</span>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Texto, mídia, lista — duplo clique: sequência rica</p>
                         </div>
                     </div>
@@ -5504,7 +5504,7 @@
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Pergunta</h4>
                                 <span class="flow-palette-pill">Popular</span>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Texto livre, lista ou botões (WhatsApp)</p>
                         </div>
                     </div>
@@ -5519,7 +5519,7 @@
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Ação</h4>
                                 <span class="flow-palette-pill">Popular</span>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Tag, nota, mensagem, transferência — tipo + payload</p>
                         </div>
                     </div>
@@ -5533,7 +5533,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Delay</h4>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Pausa entre mensagens — presets no bloco</p>
                         </div>
                     </div>
@@ -5548,7 +5548,7 @@
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Expediente</h4>
                                 <span class="flow-palette-pill flow-palette-pill--accent">Novidade</span>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Fuso IANA + janelas (dentro/fora de horas)</p>
                         </div>
                     </div>
@@ -5563,7 +5563,7 @@
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Condição</h4>
                                 <span class="flow-palette-pill">Popular</span>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Ramificar por expressão (variáveis / resposta)</p>
                         </div>
                     </div>
@@ -5577,7 +5577,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Notificar Atendente</h4>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Alerta à equipa: log, email, Slack, webhook</p>
                         </div>
                     </div>
@@ -5591,7 +5591,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Divisão</h4>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Teste A/B — pesos e ramos no canvas</p>
                         </div>
                     </div>
@@ -5605,7 +5605,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">API Request</h4>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">HTTP: URL, método, headers JSON, corpo</p>
                         </div>
                     </div>
@@ -5619,7 +5619,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Cérebro IA</h4>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Modelo, system prompt, temperatura, variável e memória</p>
                         </div>
                     </div>
@@ -5634,7 +5634,7 @@
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Agente IA</h4>
                                 <span class="flow-palette-pill flow-palette-pill--accent">BETA</span>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Persona + instruções + modelo (agente)</p>
                         </div>
                     </div>
@@ -5649,7 +5649,7 @@
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Voice Studio</h4>
                                 <span class="flow-palette-pill">Popular</span>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">TTS: perfil de voz + roteiro falado</p>
                         </div>
                     </div>
@@ -5663,7 +5663,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flow-palette-row">
                                 <h4 class="flow-palette-title">Anotação</h4>
-                            </div>
+                        </div>
                             <p class="flow-palette-desc">Nota interna — não enviada ao cliente</p>
                         </div>
                     </div>
@@ -6116,7 +6116,7 @@
                 <h2 style="font-family:var(--f-display);font-weight:800;font-size:20px;display:flex;align-items:center;gap:10px"><i class="fas fa-robot" style="color:var(--c-purple)"></i> Agente IA</h2>
                 <p style="font-size:12px;color:var(--c-muted);margin-top:4px">Studio, perfil global e integração Meta/Pixel — custos por node ficam no <a href="#" onclick="go('dashboard');return false;" style="color:var(--c-purple2);text-decoration:underline">Dashboard</a>.</p>
             </div>
-        </div>
+            </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--c-border);padding-bottom:12px">
             <button type="button" class="agente-nav-tab active" id="agente-tab-studio" onclick="switchAgenteTab('studio')"><i class="fas fa-palette"></i> Studio</button>
@@ -6702,8 +6702,8 @@ function go(name, contextTitle = null) {
 
     document.querySelectorAll('.nav-item, .sub-item').forEach(el => el.classList.remove('active'));
     if (cfg.nav) {
-        const nav = document.getElementById(cfg.nav);
-        if (nav) nav.classList.add('active');
+    const nav = document.getElementById(cfg.nav);
+    if (nav) nav.classList.add('active');
     }
 
     const hdr = document.getElementById('global-header');
@@ -12119,8 +12119,8 @@ async function loadOrRenderBuilderCanvas(contextTitle) {
         renderRecoveryFlowPreview();
         return;
     }
-    renderBaseFlow();
-}
+        renderBaseFlow();
+    }
 
 function setFlowBuilderTab(tab) {
     const t = tab === 'logs' || tab === 'relatorios' ? tab : 'automacao';
@@ -15340,8 +15340,8 @@ async function loadLeads() {
         _leads = await res.json();
         renderLeadsList(_leads);
         checkCriticalLeadAlert(_leads);
-        updateDashboardStats(_leads);
-        fetchSystemStats();
+        updateDashboardStats(_leads); 
+        fetchSystemStats(); 
     };
     try {
         await run();
@@ -16080,7 +16080,7 @@ function renderMsgsHtml(msgs) {
                 ? `<audio controls preload="none" src="${esc(mediaUrl)}" style="width:100%;margin-bottom:8px"></audio>`
                 : `<div style="display:flex;align-items:center;gap:12px;min-width:200px;margin-bottom:6px;background:rgba(255,255,255,0.05);padding:8px;border-radius:8px">
                     <button style="width:34px;height:34px;border-radius:50%;background:var(--c-purple);border:none;color:white;cursor:not-allowed;display:flex;align-items:center;justify-content:center;flex-shrink:0" disabled><i class="fas fa-play" style="font-size:12px;margin-left:3px"></i></button>
-                    <div style="flex:1;height:5px;background:var(--c-border2);border-radius:3px;overflow:hidden"><div style="width:40%;height:100%;background:var(--c-purple)"></div></div>
+                <div style="flex:1;height:5px;background:var(--c-border2);border-radius:3px;overflow:hidden"><div style="width:40%;height:100%;background:var(--c-purple)"></div></div>
                     <span style="font-size:10px;font-weight:600;opacity:0.7">sem url</span>
                 </div>`;
             content = `${player}
@@ -16092,7 +16092,7 @@ function renderMsgsHtml(msgs) {
                     <div class="chat-img-placeholder">
                         <i class="fas fa-image" style="font-size:28px;color:var(--c-purple);margin-bottom:8px;display:block"></i>
                         <span style="font-size:12px;color:var(--c-muted);font-weight:600">Clique para carregar a imagem</span>
-                    </div>
+            </div>
                     <img alt="Imagem enviada pelo lead" style="display:none;max-width:100%;max-height:280px;border-radius:10px;border:1px solid var(--c-border);object-fit:cover;margin:0 auto" />
                 </div>
                 <a class="chat-img-open-link" href="${esc(mediaUrl)}" target="_blank" rel="noopener noreferrer" style="display:none;font-size:11px;color:var(--c-purple);margin-bottom:6px">Abrir em nova aba</a>`
@@ -16550,7 +16550,7 @@ async function saveNewFlow() {
         newCard.onclick = () => go('builder', title);
         newCard.onmouseover = function() { this.style.borderColor = 'var(--c-purple)'; };
         newCard.onmouseout = function() { this.style.borderColor = 'var(--c-border)'; };
-
+        
         newCard.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
                 <div style="display:flex;gap:12px;align-items:center">
@@ -16569,7 +16569,7 @@ async function saveNewFlow() {
                 </div>
             </div>
         `;
-
+        
         grid.insertBefore(newCard, grid.firstChild);
         const empty = document.getElementById('fluxos-drafts-empty');
         if (empty) empty.style.display = 'none';
@@ -16975,7 +16975,7 @@ loadLeads();
 loadOperators();
 loadAgentProfile();
 loadAgentStudioList();
-_leadsInterval = setInterval(loadLeads, 5000);
+_leadsInterval = setInterval(loadLeads, 5000); 
 setTimeout(renderChart, 300);
 window.addEventListener('unhandledrejection', (ev) => {
     try {
