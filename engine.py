@@ -1500,6 +1500,14 @@ class Engine:
                 )
                 current_id = prox
                 continue
+            if prox == "static_meumisterio_b6" and current_id == "static_meumisterio_b5":
+                logger.info(
+                    "🔗 [ENGINE] Encadeando static_meumisterio_b6 na mesma requisição (depth=%s) lead_id=%s",
+                    depth,
+                    lead.id,
+                )
+                current_id = prox
+                continue
             if prox != "6_atencao_dinamica":
                 break
             if self._ultima_fala_do_bot_e_pergunta(res or []):

@@ -1,4 +1,4 @@
-"""Bloco 5 — placeholder até o roteiro ser definido."""
+"""Bloco 5 — ver `roteiro.py`."""
 
 from __future__ import annotations
 
@@ -14,21 +14,16 @@ logger = logging.getLogger(__name__)
 
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     meta = getattr(ctx, "metadata", None) or {}
-    if meta.get("static_mm_b5_placeholder_enviado"):
+    cfg = R.cfg(ctx)
+
+    if meta.get(R.META_B5_SEQ):
+        if (meta.get(R.META_B5_PHASE) or "").strip() == "awaiting_reply":
+            if not R.lead_respondeu_texto_ou_midia(ctx):
+                return [], "static_meumisterio_b5"
+            logger.info("event=static_mm_b5_avanca_para_b6 lead=%s", getattr(ctx, "lead_id", "?"))
+            return [Acao(tipo="delay", segundos=R.B5_DELAY_ANTES_B6_S)], "static_meumisterio_b6"
         return [], "static_meumisterio_b5"
 
-    meta["static_mm_b5_placeholder_enviado"] = True
-    texto = (
-        "Perfeito — seguimos para a próxima etapa. 💙 "
-        "O *Bloco 5* ainda vai ser montado no código quando você enviar o roteiro."
-    )
-    return (
-        [
-            R.acao_texto_copy_exata(
-                texto,
-                source="static_meumisterio_b5",
-                kind="placeholder_b5",
-            )
-        ],
-        "static_meumisterio_b5",
-    )
+    meta[R.META_B5_SEQ] = True
+    meta[R.META_B5_PHASE] = "awaiting_reply"
+    return R.montar_acoes_bloco5(cfg), "static_meumisterio_b5"
