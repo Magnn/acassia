@@ -41,6 +41,11 @@ from analytics.copy_personalization import (
     instrucao_eco_esforco_concreto,
     perfil_copy_para_prompt,
 )
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    leitura_fria_para_prompt,
+    nome_padrao_invisivel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -317,6 +322,10 @@ def executar_v2(ctx) -> tuple:
                 f"O trabalho espiritual já tem nome provisório: «{nome_mecanismo_ctx}» — pode ecoar com leveza, sem vender ainda."
             )
             prompt_ia += sufixo_ancoras_node3_para_prompt(meta)
+            # DARE: injetar leitura fria + padrão invisível por desejo_tipo
+            _desejo_tipo_n6 = classificar_desejo_tipo(meta, msg_lead)
+            _padrao_n6 = nome_padrao_invisivel(_desejo_tipo_n6)
+            _dare_leitura = leitura_fria_para_prompt(_desejo_tipo_n6, meta)
             sys_f = _SYSTEM_LEITURA_SUPREMA.format(
                 nome=nome_fmt,
                 genero=genero,
@@ -337,7 +346,7 @@ def executar_v2(ctx) -> tuple:
                 instrucao_ancoragem=instrucao_anc,
                 instrucao_eco_esforco=instrucao_eco_esf,
                 constituicao_camada=camada_constituicao_node6(meta, nome_mecanismo_ctx),
-            )
+            ) + f"\n\nPADRÃO INVISÍVEL IDENTIFICADO: \"{_padrao_n6}\"\n\n{_dare_leitura}"
             blocos_dict = {}
             ultima_exc: Optional[Exception] = None
             _temps = (0.86, 0.9, 0.88)
