@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import or_
 
 from db import models
 from db.database import SessionLocal
@@ -126,10 +127,24 @@ from flask import jsonify
 @inbox_bp.route("/data", methods=["GET"])
 @login_required
 def list_view_data():
+    """
+    Lista leads com filtros + score band + last message preview.
+
+    Query params:
+        ?filtro=todos|ativas|pausadas|convertidas|perdidas
+        &score_band=hot|warm|cold     (multi via vírgula: hot,warm)
+        &search=string                 (telefone ou nome)
+        &sort=score|recency|name       (default: recency)
+        &limit=100
+    """
     tenant_id = current_user.tenant_id
     filtro = request.args.get("filtro", "todos").lower()
     if filtro not in ALLOWED_FILTERS:
         filtro = "todos"
+    search = (request.args.get("search") or "").strip()
+    band_filter = (request.args.get("score_band") or "").strip()
+    sort = request.args.get("sort", "recency")
+    limit = min(int(request.args.get("limit") or 100), 500)
 
     db = SessionLocal()
     try:
@@ -143,7 +158,26 @@ def list_view_data():
         elif filtro == "perdidas":
             q = q.filter_by(opt_out=True)
 
-        leads = q.order_by(models.Lead.atualizado_em.desc()).limit(100).all()
+        if band_filter:
+            bands = [b.strip() for b in band_filter.split(",") if b.strip()]
+            if bands:
+                q = q.filter(models.Lead.score_band.in_(bands))
+
+        if search:
+            like = f"%{search.lower()}%"
+            q = q.filter(or_(
+                models.Lead.telefone.like(like),
+                models.Lead.nome.ilike(like),
+            ))
+
+        if sort == "score":
+            q = q.order_by(models.Lead.score_value.desc(), models.Lead.atualizado_em.desc())
+        elif sort == "name":
+            q = q.order_by(models.Lead.nome.asc())
+        else:  # recency default
+            q = q.order_by(models.Lead.atualizado_em.desc())
+
+        leads = q.limit(limit).all()
         items = []
         for lead in leads:
             last_msg = db.query(models.Mensagem).filter_by(lead_id=lead.id).order_by(
@@ -157,10 +191,43 @@ def list_view_data():
                 "convertido": bool(lead.convertido),
                 "bot_pausado": bool(lead.bot_pausado),
                 "opt_out": bool(lead.opt_out),
+                "score_value": lead.score_value or 0,
+                "score_band": lead.score_band or "cold",
+                "tags": lead.tags or [],
                 "ultima_msg": last_msg.texto if last_msg else "",
                 "ultima_em": last_msg.timestamp.isoformat() if last_msg and last_msg.timestamp else None,
+                "ultima_remetente": last_msg.remetente if last_msg else None,
             })
-        return jsonify({"items": items, "filtro": filtro})
+        return jsonify({
+            "items": items, "filtro": filtro, "total": len(items),
+            "sort": sort, "score_band": band_filter or None,
+        })
+    finally:
+        db.close()
+
+
+@inbox_bp.route("/<int:lead_id>/score/refresh", methods=["POST"])
+@login_required
+def refresh_lead_score(lead_id: int):
+    """Força recompute do score (Frente 3.24). Chamável pelo frontend."""
+    tenant_id = current_user.tenant_id
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(id=lead_id, tenant_id=tenant_id).first()
+        if not lead:
+            return jsonify({"error": "lead_not_found"}), 404
+        try:
+            import lead_scoring
+            lead_scoring.update_lead_score(lead_id, db_session=db)
+            db.refresh(lead)
+            return jsonify({
+                "ok": True,
+                "score_value": lead.score_value,
+                "score_band": lead.score_band,
+                "components": lead.score_components,
+            })
+        except Exception as exc:
+            return jsonify({"error": "compute_failed", "details": str(exc)[:200]}), 500
     finally:
         db.close()
 

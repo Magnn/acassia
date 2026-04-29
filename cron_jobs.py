@@ -420,9 +420,22 @@ def hourly_apply_pending_downgrades():
         db.close()
 
 
+def daily_recompute_lead_scores():
+    """
+    Recalcula score de todos os leads ativos. Frente 3.24.
+    """
+    try:
+        import lead_scoring
+        updated = lead_scoring.recompute_all()
+        logger.info("[cron.daily_recompute_lead_scores] updated=%d", updated)
+    except Exception as exc:
+        logger.warning("[cron.daily_recompute_lead_scores] falha: %s", exc)
+
+
 def run_daily():
     logger.info("[cron] starting daily jobs")
     daily_recompute_tenant_health()
+    daily_recompute_lead_scores()
     daily_hard_delete()
     logger.info("[cron] daily done")
 

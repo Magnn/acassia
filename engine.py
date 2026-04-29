@@ -2242,6 +2242,15 @@ class Engine:
             db.add(m)
             if auto_commit:
                 db.commit()
+                # Recalcula score do lead a cada msg salva (Frente 3.24)
+                # Skip async: cron daily faz batch refresh.
+                # Aqui só recalcula em msg inbound (user) — sinal forte.
+                if remetente == "user":
+                    try:
+                        import lead_scoring
+                        lead_scoring.update_lead_score(lead_id, db_session=db)
+                    except Exception as exc:
+                        logger.debug("[lead_scoring] update inline falhou: %s", exc)
         except Exception as e:
             db.rollback()
             logger.error(f"🚨 [DB] Falha ao salvar mensagem: {e}")

@@ -48,6 +48,15 @@ class Lead(Base):
     tom_sugerido = Column(String(50), nullable=True)
     score_engajamento = Column(Float, default=0.5)
     ultima_intencao = Column(String(50), nullable=True)
+
+    # Lead scoring (Frente 3.24) — distinto de score_engajamento legado
+    # score_value: 0-100 composto (engagement + sentiment + funnel + commercial)
+    # score_band: hot|warm|cold
+    # score_components: dict com pontuações individuais pra debug
+    score_value = Column(Integer, default=0, nullable=False, index=True)
+    score_band = Column(String(10), default="cold", nullable=False, index=True)
+    score_components = Column(JSON, nullable=True)
+    score_updated_at = Column(DateTime(timezone=True), nullable=True)
     ultimo_sentimento = Column(String(50), nullable=True)
 
     recovery_stage = Column(Integer, default=0)
