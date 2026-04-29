@@ -118,3 +118,103 @@ def takeover(lead_id: int):
     finally:
         db.close()
     return redirect(url_for("saas_inbox.conversation", lead_id=lead_id))
+
+# --- JSON API Endpoints for React Frontend ---
+
+from flask import jsonify
+
+@inbox_bp.route("/data", methods=["GET"])
+@login_required
+def list_view_data():
+    tenant_id = current_user.tenant_id
+    filtro = request.args.get("filtro", "todos").lower()
+    if filtro not in ALLOWED_FILTERS:
+        filtro = "todos"
+
+    db = SessionLocal()
+    try:
+        q = db.query(models.Lead).filter_by(tenant_id=tenant_id)
+        if filtro == "ativas":
+            q = q.filter_by(opt_out=False, bot_pausado=False, convertido=False)
+        elif filtro == "pausadas":
+            q = q.filter_by(bot_pausado=True)
+        elif filtro == "convertidas":
+            q = q.filter_by(convertido=True)
+        elif filtro == "perdidas":
+            q = q.filter_by(opt_out=True)
+
+        leads = q.order_by(models.Lead.atualizado_em.desc()).limit(100).all()
+        items = []
+        for lead in leads:
+            last_msg = db.query(models.Mensagem).filter_by(lead_id=lead.id).order_by(
+                models.Mensagem.timestamp.desc()
+            ).first()
+            items.append({
+                "id": lead.id,
+                "telefone": lead.telefone,
+                "nome": lead.nome or "",
+                "node_atual": lead.node_atual,
+                "convertido": bool(lead.convertido),
+                "bot_pausado": bool(lead.bot_pausado),
+                "opt_out": bool(lead.opt_out),
+                "ultima_msg": last_msg.texto if last_msg else "",
+                "ultima_em": last_msg.timestamp.isoformat() if last_msg and last_msg.timestamp else None,
+            })
+        return jsonify({"items": items, "filtro": filtro})
+    finally:
+        db.close()
+
+
+@inbox_bp.route("/<int:lead_id>/data", methods=["GET"])
+@login_required
+def conversation_data(lead_id: int):
+    tenant_id = current_user.tenant_id
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(id=lead_id, tenant_id=tenant_id).first()
+        if not lead:
+            return jsonify({"error": "Not found"}), 404
+            
+        messages = db.query(models.Mensagem).filter_by(lead_id=lead_id).order_by(
+            models.Mensagem.timestamp.asc()
+        ).limit(200).all()
+        
+        msgs_data = []
+        for m in messages:
+            msgs_data.append({
+                "id": m.id,
+                "texto": m.texto,
+                "origem": m.origem,
+                "timestamp": m.timestamp.isoformat() if m.timestamp else None,
+                "media_url": m.media_url,
+                "media_type": m.media_type
+            })
+            
+        return jsonify({
+            "lead": {
+                "id": lead.id,
+                "telefone": lead.telefone,
+                "nome": lead.nome or "",
+                "bot_pausado": bool(lead.bot_pausado),
+                "node_atual": lead.node_atual
+            },
+            "messages": msgs_data
+        })
+    finally:
+        db.close()
+
+
+@inbox_bp.route("/<int:lead_id>/takeover/data", methods=["POST"])
+@login_required
+def takeover_data(lead_id: int):
+    tenant_id = current_user.tenant_id
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(id=lead_id, tenant_id=tenant_id).first()
+        if not lead:
+            return jsonify({"error": "Not found"}), 404
+        lead.bot_pausado = not lead.bot_pausado
+        db.commit()
+        return jsonify({"status": "ok", "bot_pausado": lead.bot_pausado})
+    finally:
+        db.close()

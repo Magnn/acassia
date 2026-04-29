@@ -109,3 +109,46 @@ def recovery():
     _set_var(tenant_id, "recovery.cadence_minutes", cadence)
     flash(f"Cadência atualizada: {cadence}", "success")
     return redirect(url_for("saas_settings.index"))
+
+
+# --- JSON API Endpoints for React Frontend ---
+
+from flask import jsonify
+
+@settings_bp.route("/data", methods=["GET"])
+@login_required
+def settings_data():
+    tenant_id = current_user.tenant_id
+    cfg = get_tenant_config(tenant_id)
+
+    recovery_cfg = cfg.get("recovery") or {}
+    cadence = recovery_cfg.get("cadence_minutes") or [5, 60, 180]
+    if not isinstance(cadence, list):
+        cadence = [5, 60, 180]
+
+    whatsapp = cfg.get("whatsapp") or {}
+    stripe_cfg = cfg.get("stripe") or {}
+
+    return jsonify({
+        "cadence_str": ", ".join(str(x) for x in cadence),
+        "whatsapp_phone_id": whatsapp.get("phone_number_id") or "",
+        "whatsapp_waba_id": whatsapp.get("waba_id") or "",
+        "whatsapp_configured": bool(whatsapp.get("phone_number_id")),
+        "subscription_status": stripe_cfg.get("subscription_status") or "",
+        "connect_payouts": bool(stripe_cfg.get("connect_payouts_enabled")),
+    })
+
+@settings_bp.route("/recovery/data", methods=["POST"])
+@login_required
+def recovery_data():
+    tenant_id = current_user.tenant_id
+    # No React usamos JSON no body
+    data = request.get_json() or {}
+    raw = data.get("cadence_minutes", "")
+    try:
+        cadence = _parse_cadence(raw)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    _set_var(tenant_id, "recovery.cadence_minutes", cadence)
+    return jsonify({"status": "ok", "cadence": cadence})

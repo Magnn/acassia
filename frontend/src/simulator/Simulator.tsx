@@ -103,7 +103,7 @@ export default function Simulator({
   }, [nodes, edges, persona, running, append, onCurrentNodeChange]);
 
   return (
-    <aside className="w-96 flex-shrink-0 border-l border-cigana-border bg-cigana-surface flex flex-col h-full">
+    <aside className="w-96 flex-shrink-0 border-l border-cigana-border bg-cigana-surface flex flex-col h-full animate-slide-in-right shadow-xl">
       <header className="flex items-center justify-between px-3 py-2 border-b border-cigana-border flex-shrink-0">
         <span className="text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5">
           <Play className="w-3.5 h-3.5 text-cigana-purple" fill="currentColor" />
@@ -145,10 +145,10 @@ export default function Simulator({
           ref={(el) => {
             if (el) el.scrollTop = el.scrollHeight;
           }}
-          className="flex-1 overflow-y-auto bg-cigana-bg/60 px-3 py-3 space-y-2"
+          className="flex-1 overflow-y-auto bg-gradient-to-b from-[#f8f9fd] to-[#f5f7fc] px-3 py-3 space-y-2"
         >
           {bubbles.length === 0 && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 text-center mt-4">
               Clique em <strong>executar</strong> para simular o fluxo.
               {' '}Conteúdo, Delay, Condição e Fim são interpretados; outros tipos
               aparecem como stubs.
@@ -190,15 +190,15 @@ export default function Simulator({
 function Bubble({ step }: { step: SimStep }) {
   if (step.kind === 'text') {
     return (
-      <div className="rounded-lg rounded-bl-sm bg-emerald-900/40 border border-emerald-700/50 px-3 py-2 text-sm text-slate-100 max-w-[85%] whitespace-pre-wrap break-words">
+      <div className="rounded-lg rounded-bl-sm bg-[#f1edff] border border-[#ddd2ff] px-3 py-2 text-[13px] text-[#3a2f75] max-w-[85%] whitespace-pre-wrap break-words shadow-sm">
         {step.text || '(mensagem vazia)'}
       </div>
     );
   }
   if (step.kind === 'media') {
     return (
-      <div className="rounded-lg rounded-bl-sm bg-emerald-900/40 border border-emerald-700/50 px-3 py-2 max-w-[85%] space-y-1">
-        <div className="text-[10px] uppercase tracking-wide text-emerald-300">
+      <div className="rounded-lg rounded-bl-sm bg-[#f1edff] border border-[#ddd2ff] px-3 py-2 max-w-[85%] space-y-1 shadow-sm">
+        <div className="text-[10px] uppercase tracking-wide text-[#7c5af5]">
           {step.mediaType}
         </div>
         {step.mediaType === 'image' && step.url ? (
@@ -212,13 +212,13 @@ function Bubble({ step }: { step: SimStep }) {
             href={step.url}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-sky-300 underline break-all"
+            className="text-xs text-[#7c5af5] underline break-all"
           >
             {step.url || '(sem URL)'}
           </a>
         )}
         {step.caption && (
-          <div className="text-xs text-slate-300">{step.caption}</div>
+          <div className="text-[13px] text-[#3a2f75]">{step.caption}</div>
         )}
       </div>
     );

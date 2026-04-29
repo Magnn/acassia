@@ -21,7 +21,7 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
   return (
     <div
       className={[
-        'rounded-lg border px-3 py-2 min-w-[180px] max-w-[260px] shadow-sm relative',
+        'rounded-[16px] border border-slate-200 border-l-[3px] px-3 py-2 min-w-[180px] max-w-[260px] shadow-sm relative font-sans',
         v.border,
         v.bg,
         d.simActive ? 'ring-2 ring-emerald-400 animate-pulse' : '',
@@ -45,11 +45,11 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
           )}
         </span>
       )}
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-400">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-500">
         <v.Icon className={`w-3.5 h-3.5 ${v.accent}`} strokeWidth={2.25} />
         <span>{v.label}</span>
       </div>
-      <div className="mt-1 text-sm font-medium text-slate-100 break-words">
+      <div className="mt-1 text-sm font-medium text-slate-800 break-words">
         {d.label}
       </div>
       {renderConfigHint(d)}
@@ -86,7 +86,7 @@ function renderConfigHint(d: FlowNodeData) {
 
   if (!hint) return null;
   return (
-    <div className="mt-1 text-[11px] text-slate-400 break-words line-clamp-2">
+    <div className="mt-1 text-[11px] text-slate-500 break-words line-clamp-2">
       {hint}
     </div>
   );

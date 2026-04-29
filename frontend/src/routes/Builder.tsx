@@ -27,7 +27,7 @@ export default function Builder() {
   if (!Number.isFinite(blueprintId) || blueprintId <= 0) {
     return (
       <div className="p-6 text-red-400">
-        ID de blueprint inválido. <Link className="underline" to="/">Voltar</Link>
+        ID de blueprint inválido. <Link className="underline" to="/blueprints">Voltar</Link>
       </div>
     );
   }
@@ -39,7 +39,7 @@ export default function Builder() {
     return (
       <div className="p-6 text-red-400">
         Erro carregando fluxo: {(error as Error)?.message ?? 'desconhecido'}.{' '}
-        <Link className="underline" to="/">Voltar</Link>
+        <Link className="underline" to="/blueprints">Voltar</Link>
       </div>
     );
   }
@@ -110,7 +110,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
     <div className="h-full flex flex-col">
       <div className="border-b border-cigana-border bg-cigana-surface px-4 py-2 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/" className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <Link to="/blueprints" className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Fluxos</span>
           </Link>

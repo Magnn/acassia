@@ -92,3 +92,13 @@ def dashboard():
     tenant_id = current_user.tenant_id
     kpis = compute_kpis(tenant_id)
     return render_template("metrics/dashboard.html", kpis=kpis)
+
+
+@metrics_bp.route("/data", methods=["GET"])
+@login_required
+def dashboard_data():
+    """Endpoint REST para consumo do novo React Dashboard."""
+    from flask import jsonify
+    tenant_id = current_user.tenant_id
+    kpis = compute_kpis(tenant_id)
+    return jsonify(kpis)
