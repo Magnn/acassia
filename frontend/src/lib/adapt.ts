@@ -7,6 +7,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   config: Record<string, unknown>;
   /** preenchido em runtime pelo lint — não é persistido. */
   lintLevel?: 'error' | 'warning';
+  /** preenchido em runtime pelo simulador no nó corrente — não é persistido. */
+  simActive?: boolean;
 }
 
 /** Converte um documento acassia-flow para os arrays que React Flow consome. */

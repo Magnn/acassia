@@ -58,8 +58,9 @@ frontend/
 - **Fase 1**: canvas read-only com React Flow ✅
 - **Fase 2**: edição com paleta DnD + auto-save debounceado ✅
 - **Fase 3**: inspetores por tipo de nó ✅
-- **Fase 3.1** (atual): Conteúdo multi-passos + Rule Builder completo + upload de mídia ✅
-- **Fase 4**: simulador WhatsApp + lint visual
+- **Fase 3.1**: Conteúdo multi-passos + Rule Builder completo + upload de mídia ✅
+- **Fase 4a**: lint visual do grafo ✅
+- **Fase 4b** (atual): simulador WhatsApp com persona ✅
 - **Fase 5**: feature flag, redirect de `/dashboard` para `/builder`
 - **Fase 6**: descomissionar `dashboard.html`
 

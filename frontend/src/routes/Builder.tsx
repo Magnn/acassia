@@ -9,6 +9,7 @@ import SaveIndicator from '../builder/SaveIndicator';
 import { issuesByNode, lintGraph } from '../builder/lint';
 import { useFlowState } from '../builder/useFlowState';
 import Inspector from '../inspector/Inspector';
+import Simulator from '../simulator/Simulator';
 import type { AcassiaDocument } from '../lib/types';
 import type { FlowNodeData } from '../lib/adapt';
 
@@ -49,24 +50,27 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   const initialDoc = (blueprint.body ?? {}) as AcassiaDocument;
   const fs = useFlowState({ blueprintId: blueprint.id, initialDoc });
 
-  // Lint derivado do estado atual (memoizado).
   const issues = useMemo(() => lintGraph(fs.nodes, fs.edges), [fs.nodes, fs.edges]);
   const issueLevels = useMemo(() => issuesByNode(issues), [issues]);
 
-  // Decora nodes com lintLevel sem mexer no estado real (mantém serialize limpo).
+  const [simOpen, setSimOpen] = useState(false);
+  const [simCurrent, setSimCurrent] = useState<string | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ id: string; ts: number } | null>(null);
+
+  // Decora nodes com lintLevel + simActive sem mexer no estado real.
   const decoratedNodes = useMemo(
     () =>
       fs.nodes.map((n) => ({
         ...n,
-        data: { ...n.data, lintLevel: issueLevels.get(n.id) },
+        data: {
+          ...n.data,
+          lintLevel: issueLevels.get(n.id),
+          simActive: simCurrent === n.id || undefined,
+        },
       })),
-    [fs.nodes, issueLevels],
+    [fs.nodes, issueLevels, simCurrent],
   );
 
-  const [focusRequest, setFocusRequest] = useState<{
-    id: string;
-    ts: number;
-  } | null>(null);
   const requestFocus = useCallback((nodeId: string) => {
     setFocusRequest({ id: nodeId, ts: Date.now() });
   }, []);
@@ -80,10 +84,26 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
 
   const handleCloseInspector = useCallback(() => {
     if (!fs.selectedNodeId) return;
-    fs.onNodesChange([
-      { type: 'select', id: fs.selectedNodeId, selected: false },
-    ]);
+    fs.onNodesChange([{ type: 'select', id: fs.selectedNodeId, selected: false }]);
   }, [fs]);
+
+  const sidePanel = simOpen ? (
+    <Simulator
+      nodes={fs.nodes}
+      edges={fs.edges}
+      onCurrentNodeChange={setSimCurrent}
+      onClose={() => {
+        setSimCurrent(null);
+        setSimOpen(false);
+      }}
+    />
+  ) : fs.selectedNode ? (
+    <Inspector
+      node={fs.selectedNode}
+      onUpdate={handleUpdateSelected}
+      onClose={handleCloseInspector}
+    />
+  ) : null;
 
   return (
     <div className="h-full flex flex-col">
@@ -102,6 +122,18 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
             {fs.nodes.length} nodes · {fs.edges.length} arestas
           </span>
           <SaveIndicator status={fs.status} error={fs.error} />
+          <button
+            type="button"
+            onClick={() => setSimOpen((v) => !v)}
+            className={[
+              'px-2 py-0.5 rounded text-xs',
+              simOpen
+                ? 'bg-cigana-purple text-white'
+                : 'border border-cigana-border hover:border-cigana-purple',
+            ].join(' ')}
+          >
+            ▶ {simOpen ? 'Fechar simulador' : 'Simular'}
+          </button>
         </div>
       </div>
       <div className="flex-1 min-h-0 flex">
@@ -111,7 +143,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
             <Canvas
               nodes={decoratedNodes}
               edges={fs.edges}
-              editable
+              editable={!simOpen}
               focusRequest={focusRequest}
               onNodesChange={fs.onNodesChange}
               onEdgesChange={fs.onEdgesChange}
@@ -121,13 +153,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           </div>
           <LintPanel issues={issues} onFocus={requestFocus} />
         </div>
-        {fs.selectedNode && (
-          <Inspector
-            node={fs.selectedNode}
-            onUpdate={handleUpdateSelected}
-            onClose={handleCloseInspector}
-          />
-        )}
+        {sidePanel}
       </div>
     </div>
   );

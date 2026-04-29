@@ -23,9 +23,10 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
         'rounded-lg border px-3 py-2 min-w-[180px] max-w-[260px] shadow-sm relative',
         v.border,
         v.bg,
-        selected ? 'ring-2 ring-cigana-purple' : '',
-        d.lintLevel === 'error' ? 'ring-2 ring-red-500' : '',
-        d.lintLevel === 'warning' && !selected ? 'ring-1 ring-amber-400' : '',
+        d.simActive ? 'ring-2 ring-emerald-400 animate-pulse' : '',
+        !d.simActive && selected ? 'ring-2 ring-cigana-purple' : '',
+        !d.simActive && d.lintLevel === 'error' ? 'ring-2 ring-red-500' : '',
+        !d.simActive && d.lintLevel === 'warning' && !selected ? 'ring-1 ring-amber-400' : '',
       ].join(' ')}
     >
       {d.lintLevel && (
