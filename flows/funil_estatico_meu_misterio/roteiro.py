@@ -16,6 +16,8 @@ from typing import Any, List, Tuple
 
 from schema import Acao
 
+from flows.funil_estatico_meu_misterio.static_funnel_state import dispatch_em_andamento_recente
+
 
 def acao_texto_copy_exata(conteudo: str, **metadata: Any) -> Acao:
     """
@@ -42,7 +44,7 @@ AUDIO_B2_PRIORIDADE: Tuple[str, ...] = (
 URL_REL_PERFIL_IG_FALLBACK = "assets/instagram/perfil_meumisterio.png"
 
 # ── Bloco 1 ───────────────────────────────────────────────────────────────────
-B1_DELAY_APOS_GATILHO_S = 35
+B1_DELAY_APOS_GATILHO_S = 8
 B1_DELAY_APOS_LINK_S = 12
 B1_DELAY_APOS_TEXTO_LINK_S = 8
 B1_DELAY_ANTES_PERGUNTA_S = 28
@@ -52,21 +54,21 @@ B1_DELAY_ANTES_B2_S = 15
 # Copy exata do roteiro (um único balão; engine não aplica fatiamento nem sanitização agressiva).
 B1_TEXTO_INTRO = """Olá, tudo bem! 😄
 
-Eu sou  Esmeralda  e sou Especialista em casos amorosos Centro Meu Mistério, que e um  Centro de Espiritualidade e Harmonia e Paz. 🏥💙
+Eu sou Esmeralda e sou especialista em casos amorosos do Centro Meu Mistério, que é um Centro de Espiritualidade, Harmonia e Paz. ✨💙
 
-Já vou te explicar tudo certinho , mas antes, Quero te pedir para Seguir nosso Centro no Instagram. 🙏😍
+Já vou te explicar tudo direitinho, mas antes, quero te pedir para seguir nosso Centro no Instagram. 🙏😍
 
-Posto Vários Depoimentos E Mostro Como e Nossa Rotina Aqui em Nosso Centro 🥳
+Posto vários depoimentos e mostro como é nossa rotina aqui no nosso Centro 🥳
 
-👇😍Segue O Link Do Meu Instagram 😍👇"""
+👇😍 Segue o link do meu Instagram 😍👇"""
 
-B1_TEXTO_PERGUNTA = """💢Agora que já nos conhecemos vamos iniciar seu atendimento, ok!😍🙏
+B1_TEXTO_PERGUNTA = """💢Agora que já nos conhecemos vamos iniciar seu atendimento, ok! 😍🙏
 
-💫Por Favor me envie uma foto da sua mão Direita 🖐️ , 
+💫Por favor me envie uma foto da sua mão direita 🖐️,
 
-💔 Me faça uma Pergunta sobre sobre a área Amorosa
+💔 Me faça uma pergunta sobre a área amorosa
 
-Estou no seu Aguardo, ok 😇"""
+Estou no seu aguardo, ok 😇"""
 
 B1_LINK_IG_DEFAULT = "https://www.instagram.com/meumisterio_oficial"
 
@@ -80,7 +82,7 @@ RE_GATILHO_B1 = re.compile(
 # ── Bloco 2 ───────────────────────────────────────────────────────────────────
 # O tempo de espera pós-resposta do B1 está em `B1_DELAY_ANTES_B2_S` (transição no node b1).
 B2_DELAY_APOS_RESPOSTA_B1_S = 0
-B2_DELAY_PRE_AUDIO_S = 180
+B2_DELAY_PRE_AUDIO_S = 90
 B2_DELAY_POS_AUDIO_S = 26
 
 B2_TEXTO_INTERPRETACAO = (
@@ -149,7 +151,7 @@ B5_DELAY_ANTES_B6_S = 15
 B5_AUDIO_DEFAULT = "https://meumisterio.com/assets/funil_estatico_meu_misterio/audio/bloco5.ogg"
 B5_LINK_PAGAMENTO_DEFAULT = "https://pay.cakto.com.br/37fuusy"
 
-B5_TEXTO_INTRO_PAGAMENTO = """Irei te enviar o link de pagamento do Nosso Fornecedor, ok
+B5_TEXTO_INTRO_PAGAMENTO = """Irei te enviar o link de pagamento do nosso parceiro, ok
 aperta no link e escolhe opção de pix ou cartão👇👇👇"""
 
 B5_TEXTO_PERGUNTA_GARANTIA = "Quer saber qual será a Garantia que você irá ter?"
@@ -403,7 +405,7 @@ def texto_detalhe_pagamento_b5(cfg: dict) -> str:
     lk = url_link_pagamento_b5(cfg)
     return (
         "Aqui está o link de pagamento com seu desconto exclusivo de hoje:\n"
-        "Está em nome Cackto Pay LTD no valor de 100 reais\n\n"
+        "Está em nome Cakto Pay LTD no valor de 100 reais\n\n"
         "⚠️ Ele é válido apenas HOJE, pois as vagas com esse valor são limitadas:\n\n"
         f"👉 {lk}\n"
         "✅ Clica no link e gera seu pix ou cartão.\n"

@@ -18,6 +18,12 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
     if meta.get(R.META_B4_SEQ):
         if (meta.get(R.META_B4_PHASE) or "").strip() == "awaiting_reply":
+            if not bool(meta.get("static_mm_b4_entregue")):
+                if R.lead_respondeu_texto_ou_midia(ctx) and R.dispatch_em_andamento_recente(meta, "static_mm_b4"):
+                    logger.info("event=static_mm_b4_reply_durante_dispatch lead=%s", getattr(ctx, "lead_id", "?"))
+                    return [Acao(tipo="delay", segundos=R.B4_DELAY_ANTES_B5_S)], "static_meumisterio_b5"
+                meta[R.META_B4_PHASE] = "awaiting_reply"
+                return R.montar_acoes_bloco4(cfg), "static_meumisterio_b4"
             if not R.lead_respondeu_texto_ou_midia(ctx):
                 return [], "static_meumisterio_b4"
             logger.info("event=static_mm_b4_avanca_para_b5 lead=%s", getattr(ctx, "lead_id", "?"))

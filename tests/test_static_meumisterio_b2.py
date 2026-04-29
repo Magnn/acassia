@@ -46,6 +46,7 @@ class TestStaticMeumisterioB2(unittest.TestCase):
                 "__config__": {"public_url": "https://example.com"},
                 "static_mm_b2_phase": "awaiting_nome_amado",
                 "static_mm_b2_seq_dispatched": True,
+                "static_mm_b2_entregue": True,
             },
         )
         acoes, prox = b2.executar_v2(ctx)

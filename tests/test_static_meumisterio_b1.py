@@ -53,6 +53,7 @@ class TestStaticMeumisterioB1(unittest.TestCase):
             metadata={
                 "__config__": {"public_url": "https://example.com"},
                 "static_mm_b1_phase": "awaiting_reply",
+                "static_mm_b1_entregue": True,
             },
         )
         acoes, prox = b1.executar_v2(ctx)

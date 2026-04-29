@@ -1,0 +1,146 @@
+{
+  "format": "acassia-flow",
+  "version": 1,
+  "title": "Funil Meu Mistério (estático)",
+  "updatedAt": "2026-04-10T12:00:00.000Z",
+  "nodesInnerHTML": "",
+  "svgInner": "",
+  "graph": {
+    "nodes": [
+      {
+        "id": "fn-mm-trigger",
+        "type": "trigger",
+        "label": "WhatsApp — palavra-chave",
+        "iconClass": "fab fa-whatsapp",
+        "x": 52,
+        "y": 130,
+        "config": {
+          "step_name": "Gatilho — Meu Mistério",
+          "integration": "whatsapp",
+          "event": "palavra_chave",
+          "keyword": "quero minha consulta"
+        }
+      },
+      {
+        "id": "fn-mm-note",
+        "type": "anotacao",
+        "label": "Anotação",
+        "x": 250,
+        "y": 130,
+        "config": {
+          "note": "Copy e delays de produção: flows/funil_estatico_meu_misterio/roteiro.py. Edite aqui para documentar ou migrar; insira blocos Conteúdo / Delay / Divisão A/B entre os motores conforme necessário."
+        }
+      },
+      {
+        "id": "fn-mm-b1",
+        "type": "motor_ref",
+        "label": "Motor Python",
+        "x": 448,
+        "y": 130,
+        "config": {
+          "step_name": "B1 — entrada & Instagram",
+          "module_hint": "flows/funil_estatico_meu_misterio/node_static_meumisterio_b1.py"
+        }
+      },
+      {
+        "id": "fn-mm-dly",
+        "type": "delay",
+        "label": "Delay",
+        "x": 646,
+        "y": 130,
+        "config": {
+          "seconds": 15,
+          "step_name": "B1→B2 (roteiro: B1_DELAY_ANTES_B2_S = 15)"
+        }
+      },
+      {
+        "id": "fn-mm-b2",
+        "type": "motor_ref",
+        "label": "Motor Python",
+        "x": 844,
+        "y": 130,
+        "config": {
+          "step_name": "B2 — áudio & nome",
+          "module_hint": "flows/funil_estatico_meu_misterio/node_static_meumisterio_b2.py"
+        }
+      },
+      {
+        "id": "fn-mm-b3",
+        "type": "motor_ref",
+        "label": "Motor Python",
+        "x": 1042,
+        "y": 130,
+        "config": {
+          "step_name": "B3 — hipnose astral",
+          "module_hint": "flows/funil_estatico_meu_misterio/node_static_meumisterio_b3.py"
+        }
+      },
+      {
+        "id": "fn-mm-b4",
+        "type": "motor_ref",
+        "label": "Motor Python",
+        "x": 1240,
+        "y": 130,
+        "config": {
+          "step_name": "B4 — depoimentos / áudios",
+          "module_hint": "flows/funil_estatico_meu_misterio/node_static_meumisterio_b4.py"
+        }
+      },
+      {
+        "id": "fn-mm-b5",
+        "type": "motor_ref",
+        "label": "Motor Python",
+        "x": 1438,
+        "y": 130,
+        "config": {
+          "step_name": "B5 — pagamento",
+          "module_hint": "flows/funil_estatico_meu_misterio/node_static_meumisterio_b5.py"
+        }
+      },
+      {
+        "id": "fn-mm-b6",
+        "type": "motor_ref",
+        "label": "Motor Python",
+        "x": 1636,
+        "y": 130,
+        "config": {
+          "step_name": "B6 — garantia & fecho",
+          "module_hint": "flows/funil_estatico_meu_misterio/node_static_meumisterio_b6.py"
+        }
+      },
+      {
+        "id": "fn-mm-b7",
+        "type": "motor_ref",
+        "label": "Motor Python",
+        "x": 1834,
+        "y": 130,
+        "config": {
+          "step_name": "B7 — pós-pagamento",
+          "module_hint": "flows/funil_estatico_meu_misterio/node_static_meumisterio_b7.py"
+        }
+      },
+      {
+        "id": "fn-mm-end",
+        "type": "end",
+        "label": "Fim",
+        "x": 2032,
+        "y": 130,
+        "config": {
+          "step_name": "Fim do funil estático"
+        }
+      }
+    ],
+    "edges": [
+      { "id": "e-mm-0", "from": "fn-mm-trigger", "to": "fn-mm-note" },
+      { "id": "e-mm-1", "from": "fn-mm-note", "to": "fn-mm-b1" },
+      { "id": "e-mm-2", "from": "fn-mm-b1", "to": "fn-mm-dly" },
+      { "id": "e-mm-3", "from": "fn-mm-dly", "to": "fn-mm-b2" },
+      { "id": "e-mm-4", "from": "fn-mm-b2", "to": "fn-mm-b3" },
+      { "id": "e-mm-5", "from": "fn-mm-b3", "to": "fn-mm-b4" },
+      { "id": "e-mm-6", "from": "fn-mm-b4", "to": "fn-mm-b5" },
+      { "id": "e-mm-7", "from": "fn-mm-b5", "to": "fn-mm-b6" },
+      { "id": "e-mm-8", "from": "fn-mm-b6", "to": "fn-mm-b7" },
+      { "id": "e-mm-9", "from": "fn-mm-b7", "to": "fn-mm-end" }
+    ]
+  }
+}
