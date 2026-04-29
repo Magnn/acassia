@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { Field, NumberInput, TextArea, TextInput } from '../fields';
 import MediaUpload from './MediaUpload';
 import {
@@ -42,64 +43,74 @@ export default function CardList({ cards, onChange }: Props) {
   return (
     <div className="space-y-3">
       <ol className="space-y-2">
-        {cards.map((c, i) => (
-          <li
-            key={i}
-            className="rounded border border-cigana-border bg-cigana-bg p-2"
-          >
-            <div className="flex items-center justify-between mb-2 text-[11px] uppercase tracking-wide text-slate-400">
-              <span>
-                {KIND_META[c.type].emoji} {i + 1}. {KIND_META[c.type].label}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => move(i, -1)}
-                  disabled={i === 0}
-                  className="px-1 hover:text-slate-200 disabled:opacity-30"
-                  title="Mover acima"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => move(i, 1)}
-                  disabled={i === cards.length - 1}
-                  className="px-1 hover:text-slate-200 disabled:opacity-30"
-                  title="Mover abaixo"
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => remove(i)}
-                  className="px-1 hover:text-red-400"
-                  title="Remover"
-                >
-                  ×
-                </button>
+        {cards.map((c, i) => {
+          const Meta = KIND_META[c.type];
+          return (
+            <li
+              key={i}
+              className="rounded border border-cigana-border bg-cigana-bg p-2"
+            >
+              <div className="flex items-center justify-between mb-2 text-[11px] uppercase tracking-wide text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Meta.Icon className="w-3.5 h-3.5" />
+                  <span>{i + 1}. {Meta.label}</span>
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => move(i, -1)}
+                    disabled={i === 0}
+                    className="p-1 rounded hover:text-slate-200 hover:bg-cigana-surface disabled:opacity-30 disabled:hover:bg-transparent"
+                    title="Mover acima"
+                  >
+                    <ChevronUp className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(i, 1)}
+                    disabled={i === cards.length - 1}
+                    className="p-1 rounded hover:text-slate-200 hover:bg-cigana-surface disabled:opacity-30 disabled:hover:bg-transparent"
+                    title="Mover abaixo"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(i)}
+                    className="p-1 rounded hover:text-red-400 hover:bg-cigana-surface"
+                    title="Remover"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <CardEditor card={c} onChange={(c2) => update(i, c2)} />
-          </li>
-        ))}
+              <CardEditor card={c} onChange={(c2) => update(i, c2)} />
+            </li>
+          );
+        })}
       </ol>
 
       {cards.length < MAX_CARDS ? (
         <div className="grid grid-cols-3 gap-1">
-          {ALL_KINDS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => add(k)}
-              className="text-xs px-2 py-1 rounded border border-cigana-border bg-cigana-bg hover:border-cigana-purple"
-            >
-              {KIND_META[k].emoji} {KIND_META[k].label}
-            </button>
-          ))}
+          {ALL_KINDS.map((k) => {
+            const Meta = KIND_META[k];
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => add(k)}
+                className="flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded border border-cigana-border bg-cigana-bg hover:border-cigana-purple hover:text-slate-100"
+                title={`Adicionar card de ${Meta.label}`}
+              >
+                <Meta.Icon className="w-3.5 h-3.5" />
+                <span>{Meta.label}</span>
+              </button>
+            );
+          })}
         </div>
       ) : (
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] text-slate-500 flex items-center gap-1">
+          <Plus className="w-3 h-3 opacity-50" />
           Máximo de {MAX_CARDS} cards por bloco Conteúdo (política WhatsApp).
         </p>
       )}

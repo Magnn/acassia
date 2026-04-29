@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  HelpCircle,
+  Play,
+  Square,
+  StopCircle,
+  X,
+  XCircle,
+} from 'lucide-react';
 import type { FlowNodeData } from '../lib/adapt';
 import PersonaPicker from './PersonaPicker';
 import { walk, type SimStep, type WalkerControl } from './walker';
@@ -94,34 +105,37 @@ export default function Simulator({
   return (
     <aside className="w-96 flex-shrink-0 border-l border-cigana-border bg-cigana-surface flex flex-col h-full">
       <header className="flex items-center justify-between px-3 py-2 border-b border-cigana-border flex-shrink-0">
-        <span className="text-[11px] uppercase tracking-wide text-slate-400">
-          ▶ Simulador
+        <span className="text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5">
+          <Play className="w-3.5 h-3.5 text-cigana-purple" fill="currentColor" />
+          Simulador
         </span>
         <div className="flex items-center gap-2">
           {running ? (
             <button
               type="button"
               onClick={reset}
-              className="text-xs px-2 py-0.5 rounded border border-cigana-border hover:border-red-400 hover:text-red-400"
+              className="text-xs px-2 py-0.5 rounded border border-cigana-border hover:border-red-400 hover:text-red-400 flex items-center gap-1"
             >
+              <Square className="w-3 h-3" fill="currentColor" />
               parar
             </button>
           ) : (
             <button
               type="button"
               onClick={run}
-              className="text-xs px-2 py-0.5 rounded bg-cigana-purple text-white hover:brightness-110"
+              className="text-xs px-2 py-0.5 rounded bg-cigana-purple text-white hover:brightness-110 flex items-center gap-1"
             >
+              <Play className="w-3 h-3" fill="currentColor" />
               executar
             </button>
           )}
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-100 px-2 py-0.5 rounded hover:bg-cigana-bg text-sm"
+            className="text-slate-400 hover:text-slate-100 p-1 rounded hover:bg-cigana-bg"
             title="Fechar simulador"
           >
-            ×
+            <X className="w-4 h-4" />
           </button>
         </div>
       </header>
@@ -148,16 +162,18 @@ export default function Simulator({
               <button
                 type="button"
                 onClick={() => pendingChoice(true)}
-                className="text-xs px-3 py-1 rounded bg-emerald-500/80 text-white hover:bg-emerald-500"
+                className="text-xs px-3 py-1 rounded bg-emerald-500/80 text-white hover:bg-emerald-500 flex items-center gap-1"
               >
-                ✓ sim (verdadeiro)
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                sim (verdadeiro)
               </button>
               <button
                 type="button"
                 onClick={() => pendingChoice(false)}
-                className="text-xs px-3 py-1 rounded bg-rose-500/80 text-white hover:bg-rose-500"
+                className="text-xs px-3 py-1 rounded bg-rose-500/80 text-white hover:bg-rose-500 flex items-center gap-1"
               >
-                ✗ não (falso)
+                <XCircle className="w-3.5 h-3.5" />
+                não (falso)
               </button>
             </div>
           )}
@@ -210,22 +226,27 @@ function Bubble({ step }: { step: SimStep }) {
   if (step.kind === 'delay') {
     return (
       <div className="text-[10px] text-slate-500 italic flex items-center gap-1">
-        <span className="animate-pulse">⏱️</span> aguardando {step.seconds}s
+        <Clock className="w-3 h-3 animate-pulse" />
+        <span>aguardando {step.seconds}s</span>
       </div>
     );
   }
   if (step.kind === 'choice') {
     return (
-      <div className="rounded border border-amber-500/40 bg-amber-900/20 px-3 py-2 text-xs text-amber-200">
-        ❓ {step.question}
+      <div className="rounded border border-amber-500/40 bg-amber-900/20 px-3 py-2 text-xs text-amber-200 flex items-center gap-1.5">
+        <HelpCircle className="w-3.5 h-3.5 flex-shrink-0" />
+        <span>{step.question}</span>
       </div>
     );
   }
   if (step.kind === 'enter') {
     return (
-      <div className="text-[10px] text-slate-500 font-mono">
-        → entra em <span className="text-slate-300">{step.label}</span>{' '}
-        <span className="text-slate-600">[{step.type}]</span>
+      <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+        <ArrowRight className="w-3 h-3" />
+        <span>
+          entra em <span className="text-slate-300">{step.label}</span>{' '}
+          <span className="text-slate-600">[{step.type}]</span>
+        </span>
       </div>
     );
   }
@@ -241,13 +262,17 @@ function Bubble({ step }: { step: SimStep }) {
   }
   if (step.kind === 'end') {
     return (
-      <div className="text-xs text-emerald-400 font-medium">
-        ⏹️ fim — {step.label}
+      <div className="text-xs text-emerald-400 font-medium flex items-center gap-1">
+        <StopCircle className="w-3.5 h-3.5" />
+        <span>fim — {step.label}</span>
       </div>
     );
   }
   return (
-    <div className="text-xs text-red-400">⚠ {step.reason}</div>
+    <div className="text-xs text-red-400 flex items-center gap-1">
+      <XCircle className="w-3.5 h-3.5" />
+      <span>{step.reason}</span>
+    </div>
   );
 }
 

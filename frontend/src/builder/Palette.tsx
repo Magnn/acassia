@@ -1,3 +1,4 @@
+import { Layers } from 'lucide-react';
 import { visualForType } from './nodeStyles';
 import type { AcassiaNodeType } from '../lib/types';
 
@@ -19,8 +20,9 @@ const ITEMS: AcassiaNodeType[] = [
 export default function Palette() {
   return (
     <aside className="w-56 flex-shrink-0 border-r border-cigana-border bg-cigana-surface overflow-y-auto">
-      <div className="px-3 py-3 text-[11px] uppercase tracking-wide text-slate-400 border-b border-cigana-border">
-        Paleta
+      <div className="px-3 py-3 flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400 border-b border-cigana-border">
+        <Layers className="w-3.5 h-3.5" />
+        <span>Paleta</span>
       </div>
       <ul className="p-2 space-y-1">
         {ITEMS.map((t) => (
@@ -51,7 +53,7 @@ function PaletteItem({ type }: { type: AcassiaNodeType }) {
         'hover:brightness-125 transition',
       ].join(' ')}
     >
-      <span>{v.emoji}</span>
+      <v.Icon className={`w-4 h-4 ${v.accent}`} strokeWidth={2.25} />
       <span className="text-slate-100">{v.label}</span>
     </li>
   );

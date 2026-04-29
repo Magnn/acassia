@@ -1,3 +1,4 @@
+import { Plus, X } from 'lucide-react';
 import { Select, TextInput } from '../fields';
 
 export interface Rule {
@@ -86,10 +87,10 @@ export default function RuleBuilder({
               <button
                 type="button"
                 onClick={() => remove(i)}
-                className="px-1 hover:text-red-400"
+                className="p-1 rounded hover:text-red-400 hover:bg-cigana-surface"
                 title="Remover regra"
               >
-                ×
+                <X className="w-3 h-3" />
               </button>
             </div>
             <TextInput
@@ -116,9 +117,10 @@ export default function RuleBuilder({
       <button
         type="button"
         onClick={add}
-        className="w-full text-xs px-2 py-1 rounded border border-dashed border-cigana-border text-slate-400 hover:text-slate-100 hover:border-cigana-purple"
+        className="w-full text-xs px-2 py-1.5 rounded border border-dashed border-cigana-border text-slate-400 hover:text-slate-100 hover:border-cigana-purple flex items-center justify-center gap-1"
       >
-        + adicionar regra
+        <Plus className="w-3.5 h-3.5" />
+        adicionar regra
       </button>
     </div>
   );

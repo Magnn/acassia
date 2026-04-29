@@ -1,5 +1,15 @@
 // Cards do bloco Conteúdo — espelha o formato persistido pelo dashboard.html.
 
+import {
+  Clock,
+  FileText,
+  Image as ImageIcon,
+  Mic,
+  Type,
+  Video,
+  type LucideIcon,
+} from 'lucide-react';
+
 export type CardKind = 'text' | 'delay' | 'image' | 'audio' | 'video' | 'document';
 
 export interface TextCard {
@@ -31,11 +41,11 @@ export function defaultCardForKind(kind: CardKind): Card {
   return { type: kind, value: { url: '', caption: '' } };
 }
 
-export const KIND_META: Record<CardKind, { label: string; emoji: string }> = {
-  text: { label: 'Texto', emoji: '📝' },
-  image: { label: 'Imagem', emoji: '🖼️' },
-  audio: { label: 'Áudio', emoji: '🎙️' },
-  video: { label: 'Vídeo', emoji: '🎬' },
-  document: { label: 'Documento', emoji: '📄' },
-  delay: { label: 'Delay', emoji: '⏱️' },
+export const KIND_META: Record<CardKind, { label: string; Icon: LucideIcon }> = {
+  text: { label: 'Texto', Icon: Type },
+  image: { label: 'Imagem', Icon: ImageIcon },
+  audio: { label: 'Áudio', Icon: Mic },
+  video: { label: 'Vídeo', Icon: Video },
+  document: { label: 'Documento', Icon: FileText },
+  delay: { label: 'Delay', Icon: Clock },
 };

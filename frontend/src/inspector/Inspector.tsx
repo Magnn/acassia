@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react';
+import { X } from 'lucide-react';
 import type { FlowNodeData } from '../lib/adapt';
 import { visualForType } from '../builder/nodeStyles';
 import {
@@ -30,15 +31,15 @@ export default function Inspector({ node, onUpdate, onClose }: Props) {
     <aside className="w-80 flex-shrink-0 border-l border-cigana-border bg-cigana-surface flex flex-col h-full">
       <header className="flex items-center justify-between px-3 py-2 border-b border-cigana-border flex-shrink-0">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
-          <span>{v.emoji}</span>
+          <v.Icon className={`w-3.5 h-3.5 ${v.accent}`} strokeWidth={2.25} />
           <span>{v.label}</span>
         </div>
         <button
           onClick={onClose}
-          className="text-slate-400 hover:text-slate-100 px-2 py-0.5 rounded hover:bg-cigana-bg text-sm"
+          className="text-slate-400 hover:text-slate-100 p-1 rounded hover:bg-cigana-bg"
           title="Fechar inspetor (deselecionar)"
         >
-          ×
+          <X className="w-4 h-4" />
         </button>
       </header>
 

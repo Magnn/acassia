@@ -1,4 +1,5 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
+import { AlertCircle, AlertTriangle } from 'lucide-react';
 import type { FlowNodeData } from '../lib/adapt';
 import { visualForType } from './nodeStyles';
 
@@ -32,16 +33,20 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
       {d.lintLevel && (
         <span
           className={[
-            'absolute -top-2 -right-2 rounded-full text-[10px] w-5 h-5 flex items-center justify-center border border-cigana-bg',
+            'absolute -top-2 -right-2 rounded-full w-5 h-5 flex items-center justify-center border border-cigana-bg',
             d.lintLevel === 'error' ? 'bg-red-500 text-white' : 'bg-amber-400 text-slate-900',
           ].join(' ')}
           title={d.lintLevel === 'error' ? 'erro de validação' : 'aviso de validação'}
         >
-          {d.lintLevel === 'error' ? '!' : '⚠'}
+          {d.lintLevel === 'error' ? (
+            <AlertCircle className="w-3 h-3" />
+          ) : (
+            <AlertTriangle className="w-3 h-3" />
+          )}
         </span>
       )}
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
-        <span>{v.emoji}</span>
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-400">
+        <v.Icon className={`w-3.5 h-3.5 ${v.accent}`} strokeWidth={2.25} />
         <span>{v.label}</span>
       </div>
       <div className="mt-1 text-sm font-medium text-slate-100 break-words">

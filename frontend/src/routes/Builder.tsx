@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, History, Play, Square } from 'lucide-react';
 import { blueprintsApi, type BlueprintDetail } from '../api/blueprints';
 import Canvas from '../builder/Canvas';
 import LintPanel from '../builder/LintPanel';
@@ -108,9 +109,10 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   return (
     <div className="h-full flex flex-col">
       <div className="border-b border-cigana-border bg-cigana-surface px-4 py-2 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-baseline gap-3">
-          <Link to="/" className="text-xs text-slate-400 hover:text-slate-200">
-            ← Fluxos
+        <div className="flex items-center gap-3">
+          <Link to="/" className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Fluxos</span>
           </Link>
           <h2 className="text-sm font-medium">{blueprint.title}</h2>
           <span className="text-xs text-slate-500">
@@ -118,10 +120,11 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           </span>
           <a
             href="/dashboard?legacy=1"
-            className="text-[11px] text-slate-500 hover:text-slate-300 underline-offset-2 hover:underline"
+            className="text-[11px] text-slate-500 hover:text-slate-300 flex items-center gap-1 hover:underline underline-offset-2"
             title="Abrir o builder antigo (dashboard.html) — fallback de emergência"
           >
-            ↩ builder antigo
+            <History className="w-3 h-3" />
+            <span>builder antigo</span>
           </a>
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -133,13 +136,23 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
             type="button"
             onClick={() => setSimOpen((v) => !v)}
             className={[
-              'px-2 py-0.5 rounded text-xs',
+              'px-2 py-1 rounded text-xs flex items-center gap-1',
               simOpen
                 ? 'bg-cigana-purple text-white'
                 : 'border border-cigana-border hover:border-cigana-purple',
             ].join(' ')}
           >
-            ▶ {simOpen ? 'Fechar simulador' : 'Simular'}
+            {simOpen ? (
+              <>
+                <Square className="w-3 h-3" fill="currentColor" />
+                Fechar simulador
+              </>
+            ) : (
+              <>
+                <Play className="w-3 h-3" fill="currentColor" />
+                Simular
+              </>
+            )}
           </button>
         </div>
       </div>

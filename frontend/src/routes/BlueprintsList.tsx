@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { History } from 'lucide-react';
 import { blueprintsApi } from '../api/blueprints';
 
 export default function BlueprintsList() {
@@ -14,10 +15,11 @@ export default function BlueprintsList() {
         <h1 className="text-xl font-semibold">Fluxos do tenant</h1>
         <a
           href="/dashboard?legacy=1"
-          className="text-xs text-slate-500 hover:text-slate-300"
+          className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1"
           title="Builder antigo (dashboard.html)"
         >
-          ↩ builder antigo
+          <History className="w-3 h-3" />
+          <span>builder antigo</span>
         </a>
       </div>
 

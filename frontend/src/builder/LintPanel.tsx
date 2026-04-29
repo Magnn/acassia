@@ -1,4 +1,12 @@
 import { useState } from 'react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Crosshair,
+} from 'lucide-react';
 import type { LintIssue } from './lint';
 
 interface Props {
@@ -13,8 +21,9 @@ export default function LintPanel({ issues, onFocus }: Props) {
 
   if (issues.length === 0) {
     return (
-      <div className="border-t border-cigana-border bg-cigana-surface px-3 py-1.5 text-[11px] text-emerald-400 flex-shrink-0">
-        ✓ sem avisos de validação
+      <div className="border-t border-cigana-border bg-cigana-surface px-3 py-1.5 text-[11px] text-emerald-400 flex items-center gap-1.5 flex-shrink-0">
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        <span>sem avisos de validação</span>
       </div>
     );
   }
@@ -28,35 +37,50 @@ export default function LintPanel({ issues, onFocus }: Props) {
       >
         <span className="flex items-center gap-3">
           {errors > 0 && (
-            <span className="text-red-400">● {errors} erro(s)</span>
+            <span className="flex items-center gap-1 text-red-400">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {errors} erro(s)
+            </span>
           )}
           {warnings > 0 && (
-            <span className="text-amber-400">⚠ {warnings} aviso(s)</span>
+            <span className="flex items-center gap-1 text-amber-400">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              {warnings} aviso(s)
+            </span>
           )}
         </span>
-        <span className="text-slate-500">{open ? '▼ ocultar' : '▲ ver lista'}</span>
+        <span className="flex items-center gap-1 text-slate-500">
+          {open ? (
+            <>
+              <ChevronDown className="w-3 h-3" /> ocultar
+            </>
+          ) : (
+            <>
+              <ChevronUp className="w-3 h-3" /> ver lista
+            </>
+          )}
+        </span>
       </button>
       {open && (
         <ul className="max-h-44 overflow-y-auto border-t border-cigana-border divide-y divide-cigana-border/50">
           {issues.map((i, idx) => (
             <li
               key={idx}
-              className="px-3 py-1.5 flex items-baseline gap-2 text-xs hover:bg-cigana-bg/40"
+              className="px-3 py-1.5 flex items-center gap-2 text-xs hover:bg-cigana-bg/40"
             >
-              <span
-                className={
-                  i.level === 'error' ? 'text-red-400' : 'text-amber-400'
-                }
-              >
-                {i.level === 'error' ? '●' : '⚠'}
-              </span>
+              {i.level === 'error' ? (
+                <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+              ) : (
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+              )}
               <span className="flex-1 text-slate-300">{i.message}</span>
               {i.nodeId && (
                 <button
                   type="button"
                   onClick={() => onFocus(i.nodeId!)}
-                  className="text-[11px] text-sky-400 hover:underline"
+                  className="text-[11px] text-sky-400 hover:underline flex items-center gap-1"
                 >
+                  <Crosshair className="w-3 h-3" />
                   focar
                 </button>
               )}
