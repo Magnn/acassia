@@ -14,7 +14,13 @@ export interface LeadPreview {
   score_value?: number;
   score_band?: 'hot' | 'warm' | 'cold';
   tags?: string[];
+  spiritual_category?: string | null;
+  spiritual_urgency?: 'low' | 'med' | 'high' | null;
 }
+
+export type SpiritualCategory =
+  | 'amor' | 'dinheiro' | 'saude' | 'carreira'
+  | 'familia' | 'espiritual' | 'decisao' | 'luto';
 
 export interface LeadMessage {
   id: number;
@@ -55,6 +61,7 @@ export const inboxApi = {
   getLeads: (params: {
     filtro?: string;
     score_band?: string;
+    spiritual_category?: string;
     search?: string;
     sort?: 'recency' | 'score' | 'name';
     limit?: number;
@@ -62,6 +69,7 @@ export const inboxApi = {
     const q = new URLSearchParams();
     if (params.filtro) q.set('filtro', params.filtro);
     if (params.score_band) q.set('score_band', params.score_band);
+    if (params.spiritual_category) q.set('spiritual_category', params.spiritual_category);
     if (params.search) q.set('search', params.search);
     if (params.sort) q.set('sort', params.sort);
     if (params.limit) q.set('limit', String(params.limit));

@@ -27,7 +27,13 @@ import QuickReplyManager from '../components/QuickReplyManager';
 
 type ViewMode = 'chat' | 'table';
 type ScoreFilter = null | 'hot' | 'warm' | 'cold';
+type SpiritualFilter = null | 'amor' | 'dinheiro' | 'saude' | 'carreira' | 'familia' | 'espiritual' | 'decisao' | 'luto';
 type Density = 'comfy' | 'compact';
+
+const SPIRITUAL_EMOJI: Record<string, string> = {
+  amor: '❤️', dinheiro: '💰', saude: '🌿', carreira: '💼',
+  familia: '🏠', espiritual: '🙏', decisao: '🔀', luto: '🕊️',
+};
 
 const DENSITY_KEY = 'acassia.inbox.density';
 
@@ -75,6 +81,7 @@ export default function Leads() {
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const [filtro, setFiltro] = useState('todos');
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>(null);
+  const [spiritualFilter, setSpiritualFilter] = useState<SpiritualFilter>(null);
   const [search, setSearch] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
@@ -98,10 +105,11 @@ export default function Leads() {
   }, [density]);
 
   const { data: leadsData, isLoading: isLoadingLeads } = useQuery({
-    queryKey: ['leads-list', filtro, scoreFilter],
+    queryKey: ['leads-list', filtro, scoreFilter, spiritualFilter],
     queryFn: () => inboxApi.getLeads({
       filtro,
       score_band: scoreFilter || undefined,
+      spiritual_category: spiritualFilter || undefined,
       sort: 'score',
       limit: 200,
     }),
@@ -305,6 +313,25 @@ export default function Leads() {
                 )}
               </button>
             </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[9px] font-black uppercase tracking-widest text-secondary mr-0.5">Tema:</span>
+              {(['amor', 'dinheiro', 'familia', 'carreira', 'espiritual', 'decisao', 'saude', 'luto'] as const).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setSpiritualFilter(spiritualFilter === c ? null : c)}
+                  title={c}
+                  className={`text-[10px] px-2 py-1 rounded-lg border transition-all flex items-center gap-1 ${
+                    spiritualFilter === c
+                      ? 'bg-accent-amethyst text-white border-accent-amethyst'
+                      : 'bg-bg-primary/50 border-border/50 text-secondary hover:text-primary'
+                  }`}
+                >
+                  <span>{SPIRITUAL_EMOJI[c]}</span>
+                  <span className="font-bold capitalize">{c}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -355,6 +382,19 @@ export default function Leads() {
                   )}
                   {!isCompact && (
                     <div className="flex gap-1.5 mt-2 flex-wrap">
+                      {l.spiritual_category && (
+                        <span
+                          className={`text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border flex items-center gap-1 ${
+                            l.spiritual_urgency === 'high'
+                              ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                              : 'bg-accent-amethyst/10 text-accent-amethyst border-accent-amethyst/30'
+                          }`}
+                          title={`Tema: ${l.spiritual_category}${l.spiritual_urgency ? ` · urgência ${l.spiritual_urgency}` : ''}`}
+                        >
+                          {SPIRITUAL_EMOJI[l.spiritual_category] || '✦'}
+                          {l.spiritual_category}
+                        </span>
+                      )}
                       {l.bot_pausado && (
                         <span className="bg-amber-500/10 text-amber-500 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-amber-500/20">
                           Pausado

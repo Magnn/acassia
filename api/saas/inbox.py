@@ -132,9 +132,10 @@ def list_view_data():
 
     Query params:
         ?filtro=todos|ativas|pausadas|convertidas|perdidas
-        &score_band=hot|warm|cold     (multi via vírgula: hot,warm)
-        &search=string                 (telefone ou nome)
-        &sort=score|recency|name       (default: recency)
+        &score_band=hot|warm|cold              (multi via vírgula: hot,warm)
+        &spiritual_category=amor|dinheiro|...  (multi via vírgula)
+        &search=string                          (telefone ou nome)
+        &sort=score|recency|name                (default: recency)
         &limit=100
     """
     tenant_id = current_user.tenant_id
@@ -143,6 +144,7 @@ def list_view_data():
         filtro = "todos"
     search = (request.args.get("search") or "").strip()
     band_filter = (request.args.get("score_band") or "").strip()
+    spiritual_filter = (request.args.get("spiritual_category") or "").strip()
     sort = request.args.get("sort", "recency")
     limit = min(int(request.args.get("limit") or 100), 500)
 
@@ -162,6 +164,11 @@ def list_view_data():
             bands = [b.strip() for b in band_filter.split(",") if b.strip()]
             if bands:
                 q = q.filter(models.Lead.score_band.in_(bands))
+
+        if spiritual_filter:
+            cats = [c.strip().lower() for c in spiritual_filter.split(",") if c.strip()]
+            if cats:
+                q = q.filter(models.Lead.spiritual_category.in_(cats))
 
         if search:
             like = f"%{search.lower()}%"
@@ -194,6 +201,8 @@ def list_view_data():
                 "score_value": lead.score_value or 0,
                 "score_band": lead.score_band or "cold",
                 "tags": lead.tags or [],
+                "spiritual_category": lead.spiritual_category,
+                "spiritual_urgency": (lead.spiritual_intent or {}).get("urgency") if lead.spiritual_intent else None,
                 "ultima_msg": last_msg.texto if last_msg else "",
                 "ultima_em": last_msg.timestamp.isoformat() if last_msg and last_msg.timestamp else None,
                 "ultima_remetente": last_msg.remetente if last_msg else None,
@@ -201,6 +210,7 @@ def list_view_data():
         return jsonify({
             "items": items, "filtro": filtro, "total": len(items),
             "sort": sort, "score_band": band_filter or None,
+            "spiritual_category": spiritual_filter or None,
         })
     finally:
         db.close()
@@ -332,6 +342,11 @@ def lead_context(lead_id: int):
                 ],
             },
             "tarot_readings_count": tarot_count,
+            "spiritual": {
+                "category": lead.spiritual_category,
+                "intent": lead.spiritual_intent,
+                "computed_at": lead.spiritual_intent_at.isoformat() if lead.spiritual_intent_at else None,
+            },
         })
     finally:
         db.close()

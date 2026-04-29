@@ -512,8 +512,19 @@ def run_daily():
     logger.info("[cron] starting daily jobs")
     daily_recompute_tenant_health()
     daily_recompute_lead_scores()
+    daily_recompute_spiritual_intents()
     daily_hard_delete()
     logger.info("[cron] daily done")
+
+
+def daily_recompute_spiritual_intents():
+    """Reclassifica intent espiritual de leads ativos (Frente 4.19)."""
+    try:
+        import spiritual_classifier
+        n = spiritual_classifier.recompute_recent_leads(days_back=7, max_leads=200)
+        logger.info("[cron.daily_recompute_spiritual_intents] leads_processed=%d", n)
+    except Exception as exc:
+        logger.warning("[cron.spiritual_intents] falha: %s", exc)
 
 
 if __name__ == "__main__":

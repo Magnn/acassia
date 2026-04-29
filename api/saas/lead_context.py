@@ -322,6 +322,42 @@ def _generate_next_action(lead: models.Lead, msgs: list[models.Mensagem]) -> dic
         return _fallback_next_action(lead)
 
 
+@lead_context_bp.route("/<int:lead_id>/spiritual-intent/recompute", methods=["POST"])
+@login_required
+def recompute_spiritual_intent(lead_id: int):
+    """Reclassifica intent espiritual via ultimas msgs do lead (Frente 4.19)."""
+    body = request.get_json(silent=True) or {}
+    last_n = max(1, min(int(body.get("last_n") or 10), 30))
+
+    try:
+        import quota
+        # cada classificacao pode usar Gemini; estimamos 3 chamadas
+        allowed, _, _ = quota.consume_quota(
+            current_user.tenant_id, "gemini_tokens_month", 1000,
+        )
+        if not allowed:
+            return jsonify({"error": "quota_exceeded"}), 402
+    except Exception:
+        pass
+
+    db = SessionLocal()
+    try:
+        lead = _get_lead_or_404(db, lead_id)
+        if not lead:
+            return jsonify({"error": "lead_not_found"}), 404
+        try:
+            import spiritual_classifier
+        except Exception as exc:
+            return jsonify({"error": "classifier_unavailable", "message": str(exc)}), 500
+
+        result = spiritual_classifier.aggregate_lead(lead_id, last_n=last_n, db_session=db)
+        if "error" in result:
+            return jsonify(result), 404
+        return jsonify({"ok": True, **result})
+    finally:
+        db.close()
+
+
 def _fallback_next_action(lead: models.Lead) -> dict:
     band = (lead.score_band or "cold").lower()
     if band == "hot":

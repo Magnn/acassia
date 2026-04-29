@@ -80,6 +80,11 @@ class Lead(Base):
     cidade = Column(String(120), nullable=True)
     custom_fields = Column(JSON, default=dict, nullable=False)
 
+    # Frente 4.19: aggregate intent espiritual (top category + urgency)
+    spiritual_category = Column(String(40), nullable=True, index=True)
+    spiritual_intent = Column(JSON, nullable=True)
+    spiritual_intent_at = Column(DateTime(timezone=True), nullable=True)
+
     criado_em = Column(DateTime(timezone=True), default=_agora_utc)
     atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
     # Controle de concorrência (motor vs thread de envio): merge otimista em metadata_json
@@ -110,6 +115,9 @@ class Mensagem(Base):
 
     intencao = Column(String(50), nullable=True)
     sentimento = Column(String(50), nullable=True)
+    # Frente 4.19: classificacao de intent espiritual
+    # {categories: ["amor","decisao"], urgency: "high|med|low", emotion: "ansiedade"}
+    spiritual_intent = Column(JSON, nullable=True)
     timestamp = Column(DateTime(timezone=True), default=_agora_utc, index=True)
 
     lead = relationship("Lead", back_populates="mensagens")

@@ -46,6 +46,17 @@ export interface LeadContext {
     }>;
   };
   tarot_readings_count: number;
+  spiritual?: {
+    category: string | null;
+    intent: {
+      categories?: string[];
+      categories_distribution?: Record<string, number>;
+      urgency?: 'low' | 'med' | 'high';
+      emotion?: string | null;
+      msgs_analyzed?: number;
+    } | null;
+    computed_at: string | null;
+  };
 }
 
 export function useLeadContext(leadId: number | null) {

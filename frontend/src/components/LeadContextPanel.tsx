@@ -37,7 +37,7 @@ export default function LeadContextPanel({ leadId }: Props) {
     );
   }
 
-  const { lead, score, journey, sentiment, commercial, tarot_readings_count } = data;
+  const { lead, score, journey, sentiment, commercial, tarot_readings_count, spiritual } = data;
 
   return (
     <div className="p-4 space-y-3 overflow-y-auto h-full">
@@ -151,6 +151,7 @@ export default function LeadContextPanel({ leadId }: Props) {
         </Card>
       )}
 
+      <SpiritualIntentCard leadId={leadId} spiritual={spiritual} />
       <NextActionCard leadId={leadId} />
       <NotesCard leadId={leadId} />
     </div>
@@ -393,6 +394,122 @@ function FieldEdit({
         onChange={(e) => onChange(e.target.value)}
         className="w-full bg-bg-primary border border-border rounded-lg px-2.5 py-1.5 text-[11px]"
       />
+    </div>
+  );
+}
+
+
+// ─── Spiritual intent classifier (4.19) ───────────────────────────
+
+
+const SPIRITUAL_EMOJI: Record<string, string> = {
+  amor: '❤️', dinheiro: '💰', saude: '🌿', carreira: '💼',
+  familia: '🏠', espiritual: '🙏', decisao: '🔀', luto: '🕊️',
+};
+
+function SpiritualIntentCard({
+  leadId, spiritual,
+}: {
+  leadId: number;
+  spiritual?: {
+    category: string | null;
+    intent: {
+      categories?: string[];
+      categories_distribution?: Record<string, number>;
+      urgency?: 'low' | 'med' | 'high';
+      emotion?: string | null;
+      msgs_analyzed?: number;
+    } | null;
+    computed_at: string | null;
+  };
+}) {
+  const qc = useQueryClient();
+  const recomputeMut = useMutation({
+    mutationFn: () => fetch(`/saas/inbox/${leadId}/spiritual-intent/recompute`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ last_n: 10 }),
+    }).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.message || data?.error || 'recompute_failed');
+      return data;
+    }),
+    onSuccess: () => {
+      toast.success('Intent espiritual recomputado');
+      qc.invalidateQueries({ queryKey: ['lead-context', leadId] });
+      qc.invalidateQueries({ queryKey: ['leads-list'] });
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const intent = spiritual?.intent;
+  const urgencyColor = {
+    high: 'text-rose-400',
+    med: 'text-amber-400',
+    low: 'text-emerald-400',
+  } as const;
+
+  return (
+    <div className="bg-bg-surface border border-border rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-accent-amethyst" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-secondary">
+            Tema espiritual
+          </span>
+        </div>
+        <button
+          onClick={() => recomputeMut.mutate()}
+          disabled={recomputeMut.isPending}
+          className="text-[10px] text-accent-amethyst hover:underline flex items-center gap-1 font-bold"
+        >
+          <RefreshCw className={`w-3 h-3 ${recomputeMut.isPending ? 'animate-spin' : ''}`} />
+          {spiritual?.category ? 'Atualizar' : 'Classificar'}
+        </button>
+      </div>
+
+      {!spiritual?.category ? (
+        <p className="text-[11px] text-secondary text-center py-2">
+          Ainda não classificado.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{SPIRITUAL_EMOJI[spiritual.category] || '✦'}</span>
+            <div className="flex-1">
+              <div className="text-sm font-black capitalize">{spiritual.category}</div>
+              {intent?.urgency && (
+                <div className={`text-[10px] uppercase font-black tracking-widest ${urgencyColor[intent.urgency]}`}>
+                  Urgência {intent.urgency}
+                </div>
+              )}
+            </div>
+          </div>
+          {intent?.emotion && (
+            <KV k="Emoção" v={intent.emotion} />
+          )}
+          {intent?.categories_distribution && Object.keys(intent.categories_distribution).length > 1 && (
+            <div className="pt-2 border-t border-border">
+              <div className="text-[9px] font-black uppercase tracking-widest text-secondary mb-1.5">
+                Outras menções
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(intent.categories_distribution).map(([cat, n]) => (
+                  <span key={cat} className="text-[10px] bg-bg-primary border border-border px-1.5 rounded">
+                    {SPIRITUAL_EMOJI[cat] || '·'} {cat}: {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {intent?.msgs_analyzed != null && (
+            <div className="text-[10px] text-secondary mt-1">
+              {intent.msgs_analyzed} mensagem{intent.msgs_analyzed === 1 ? '' : 's'} analisada{intent.msgs_analyzed === 1 ? '' : 's'}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
