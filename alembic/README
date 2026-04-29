@@ -1,0 +1,50 @@
+Alembic — schema migrations
+============================
+
+Configuração lê DATABASE_URL via `db.database` (mesma fonte da app).
+Em dev: SQLite local. Em prod: tipicamente Postgres.
+
+Comandos comuns
+----------------
+
+    # Status: revisão atual aplicada na DB
+    python -m alembic current
+
+    # Histórico de migrations
+    python -m alembic history
+
+    # Após mudar db/models.py, gerar migration de diff
+    python -m alembic revision --autogenerate -m "add coluna X em Y"
+
+    # Aplicar migrations pendentes (=upgrade até a head)
+    python -m alembic upgrade head
+
+    # Reverter última (raro — só em dev)
+    python -m alembic downgrade -1
+
+    # Marcar DB existente como estando numa revisão sem rodar SQL
+    # (usado quando schema já existe e queremos só sincronizar Alembic)
+    python -m alembic stamp head
+
+Deploy
+-------
+
+A regra é: `alembic upgrade head` SEMPRE antes de subir o app novo.
+Em CI/script de deploy:
+
+    pip install -r requirements.txt
+    python -m alembic upgrade head    # falha = aborta deploy
+    systemctl restart sibila-gunicorn
+
+Render mode
+-----------
+
+`render_as_batch=True` no env.py habilita migrações em SQLite
+(que não suporta ALTER TABLE). Em Postgres é no-op. Não remova.
+
+Convenções
+-----------
+
+- Mensagens em pt-br ("add coluna X", não "add column X")
+- Uma migration por mudança lógica (não 5 mudanças num arquivo só)
+- Antes de PR, sempre rodar `alembic upgrade head` localmente pra validar
