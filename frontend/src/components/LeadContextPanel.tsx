@@ -1,9 +1,15 @@
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   User, MapPin, Calendar, Sparkles, MessageSquare,
   TrendingUp, TrendingDown, Activity, Star, CreditCard,
-  Wand2, Phone,
+  Wand2, Phone, Edit3, Save, X, Plus, Trash2, RefreshCw,
+  StickyNote, Check, Copy,
 } from 'lucide-react';
 import { useLeadContext } from '../hooks/useLeadContext';
+import { leadContextApi, type LeadNote } from '../api/leadContext';
+import { handleApiError } from '../lib/handleApiError';
+import { toast } from '../lib/toast';
 import ScoreBadge from './ScoreBadge';
 
 interface Props {
@@ -35,36 +41,7 @@ export default function LeadContextPanel({ leadId }: Props) {
 
   return (
     <div className="p-4 space-y-3 overflow-y-auto h-full">
-      {/* Lead card */}
-      <Card title="Lead" icon={User}>
-        <KV k="Nome" v={lead.nome || '—'} />
-        <KV k="Telefone" v={lead.telefone} icon={Phone} />
-        {lead.signo && <KV k="Signo" v={lead.signo} icon={Star} />}
-        {lead.idade && <KV k="Idade" v={`${lead.idade} anos`} icon={Calendar} />}
-        {lead.cidade && <KV k="Cidade" v={lead.cidade} icon={MapPin} />}
-        {lead.criado_em && (
-          <KV k="Cliente desde" v={new Date(lead.criado_em).toLocaleDateString('pt-BR')} />
-        )}
-        {lead.tags && lead.tags.length > 0 && (
-          <div className="pt-2 mt-2 border-t border-border">
-            <div className="text-[9px] font-black uppercase tracking-widest text-secondary mb-1.5">Tags</div>
-            <div className="flex flex-wrap gap-1">
-              {lead.tags.map((t, i) => (
-                <span
-                  key={`${t}-${i}`}
-                  className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    t === 'opted_out'
-                      ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                      : 'bg-bg-primary text-secondary border border-border'
-                  }`}
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </Card>
+      <EditableLeadCard leadId={leadId} lead={lead} />
 
       {/* Score */}
       <Card title="Score" icon={Activity}>
@@ -173,6 +150,9 @@ export default function LeadContextPanel({ leadId }: Props) {
           <KV k="Tiragens feitas" v={String(tarot_readings_count)} />
         </Card>
       )}
+
+      <NextActionCard leadId={leadId} />
+      <NotesCard leadId={leadId} />
     </div>
   );
 }
@@ -246,4 +226,415 @@ function fmtRelative(iso: string): string {
   const h = Math.floor(min / 60);
   if (h < 24) return `${h}h atrás`;
   return `${Math.floor(h / 24)}d atrás`;
+}
+
+
+// ─── Editable Lead card (3.18) ─────────────────────────────────────
+
+
+function EditableLeadCard({
+  leadId, lead,
+}: {
+  leadId: number;
+  lead: {
+    nome: string | null;
+    telefone: string;
+    email: string | null;
+    signo: string | null;
+    idade: number | null;
+    cidade: string | null;
+    tags: string[];
+    custom_fields: Record<string, unknown>;
+    criado_em: string | null;
+  };
+}) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    nome: lead.nome || '',
+    signo: lead.signo || '',
+    idade: lead.idade != null ? String(lead.idade) : '',
+    cidade: lead.cidade || '',
+    email: lead.email || '',
+    tags: (lead.tags || []).join(', '),
+  });
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft({
+        nome: lead.nome || '',
+        signo: lead.signo || '',
+        idade: lead.idade != null ? String(lead.idade) : '',
+        cidade: lead.cidade || '',
+        email: lead.email || '',
+        tags: (lead.tags || []).join(', '),
+      });
+    }
+  }, [lead, editing]);
+
+  const saveMut = useMutation({
+    mutationFn: () => leadContextApi.patchProfile(leadId, {
+      nome: draft.nome.trim() || null,
+      signo: draft.signo.trim() || null,
+      idade: draft.idade ? Number(draft.idade) : null,
+      cidade: draft.cidade.trim() || null,
+      email: draft.email.trim() || null,
+      tags: draft.tags.split(',').map((t) => t.trim()).filter(Boolean),
+    }),
+    onSuccess: () => {
+      toast.success('Perfil atualizado');
+      qc.invalidateQueries({ queryKey: ['lead-context', leadId] });
+      qc.invalidateQueries({ queryKey: ['leads-list'] });
+      setEditing(false);
+    },
+    onError: handleApiError('Erro ao salvar'),
+  });
+
+  return (
+    <div className="bg-bg-surface border border-border rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-border">
+        <div className="flex items-center gap-2">
+          <User className="w-3.5 h-3.5 text-accent-amethyst" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-secondary">Lead</span>
+        </div>
+        {!editing ? (
+          <button
+            onClick={() => setEditing(true)}
+            className="text-[10px] text-secondary hover:text-accent-amethyst flex items-center gap-1 font-bold"
+          >
+            <Edit3 className="w-3 h-3" />
+            Editar
+          </button>
+        ) : (
+          <div className="flex gap-1">
+            <button
+              onClick={() => setEditing(false)}
+              className="text-[10px] text-secondary hover:text-primary flex items-center gap-0.5 font-bold"
+            >
+              <X className="w-3 h-3" /> cancelar
+            </button>
+            <button
+              onClick={() => saveMut.mutate()}
+              disabled={saveMut.isPending}
+              className="text-[10px] text-accent-amethyst hover:underline flex items-center gap-0.5 font-bold"
+            >
+              <Save className="w-3 h-3" /> {saveMut.isPending ? 'salvando…' : 'salvar'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!editing ? (
+        <div className="space-y-1.5">
+          <KV k="Nome" v={lead.nome || '—'} />
+          <KV k="Telefone" v={lead.telefone} icon={Phone} />
+          {lead.email && <KV k="Email" v={lead.email} />}
+          {lead.signo && <KV k="Signo" v={lead.signo} icon={Star} />}
+          {lead.idade != null && <KV k="Idade" v={`${lead.idade} anos`} icon={Calendar} />}
+          {lead.cidade && <KV k="Cidade" v={lead.cidade} icon={MapPin} />}
+          {lead.criado_em && (
+            <KV k="Cliente desde" v={new Date(lead.criado_em).toLocaleDateString('pt-BR')} />
+          )}
+          {lead.tags && lead.tags.length > 0 && (
+            <div className="pt-2 mt-2 border-t border-border">
+              <div className="text-[9px] font-black uppercase tracking-widest text-secondary mb-1.5">Tags</div>
+              <div className="flex flex-wrap gap-1">
+                {lead.tags.map((t, i) => (
+                  <span
+                    key={`${t}-${i}`}
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      t === 'opted_out'
+                        ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                        : 'bg-bg-primary text-secondary border border-border'
+                    }`}
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <FieldEdit label="Nome" value={draft.nome} onChange={(v) => setDraft({ ...draft, nome: v })} />
+          <FieldEdit label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} />
+          <FieldEdit label="Signo" value={draft.signo} onChange={(v) => setDraft({ ...draft, signo: v })} />
+          <div className="grid grid-cols-2 gap-2">
+            <FieldEdit label="Idade" value={draft.idade} onChange={(v) => setDraft({ ...draft, idade: v.replace(/[^0-9]/g, '') })} />
+            <FieldEdit label="Cidade" value={draft.cidade} onChange={(v) => setDraft({ ...draft, cidade: v })} />
+          </div>
+          <FieldEdit
+            label="Tags (separadas por vírgula)"
+            value={draft.tags}
+            onChange={(v) => setDraft({ ...draft, tags: v })}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FieldEdit({
+  label, value, onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-[9px] font-black uppercase tracking-widest text-secondary block mb-0.5">
+        {label}
+      </label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-bg-primary border border-border rounded-lg px-2.5 py-1.5 text-[11px]"
+      />
+    </div>
+  );
+}
+
+
+// ─── Next-action AI suggestion (3.21) ──────────────────────────────
+
+
+function NextActionCard({ leadId }: { leadId: number }) {
+  const qc = useQueryClient();
+  const [copied, setCopied] = useState(false);
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['next-action', leadId],
+    queryFn: () => leadContextApi.nextAction(leadId, false),
+    staleTime: 0,
+    enabled: false, // bota gerar manualmente
+  });
+
+  const triggerMut = useMutation({
+    mutationFn: (force: boolean) => leadContextApi.nextAction(leadId, force),
+    onSuccess: (res) => {
+      qc.setQueryData(['next-action', leadId], res);
+    },
+    onError: handleApiError('Erro ao sugerir ação'),
+  });
+
+  const sug = data?.suggestion || triggerMut.data?.suggestion;
+  const cached = data?.cached || triggerMut.data?.cached;
+  const loading = isLoading || isFetching || triggerMut.isPending;
+
+  const copyMessage = () => {
+    if (!sug?.message) return;
+    navigator.clipboard.writeText(sug.message);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <div className="bg-bg-surface border border-border rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Wand2 className="w-3.5 h-3.5 text-accent-amethyst" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-secondary">
+            IA sugere próxima ação
+          </span>
+        </div>
+        <button
+          onClick={() => triggerMut.mutate(!!sug)}
+          disabled={loading}
+          className="text-[10px] text-accent-amethyst hover:underline flex items-center gap-1 font-bold"
+        >
+          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+          {sug ? (cached ? 'Atualizar' : 'Regen') : 'Gerar'}
+        </button>
+      </div>
+
+      {!sug && !loading ? (
+        <p className="text-[11px] text-secondary text-center py-3">
+          Clique "Gerar" para a IA analisar a conversa e sugerir o próximo passo.
+        </p>
+      ) : loading ? (
+        <p className="text-[11px] text-secondary text-center py-3">Pensando…</p>
+      ) : sug ? (
+        <div className="space-y-2">
+          <div>
+            <div className="text-[9px] font-black uppercase tracking-widest text-secondary">Estado</div>
+            <div className="text-[11px] text-primary mt-0.5">{sug.summary}</div>
+          </div>
+          <div>
+            <div className="text-[9px] font-black uppercase tracking-widest text-secondary">Ação sugerida</div>
+            <div className="text-[11px] text-primary mt-0.5">{sug.action}</div>
+          </div>
+          {sug.message && (
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-widest text-secondary mb-0.5">Mensagem pronta</div>
+              <div className="bg-bg-primary border border-border rounded-lg p-2.5 text-[11px] leading-relaxed">
+                {sug.message}
+              </div>
+              <button
+                onClick={copyMessage}
+                className="mt-1.5 text-[10px] text-accent-amethyst hover:underline flex items-center gap-1 font-bold"
+              >
+                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copied ? 'Copiado' : 'Copiar mensagem'}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
+// ─── Notes (3.23) ──────────────────────────────────────────────────
+
+
+function NotesCard({ leadId }: { leadId: number }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['lead-notes', leadId],
+    queryFn: () => leadContextApi.listNotes(leadId),
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => leadContextApi.createNote(leadId, draft.trim()),
+    onSuccess: () => {
+      setDraft('');
+      qc.invalidateQueries({ queryKey: ['lead-notes', leadId] });
+    },
+    onError: handleApiError('Erro ao criar nota'),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => leadContextApi.deleteNote(leadId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['lead-notes', leadId] }),
+    onError: handleApiError('Erro ao remover'),
+  });
+
+  const items = data?.notes ?? [];
+
+  return (
+    <div className="bg-bg-surface border border-border rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-border">
+        <StickyNote className="w-3.5 h-3.5 text-accent-amethyst" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-secondary">
+          Notas internas
+        </span>
+        <span className="text-[10px] text-secondary ml-auto">{items.length}</span>
+      </div>
+
+      <div className="space-y-2">
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={2}
+          maxLength={8000}
+          placeholder="Anote algo sobre este lead…"
+          className="w-full bg-bg-primary border border-border rounded-lg px-2.5 py-1.5 text-[11px] resize-none"
+        />
+        <button
+          onClick={() => createMut.mutate()}
+          disabled={!draft.trim() || createMut.isPending}
+          className="w-full px-3 py-1.5 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-30 text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1"
+        >
+          <Plus className="w-3 h-3" />
+          {createMut.isPending ? 'Salvando…' : 'Adicionar nota'}
+        </button>
+      </div>
+
+      <div className="space-y-2 mt-3">
+        {isLoading ? (
+          <div className="text-[10px] text-secondary text-center py-2">Carregando…</div>
+        ) : items.length === 0 ? (
+          <div className="text-[10px] text-secondary text-center py-2">Sem notas ainda.</div>
+        ) : (
+          items.map((n: LeadNote) => <NoteRow key={n.id} note={n} leadId={leadId} onDelete={() => deleteMut.mutate(n.id)} />)
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NoteRow({
+  note, leadId, onDelete,
+}: {
+  note: LeadNote;
+  leadId: number;
+  onDelete: () => void;
+}) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(note.content);
+
+  useEffect(() => { if (!editing) setText(note.content); }, [note.content, editing]);
+
+  const saveMut = useMutation({
+    mutationFn: () => leadContextApi.updateNote(leadId, note.id, text.trim()),
+    onSuccess: () => {
+      setEditing(false);
+      qc.invalidateQueries({ queryKey: ['lead-notes', leadId] });
+    },
+    onError: handleApiError('Erro ao salvar nota'),
+  });
+
+  return (
+    <div className="bg-bg-primary border border-border rounded-lg p-2 group">
+      {editing ? (
+        <>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={3}
+            className="w-full bg-bg-surface border border-border rounded px-2 py-1.5 text-[11px] resize-none"
+          />
+          <div className="flex justify-end gap-1.5 mt-1">
+            <button
+              onClick={() => setEditing(false)}
+              className="text-[10px] text-secondary hover:text-primary"
+            >
+              cancelar
+            </button>
+            <button
+              onClick={() => saveMut.mutate()}
+              disabled={!text.trim() || saveMut.isPending}
+              className="text-[10px] text-accent-amethyst font-bold hover:underline disabled:opacity-30"
+            >
+              {saveMut.isPending ? 'salvando…' : 'salvar'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-[11px] leading-relaxed whitespace-pre-wrap">{note.content}</p>
+          <div className="flex justify-between items-center mt-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+            <span className="text-[9px] text-secondary">
+              {fmtRelative(note.updated_at || note.created_at)}
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setEditing(true)}
+                className="text-secondary hover:text-accent-amethyst p-0.5"
+                title="Editar"
+              >
+                <Edit3 className="w-2.5 h-2.5" />
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('Remover esta nota?')) onDelete();
+                }}
+                className="text-secondary hover:text-rose-400 p-0.5"
+                title="Remover"
+              >
+                <Trash2 className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }

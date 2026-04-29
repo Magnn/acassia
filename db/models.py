@@ -75,6 +75,11 @@ class Lead(Base):
     # consents: {daily_horoscope: bool, marketing: bool, ...} — LGPD
     consents = Column(JSON, default=dict, nullable=False)
 
+    # Cadastro extendido (Frente 3.18)
+    idade = Column(Integer, nullable=True)
+    cidade = Column(String(120), nullable=True)
+    custom_fields = Column(JSON, default=dict, nullable=False)
+
     criado_em = Column(DateTime(timezone=True), default=_agora_utc)
     atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
     # Controle de concorrência (motor vs thread de envio): merge otimista em metadata_json
@@ -1118,6 +1123,19 @@ class LeadNumerology(Base):
     interpretation_text = Column(Text, nullable=True)
     computed_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
     interpreted_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class LeadNote(Base):
+    """Notas livres do atendente sobre um lead (Frente 3.23)."""
+    __tablename__ = "lead_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    author_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False)
 
 
 class QuickReply(Base):
