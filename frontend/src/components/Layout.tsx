@@ -36,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/blueprints', icon: FolderTree, label: 'Fluxos', group: 'oraculo', roles: ['admin'] },
   { to: '/templates', icon: FolderTree, label: 'Templates', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/tarot', icon: FolderTree, label: 'Tarot Virtual', group: 'oraculo', roles: ['admin', 'user'] },
+  { to: '/pix', icon: CreditCard, label: 'Pix QR', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/agents', icon: Bot, label: 'Atendentes', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo', roles: ['admin'] },
   { to: '/analytics/funnel', icon: Activity, label: 'Funnel', group: 'oraculo', roles: ['admin', 'user'] },

@@ -20,6 +20,7 @@ const Funnel = lazy(() => import('./routes/Funnel'));
 const Recovery = lazy(() => import('./routes/Recovery'));
 const Templates = lazy(() => import('./routes/Templates'));
 const Tarot = lazy(() => import('./routes/Tarot'));
+const Pix = lazy(() => import('./routes/Pix'));
 const TenantConfig = lazy(() => import('./routes/TenantConfig'));
 const Integrations = lazy(() => import('./routes/Integrations'));
 const AgentStudio = lazy(() => import('./routes/AgentStudio'));
@@ -78,6 +79,7 @@ export default function App() {
             <Route path="/analytics/recovery" element={<Recovery />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/tarot" element={<Tarot />} />
+            <Route path="/pix" element={<Pix />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/tenant-config" element={<TenantConfig />} />
 

@@ -254,6 +254,7 @@ def _register_saas_blueprints():
     from api.saas.analytics import analytics_bp as saas_analytics_bp
     from api.saas.templates import templates_bp as saas_templates_bp
     from api.saas.tarot import tarot_bp as saas_tarot_bp
+    from api.saas.pix import pix_bp as saas_pix_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -277,6 +278,7 @@ def _register_saas_blueprints():
         saas_analytics_bp,
         saas_templates_bp,
         saas_tarot_bp,
+        saas_pix_bp,
     ):
         app.register_blueprint(bp)
 

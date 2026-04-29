@@ -704,6 +704,30 @@ class TarotCard(Base):
     keywords = Column(JSON, nullable=True)
 
 
+class PixPayment(Base):
+    """
+    Pix QR dinâmico (Frente 7.1).
+    Gerado via Mercado Pago / Asaas / Pagar.me.
+    """
+    __tablename__ = "pix_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
+    flow_run_id = Column(Integer, nullable=True)
+    provider = Column(String(40), nullable=False)  # mercadopago|asaas|pagarme
+    provider_payment_id = Column(String(120), nullable=False, unique=True, index=True)
+    amount_brl_cents = Column(Integer, nullable=False)
+    description = Column(Text, nullable=True)
+    qr_code_image_url = Column(Text, nullable=True)  # base64 data URL ou URL imagem
+    qr_code_text = Column(Text, nullable=True)  # copia-e-cola
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(20), default="pending", nullable=False, index=True)  # pending|approved|expired|cancelled
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    raw_response = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class TarotReading(Base):
     """Tiragens feitas pra leads (Frente 4.10)."""
     __tablename__ = "tarot_readings"
