@@ -170,14 +170,41 @@ def flow_gemini_generate_text(
     return text[:4000], None
 
 
+def _coerce_section(value: Any, *, nested_keys: Tuple[str, ...] = ()) -> str:
+    """
+    Aceita string OU dict aninhado e devolve texto unificado.
+
+    Studio tem 2 shapes em circulação:
+      - Plano (frontend AgentStudio.tsx novo): valor é string direta.
+      - Aninhado (legacy `_studio_default_data` no app.py): valor é dict com
+        sub-campos (ex.: ``{identidade, diretrizes}``).
+
+    ``nested_keys`` define a ordem dos sub-campos a concatenar caso seja dict.
+    Strings vazias / chaves ausentes são puladas silenciosamente.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        chunks: List[str] = []
+        for k in nested_keys or list(value.keys()):
+            v = value.get(k)
+            if isinstance(v, str) and v.strip():
+                chunks.append(v.strip())
+        return "\n\n".join(chunks)
+    return ""
+
+
 def _build_system_instruction_from_studio(snap: Any) -> Optional[str]:
     """
     Constrói o ``systemInstruction`` para o Gemini a partir do snapshot do
     agente Studio publicado (injetado em ``ctx.metadata['__acassia_studio__']``
     pelo ``studio_runtime.inject_published_studio_into_metadata``).
 
-    Junta personalidade + instruções + base + FAQ em seções markdown.
-    Retorna None se o snapshot estiver vazio ou malformado.
+    Tolera ambos os shapes do Studio (plano novo e aninhado legado), juntando
+    personalidade + instruções + base + FAQ em seções markdown. Retorna None
+    se o snapshot estiver vazio ou malformado.
     """
     if not isinstance(snap, dict):
         return None
@@ -185,25 +212,50 @@ def _build_system_instruction_from_studio(snap: Any) -> Optional[str]:
     if not isinstance(data, dict):
         return None
     parts: List[str] = []
-    persona = str(data.get("personalidade") or "").strip()
+
+    persona = _coerce_section(
+        data.get("personalidade"),
+        nested_keys=("identidade", "diretrizes"),
+    )
     if persona:
         parts.append(f"## Personalidade\n{persona}")
-    instrucoes = str(data.get("instrucoes") or "").strip()
+
+    instrucoes = _coerce_section(
+        data.get("instrucoes"),
+        nested_keys=("gerais", "proibicoes", "formato_saida"),
+    )
     if instrucoes:
         parts.append(f"## Instruções operacionais\n{instrucoes}")
-    base = str(data.get("base_conhecimento") or "").strip()
+
+    # Base aceita "base_conhecimento" (novo) OR "base" (legado) com sub-campos.
+    base = _coerce_section(
+        data.get("base_conhecimento"),
+    ) or _coerce_section(
+        data.get("base"),
+        nested_keys=("contexto_empresa", "produtos", "politica_preco"),
+    )
     if base:
         parts.append(f"## Base de conhecimento\n{base}")
-    faqs = data.get("faqs") if isinstance(data.get("faqs"), list) else []
+
+    # FAQ: array de {q, a} (novo) OR objeto {perguntas: str} (legado)
     faq_lines: List[str] = []
-    for f in faqs:
-        if isinstance(f, dict):
-            q = str(f.get("q") or "").strip()
-            a = str(f.get("a") or "").strip()
-            if q and a:
-                faq_lines.append(f"P: {q}\nR: {a}")
+    faqs_new = data.get("faqs")
+    if isinstance(faqs_new, list):
+        for f in faqs_new:
+            if isinstance(f, dict):
+                q = str(f.get("q") or "").strip()
+                a = str(f.get("a") or "").strip()
+                if q and a:
+                    faq_lines.append(f"P: {q}\nR: {a}")
+    if not faq_lines:
+        legacy = data.get("faq")
+        if isinstance(legacy, dict):
+            perguntas = str(legacy.get("perguntas") or "").strip()
+            if perguntas:
+                faq_lines.append(perguntas)
     if faq_lines:
         parts.append("## FAQ\n" + "\n\n".join(faq_lines))
+
     return "\n\n".join(parts) if parts else None
 
 
