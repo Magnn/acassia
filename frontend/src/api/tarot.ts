@@ -41,6 +41,7 @@ export interface TarotReading {
   question: string | null;
   interpretation: string | null;
   sent_to_lead: boolean;
+  sent_at?: string | null;
   created_at: string;
 }
 
@@ -79,4 +80,19 @@ export const tarotApi = {
       `/saas/tarot/readings${qs ? '?' + qs : ''}`,
     );
   },
+
+  getReading: (id: number) => api.get<TarotReading>(`/saas/tarot/readings/${id}`),
+
+  sendReading: (id: number) =>
+    api.post<{ ok: boolean; preview: string }>(
+      `/saas/tarot/readings/${id}/send`, {},
+    ),
+
+  regenerate: (id: number) =>
+    api.post<{ ok: boolean; interpretation: string }>(
+      `/saas/tarot/readings/${id}/regenerate`, {},
+    ),
+
+  deleteReading: (id: number) =>
+    api.del<{ ok: boolean }>(`/saas/tarot/readings/${id}`),
 };

@@ -926,6 +926,7 @@ class TarotReading(Base):
     question = Column(Text, nullable=True)
     interpretation = Column(Text, nullable=True)
     sent_to_lead = Column(Boolean, default=False, nullable=False)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 

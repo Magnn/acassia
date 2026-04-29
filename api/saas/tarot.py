@@ -246,6 +246,125 @@ def list_readings():
         db.close()
 
 
+@tarot_bp.route("/readings/<int:reading_id>/send", methods=["POST"])
+@login_required
+def send_reading_to_lead(reading_id: int):
+    """Envia interpretacao da tiragem para o lead via WhatsApp."""
+    db = SessionLocal()
+    try:
+        r = db.query(models.TarotReading).filter_by(
+            id=reading_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not r:
+            return jsonify({"error": "not_found"}), 404
+        if not r.lead_id:
+            return jsonify({"error": "reading_not_linked_to_lead"}), 422
+
+        lead = db.query(models.Lead).filter_by(
+            id=r.lead_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not lead:
+            return jsonify({"error": "lead_not_found"}), 404
+
+        cards_block = "\n".join([
+            f"• {c['position'].capitalize()}: {c['name']}"
+            f"{' (invertida)' if c.get('reversed') else ''}"
+            for c in (r.cards or [])
+        ])
+        spread_name = SPREAD_TYPES.get(r.spread_type, {}).get("name", r.spread_type)
+        intro = f"✦ Tiragem: {spread_name}"
+        if r.question:
+            intro += f"\nPergunta: {r.question}"
+        body = f"{intro}\n\n{cards_block}"
+        if r.interpretation:
+            body += f"\n\n{r.interpretation}"
+
+        try:
+            import horoscope
+            client = horoscope._get_whatsapp_client(current_user.tenant_id)
+            if client is None:
+                return jsonify({"error": "whatsapp_unavailable"}), 502
+            ok = client.enviar_mensagem(lead.telefone, body, formato="texto")
+            if not ok:
+                return jsonify({"error": "send_returned_false"}), 502
+        except Exception as exc:
+            logger.exception("[tarot.send] falha: %s", exc)
+            return jsonify({"error": "send_failed", "message": str(exc)[:200]}), 502
+
+        from datetime import datetime, timezone as _tz
+        r.sent_to_lead = True
+        r.sent_at = datetime.now(_tz.utc) if hasattr(r, "sent_at") else None
+        db.commit()
+
+        try:
+            db.add(models.AuditEvent(
+                tenant_id=current_user.tenant_id,
+                actor_user_id=current_user.id,
+                event_type="tarot.reading.sent",
+                target_type="tarot_reading",
+                target_id=str(r.id),
+                payload={"lead_id": r.lead_id, "spread": r.spread_type},
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        return jsonify({"ok": True, "preview": body[:500]})
+    finally:
+        db.close()
+
+
+@tarot_bp.route("/readings/<int:reading_id>/regenerate", methods=["POST"])
+@login_required
+def regenerate_interpretation(reading_id: int):
+    """Regenera a interpretacao IA de uma leitura existente."""
+    db = SessionLocal()
+    try:
+        r = db.query(models.TarotReading).filter_by(
+            id=reading_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not r:
+            return jsonify({"error": "not_found"}), 404
+        if not r.cards:
+            return jsonify({"error": "no_cards"}), 422
+
+        try:
+            import quota
+            allowed, _, _ = quota.consume_quota(
+                current_user.tenant_id, "gemini_tokens_month", 2000,
+            )
+            if not allowed:
+                return jsonify({"error": "quota_exceeded"}), 402
+        except Exception:
+            pass
+
+        new_text = _generate_interpretation(
+            r.cards, r.question or "", r.spread_type,
+        )
+        r.interpretation = new_text
+        db.commit()
+        return jsonify({"ok": True, "interpretation": new_text})
+    finally:
+        db.close()
+
+
+@tarot_bp.route("/readings/<int:reading_id>", methods=["DELETE"])
+@login_required
+def delete_reading(reading_id: int):
+    db = SessionLocal()
+    try:
+        r = db.query(models.TarotReading).filter_by(
+            id=reading_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not r:
+            return jsonify({"error": "not_found"}), 404
+        db.delete(r)
+        db.commit()
+        return jsonify({"ok": True})
+    finally:
+        db.close()
+
+
 @tarot_bp.route("/readings/<int:reading_id>", methods=["GET"])
 @login_required
 def get_reading(reading_id: int):
