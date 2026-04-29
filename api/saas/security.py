@@ -27,7 +27,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import bcrypt
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
 from db import models
@@ -336,6 +336,130 @@ def email_verify_request():
             logger.warning("[DEV] email verify URL: %s", verify_url)
         # TODO Frente 7.25: send email via Resend
         return jsonify({"ok": True, "message": "Email de verificação enviado."})
+    finally:
+        db.close()
+
+
+# ─── Session management (Frente 8.4-8.6) ──────────────────────────────
+
+
+def _session_token_hash(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def record_user_session(user_id: int, session_id: str) -> int:
+    """
+    Cria UserSession persistente. Chamado em login_success.
+    Returns id da sessão criada.
+
+    NÃO bloqueia login se gravação falhar (resilient).
+    """
+    db = SessionLocal()
+    try:
+        # Resolve geo (IP geolocation simples — futuro: usar GeoIP2 lib)
+        ip = (request.remote_addr or "")[:45]
+        ua = (request.headers.get("User-Agent", "") or "")[:500]
+
+        # Marca todas sessões anteriores como is_current=False
+        db.query(models.UserSession).filter_by(
+            user_id=user_id, is_current=True,
+        ).update({"is_current": False}, synchronize_session=False)
+
+        sess = models.UserSession(
+            user_id=user_id,
+            session_token_hash=_session_token_hash(session_id),
+            ip_address=ip,
+            user_agent=ua,
+            is_current=True,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+        )
+        db.add(sess)
+        db.commit()
+        return sess.id
+    except Exception as exc:
+        logger.warning("[session] record falhou: %s", exc)
+        return 0
+    finally:
+        db.close()
+
+
+@security_bp.route("/sessions", methods=["GET"])
+@login_required
+def list_sessions():
+    """Lista sessões ativas do user logado."""
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        sessions = (
+            db.query(models.UserSession)
+            .filter(
+                models.UserSession.user_id == current_user.id,
+                models.UserSession.revoked_at.is_(None),
+            )
+            .order_by(models.UserSession.last_activity_at.desc())
+            .all()
+        )
+        return jsonify({
+            "sessions": [
+                {
+                    "id": s.id,
+                    "ip_address": s.ip_address,
+                    "user_agent": (s.user_agent or "")[:200],
+                    "geo_country": s.geo_country,
+                    "geo_city": s.geo_city,
+                    "is_current": s.is_current,
+                    "created_at": s.created_at.isoformat(),
+                    "last_activity_at": s.last_activity_at.isoformat(),
+                    "expires_at": s.expires_at.isoformat() if s.expires_at else None,
+                } for s in sessions
+            ]
+        })
+    finally:
+        db.close()
+
+
+@security_bp.route("/sessions/<int:session_id>/revoke", methods=["POST"])
+@login_required
+def revoke_session(session_id: int):
+    """Revoga uma sessão específica."""
+    db = SessionLocal()
+    try:
+        sess = db.query(models.UserSession).filter_by(
+            id=session_id, user_id=current_user.id,
+        ).first()
+        if not sess:
+            return jsonify({"error": "session_not_found"}), 404
+        if sess.revoked_at:
+            return jsonify({"error": "already_revoked"}), 409
+        sess.revoked_at = datetime.now(timezone.utc)
+        sess.revoked_reason = "user_revoke"
+        db.commit()
+        logger.info("[session.revoked] user_id=%s session_id=%s", current_user.id, session_id)
+        return jsonify({"ok": True})
+    finally:
+        db.close()
+
+
+@security_bp.route("/sessions/revoke-all-others", methods=["POST"])
+@login_required
+def revoke_all_other_sessions():
+    """Revoga TODAS as sessões exceto a atual."""
+    db = SessionLocal()
+    try:
+        count = (
+            db.query(models.UserSession)
+            .filter(
+                models.UserSession.user_id == current_user.id,
+                models.UserSession.is_current == False,  # noqa: E712
+                models.UserSession.revoked_at.is_(None),
+            )
+            .update(
+                {"revoked_at": datetime.now(timezone.utc), "revoked_reason": "user_revoke_all_others"},
+                synchronize_session=False,
+            )
+        )
+        db.commit()
+        return jsonify({"ok": True, "revoked_count": count})
     finally:
         db.close()
 

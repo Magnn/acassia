@@ -633,6 +633,28 @@ class ConsentRecord(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class UserSession(Base):
+    """
+    Sessão de login persistida pra session mgmt (Frente 8.4-8.6).
+    Gravada em parallelo com flask-login session cookie.
+    """
+    __tablename__ = "user_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    session_token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    geo_country = Column(String(2), nullable=True)
+    geo_city = Column(String(100), nullable=True)
+    is_current = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    last_activity_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_reason = Column(String(40), nullable=True)
+
+
 class PaymentEventReceipt(Base):
     """
     Idempotência durável de webhooks de pagamento (at-least-once delivery).

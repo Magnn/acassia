@@ -389,13 +389,22 @@ def login():
 
         # Sucesso: limpa contador
         try:
-            from api.saas.security import record_login_success
+            from api.saas.security import record_login_success, record_user_session
             record_login_success(user.id)
         except Exception:
             pass
 
         _touch_last_login(user.id)
         login_user(AuthenticatedUser(user.id, user.email, user.tenant_id, user.role))
+
+        # Grava sessão persistida pra session mgmt (Frente 8.4)
+        try:
+            from flask import session as flask_session
+            sess_id = flask_session.get("_id") or flask_session.sid if hasattr(flask_session, 'sid') else "unknown"
+            record_user_session(user.id, str(sess_id))
+        except Exception:
+            pass
+
         next_url = request.args.get("next") or url_for("saas_auth.signup_done")
         return redirect(next_url)
 
