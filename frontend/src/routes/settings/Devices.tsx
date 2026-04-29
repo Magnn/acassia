@@ -12,6 +12,7 @@ import {
   Phone,
   Plus,
   PowerOff,
+  QrCode,
   Save,
   Send,
   Server,
@@ -86,6 +87,7 @@ export default function Devices() {
 
   const [form, setForm] = useState<WhatsAppConfig | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [editingNickname, setEditingNickname] = useState(false);
   const [nickname, setNickname] = useState('');
@@ -204,40 +206,53 @@ export default function Devices() {
           </button>
         )}
 
-        {/* Card de dispositivo conectado */}
+        {/* Card de dispositivo conectado/aguardando */}
         {isConfigured && config && status && (
-          <div className="rounded-xl border border-sibila-mist bg-sibila-obsidian overflow-hidden shadow-inset-veil">
-            {/* Header com logo do provider + número + nickname */}
+          <div
+            className={[
+              'rounded-xl bg-sibila-obsidian overflow-hidden shadow-inset-veil',
+              status.ok
+                ? 'border border-sibila-mist'
+                : 'border-2 border-sibila-crimson/60',
+            ].join(' ')}
+          >
+            {/* Header com logo do provider + pill status + nickname */}
             <div className="px-4 py-4 flex items-start gap-3">
-              <ProviderLogo provider={config.provider} />
+              <ProviderLogo provider={config.provider} state={status.ok ? 'connected' : 'pending'} />
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] uppercase tracking-wider-2 text-sibila-smoke mb-0.5">
-                  {activeProviderMeta.badge}
-                </div>
-                <div className="flex items-center gap-2">
-                  {phoneFromConfig(config) && (
-                    <span className="inline-block px-2 py-0.5 rounded bg-sibila-amethyst/15 text-sibila-amethyst text-[11px] font-mono">
-                      +{phoneFromConfig(config)}
-                    </span>
-                  )}
-                </div>
+                {status.ok ? (
+                  <>
+                    <div className="text-[10px] uppercase tracking-wider-2 text-sibila-smoke mb-0.5">
+                      {activeProviderMeta.badge}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {phoneFromConfig(config) && (
+                        <span className="inline-block px-2 py-0.5 rounded bg-sibila-amethyst/15 text-sibila-amethyst text-[11px] font-mono">
+                          +{phoneFromConfig(config)}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <span className="inline-block px-2 py-0.5 rounded bg-sibila-rose/15 text-sibila-rose text-[11px] font-medium">
+                    Aguardando Conexão
+                  </span>
+                )}
                 <div className="mt-2 flex items-center gap-2 group">
                   {editingNickname ? (
-                    <>
-                      <input
-                        autoFocus
-                        value={nickname}
-                        onChange={(e) => setNickname(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSaveNickname()}
-                        onBlur={handleSaveNickname}
-                        placeholder="Apelido (ex.: Esmeralda Cigana)"
-                        className="bg-sibila-veil border border-sibila-mist rounded px-2 py-0.5 text-sm text-sibila-moonlight focus:outline-none focus:border-sibila-amethyst flex-1"
-                      />
-                    </>
+                    <input
+                      autoFocus
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveNickname()}
+                      onBlur={handleSaveNickname}
+                      placeholder="Apelido (ex.: Esmeralda Cigana)"
+                      className="bg-sibila-veil border border-sibila-mist rounded px-2 py-0.5 text-sm text-sibila-moonlight focus:outline-none focus:border-sibila-amethyst flex-1"
+                    />
                   ) : (
                     <>
                       <span className="text-sm text-sibila-moonlight">
-                        {nickname || 'Dispositivo principal'}
+                        {nickname || (status.ok ? 'Dispositivo principal' : 'Novo Dispositivo')}
                       </span>
                       <button
                         onClick={() => setEditingNickname(true)}
@@ -251,27 +266,17 @@ export default function Devices() {
               </div>
             </div>
 
-            {/* Status banner */}
-            <div
-              className={[
-                'px-4 py-2 text-center text-sm font-medium',
-                status.ok
-                  ? 'bg-sibila-amethyst text-white'
-                  : 'bg-sibila-crimson/20 text-sibila-crimson',
-              ].join(' ')}
-            >
-              {status.ok ? (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
-                  Conexão realizada com sucesso!
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />
-                  Aguardando conexão
-                </>
-              )}
-            </div>
+            {/* Status banner / Tentativas */}
+            {status.ok ? (
+              <div className="px-4 py-2 text-center text-sm font-medium bg-sibila-amethyst text-white">
+                <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
+                Conexão realizada com sucesso!
+              </div>
+            ) : (
+              <div className="px-4 py-2 text-center text-sm font-medium border-y border-sibila-mist text-sibila-fog">
+                Tentativas de conexão <strong className="text-sibila-moonlight">3</strong> de <strong className="text-sibila-moonlight">3</strong> .
+              </div>
+            )}
 
             {/* Mostrar Detalhes */}
             <button
@@ -319,6 +324,17 @@ export default function Devices() {
               </div>
             )}
 
+            {/* Gerar QR Code (só Evolution não conectado) */}
+            {!status.ok && config.provider === 'evolution' && (
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="w-full px-4 py-2.5 text-sm text-sibila-amethyst hover:bg-sibila-amethyst/10 border-t border-sibila-mist flex items-center justify-center gap-1.5 transition-colors font-medium"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                Gerar QR Code
+              </button>
+            )}
+
             {/* Desconectar */}
             <button
               onClick={handleDisconnect}
@@ -346,17 +362,42 @@ export default function Devices() {
           saving={saveMutation.isPending}
         />
       )}
+
+      {/* Modal QR — só pra Evolution não conectado */}
+      {showQrModal && (
+        <QrModal onClose={() => setShowQrModal(false)} onPaired={() => {
+          setShowQrModal(false);
+          refetchStatus();
+        }} />
+      )}
     </div>
   );
 }
 
 // ── Subcomponents ──────────────────────────────────────────────────────
 
-function ProviderLogo({ provider }: { provider: ProviderMode }) {
+function ProviderLogo({
+  provider,
+  state = 'connected',
+}: {
+  provider: ProviderMode;
+  state?: 'connected' | 'pending';
+}) {
   const meta = PROVIDERS.find((p) => p.id === provider)!;
+  // Estado pendente: usa cor de Evolution (esmeralda) com Plus circle pra indicar "novo"
+  const cls =
+    state === 'pending'
+      ? 'bg-emerald-500/10 border-emerald-500/30'
+      : 'bg-sibila-veil border-sibila-mist';
+  const iconColor = state === 'pending' ? 'text-emerald-500' : 'text-sibila-amethyst';
   return (
-    <span className="w-12 h-12 rounded-lg bg-sibila-veil border border-sibila-mist flex items-center justify-center flex-shrink-0">
-      <meta.Icon className="w-5 h-5 text-sibila-amethyst" strokeWidth={1.6} />
+    <span className={`relative w-12 h-12 rounded-lg border flex items-center justify-center flex-shrink-0 ${cls}`}>
+      <meta.Icon className={`w-5 h-5 ${iconColor}`} strokeWidth={1.6} />
+      {state === 'pending' && (
+        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-sibila-obsidian flex items-center justify-center">
+          <Plus className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+        </span>
+      )}
     </span>
   );
 }
@@ -752,6 +793,143 @@ function Secret({
         className="w-full rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm font-mono text-sibila-moonlight placeholder:text-sibila-smoke focus:outline-none focus:border-sibila-amethyst"
       />
     </label>
+  );
+}
+
+// ── QR Modal — pareamento Evolution (estilo Lailla) ────────────────────
+
+function QrModal({
+  onClose,
+  onPaired,
+}: {
+  onClose: () => void;
+  onPaired: () => void;
+}) {
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ['whatsapp-qr'],
+    queryFn: whatsappApi.qr,
+    retry: false,
+    refetchInterval: 3000, // re-busca cada 3s — Evolution rotaciona o QR
+  });
+
+  // Detecta estado paired via status; se virar 'open', avisa parent
+  const { data: status } = useQuery({
+    queryKey: ['whatsapp-status'],
+    queryFn: whatsappApi.status,
+    retry: false,
+    refetchInterval: 2500,
+  });
+
+  useEffect(() => {
+    if (status?.connection_state === 'open') {
+      onPaired();
+    }
+  }, [status, onPaired]);
+
+  // Extrai QR do payload Evolution v2: { base64?, code?, pairingCode? }
+  const qrPayload = (data?.data ?? {}) as Record<string, unknown>;
+  const qrBase64 = typeof qrPayload.base64 === 'string' ? qrPayload.base64 : null;
+  const qrCode = typeof qrPayload.code === 'string' ? qrPayload.code : null;
+  const pairingCode = typeof qrPayload.pairingCode === 'string' ? qrPayload.pairingCode : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white text-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden"
+      >
+        <header className="flex items-center justify-between px-5 py-3 bg-sibila-amethyst text-white">
+          <h3 className="font-display text-base">Conectar com número de telefone</h3>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-slate-700 flex items-center justify-center transition-colors"
+            title="Fechar"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </header>
+
+        <div className="p-6 grid grid-cols-1 md:grid-cols-[1fr,auto] gap-6 items-start">
+          {/* Instruções */}
+          <div className="space-y-3">
+            <h4 className="font-display text-lg text-slate-800">Leitura de QR Code</h4>
+            <ol className="space-y-2 text-sm text-slate-600">
+              <li>Abra o WhatsApp no seu celular.</li>
+              <li>
+                Toque em <strong>Mais opções</strong> ou <strong>Configurações</strong> e
+                selecione <strong>Aparelhos conectados</strong>.
+              </li>
+              <li>Toque em <strong>Conectar um aparelho</strong>.</li>
+              <li>
+                Aponte seu celular para esta tela para capturar o QR code e aguarde a
+                conexão ser concluída.
+              </li>
+            </ol>
+
+            {pairingCode && (
+              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 mt-3">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                  Código de pareamento alternativo
+                </div>
+                <code className="font-mono text-lg font-semibold text-slate-800 tracking-wider">
+                  {pairingCode}
+                </code>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Use no WhatsApp em "Conectar com número de telefone".
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                <strong>Não consegui buscar o QR.</strong>{' '}
+                {(error as Error).message}
+                <button
+                  onClick={() => refetch()}
+                  className="block mt-1 text-xs underline hover:text-red-900"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+
+            {!error && status && status.connection_state !== 'open' && (
+              <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Aguardando pareamento… (atualiza a cada 3s)
+              </div>
+            )}
+          </div>
+
+          {/* QR */}
+          <div className="flex items-center justify-center">
+            {isLoading || isFetching ? (
+              <div className="w-[260px] h-[260px] rounded-lg bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-sm">
+                Gerando QR…
+              </div>
+            ) : qrBase64 ? (
+              <img
+                src={qrBase64.startsWith('data:') ? qrBase64 : `data:image/png;base64,${qrBase64}`}
+                alt="QR code"
+                className="w-[260px] h-[260px] rounded-lg border border-slate-200"
+              />
+            ) : qrCode ? (
+              <div className="w-[260px] h-[260px] rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center p-3 text-[10px] font-mono text-slate-400 break-all overflow-hidden">
+                {qrCode.slice(0, 200)}…
+              </div>
+            ) : (
+              <div className="w-[260px] h-[260px] rounded-lg bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
+                <QrCode className="w-10 h-10" strokeWidth={1.2} />
+                <span className="text-xs">QR não disponível</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
