@@ -43,6 +43,46 @@ if _ROOT not in sys.path:
 
 load_dotenv()
 
+# ── SENTRY (opcional) ────────────────────────────────────────────────
+_SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
+if _SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.flask import FlaskIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+        import logging as _logging_sentry
+
+        _sentry_traces = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1") or "0.1")
+        _sentry_profile = float(os.getenv("SENTRY_PROFILE_SAMPLE_RATE", "0.1") or "0.1")
+        _sentry_env     = os.getenv("SENTRY_ENVIRONMENT", "production")
+
+        sentry_sdk.init(
+            dsn=_SENTRY_DSN,
+            environment=_sentry_env,
+            # Logs nativos (Sentry Logs tab) — requer sentry-sdk >= 2.x
+            enable_logs=True,
+            # Tracing: % das requisições Flask que viram transações de performance
+            traces_sample_rate=_sentry_traces,
+            # Profiling: % das transações tracadas que também fazem profiling de CPU
+            profile_session_sample_rate=_sentry_profile,
+            profile_lifecycle="trace",
+            # Não enviar IPs nem headers de usuário (LGPD)
+            send_default_pii=False,
+            integrations=[
+                FlaskIntegration(),
+                # logger.error() → Issue Sentry  |  logger.warning() → Breadcrumb
+                LoggingIntegration(
+                    level=_logging_sentry.WARNING,   # breadcrumbs a partir de WARNING
+                    event_level=_logging_sentry.ERROR,  # Issue a partir de ERROR
+                ),
+            ],
+        )
+        print(f"[SENTRY] Inicializado — env={_sentry_env} traces={_sentry_traces} profile={_sentry_profile}")
+    except ImportError:
+        print("[SENTRY] sentry-sdk não instalado. Execute: pip install 'sentry-sdk[flask]'")
+    except Exception as _sentry_err:
+        print(f"[SENTRY] Falha ao inicializar: {_sentry_err}")
+
 # Consola Windows: evita linhas de log partidas com emojis (UTF-8).
 if sys.platform == "win32":
     try:
@@ -53,6 +93,7 @@ if sys.platform == "win32":
 
 # ── INFRAESTRUTURA DE BANCO E MODELOS ────────────────────────────────
 from sqlalchemy import func, case, text
+from sqlalchemy.exc import IntegrityError
 from db import database, models
 from db.database import engine, Base, SessionLocal
 from tenant_context import get_request_tenant_id, get_engine_tenant_id
@@ -95,6 +136,35 @@ os.makedirs(REPORTS_DIR, exist_ok=True)
 CACHE_MENSAGENS   = deque(maxlen=2000)
 LOCK_IDEMPOTENCIA = threading.Lock()
 
+
+def _try_claim_wamid_db(wamid: str) -> bool:
+    """
+    True = primeira vez (seguir para a fila). False = wamid já persistido (at-least-once / restart).
+    """
+    if not wamid:
+        return True
+    tid = get_engine_tenant_id()
+    db = SessionLocal()
+    try:
+        db.add(
+            models.WhatsAppInboundReceipt(
+                tenant_id=tid,
+                wamid=str(wamid)[:128],
+                lead_id=None,
+            )
+        )
+        db.commit()
+        return True
+    except IntegrityError:
+        db.rollback()
+        return False
+    except Exception as e:
+        db.rollback()
+        logger.warning("⚠️ [WEBHOOK] claim wamid falhou (fail-open processa 1x): %s", e)
+        return True
+    finally:
+        db.close()
+
 # ── INICIALIZAÇÃO DA APLICAÇÃO ───────────────────────────────────────
 app = Flask(__name__)
 CORS(app) # Libera acesso para o Dashboard não ser bloqueado
@@ -124,10 +194,23 @@ def _ensure_leads_tenant_id_column():
     except Exception as e:
         logger.warning(f"⚠️ [DATABASE] Não foi possível garantir tenant_id em leads: {e}")
 
+def _ensure_leads_metadata_version_column():
+    """Merge otimista em metadata_json (motor vs fila de envio)."""
+    try:
+        with engine.begin() as conn:
+            cols = conn.execute(text("PRAGMA table_info(leads)")).fetchall()
+            names = {str(c[1]).lower() for c in cols if len(c) > 1}
+            if "metadata_version" not in names:
+                conn.execute(text("ALTER TABLE leads ADD COLUMN metadata_version INTEGER NOT NULL DEFAULT 0"))
+                logger.info("🧩 [DATABASE] Coluna leads.metadata_version adicionada.")
+    except Exception as e:
+        logger.warning(f"⚠️ [DATABASE] Não foi possível garantir metadata_version em leads: {e}")
+
 try:
     Base.metadata.create_all(bind=engine)
     _ensure_leads_tenant_id_column()
     _ensure_mensagens_media_url_column()
+    _ensure_leads_metadata_version_column()
     logger.info("✅ [DATABASE] Tabelas sincronizadas com sucesso.")
 except Exception as e:
     logger.critical(f"🚨 [DATABASE] Falha ao sincronizar banco: {e}")
@@ -159,10 +242,18 @@ class LeadInboxManager:
     def __init__(self):
         self.inboxes = {}
         self.lock = threading.Lock()
+        self._dedup_lock = threading.Lock()
+        self._recent_fp_by_phone = {}
         self.max_busy_retries = int(CONFIG_CLIENTE.get("inbox_max_retries_busy", 8) or 8)
         self.max_fila_por_lead = int(CONFIG_CLIENTE.get("inbox_max_tamanho_fila_por_lead", 96) or 96)
         self.coalesce_s = max(1.0, min(float(CONFIG_CLIENTE.get("inbox_coalesce_seconds", 3) or 3), 12.0))
         self.silence_s = max(0.0, min(float(CONFIG_CLIENTE.get("inbox_silence_seconds", 25) or 25), 120.0))
+        self.dedupe_window_s = max(
+            5.0, min(float(CONFIG_CLIENTE.get("inbox_dedupe_window_seconds", 45) or 45), 180.0)
+        )
+        self.static_block_cooldown_s = max(
+            0.0, min(float(CONFIG_CLIENTE.get("inbox_static_block_cooldown_seconds", 90) or 90), 600.0)
+        )
         self.after_text_grace_s = max(
             0.0, min(float(CONFIG_CLIENTE.get("inbox_after_text_grace_seconds", 20) or 20), 60.0)
         )
@@ -183,6 +274,97 @@ class LeadInboxManager:
             r"\b(foto|imagem|palma|m[aã]o|mao|print|selfie|enviei\s+foto|mandei\s+foto)\b",
             re.I,
         )
+
+    @staticmethod
+    def _parse_iso_utc(raw: str):
+        s = str(raw or "").strip()
+        if not s:
+            return None
+        try:
+            s = s.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(s)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
+            return dt
+        except Exception:
+            return None
+
+    @staticmethod
+    def _payload_fingerprint(payload: dict) -> str:
+        tipo = str(payload.get("tipo_mensagem") or "text").strip().lower()
+        texto = re.sub(r"\s+", " ", str(payload.get("texto_recebido") or "").strip().lower())[:240]
+        media_id = str(payload.get("meta_media_id") or "").strip()
+        media_url = str(payload.get("media_url") or payload.get("imagem_url") or "").strip().lower()
+        if len(media_url) > 160:
+            media_url = media_url[-160:]
+        msg_id = str(payload.get("meta_msg_id") or "").strip()
+        raw = f"{tipo}|{texto}|{media_id}|{media_url}|{msg_id}"
+        return hashlib.sha1(raw.encode("utf-8", errors="ignore")).hexdigest()
+
+    def _is_recent_duplicate(self, telefone: str, payload: dict) -> bool:
+        now = time.time()
+        fp = self._payload_fingerprint(payload)
+        with self._dedup_lock:
+            dq = self._recent_fp_by_phone.setdefault(telefone, deque())
+            while dq and (now - float(dq[0][0])) > self.dedupe_window_s:
+                dq.popleft()
+            if any((old_fp == fp) for _, old_fp in dq):
+                return True
+            dq.append((now, fp))
+            if len(dq) > 300:
+                dq.popleft()
+        return False
+
+    def _should_skip_static_cooldown(self, telefone: str, payload: dict) -> bool:
+        if self.static_block_cooldown_s <= 0:
+            return False
+        tipo = str(payload.get("tipo_mensagem") or "text").strip().lower()
+        if tipo in ("audio", "image", "video"):
+            return False
+        tx = str(payload.get("texto_recebido") or "").strip()
+        if not tx:
+            return False
+        palavras = tx.split()
+        if len(palavras) > 8 or not self._re_confirmacao_curta.search(tx):
+            return False
+        db = SessionLocal()
+        try:
+            lead = db.query(models.Lead).filter_by(
+                telefone=telefone, tenant_id=get_engine_tenant_id()
+            ).first()
+            if not lead:
+                return False
+            node = str(getattr(lead, "node_atual", "") or "")
+            if not node.startswith("static_meumisterio_"):
+                return False
+            md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
+            key = node.replace("static_meumisterio_", "static_mm_") + "_last_sent_at"
+            dt_last = self._parse_iso_utc(md.get(key))
+            if not dt_last:
+                return False
+            delta = (datetime.now(timezone.utc) - dt_last).total_seconds()
+            if delta < self.static_block_cooldown_s:
+                self._auditar_busy_por_telefone(
+                    telefone,
+                    "inbox_static_cooldown_skip",
+                    {
+                        "node_atual": node,
+                        "delta_s": round(float(delta), 2),
+                        "cooldown_s": round(float(self.static_block_cooldown_s), 2),
+                    },
+                )
+                logger.info(
+                    "🧊 [FILA] Cooldown estático: suprimindo replay curto para %s (node=%s delta=%.1fs).",
+                    telefone,
+                    node,
+                    delta,
+                )
+                return True
+            return False
+        finally:
+            db.close()
 
     @staticmethod
     def _merge_payload(base: dict, extra: dict) -> dict:
@@ -326,6 +508,14 @@ class LeadInboxManager:
         )
 
     def enqueue(self, telefone, payload):
+        if self._is_recent_duplicate(telefone, payload):
+            logger.info("♻️ [FILA] Duplicata recente suprimida para %s.", telefone)
+            self._auditar_busy_por_telefone(
+                telefone,
+                "inbox_dedupe_suppressed",
+                {"window_s": round(float(self.dedupe_window_s), 2)},
+            )
+            return
         with self.lock:
             if telefone not in self.inboxes:
                 self.inboxes[telefone] = queue.Queue()
@@ -372,6 +562,8 @@ class LeadInboxManager:
                     bool(payload.get("_inbox_after_text_grace")),
                     len(tx),
                 )
+                if self._should_skip_static_cooldown(telefone, payload):
+                    continue
 
                 # Despacha para o motor de estados
                 acquired = False
@@ -592,6 +784,111 @@ def _lead_metadata_as_dict(raw) -> dict:
         except json.JSONDecodeError:
             return {}
     return {}
+
+
+def _normalizar_static_target_node(raw: str) -> str:
+    s = (raw or "").strip().lower().replace(" ", "").replace("-", "_")
+    if not s:
+        return ""
+    if s in {"b1", "b2", "b3", "b4", "b5", "b6"}:
+        return f"static_meumisterio_{s}"
+    if s.startswith("static_meumisterio_"):
+        return s
+    if s.startswith("static_meumisteriob") and len(s) > len("static_meumisteriob"):
+        return "static_meumisterio_" + s.split("static_meumisteriob", 1)[1]
+    if s.startswith("static_mm_b"):
+        return "static_meumisterio_" + s.split("static_mm_", 1)[1]
+    return s
+
+
+def _next_static_node(node: str) -> str:
+    order = (
+        "static_meumisterio_b1",
+        "static_meumisterio_b2",
+        "static_meumisterio_b3",
+        "static_meumisterio_b4",
+        "static_meumisterio_b5",
+        "static_meumisterio_b6",
+    )
+    try:
+        idx = order.index(str(node or ""))
+    except ValueError:
+        return ""
+    if idx >= len(order) - 1:
+        return ""
+    return order[idx + 1]
+
+
+def _bot_state_snapshot_for_lead(db, lead) -> dict:
+    md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
+    node = str(getattr(lead, "node_atual", "") or "")
+    phase = ""
+    if node == "static_meumisterio_b1":
+        phase = str(md.get("static_mm_b1_phase") or "")
+    elif node == "static_meumisterio_b2":
+        phase = str(md.get("static_mm_b2_phase") or "")
+    elif node == "static_meumisterio_b3":
+        phase = str(md.get("static_mm_b3_phase") or "")
+    elif node == "static_meumisterio_b4":
+        phase = str(md.get("static_mm_b4_phase") or "")
+    elif node == "static_meumisterio_b5":
+        phase = str(md.get("static_mm_b5_phase") or "")
+    elif node == "static_meumisterio_b6":
+        phase = "awaiting_reply"
+
+    last_user = (
+        db.query(models.Mensagem)
+        .filter(models.Mensagem.lead_id == lead.id, models.Mensagem.remetente == "user")
+        .order_by(models.Mensagem.timestamp.desc())
+        .first()
+    )
+    last_bot = (
+        db.query(models.Mensagem)
+        .filter(models.Mensagem.lead_id == lead.id, models.Mensagem.remetente == "bot")
+        .order_by(models.Mensagem.timestamp.desc())
+        .first()
+    )
+    now = datetime.now(timezone.utc)
+    orphan_s = 0.0
+    if last_user and getattr(last_user, "timestamp", None):
+        tsu = last_user.timestamp
+        if tsu.tzinfo is None:
+            tsu = tsu.replace(tzinfo=timezone.utc)
+        tsb = None
+        if last_bot and getattr(last_bot, "timestamp", None):
+            tsb = last_bot.timestamp
+            if tsb.tzinfo is None:
+                tsb = tsb.replace(tzinfo=timezone.utc)
+        if tsb is None or tsb < tsu:
+            orphan_s = max(0.0, float((now - tsu).total_seconds()))
+
+    paused = bool(getattr(lead, "bot_pausado", False))
+    waiting_reply = phase.startswith("awaiting")
+    status = "running"
+    action_hint = "Aguardar próximo turno normal."
+    if paused:
+        status = "paused_handoff"
+        action_hint = "Clique em Reativar IA ou Retomar."
+    elif waiting_reply:
+        status = "waiting_reply"
+        action_hint = "Aguardando resposta do lead para avançar."
+    elif orphan_s >= 300:
+        status = "orphan_waiting_delivery"
+        action_hint = "Use Retomar para reprocessar o último turno."
+
+    return _json_safe_for_api(
+        {
+            "status": status,
+            "node_atual": node,
+            "phase": phase,
+            "waiting_reply": waiting_reply,
+            "paused": paused,
+            "orphan_wait_seconds": int(orphan_s),
+            "last_user_at": last_user.timestamp.isoformat() if last_user and last_user.timestamp else None,
+            "last_bot_at": last_bot.timestamp.isoformat() if last_bot and last_bot.timestamp else None,
+            "action_hint": action_hint,
+        }
+    )
 
 
 def _json_safe_for_api(obj):
@@ -987,8 +1284,21 @@ def api_flows_schema():
     """Catálogo de blocos e campos (para o construtor)."""
     try:
         from flow_builder_runtime import public_node_catalog
+        from flow_executor import (
+            flow_blueprint_allow_http,
+            flow_blueprint_allow_llm,
+            flow_blueprint_gemini_configured,
+        )
+        from flow_motor_ref import flow_blueprint_allow_motor_ref
 
-        return jsonify({"ok": True, **_json_safe_for_api(public_node_catalog())}), 200
+        payload = public_node_catalog()
+        payload["runtime"] = {
+            "allow_http": flow_blueprint_allow_http(),
+            "allow_llm": flow_blueprint_allow_llm(),
+            "gemini_configured": flow_blueprint_gemini_configured(),
+            "allow_motor_ref": flow_blueprint_allow_motor_ref(),
+        }
+        return jsonify({"ok": True, **_json_safe_for_api(payload)}), 200
     except Exception as e:
         logger.error("🚨 [API] /api/flows/schema: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -1252,16 +1562,33 @@ def api_flows_blueprint_execute(bid: int):
         if not lead or str(getattr(lead, "tenant_id", "default") or "default") != tid:
             return jsonify({"ok": False, "error": "lead não encontrado neste tenant"}), 404
 
-        from flow_executor import document_to_acoes
+        from flow_executor import document_to_acoes, flow_context_from_lead
         from schema import ContextoConversa
+        from sqlalchemy.orm.attributes import flag_modified
 
         doc = bp.body_json if isinstance(bp.body_json, dict) else {}
+        div_out = {}
+        fv_out = {}
         try:
-            acoes = document_to_acoes(doc)
+            acoes = document_to_acoes(
+                doc,
+                context=flow_context_from_lead(lead, tenant_id=tid),
+                blueprint_id=bid,
+                tenant_id=tid,
+                divisao_metadata_out=div_out,
+                flow_vars_metadata_out=fv_out,
+            )
         except ValueError as ve:
             return jsonify({"ok": False, "error": str(ve)}), 422
         if not acoes:
             return jsonify({"ok": False, "error": "nenhuma ação gerada (revise blocos message/delay)"}), 422
+
+        if div_out or fv_out:
+            meta = dict(lead.metadata_json or {}) if isinstance(lead.metadata_json, dict) else {}
+            meta.update(div_out)
+            meta.update(fv_out)
+            lead.metadata_json = meta
+            flag_modified(lead, "metadata_json")
 
         ctx = ContextoConversa(
             lead_id=lead.id,
@@ -2583,12 +2910,6 @@ def get_leads():
 
         tid = get_request_tenant_id()
         leads_q = db.query(models.Lead).filter(models.Lead.tenant_id == tid)
-        if status == "new":
-            leads_q = leads_q.filter(models.Lead.bot_pausado.is_(True), models.Lead.convertido.is_(False))
-        elif status == "open":
-            leads_q = leads_q.filter(models.Lead.convertido.is_(False))
-        elif status == "closed":
-            leads_q = leads_q.filter(models.Lead.convertido.is_(True))
 
         if q:
             like = f"%{q}%"
@@ -2624,6 +2945,7 @@ def get_leads():
             waiting_human = False
             unread_human = False
             sla_wait_minutes = 0
+            resolved = False
             resolved_at = str(md.get("chat_resolvido_em") or "").strip()
             if last_user and (not last_bot or (last_user.timestamp and last_bot.timestamp and last_user.timestamp > last_bot.timestamp)):
                 waiting_human = bool(l.bot_pausado or str(getattr(l, "ultimo_sentimento", "") or "").lower() in ("frustrado", "resistente"))
@@ -2642,8 +2964,20 @@ def get_leads():
                             waiting_human = False
                             unread_human = False
                             sla_wait_minutes = 0
+                            resolved = True
                     except Exception:
                         pass
+            elif resolved_at:
+                try:
+                    _ = datetime.fromisoformat(resolved_at.replace("Z", "+00:00"))
+                    resolved = True
+                except Exception:
+                    resolved = False
+
+            manual_open = bool(getattr(l, "bot_pausado", False)) and (not bool(getattr(l, "convertido", False))) and (not resolved)
+            new_message = bool(unread_human) and (not manual_open) and (not bool(getattr(l, "convertido", False))) and (not resolved)
+            closed_chat = bool(getattr(l, "convertido", False)) or resolved
+            open_in_progress = (not closed_chat) and (not new_message)
 
             fechamento_score = 0.0
             try:
@@ -2672,11 +3006,22 @@ def get_leads():
                     "last_message_from": (str(last_msg.remetente or "") if last_msg else ""),
                     "waiting_human": waiting_human,
                     "unread_human": unread_human,
+                    "is_resolved": resolved,
+                    "is_manual_open": manual_open,
+                    "is_new_message": new_message,
+                    "is_closed_chat": closed_chat,
+                    "is_open_in_progress": open_in_progress,
                     "sla_wait_minutes": int(sla_wait_minutes),
                     "closing_priority_score": round(float(fechamento_score), 2),
                     "owner_operator": str(md.get("chat_owner_operator") or ""),
                 }
             )
+        if status == "new":
+            out = [x for x in out if bool(x.get("is_new_message"))]
+        elif status == "open":
+            out = [x for x in out if bool(x.get("is_open_in_progress"))]
+        elif status == "closed":
+            out = [x for x in out if bool(x.get("is_closed_chat"))]
         if sort == "priority":
             out = sorted(
                 out,
@@ -2708,6 +3053,7 @@ def resolve_lead_chat(lead_id: int):
         md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
         md["chat_resolvido_em"] = datetime.now(timezone.utc).isoformat()
         lead.metadata_json = md
+        lead.bot_pausado = False
         db.commit()
         return jsonify({"ok": True, "resolved_at": md["chat_resolvido_em"]}), 200
     except Exception as e:
@@ -2902,6 +3248,7 @@ def get_messages(lead_id):
         meta_raw = _lead_metadata_as_dict(lead.metadata_json)
         meta = _json_safe_for_api(meta_raw)
         wa_win = _whatsapp_care_window_info(db, lead_id)
+        bot_state = _bot_state_snapshot_for_lead(db, lead)
 
         return jsonify({
             "messages": [{
@@ -2919,6 +3266,7 @@ def get_messages(lead_id):
             "messages_returned": len(rows),
             "truncated": (total > len(rows)) if include_total else False,
             "whatsapp_meta": _json_safe_for_api(wa_win),
+            "bot_state": bot_state,
             "whatsapp_policy_hint": (
                 "Regra usual Meta: dentro de ~24h após a última mensagem do lead, mensagens de sessão para continuar "
                 "o atendimento costumam ser aceitas. Fora disso, contatos proativos costumam exigir templates (HSM) "
@@ -2990,6 +3338,151 @@ def toggle_pause(lead_id):
         db.commit()
         logger.info(f"⏯️ [DASHBOARD] Bot {'PAUSADO' if lead.bot_pausado else 'ATIVADO'} para {lead.telefone}.")
         return jsonify({"bot_pausado": lead.bot_pausado}), 200
+    finally:
+        db.close()
+
+
+@app.route("/api/leads/<int:lead_id>/resume-last-user", methods=["POST"])
+def resume_last_user_turn(lead_id: int):
+    """
+    Reprocessa a última mensagem do usuário para retomada manual do atendimento.
+    Não envia texto novo: apenas reaplica o último turno recebido.
+    """
+    db = SessionLocal()
+    try:
+        lead = db.get(models.Lead, lead_id)
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+        if str(getattr(lead, "tenant_id", "default") or "default") != get_request_tenant_id():
+            return jsonify({"error": "not_found"}), 404
+        last_user = (
+            db.query(models.Mensagem)
+            .filter(models.Mensagem.lead_id == lead.id, models.Mensagem.remetente == "user")
+            .order_by(models.Mensagem.id.desc())
+            .first()
+        )
+        if not last_user:
+            return jsonify({"error": "no_user_message"}), 400
+        texto = str(getattr(last_user, "texto", "") or "").strip()
+        if not texto:
+            return jsonify({"error": "empty_user_message"}), 400
+
+        lead.bot_pausado = False
+        db.commit()
+
+        out = motor.processar_mensagem(
+            str(getattr(lead, "telefone", "") or ""),
+            texto,
+            tipo_mensagem=str(getattr(last_user, "tipo", "text") or "text"),
+        )
+        return jsonify({"ok": True, "result": out or {"status": "ok"}}), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/leads/<int:lead_id>/resend-current-block", methods=["POST"])
+def resend_current_block(lead_id: int):
+    """
+    Reenvia o bloco atual do funil estático, limpando flags de dispatch/fase do bloco.
+    """
+    db = SessionLocal()
+    try:
+        lead = db.get(models.Lead, lead_id)
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+        if str(getattr(lead, "tenant_id", "default") or "default") != get_request_tenant_id():
+            return jsonify({"error": "not_found"}), 404
+        node = str(getattr(lead, "node_atual", "") or "").strip()
+        if not node.startswith("static_meumisterio_"):
+            return jsonify({"error": "not_static_node"}), 400
+
+        md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
+        reset_map = {
+            "static_meumisterio_b1": ["static_mm_b1_phase", "static_mm_b1_entregue"],
+            "static_meumisterio_b2": ["static_mm_b2_phase", "static_mm_b2_seq_dispatched", "static_mm_b2_entregue"],
+            "static_meumisterio_b3": ["static_mm_b3_phase", "static_mm_b3_seq_dispatched", "static_mm_b3_entregue"],
+            "static_meumisterio_b4": ["static_mm_b4_phase", "static_mm_b4_seq_dispatched", "static_mm_b4_entregue"],
+            "static_meumisterio_b5": ["static_mm_b5_phase", "static_mm_b5_seq_dispatched", "static_mm_b5_entregue"],
+            "static_meumisterio_b6": ["static_mm_b6_seq_dispatched"],
+        }
+        for k in reset_map.get(node, []):
+            md.pop(k, None)
+        lead.metadata_json = md
+        lead.bot_pausado = False
+        db.commit()
+
+        default_text = "quero minha consulta" if node == "static_meumisterio_b1" else "ok"
+        out = motor.processar_mensagem(str(getattr(lead, "telefone", "") or ""), default_text, tipo_mensagem="text")
+        return jsonify({"ok": True, "node": node, "result": out or {"status": "ok"}}), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/leads/<int:lead_id>/advance-node", methods=["POST"])
+def advance_lead_node(lead_id: int):
+    """
+    Avança manualmente o nó atual do funil estático para um nó alvo.
+    """
+    db = SessionLocal()
+    try:
+        lead = db.get(models.Lead, lead_id)
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+        if str(getattr(lead, "tenant_id", "default") or "default") != get_request_tenant_id():
+            return jsonify({"error": "not_found"}), 404
+        body = request.get_json(silent=True) or {}
+        target_node = _normalizar_static_target_node(str(body.get("target_node") or "").strip())
+        allowed = {
+            "static_meumisterio_b1",
+            "static_meumisterio_b2",
+            "static_meumisterio_b3",
+            "static_meumisterio_b4",
+            "static_meumisterio_b5",
+            "static_meumisterio_b6",
+        }
+        if target_node not in allowed:
+            return jsonify({"error": "invalid_target_node"}), 400
+        prev = str(getattr(lead, "node_atual", "") or "")
+        if target_node == prev:
+            maybe_next = _next_static_node(prev)
+            if bool(body.get("auto_next")) and maybe_next:
+                target_node = maybe_next
+            else:
+                return jsonify({"error": "same_target_node", "node": prev}), 400
+        md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
+        reset_map = {
+            "static_meumisterio_b1": ["static_mm_b1_phase", "static_mm_b1_entregue"],
+            "static_meumisterio_b2": ["static_mm_b2_phase", "static_mm_b2_seq_dispatched", "static_mm_b2_entregue"],
+            "static_meumisterio_b3": ["static_mm_b3_phase", "static_mm_b3_seq_dispatched", "static_mm_b3_entregue"],
+            "static_meumisterio_b4": ["static_mm_b4_phase", "static_mm_b4_seq_dispatched", "static_mm_b4_entregue"],
+            "static_meumisterio_b5": ["static_mm_b5_phase", "static_mm_b5_seq_dispatched", "static_mm_b5_entregue"],
+            "static_meumisterio_b6": ["static_mm_b6_seq_dispatched"],
+        }
+        for k in reset_map.get(target_node, []):
+            md.pop(k, None)
+        lead.metadata_json = md
+        lead.node_atual = target_node
+        lead.bot_pausado = False
+        db.add(
+            models.EventoAudit(
+                lead_id=lead.id,
+                evento="manual_node_advance",
+                dados={"from": prev, "to": target_node},
+            )
+        )
+        db.commit()
+        default_text = "quero minha consulta" if target_node == "static_meumisterio_b1" else "ok"
+        out = motor.processar_mensagem(str(getattr(lead, "telefone", "") or ""), default_text, tipo_mensagem="text")
+        return jsonify({"ok": True, "from": prev, "to": target_node, "result": out or {"status": "ok"}}), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         db.close()
 
@@ -3133,6 +3626,17 @@ def send_whatsapp_template(lead_id):
 def integrations_summary():
     """URLs públicas e estado de configuração para o painel Integrações (sem expor segredos)."""
     base = (request.url_root or "").rstrip("/")
+    redis_inbound = {"configured": False, "ready": False, "queue_key": None, "depth": None}
+    if (os.getenv("REDIS_URL") or "").strip():
+        redis_inbound["configured"] = True
+        try:
+            from reliability.redis_inbound import QUEUE_KEY, queue_depth, redis_inbound_ready
+
+            redis_inbound["queue_key"] = QUEUE_KEY
+            redis_inbound["ready"] = redis_inbound_ready()
+            redis_inbound["depth"] = queue_depth()
+        except Exception:
+            pass
     return jsonify({
         "base_url": base,
         "webhooks": [
@@ -3155,6 +3659,7 @@ def integrations_summary():
             "token_configured": bool(WEBAPP_TOKEN),
             "verify_token_configured": bool(VERIFY_TOKEN),
         },
+        "redis_inbound": redis_inbound,
         "docs": {
             "whatsapp_cloud": "https://developers.facebook.com/docs/whatsapp/cloud-api",
             "webhooks_graph": "https://developers.facebook.com/docs/graph-api/webhooks/getting-started",
@@ -3190,8 +3695,17 @@ def webhook_meta():
     data = request.get_json(silent=True)
     if not data: return "NO_DATA", 400
 
-    # Descarrega para thread de triagem para responder 200 OK imediatamente
-    threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()
+    # Com REDIS_URL: fila durável (LPUSH) + worker BRPOP → mesma _triagem_meta. Senão: thread in-process.
+    enqueued = False
+    try:
+        from reliability.redis_inbound import enqueue_inbound_webhook, redis_inbound_ready
+
+        if redis_inbound_ready():
+            enqueued = enqueue_inbound_webhook(data)
+    except Exception as e:
+        logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
+    if not enqueued:
+        threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()
     return "EVENT_RECEIVED", 200
 
 def _triagem_meta(data):
@@ -3205,19 +3719,28 @@ def _triagem_meta(data):
 
         msg = value["messages"][0]
         msg_id = msg.get("id")
-        
-        # 🚨 IDEMPOTÊNCIA: Bloqueia reprocessamento da mesma mensagem
+
+        # IDEMPOTÊNCIA (memória + SQLite): Meta pode reentregar o mesmo wamid após restart
         with LOCK_IDEMPOTENCIA:
-            if msg_id in CACHE_MENSAGENS:
-                logger.debug(f"♻️ [TRAVA] Ignorando duplicata: {msg_id}")
+            if msg_id and msg_id in CACHE_MENSAGENS:
+                logger.debug("♻️ [TRAVA] Ignorando duplicata em memória: %s", msg_id)
                 return
-            CACHE_MENSAGENS.append(msg_id)
+        if msg_id and not _try_claim_wamid_db(msg_id):
+            with LOCK_IDEMPOTENCIA:
+                if msg_id not in CACHE_MENSAGENS:
+                    CACHE_MENSAGENS.append(msg_id)
+            logger.info("♻️ [WEBHOOK] Duplicata durável ignorada (wamid já processado): %s", msg_id)
+            return
+        with LOCK_IDEMPOTENCIA:
+            if msg_id:
+                CACHE_MENSAGENS.append(msg_id)
 
         telefone = msg.get("from")
         tipo = msg.get("type")
         texto_recebido = ""
         img_url = ""
         media_url = ""
+        media_id = ""
         nome_perfil_whatsapp = ""
 
         # Nome de perfil enviado pela Meta (quando disponível em contacts[*].profile.name)
@@ -3264,12 +3787,26 @@ def _triagem_meta(data):
             "tipo_mensagem": tipo,
             "imagem_url": img_url,
             "media_url": media_url,
+            "meta_msg_id": msg_id,
+            "meta_media_id": media_id,
             "nome_perfil_whatsapp": nome_perfil_whatsapp,
         }
         inbox_manager.enqueue(telefone, payload)
 
     except Exception as e:
         logger.error(f"🚨 [TRIAGEM] Erro crítico na extração: {e}", exc_info=True)
+
+
+def _bootstrap_redis_inbound_consumer():
+    try:
+        from reliability.redis_inbound import start_consumer_if_configured
+
+        start_consumer_if_configured(_triagem_meta)
+    except Exception as e:
+        logger.warning("⚠️ [REDIS] Worker inbound não iniciado: %s", e)
+
+
+_bootstrap_redis_inbound_consumer()
 
 # ─────────────────────────────────────────────────────────────────────
 # WEBHOOK (CAKTO) - GESTÃO DE VENDAS

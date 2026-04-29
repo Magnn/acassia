@@ -61,9 +61,17 @@ class Lead(Base):
 
     criado_em = Column(DateTime(timezone=True), default=_agora_utc)
     atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
+    # Controle de concorrência (motor vs thread de envio): merge otimista em metadata_json
+    metadata_version = Column(Integer, nullable=False, default=0)
 
     mensagens = relationship("Mensagem", back_populates="lead", lazy="dynamic", cascade="all, delete-orphan")
     eventos = relationship("EventoAudit", back_populates="lead", lazy="dynamic", cascade="all, delete-orphan")
+    behavior_events = relationship(
+        "LeadBehaviorEvent",
+        back_populates="lead",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<Lead id={self.id} tel={self.telefone} node={self.node_atual} genero={self.genero}>"
@@ -125,6 +133,41 @@ class EventoAudit(Base):
     dados = Column(JSON, default=dict)
 
     lead = relationship("Lead", back_populates="eventos")
+
+
+class WhatsAppInboundReceipt(Base):
+    """
+    Idempotência durável de webhooks Meta (at-least-once delivery).
+    Mesmo wamid não reentra na fila após restart do processo.
+    """
+
+    __tablename__ = "whatsapp_inbound_receipts"
+    __table_args__ = (UniqueConstraint("tenant_id", "wamid", name="uq_wa_receipt_tenant_wamid"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    wamid = Column(String(128), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc, index=True)
+
+
+class LeadBehaviorEvent(Base):
+    """
+    Telemetria passiva para dataset de treino da IA de atendimento.
+    Não altera o fluxo do motor; apenas registra sinais observados do turno.
+    """
+
+    __tablename__ = "lead_behavior_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    timestamp = Column(DateTime(timezone=True), default=_agora_utc, index=True)
+    event_type = Column(String(64), nullable=False, index=True)
+    node_atual = Column(String(100), nullable=True, index=True)
+    payload = Column(JSON, default=dict)
+
+    lead = relationship("Lead", back_populates="behavior_events")
 
 
 class StudioAgent(Base):

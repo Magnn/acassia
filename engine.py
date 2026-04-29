@@ -31,7 +31,7 @@ from typing import Any, Optional, List, Set
 import requests
 
 from db.database import SessionLocal
-from db.models import Lead, Mensagem, EventoAudit
+from db.models import Lead, Mensagem, EventoAudit, LeadBehaviorEvent
 from ai.intent_classifier import IntentClassifier
 from ai.context_compressor import ContextCompressor
 from ai.sentiment_analyzer import SentimentAnalyzer
@@ -76,6 +76,13 @@ from copy_sanitizer import (
     nome_lead_para_exibicao,
     preview_url_flag_para_whatsapp,
 )
+from flows.funil_estatico_meu_misterio.static_funnel_state import (
+    apply_delivered,
+    apply_dispatch_started,
+    collect_static_sources_from_acoes,
+    merge_metadata_for_persist,
+)
+from reliability.lead_metadata_atomic import atomic_patch_metadata_json, atomic_update_lead_columns
 from conversation_policy import (
     acoes_reparo_entrega_padrao,
     lead_reportou_problema_entrega,
@@ -242,6 +249,158 @@ class Engine:
             self.tenant_id = str(kwargs.get("tenant_id") or get_engine_tenant_id())
         except Exception:
             self.tenant_id = "default"
+        self._monitor_retomada_estatica_ativo = False
+        self._iniciar_monitor_retomada_estatica()
+
+    def _iniciar_monitor_retomada_estatica(self) -> None:
+        """
+        Monitor de auto-retomada do funil estático:
+        quando um lead respondeu e ficou sem resposta do bot após queda/restart,
+        reenfileira o último turno do usuário automaticamente.
+        """
+        try:
+            enabled = bool(CONFIG_CLIENTE.get("funil_estatico_auto_retoma_ativo", True))
+        except Exception:
+            enabled = True
+        if not enabled:
+            return
+        if self._monitor_retomada_estatica_ativo:
+            return
+        self._monitor_retomada_estatica_ativo = True
+        th = threading.Thread(
+            target=self._loop_monitor_retomada_estatica,
+            daemon=True,
+            name="static-mm-auto-retoma",
+        )
+        th.start()
+
+    @staticmethod
+    def _meta_as_dict(raw: Any) -> dict:
+        if isinstance(raw, dict):
+            return dict(raw)
+        if isinstance(raw, str):
+            try:
+                obj = json.loads(raw)
+                return dict(obj) if isinstance(obj, dict) else {}
+            except Exception:
+                return {}
+        return {}
+
+    @staticmethod
+    def _as_utc(dt: Optional[datetime]) -> Optional[datetime]:
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    def _loop_monitor_retomada_estatica(self) -> None:
+        interval_s = int(CONFIG_CLIENTE.get("funil_estatico_auto_retoma_intervalo_s", 45) or 45)
+        grace_s = int(CONFIG_CLIENTE.get("funil_estatico_auto_retoma_grace_s", 360) or 360)
+        cooldown_s = int(CONFIG_CLIENTE.get("funil_estatico_auto_retoma_cooldown_s", 600) or 600)
+        interval_s = max(20, min(interval_s, 600))
+        grace_s = max(120, min(grace_s, 3600))
+        cooldown_s = max(120, min(cooldown_s, 7200))
+
+        while True:
+            try:
+                self._executar_ciclo_retomada_estatica(grace_s=grace_s, cooldown_s=cooldown_s)
+            except Exception as e:
+                logger.warning("⚠️ [STATIC-RECOVER] ciclo falhou: %s", e)
+            time.sleep(interval_s)
+
+    def _executar_ciclo_retomada_estatica(self, *, grace_s: int, cooldown_s: int) -> None:
+        db = SessionLocal()
+        try:
+            candidatos = (
+                db.query(Lead)
+                .filter(
+                    Lead.tenant_id == (self.tenant_id or "default"),
+                    Lead.node_atual.in_(
+                        (
+                            "static_meumisterio_b1",
+                            "static_meumisterio_b2",
+                            "static_meumisterio_b3",
+                            "static_meumisterio_b4",
+                            "static_meumisterio_b5",
+                        )
+                    ),
+                )
+                .all()
+            )
+            now = datetime.now(timezone.utc)
+            for lead in candidatos:
+                # Evita corrida com turnos em execução.
+                with self._lock_proc:
+                    if lead.id in self._leads_em_processamento:
+                        continue
+
+                last_user = (
+                    db.query(Mensagem)
+                    .filter(Mensagem.lead_id == lead.id, Mensagem.remetente == "user")
+                    .order_by(Mensagem.id.desc())
+                    .first()
+                )
+                if not last_user:
+                    continue
+                last_bot = (
+                    db.query(Mensagem)
+                    .filter(Mensagem.lead_id == lead.id, Mensagem.remetente == "bot")
+                    .order_by(Mensagem.id.desc())
+                    .first()
+                )
+                last_user_ts = self._as_utc(getattr(last_user, "timestamp", None))
+                last_bot_ts = self._as_utc(getattr(last_bot, "timestamp", None)) if last_bot else None
+                if last_bot_ts and last_user_ts and last_bot_ts >= last_user_ts:
+                    continue
+                if not last_user_ts:
+                    continue
+                age_s = (now - last_user_ts).total_seconds()
+                if age_s < float(grace_s):
+                    continue
+
+                meta = self._meta_as_dict(getattr(lead, "metadata_json", None))
+                last_msg_id = int(meta.get("static_mm_retomada_ultimo_user_msg_id", 0) or 0)
+                last_try_iso = str(meta.get("static_mm_retomada_ultimo_attempt_at", "") or "").strip()
+                last_try_at = None
+                if last_try_iso:
+                    try:
+                        last_try_at = self._as_utc(datetime.fromisoformat(last_try_iso.replace("Z", "+00:00")))
+                    except Exception:
+                        last_try_at = None
+                if last_msg_id == int(last_user.id) and last_try_at is not None:
+                    if (now - last_try_at).total_seconds() < float(cooldown_s):
+                        continue
+
+                meta["static_mm_retomada_ultimo_user_msg_id"] = int(last_user.id)
+                meta["static_mm_retomada_ultimo_attempt_at"] = now.isoformat()
+                lead.metadata_json = meta
+                db.commit()
+
+                txt = str(getattr(last_user, "texto", "") or "").strip()
+                if not txt:
+                    continue
+                logger.info(
+                    "event=static_mm_auto_retomada lead_id=%s node=%s user_msg_id=%s age_s=%.1f",
+                    lead.id,
+                    str(getattr(lead, "node_atual", "") or ""),
+                    int(last_user.id),
+                    float(age_s),
+                )
+                try:
+                    self.processar_mensagem(
+                        str(getattr(lead, "telefone", "") or ""),
+                        txt,
+                        tipo_mensagem=str(getattr(last_user, "tipo", "text") or "text"),
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "⚠️ [STATIC-RECOVER] falha ao retomar lead_id=%s: %s",
+                        lead.id,
+                        e,
+                    )
+        finally:
+            db.close()
 
     def _lock_envio_lead(self, lead_id: int) -> threading.Lock:
         """Evita intercalar no WhatsApp balões de dois processamentos do mesmo lead."""
@@ -364,6 +523,27 @@ class Engine:
                 if caption: ctx.metadata["caption"] = caption
 
                 # ── HANDOFF: Verifica se o bot está pausado para atendimento humano ──
+                _node_atual_handoff = str(getattr(lead, "node_atual", "") or "")
+                _em_estatico_mm = _node_atual_handoff.startswith("static_meumisterio_")
+                # Guardrail: no funil estático ativo, não manter pause legado/indevido.
+                if _em_estatico_mm and bool(getattr(lead, "bot_pausado", False)) and not bool(getattr(lead, "convertido", False)):
+                    lead.bot_pausado = False
+                    try:
+                        db.add(
+                            EventoAudit(
+                                lead_id=lead.id,
+                                evento="handoff_guardrail_unpause_static",
+                                dados={"node_atual": _node_atual_handoff},
+                            )
+                        )
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+                    logger.info(
+                        "event=handoff_guardrail_unpause_static lead=%s node=%s",
+                        lead.id,
+                        _node_atual_handoff,
+                    )
                 if getattr(lead, "bot_pausado", False):
                     logger.info(f"⏸️ [HANDOFF] Bot pausado para {telefone}. Apenas a registar mensagem.")
                     db.commit()
@@ -386,8 +566,9 @@ class Engine:
                                 },
                             )
                         )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        db.rollback()
+                        logger.warning("⚠️ [AUDIT] handoff_pos_funil audit: %s", e)
                     logger.info(
                         "⏸️ [HANDOFF] Lead pós-funil/comprador (%s) desviado para atendimento silencioso.",
                         telefone,
@@ -420,14 +601,18 @@ class Engine:
                         from studio_runtime import inject_published_studio_into_metadata
 
                         inject_published_studio_into_metadata(ctx.metadata, tenant_id=self.tenant_id)
-                    except Exception:
+                    except ImportError:
                         pass
+                    except Exception as e:
+                        logger.warning("⚠️ [ENGINE] studio_runtime inject falhou: %s", e)
                     try:
                         from flow_executor import inject_published_flow_metadata
 
                         inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
-                    except Exception:
+                    except ImportError:
                         pass
+                    except Exception as e:
+                        logger.warning("⚠️ [ENGINE] flow_executor inject falhou: %s", e)
 
                 # Nome do lead: coluna `lead.nome` é fonte de verdade quando preenchida;
                 # evita nodes usarem a primeira palavra da mensagem atual ("mandei", "foto") quando o JSON não tem nome_lead.
@@ -499,6 +684,7 @@ class Engine:
                 resolver_avanco_node_fase1(lead, ctx, meta)
                 ctx.metadata = meta
 
+                _snap = {}
                 try:
                     _nm_snap = (
                         (getattr(ctx, "nome_lead", None) or meta.get("nome_lead") or "")
@@ -510,8 +696,8 @@ class Engine:
                         getattr(ctx, "node_atual", ""),
                         _snap,
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("⚠️ [ENGINE] snapshot_fase1_coleta falhou lead=%s: %s", lead.id, e)
 
                 # Enriquecimento IA (com curto-circuito para alta escala)
                 if CONFIG_CLIENTE.get("ia_motor_desligada") or _node_static_mm:
@@ -587,6 +773,23 @@ class Engine:
                 # Máquina de estados
                 acoes = self._rotear_state_machine(db, lead, ctx)
                 acoes, motivos_redundancia = self._filtrar_acoes_redundantes_por_contexto(ctx, acoes)
+                resumo_turno = self._resumo_acoes_turno(acoes or [])
+                self._registrar_evento_comportamental(
+                    db,
+                    lead,
+                    event_type="turn_observed",
+                    ctx=ctx,
+                    payload={
+                        "tipo_mensagem": str(tipo_msg or "text"),
+                        "texto_chars": len(str(texto_recebido or "")),
+                        "foto_atual": bool(tipo_msg in ("image", "video")),
+                        "sniffer_eventos": list(_ev_sniffer or []),
+                        "snapshot_fase1": dict(_snap) if isinstance(_snap, dict) else {},
+                        "acoes": resumo_turno,
+                        "intencao": str(getattr(ctx, "intencao", "") or "")[:50],
+                        "sentimento": str(getattr(ctx, "sentimento", "") or "")[:50],
+                    },
+                )
                 if motivos_redundancia:
                     for motivo, qtd in motivos_redundancia.items():
                         db.add(
@@ -744,14 +947,18 @@ class Engine:
                 from studio_runtime import inject_published_studio_into_metadata
 
                 inject_published_studio_into_metadata(ctx.metadata, tenant_id=self.tenant_id)
-            except Exception:
+            except ImportError:
                 pass
+            except Exception as e:
+                logger.warning("⚠️ [ENGINE] studio_runtime inject falhou (pos_venda): %s", e)
             try:
                 from flow_executor import inject_published_flow_metadata
 
                 inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
-            except Exception:
+            except ImportError:
                 pass
+            except Exception as e:
+                logger.warning("⚠️ [ENGINE] flow_executor inject falhou (pos_venda): %s", e)
             self._restaurar_memoria(lead, ctx)
             acoes = self._executar_node(target_entrega, ctx, db, lead)
             self._processar_fila(lead.id, ctx, acoes)
@@ -781,14 +988,18 @@ class Engine:
                 from studio_runtime import inject_published_studio_into_metadata
 
                 inject_published_studio_into_metadata(ctx.metadata, tenant_id=self.tenant_id)
-            except Exception:
+            except ImportError:
                 pass
+            except Exception as e:
+                logger.warning("⚠️ [ENGINE] studio_runtime inject falhou (recuperacao): %s", e)
             try:
                 from flow_executor import inject_published_flow_metadata
 
                 inject_published_flow_metadata(ctx.metadata, tenant_id=self.tenant_id)
-            except Exception:
+            except ImportError:
                 pass
+            except Exception as e:
+                logger.warning("⚠️ [ENGINE] flow_executor inject falhou (recuperacao): %s", e)
             self._restaurar_memoria(lead, ctx)
             self._processar_fila(lead.id, ctx, acoes)
         except Exception as e:
@@ -834,10 +1045,38 @@ class Engine:
         pendentes_db = 0
         batch_commit = 5
         ultimo_tipo_enviado = ""
+        delivered_static_sources: Set[str] = set()
+
+        def _registrar_source_entregue(acao_obj: Acao) -> None:
+            meta_acao = getattr(acao_obj, "metadata", None) or {}
+            src = str(meta_acao.get("source") or "").strip().lower()
+            if src.startswith("static_meumisterio_b"):
+                delivered_static_sources.add(src)
 
         try:
             if acoes:
                 aplicar_gancho_na_lista_acoes(acoes)
+            planned_static_sources = collect_static_sources_from_acoes(acoes)
+            if planned_static_sources:
+                try:
+                    ok_dispatch = atomic_patch_metadata_json(
+                        db,
+                        lead_id,
+                        lambda old: apply_dispatch_started(old, planned_static_sources),
+                        max_retries=6,
+                    )
+                    if not ok_dispatch:
+                        lead_obj = db.query(Lead).filter(Lead.id == lead_id).first()
+                        if lead_obj:
+                            meta = apply_dispatch_started(
+                                dict(getattr(lead_obj, "metadata_json", None) or {}),
+                                planned_static_sources,
+                            )
+                            lead_obj.metadata_json = meta
+                            db.commit()
+                except Exception as e:
+                    db.rollback()
+                    logger.warning("⚠️ [FILA] dispatch_started patch falhou lead=%s: %s", lead_id, e)
             # Só neste disparo: evita repetir o mesmo balão fatiado duas vezes na mesma lista de ações.
             dedup_texto_neste_lote: Set[str] = set()
             for acao in acoes:
@@ -856,6 +1095,42 @@ class Engine:
 
                 elif acao.tipo == "text":
                     _meta_ac = getattr(acao, "metadata", None) or {}
+                    # Flow Builder (GPT/Agente): placeholder `runtime=llm` não envia o prompt (A1).
+                    # Texto já gerado pelo Gemini em `flow_executor` usa `runtime=llm_gemini` (C2).
+                    if (
+                        str(_meta_ac.get("source") or "").strip().lower() == "flow_builder"
+                        and str(_meta_ac.get("runtime") or "").strip().lower() == "llm"
+                    ):
+                        logger.warning(
+                            "event=flow_builder_llm_skip lead=%s node=%s — prompt do bloco IA não enviado ao WhatsApp",
+                            lead_id,
+                            getattr(ctx, "node_atual", ""),
+                        )
+                        continue
+                    # Flow Builder — anotação interna (B4): não enviar ao lead (ver docs/roadmap-canvas-orbita.md).
+                    if (
+                        str(_meta_ac.get("source") or "").strip().lower() == "flow_builder"
+                        and str(_meta_ac.get("kind") or "").strip().lower() == "note"
+                    ):
+                        logger.info(
+                            "event=flow_builder_note_skip lead=%s node=%s — anotação de fluxo não enviada ao WhatsApp",
+                            lead_id,
+                            getattr(ctx, "node_atual", ""),
+                        )
+                        continue
+                    # Flow Builder — motor_ref sem execução ou com erro (C3): não enviar texto técnico ao lead.
+                    _rt_m = str(_meta_ac.get("runtime") or "").strip().lower()
+                    if str(_meta_ac.get("source") or "").strip().lower() == "flow_builder" and _rt_m in (
+                        "motor_ref_pending",
+                        "motor_ref_error",
+                    ):
+                        logger.info(
+                            "event=flow_builder_motor_ref_skip lead=%s node=%s runtime=%s",
+                            lead_id,
+                            getattr(ctx, "node_atual", ""),
+                            _rt_m,
+                        )
+                        continue
                     # Roteiro estático: um único balão, sem fatiar nem pipeline que colapsa espaços.
                     if _meta_ac.get("engine_texto_unico"):
                         fatiados = [str(acao.conteudo or "").rstrip()]
@@ -908,6 +1183,7 @@ class Engine:
                             )
                             continue
                         if self._enviar_com_retry(ctx.telefone, "text", balao_limpo):
+                            _registrar_source_entregue(acao)
                             if chave_dedup:
                                 dedup_texto_neste_lote.add(chave_dedup)
                             self._salvar_mensagem(db, lead_id, "bot", balao_limpo, "text", auto_commit=False)
@@ -925,6 +1201,7 @@ class Engine:
                     if ultimo_tipo_enviado == "text":
                         time.sleep(random.uniform(2.2, 3.4))
                     if self._enviar_com_retry(ctx.telefone, "vcard", acao.conteudo):
+                        _registrar_source_entregue(acao)
                         self._salvar_mensagem(db, lead_id, "bot", "[vcard]", "vcard", auto_commit=False)
                         enviados += 1
                         pendentes_db += 1
@@ -941,6 +1218,7 @@ class Engine:
                             roteiro = preparar_texto_envio(acao.tts_template, "engine_tts")
                             audio_url = self.audio_engine.gerar(roteiro)
                             if audio_url and self._enviar_com_retry(ctx.telefone, "audio", audio_url):
+                                _registrar_source_entregue(acao)
                                 self._salvar_mensagem(db, lead_id, "bot", "[tts]", "audio", auto_commit=False)
                                 enviados += 1
                                 pendentes_db += 1
@@ -952,6 +1230,7 @@ class Engine:
                             logger.warning(f"⚠️ [TTS] Falha: {e}. Fallback para texto.")
                             fb = preparar_texto_envio(acao.tts_template, "engine_tts_fallback")
                             if self._enviar_com_retry(ctx.telefone, "text", fb):
+                                _registrar_source_entregue(acao)
                                 self._salvar_mensagem(db, lead_id, "bot", fb, "text", auto_commit=False)
                                 enviados += 1
                                 pendentes_db += 1
@@ -965,6 +1244,7 @@ class Engine:
                     if payload_url and self._enviar_com_retry(
                         ctx.telefone, "audio", payload_url, audio_voice=_voice
                     ):
+                        _registrar_source_entregue(acao)
                         self._salvar_mensagem(db, lead_id, "bot", "[audio]", "audio", auto_commit=False)
                         enviados += 1
                         pendentes_db += 1
@@ -981,6 +1261,7 @@ class Engine:
                     if acao.tipo in ("image", "video") and ultimo_tipo_enviado == "text":
                         time.sleep(random.uniform(1.4, 2.4))
                     if payload_url and self._enviar_com_retry(ctx.telefone, acao.tipo, payload_url):
+                        _registrar_source_entregue(acao)
                         self._salvar_mensagem(db, lead_id, "bot", f"[{acao.tipo}]", acao.tipo, auto_commit=False)
                         enviados += 1
                         pendentes_db += 1
@@ -998,8 +1279,29 @@ class Engine:
             if pendentes_db > 0:
                 try:
                     db.commit()
-                except Exception:
+                except Exception as e:
                     db.rollback()
+                    logger.warning("⚠️ [FILA] commit final falhou lead=%s: %s", lead_id, e)
+            if delivered_static_sources:
+                try:
+                    ok_del = atomic_patch_metadata_json(
+                        db,
+                        lead_id,
+                        lambda old: apply_delivered(old, delivered_static_sources),
+                        max_retries=6,
+                    )
+                    if not ok_del:
+                        lead_obj = db.query(Lead).filter(Lead.id == lead_id).first()
+                        if lead_obj:
+                            meta = apply_delivered(
+                                dict(getattr(lead_obj, "metadata_json", None) or {}),
+                                delivered_static_sources,
+                            )
+                            lead_obj.metadata_json = meta
+                            db.commit()
+                except Exception as e:
+                    db.rollback()
+                    logger.warning("⚠️ [FILA] apply_delivered patch falhou lead=%s: %s", lead_id, e)
             db.close()
             with self._lock_proc:
                 self._leads_em_processamento.pop(lead_id, None)
@@ -1128,6 +1430,32 @@ class Engine:
             elif tipo == "vcard":
                 resumo["vcards"] += 1
         return resumo
+
+    def _registrar_evento_comportamental(
+        self,
+        db,
+        lead: Lead,
+        *,
+        event_type: str,
+        ctx: ContextoConversa,
+        payload: Optional[dict] = None,
+    ) -> None:
+        """
+        Captura passiva para treino offline da IA de atendimento.
+        Não faz commit isolado para não interferir no fluxo estático.
+        """
+        try:
+            db.add(
+                LeadBehaviorEvent(
+                    lead_id=int(getattr(lead, "id", 0) or 0),
+                    tenant_id=str(getattr(lead, "tenant_id", None) or getattr(self, "tenant_id", "default")),
+                    event_type=str(event_type or "unknown")[:64],
+                    node_atual=str(getattr(ctx, "node_atual", "") or "")[:100],
+                    payload=dict(payload or {}),
+                )
+            )
+        except Exception as e:
+            logger.warning("⚠️ [BEHAVIOR] Falha ao registrar evento comportamental: %s", e)
 
     @staticmethod
     def _dedup_db_desligado_para_node(node: str) -> bool:
@@ -1297,8 +1625,9 @@ class Engine:
                     )
                 )
                 db.commit()
-            except Exception:
+            except Exception as e:
                 db.rollback()
+                logger.warning("⚠️ [AUDIT] problema_entrega audit: %s", e)
             return self._acoes_reparo_entrega(self._vocativo_curto_lead(lead, ctx))
 
         if ctx.node_atual in self._ESTADOS_SILENCIOSOS:
@@ -1635,6 +1964,7 @@ class Engine:
                 time.sleep(2 ** tentativa)
 
             except Exception as e:
+                logger.warning("⚠️ [WA] Exceção ao enviar %s para %s (tentativa %s): %s", tipo, telefone, tentativa + 1, e)
                 self._circuit.registrar_falha()
 
         return False
@@ -1719,13 +2049,62 @@ class Engine:
             ctx.estado_coleta = getattr(lead, "estado_coleta", None) or "inicial"
 
     def _persistir_memoria(self, db, lead, ctx: ContextoConversa):
+        lead_id = int(getattr(lead, "id", 0) or 0)
+        if lead_id <= 0:
+            return
+
+        def _build_patch(lead_row: Lead):
+            patch: dict = {}
+            if hasattr(ctx, "estado_coleta"):
+                patch[Lead.estado_coleta] = ctx.estado_coleta
+                ctx.metadata["estado_coleta"] = ctx.estado_coleta
+
+            if ctx.nome_lead and getattr(lead_row, "nome", "") != ctx.nome_lead:
+                patch[Lead.nome] = ctx.nome_lead
+
+            m = ctx.metadata or {}
+            if m.get("resumo_dor"):
+                patch[Lead.resumo_dor] = str(m["resumo_dor"])[:8000]
+            if m.get("objecao_silenciosa"):
+                patch[Lead.objecao_silenciosa] = str(m["objecao_silenciosa"])[:4000]
+            if m.get("nome_mecanismo"):
+                patch[Lead.nome_mecanismo] = str(m["nome_mecanismo"])[:200]
+            if m.get("genero_lead"):
+                patch[Lead.genero] = str(m["genero_lead"])[:24]
+
+            if ctx.metadata:
+                existente = self._meta_as_dict(getattr(lead_row, "metadata_json", None))
+                combinado = merge_metadata_for_persist(existente, dict(ctx.metadata))
+                patch[Lead.metadata_json] = self._metadata_persistivel(combinado)
+
+            if getattr(ctx, "intencao", None):
+                patch[Lead.ultima_intencao] = str(ctx.intencao)[:50]
+            if getattr(ctx, "sentimento", None):
+                patch[Lead.ultimo_sentimento] = str(ctx.sentimento)[:50]
+
+            return patch if patch else None
+
+        ok = atomic_update_lead_columns(db, lead_id, _build_patch, max_retries=6)
+        if ok:
+            return
+
+        logger.warning("event=persistir_memoria_fallback_atomic lead_id=%s", lead_id)
+        try:
+            db.add(
+                EventoAudit(
+                    lead_id=lead_id,
+                    evento="lead_metadata_atomic_fallback",
+                    dados={"where": "persistir_memoria"},
+                )
+            )
+        except Exception:
+            pass
+
         if hasattr(ctx, "estado_coleta"):
             lead.estado_coleta = ctx.estado_coleta
             ctx.metadata["estado_coleta"] = ctx.estado_coleta
-
         if ctx.nome_lead and getattr(lead, "nome", "") != ctx.nome_lead:
             lead.nome = ctx.nome_lead
-
         if ctx.metadata:
             m = ctx.metadata
             if m.get("resumo_dor"):
@@ -1736,15 +2115,13 @@ class Engine:
                 lead.nome_mecanismo = str(m["nome_mecanismo"])[:200]
             if m.get("genero_lead"):
                 lead.genero = str(m["genero_lead"])[:24]
-
-            meta_para_salvar = self._metadata_persistivel(dict(ctx.metadata))
-            lead.metadata_json = meta_para_salvar
-
+            existente = self._meta_as_dict(getattr(lead, "metadata_json", None))
+            combinado = merge_metadata_for_persist(existente, dict(ctx.metadata))
+            lead.metadata_json = self._metadata_persistivel(combinado)
         if getattr(ctx, "intencao", None):
             lead.ultima_intencao = str(ctx.intencao)[:50]
         if getattr(ctx, "sentimento", None):
             lead.ultimo_sentimento = str(ctx.sentimento)[:50]
-
         db.commit()
 
     def _obter_ou_criar_lead(self, db, telefone: str) -> Lead:
