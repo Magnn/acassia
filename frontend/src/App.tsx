@@ -8,6 +8,7 @@ import Toaster from './components/Toaster';
 import ImpersonateBanner from './components/ImpersonateBanner';
 import CookieBanner from './components/CookieBanner';
 import QuotaWarningBanner from './components/QuotaWarningBanner';
+import OnboardingChecklist from './components/OnboardingChecklist';
 import BlueprintsList from './routes/BlueprintsList';
 
 // Telas SaaS — lazy.
@@ -56,6 +57,7 @@ export default function App() {
       <ImpersonateBanner />
       <QuotaWarningBanner />
       <CookieBanner />
+      <OnboardingChecklist />
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/onboarding" element={<Onboarding />} />

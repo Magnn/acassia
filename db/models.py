@@ -642,6 +642,85 @@ class ConsentRecord(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class OnboardingMilestone(Base):
+    """
+    Marcos de ativação do user (Frente 5.1).
+    Auto-detectados em hot paths (signup, wa_connect, first_flow_published, etc).
+    """
+    __tablename__ = "onboarding_milestones"
+
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    milestone_key = Column(String(40), primary_key=True)
+    completed_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    metadata_json = Column(JSON, nullable=True)
+
+
+class FlowTemplate(Base):
+    """
+    Templates pré-construídos de fluxo pra acelerar onboarding (Frente 5.3).
+    Marketplace V2 (Frente 7.14) reutiliza essa table com seller_tenant_id.
+    """
+    __tablename__ = "flow_templates"
+
+    id = Column(String(40), primary_key=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(40), nullable=True)
+    preview_image_url = Column(String(500), nullable=True)
+    ticket_brl_avg = Column(Integer, default=0, nullable=False)
+    blueprint_json = Column(JSON, nullable=False)
+    agent_json = Column(JSON, nullable=True)
+    usage_count = Column(Integer, default=0, nullable=False)
+    is_official = Column(Boolean, default=True, nullable=False)
+    seller_tenant_id = Column(String(64), nullable=True)
+    price_brl_cents = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class TarotDeck(Base):
+    """Decks de tarot (Marselha, Rider-Waite, custom). Frente 4.7."""
+    __tablename__ = "tarot_decks"
+
+    id = Column(String(40), primary_key=True)
+    name = Column(String(100), nullable=False)
+    is_default = Column(Boolean, default=False, nullable=False)
+    tenant_id = Column(String(64), nullable=True)  # null = global/shared
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class TarotCard(Base):
+    """Cartas individuais (78 por deck). Frente 4.7."""
+    __tablename__ = "tarot_cards"
+
+    id = Column(String(40), primary_key=True)
+    deck_id = Column(String(40), ForeignKey("tarot_decks.id"), primary_key=True)
+    name = Column(String(100), nullable=False)
+    arcana = Column(String(10), nullable=False)  # major|minor
+    suit = Column(String(20), nullable=True)  # copas|ouros|espadas|paus
+    number = Column(Integer, nullable=True)
+    image_url = Column(String(500), nullable=True)
+    meaning_upright = Column(Text, nullable=True)
+    meaning_reversed = Column(Text, nullable=True)
+    keywords = Column(JSON, nullable=True)
+
+
+class TarotReading(Base):
+    """Tiragens feitas pra leads (Frente 4.10)."""
+    __tablename__ = "tarot_readings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
+    attended_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    spread_type = Column(String(40), nullable=False)  # 1card|3card|cross5|celtic10
+    deck_id = Column(String(40), nullable=False)
+    cards = Column(JSON, nullable=False)  # [{card_id, position, reversed}]
+    question = Column(Text, nullable=True)
+    interpretation = Column(Text, nullable=True)
+    sent_to_lead = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class FlowNodeVisit(Base):
     """
     Visita de lead em um nó específico do fluxo (Frente 3.26).

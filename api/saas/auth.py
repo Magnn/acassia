@@ -493,3 +493,27 @@ def me_usage():
     import quota
     usage = quota.get_usage(current_user.tenant_id)
     return jsonify({"usage": usage, "tenant_id": current_user.tenant_id})
+
+
+@auth_bp.route("/me/onboarding", methods=["GET"])
+@login_required
+def me_onboarding():
+    """
+    Progresso de onboarding gamificado (Frente 5.1).
+    Auto-detecta milestones antes de retornar pra evitar UI stale.
+    """
+    import onboarding_progress
+    try:
+        onboarding_progress.auto_detect_for_tenant(current_user.tenant_id)
+    except Exception:
+        pass
+    return jsonify(onboarding_progress.progress(current_user.id))
+
+
+@auth_bp.route("/me/onboarding/<milestone_key>/complete", methods=["POST"])
+@login_required
+def me_complete_milestone(milestone_key):
+    """Force-complete um milestone (admin/dev override)."""
+    import onboarding_progress
+    is_new = onboarding_progress.mark_milestone(current_user.id, milestone_key)
+    return jsonify({"ok": True, "is_new": is_new})
