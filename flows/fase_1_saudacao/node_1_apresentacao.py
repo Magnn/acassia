@@ -21,6 +21,11 @@ from flows.funnel_gates import (
     pode_burst_coleta_sem_node2,
     VOCATIVO_SEM_NOME,
 )
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    hook_abertura_para_prompt,
+    _DESIRE_MAP,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +253,21 @@ def _briefing_comportamental(
     linhas.append(
         "[ANTI-DUPLICAÇÃO VAGA] Se o texto de vaga/consulta inicial já existir em extra, A ou B, D_confirmacao é só transição humana (próximo passo da leitura), sem repetir 'última vaga', 'essa leva' nem 'consulta inicial' outra vez."
     )
+
+    # ── DARE: Hook de abertura por quebra de padrão (Schwartz nível 1-2) ──
+    if tem_dor or tem_amor:
+        _meta_tmp = metadata or {}
+        desejo_tipo = classificar_desejo_tipo(_meta_tmp, msg_raw)
+        dados_desejo = _DESIRE_MAP.get(desejo_tipo, _DESIRE_MAP["amor"])
+        hook = dados_desejo["hook_frio"]
+        linhas.append(
+            f"[DARE HOOK] Lead chegou com contexto emocional claro. "
+            f"Se usar o campo 'extra', priorize este hook de abertura como referência de tom "
+            f"(adapte ao contexto real, não copie igual): \"{hook}\" — "
+            "objetivo: fazer o lead sentir que Esmeralda JÁ viu algo, antes de qualquer saudação genérica. "
+            "Isso é Schwartz nível 1-2: o lead não sabe que existe saída — mostre que existe, antes de pedir o nome."
+        )
+
     return "\n".join(linhas)
 
 
@@ -899,6 +919,17 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             ctx.metadata = {}
         ctx.metadata["nome_lead"] = nome
         ctx.nome_lead = nome
+
+    # ── 2b. DARE: classificar desejo_tipo cedo para downstream (nodes 3, 7, 8) ──
+    if not hasattr(ctx, "metadata") or ctx.metadata is None:
+        ctx.metadata = {}
+    if not ctx.metadata.get("desejo_tipo"):
+        _desejo_tipo_node1 = classificar_desejo_tipo(ctx.metadata, blob_ctx)
+        if _desejo_tipo_node1 != "amor" or any(
+            kw in blob_ctx.lower()
+            for kw in _DESIRE_MAP.get(_desejo_tipo_node1, {}).get("keywords", [])
+        ):
+            ctx.metadata["desejo_tipo"] = _desejo_tipo_node1
 
     # ── 3. Abertura: adaptive JSON (quando possível) -> contrato determinístico (fallback seguro) ──
     if not hasattr(ctx, "metadata") or ctx.metadata is None:

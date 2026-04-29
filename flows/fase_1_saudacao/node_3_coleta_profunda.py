@@ -43,6 +43,10 @@ from flows.funnel_gates import (
     nome_eh_placeholder,
     VOCATIVO_SEM_NOME,
 )
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    instrucao_diagnostico_para_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +79,12 @@ _RE_ASSUNTO_OPERACIONAL = re.compile(
     re.I,
 )
 _RE_PRECO_DIRETO = re.compile(r"\b(pre[cç]o|valor|quanto|custa|pix|pagamento)\b", re.I)
+# Rejeita perguntas operacionais/preço armazenadas como evento_gatilho
+_RE_GATILHO_INVALIDO = re.compile(
+    r"\b(quanto|custa|pre[cç]o|valor|pix|pagamento|link|instagram|insta|"
+    r"como\s+funciona|o\s+que\s+[eé]|como\s+(?:manda|envia|fa[cç]o)|consulta)\b",
+    re.I,
+)
 _RE_VALOR_AFETIVO = re.compile(
     r"\b(?:homem|mulher|parceir[oa]|relacionamento|amor)\s+de\s+valor\b|\bde\s+valor\b",
     re.I,
@@ -94,9 +104,32 @@ _RESPOSTAS_VAZIAS = frozenset({
 })
 
 _SINAIS_DESISTENCIA = re.compile(
-    r"\b(não|nao|não quero|nao quero|desisto|parar|sair|deixa pra lá|esquece|mentira|golpe|charlatão|encerrar)\b",
+    r"\b(n[aã]o\s+quero|desisto|deixa\s+pra\s+l[aá]|esquece|mentira|golpe|charlat[aã]o|encerrar|"
+    r"n[aã]o\s+vou\s+continuar|vou\s+parar|quero\s+sair|para\s+de\s+enviar|me\s+tira\s+da\s+lista)\b",
     re.IGNORECASE,
 )
+
+# Meta-perguntas do funil: "quero sim, mas porque está perguntando isso?" — não são dor real
+_RE_META_PERGUNTA_FUNIL = re.compile(
+    r"^\s*(?:quero\s+sim|quero\s+(?:saber|entender)|sim\s*,|tá\s+(?:bem|bom)|ok\s*,?)\b"
+    r".{0,120}\b(?:porque|por\s+que|pq)\b",
+    re.I | re.DOTALL,
+)
+
+# Apresentações de nome inline: "me chamo Magnus", "meu nome é X" — remove antes de acumular
+_RE_APRESENTACAO_NOME_INLINE = re.compile(
+    r"(?:^|[\n,;])[^\n.]{0,60}(?:me\s+chamo|meu\s+nome\s+[eéh]|chamo[- ]?me|sou\s+(?:o|a)\s+)\s*\w+[^\n.]{0,80}",
+    re.I,
+)
+
+
+def _sanitizar_msg_para_desabafo(texto: str) -> str:
+    """Remove apresentações de nome antes de armazenar no desabafo_original."""
+    if not texto:
+        return texto
+    sanitizado = _RE_APRESENTACAO_NOME_INLINE.sub("", texto)
+    sanitizado = re.sub(r"\s{2,}", " ", sanitizado).strip()
+    return sanitizado
 
 _REGEX_CORTE_FATAL = r"([,;:\-]|\b(?:a|ao|as|e|é|eh|éh|foi|o|os|se|à|em|mas|ou|um|uma|que|de|do|da|com|por|para|sem|são|tão|tbm|também|esse|essa|isso|isto|nele|nela|nisso|nisto|meu|seu|sua|minha))\s*$"
 
@@ -136,7 +169,7 @@ _PERGUNTA_DESEJO_POR_UNIVERSO: Dict[str, str] = {
     "geral": "Qual é o foco principal da leitura pra você agora?",
 }
 
-# Transição camada 1 → 2: uma linha de acolhimento (sem “?” — o normalizador corta no primeiro interrogação).
+# Transição camada 1 → 2: uma linha de acolhimento (sem "?" — o normalizador corta no primeiro interrogação).
 def _fechamento_camada2_presenca(universo: str) -> str:
     u = (universo or "geral").strip().lower()
     mapa = {
@@ -183,6 +216,8 @@ def _tem_substancia_dor(texto: str) -> bool:
     if _RE_ASSUNTO_OPERACIONAL.search(limpo):
         return False
     if _RE_PRECO_DIRETO.search(limpo) and not _RE_VALOR_AFETIVO.search(limpo):
+        return False
+    if _RE_META_PERGUNTA_FUNIL.search(limpo):
         return False
     if _RE_MARCADORES_DOR_OU_DESEJO.search(limpo):
         return True
@@ -489,7 +524,7 @@ def _validar_foto_mao_com_gemini(ctx) -> bool:
             return bool(media_bytes)
 
         mime = _mime_por_magic_bytes(media_bytes)
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=api_key, http_options={"timeout": 30})
         # Critério mais humano: mão/palma perceptível (iluminação e foco variam no WhatsApp)
         prompt = (
             "Analise esta imagem. Há uma mão humana com a palma visível (mesmo que pouco nítida, "
@@ -547,9 +582,9 @@ WHATSAPP:
 PROIBIDO nesta etapa: "o que você quer saber sobre sua vida", "mapa da vida", segunda grande pergunta existencial, ou qualquer coisa que pule a fila antes de foto+desabafo estarem completos.
 """
 
-_SYSTEM_GRACEFUL_EXIT = """Você é Esmeralda Ácassia (Cigana Esmeralda). O lead quer desistir ou está com muito medo.
-Acolha com respeito. Se fizer sentido, lembre que pode digitar ENCERRAR para parar de verdade.
-Tom: leitura, curta, sem culpa. Sem travessão.
+_SYSTEM_GRACEFUL_EXIT = """Você é Esmeralda Ácassia (Cigana Esmeralda). O lead demonstrou hesitação ou medo.
+Acolha com respeito e leveza. Mantenha a porta aberta sem pressão. NÃO sugira encerrar nem mencione a palavra ENCERRAR.
+Responda com 1 a 2 balões curtos. Tom: templo, suave, sem culpa, sem travessão.
 """
 
 _SYSTEM_EXTRACAO_RICA = """Do texto do lead abaixo, extraia (use INDEFINIDO se não houver):
@@ -582,12 +617,12 @@ def _graceful_exit(ctx, nome_fmt: str, msg_lead: str) -> List[Acao]:
         Acao(tipo="delay", segundos=8),
         Acao(
             tipo="text",
-            conteudo=f"Sinto seu receio daqui, {nome_fmt}… o medo às vezes aperta mesmo. 😔",
+            conteudo=f"Sinto seu receio daqui, {nome_fmt}. O medo às vezes aperta bem antes da resposta chegar.",
         ),
         Acao(tipo="delay", segundos=12),
         Acao(
             tipo="text",
-            conteudo="Estou aqui se quiser continuar. Se preferir encerrar, digite ENCERRAR.",
+            conteudo="Estou aqui quando você estiver pronta. Pode continuar no seu tempo.",
         ),
     ]
 
@@ -623,7 +658,8 @@ def _parse_extracao_rica(texto: str) -> Dict[str, str]:
         elif key == "TEMPO_EXATO":
             out["tempo_exato"] = val
         elif key == "EVENTO_GATILHO":
-            out["evento_gatilho"] = val
+            if not _RE_GATILHO_INVALIDO.search(val):
+                out["evento_gatilho"] = val
     return out
 
 
@@ -679,8 +715,24 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
     proximo_node = "3_coleta_profunda"
 
+    # Guard: se todos os dados já estão coletados (burst_elegivel) mas o estado não reflete isso,
+    # avança direto — evita ficar preso quando Gemini falha em turnos já completos.
+    # IMPORTANTE: requer desejo_declarado com substância para não pular camada 2 (personalização).
+    _desejo_burst = str(meta.get("desejo_declarado") or "").strip()
+    _snap_burst = bool(
+        meta.get("foto_recebida")
+        and meta.get("desabafo_recebido")
+        and meta.get("lead_contato_salvo_declarado")
+        and _tem_substancia_desejo(_desejo_burst)
+        and estado not in ("inicial",)
+    )
+    if _snap_burst and estado not in ("coleta_completa",):
+        meta["node3_estado"] = "coleta_completa"
+        estado = "coleta_completa"
+        logger.info("event=node3_burst_avanco_direto lead=%s estado_anterior=%s", getattr(ctx, 'lead_id', '?'), estado)
+
     # Leads antigos (DB) ou resquício: o pré-flight costuma pular para o 4 antes; se o 3 ainda rodar,
-    # não devolve lista vazia (evita turno “mudo” se o encadeamento falhar).
+    # não devolve lista vazia (evita turno "mudo" se o encadeamento falhar).
     if estado == "coleta_completa":
         ctx.metadata = meta
         acoes_handoff = [
@@ -750,12 +802,16 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             if desabafo:
                 meta["desabafo_original"] = desabafo[:2000]
             meta["universo_desejo"] = _classificar_universo(ctx, meta, meta.get("desabafo_original", ""))
+            # DARE: mapear universo para desejo_tipo estruturado (alimenta nodes 7 e 8)
+            if not meta.get("desejo_tipo"):
+                meta["desejo_tipo"] = classificar_desejo_tipo(meta, meta.get("desabafo_original", ""))
             desejo_precoce = (meta.get("desejo_declarado") or "").strip()
             aprofundamento_precoce = (meta.get("aprofundamento_texto") or "").strip()
             logger.info(
-                "⚡ [NODE 3] Fast-track (foto+dor via Sniffer). Lead=%s universo=%s desejo_precoce=%s aprofundamento_precoce=%s",
+                "⚡ [NODE 3] Fast-track (foto+dor via Sniffer). Lead=%s universo=%s desejo_tipo=%s desejo_precoce=%s aprofundamento_precoce=%s",
                 nome_fmt,
                 meta.get("universo_desejo"),
+                meta.get("desejo_tipo"),
                 bool(desejo_precoce),
                 bool(aprofundamento_precoce),
             )
@@ -778,9 +834,9 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     ctx.metadata = meta
                     return _normalizar_acoes_texto_node3(acoes_iniciais), "4_instagram"
 
-                meta["node3_estado"] = "aguardando_aprofundamento"
+                meta["node3_estado"] = "aguardando_aprofundamento_tempo"
                 meta["node3_aprofundamento_acumulado"] = ""
-                ctx.estado_coleta = "node3_camada3_tempo_tentativas"
+                ctx.estado_coleta = "node3_camada3_tempo"
                 _append_node3_ancora(meta, desejo_precoce[:240])
                 acoes_iniciais.extend(
                     [
@@ -789,7 +845,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                         Acao(tipo="delay", segundos=random.randint(8, 14)),
                         Acao(
                             tipo="text",
-                            conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
+                            conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim?",
                         ),
                     ]
                 )
@@ -887,7 +943,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 meta["foto_recebida"] = True
             elif not _validar_foto_mao_com_gemini(ctx):
                 # Só zera `foto_recebida` quando esta é a única mídia no fio (primeira tentativa falhou).
-                # Se já houve foto antes (ex.: node 1), não apagar a prova do sniffer — pede outra imagem sem “esquecer” a primeira.
+                # Se já houve foto antes (ex.: node 1), não apagar a prova do sniffer — pede outra imagem sem "esquecer" a primeira.
                 if _historico_conta_midia_usuario(ctx) <= 1:
                     meta["foto_recebida"] = False
                 voc = vocativo_cigana(nome_db, genero, meta)
@@ -905,8 +961,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
         if _tem_substancia_dor(msg_lead):
             meta["desabafo_recebido"] = True
-            acum = meta.get("desabafo_original", "")
-            meta["desabafo_original"] = f"{acum} {msg_lead[:1500]}".strip()
+            msg_dor = _sanitizar_msg_para_desabafo(msg_lead)
+            if msg_dor:
+                acum = meta.get("desabafo_original", "")
+                meta["desabafo_original"] = f"{acum} {msg_dor[:1500]}".strip()
 
         if _historico_tem_midia_usuario(ctx):
             meta["foto_recebida"] = True
@@ -945,6 +1003,9 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             else:
                 universo = _classificar_universo(ctx, meta, desabafo)
             meta["universo_desejo"] = universo
+            # DARE: mapear universo para desejo_tipo estruturado (alimenta nodes 7 e 8)
+            if not meta.get("desejo_tipo"):
+                meta["desejo_tipo"] = classificar_desejo_tipo(meta, desabafo)
 
             # Se o pré-flight já trouxe desejo/aprofundamento com substância, não repetir pedidos.
             desejo_precoce = (meta.get("desejo_declarado") or "").strip()
@@ -970,9 +1031,9 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     ]
                     ctx.metadata = meta
                     return _normalizar_acoes_texto_node3(fechar_ft), "4_instagram"
-                meta["node3_estado"] = "aguardando_aprofundamento"
+                meta["node3_estado"] = "aguardando_aprofundamento_tempo"
                 meta["node3_aprofundamento_acumulado"] = ""
-                ctx.estado_coleta = "node3_camada3_tempo_tentativas"
+                ctx.estado_coleta = "node3_camada3_tempo"
                 _append_node3_ancora(meta, desejo_precoce[:240])
                 acoes_ap: List[Acao] = [
                     Acao(tipo="delay", segundos=random.randint(7, 11)),
@@ -980,7 +1041,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     Acao(tipo="delay", segundos=random.randint(8, 13)),
                     Acao(
                         tipo="text",
-                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
+                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim?",
                     ),
                 ]
                 ctx.metadata = meta
@@ -1004,8 +1065,15 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         acoes: List[Acao] = []
         if ctx.personalizer:
             try:
+                # DARE: injetar instrução de diagnóstico cirúrgico quando desejo_tipo já identificado
+                _desejo_tipo_c1 = meta.get("desejo_tipo") or "amor"
+                _dare_injecao_c1 = (
+                    "\n\n" + instrucao_diagnostico_para_prompt(_desejo_tipo_c1)
+                    if meta.get("desabafo_recebido") and not meta.get("desejo_declarado")
+                    else ""
+                )
                 resp_ia = ctx.personalizer.gerar_resposta(
-                    system_prompt=_SYSTEM_COLETA_DINAMICA.format(genero_hint=genero_hint),
+                    system_prompt=_SYSTEM_COLETA_DINAMICA.format(genero_hint=genero_hint) + _dare_injecao_c1,
                     historico_lista=slice_historico_para_ia(ctx, 10),
                     mensagem_lead=(
                         f"SITUAÇÃO (lead {nome_fmt}): foto da mão = {bool(meta.get('foto_recebida'))}; "
@@ -1079,10 +1147,12 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     Acao(tipo="delay", segundos=random.randint(10, 18)),
                     Acao(
                         tipo="text",
-                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
+                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim?",
                     ),
                 ]
             )
+            meta["node3_estado"] = "aguardando_aprofundamento_tempo"
+            meta["node3_aprofundamento_acumulado"] = ""
             ctx.metadata = meta
             return _normalizar_acoes_texto_node3(acoes_c3), proximo_node
 
@@ -1095,6 +1165,24 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             Acao(tipo="delay", segundos=random.randint(6, 10)),
             Acao(tipo="text", conteudo=_PERGUNTA_DESEJO_POR_UNIVERSO.get(u, _PERGUNTA_DESEJO_POR_UNIVERSO["geral"])),
         ], proximo_node
+
+    # ── camada 3a: primeira pergunta respondida (tempo) → pede tentativas ──
+    if estado == "aguardando_aprofundamento_tempo":
+        ctx.estado_coleta = "node3_camada3_tempo"
+        cur = (msg_lead or "").strip()
+        if cur:
+            meta["node3_aprofundamento_acumulado"] = cur[:1500]
+        meta["node3_estado"] = "aguardando_aprofundamento"
+        ctx.metadata = meta
+        return _normalizar_acoes_texto_node3(
+            [
+                Acao(tipo="delay", segundos=random.randint(8, 14)),
+                Acao(
+                    tipo="text",
+                    conteudo="E o que você já tentou antes de chegar aqui?",
+                ),
+            ]
+        ), proximo_node
 
     # ── camada 3 + 4 ──
     if estado == "aguardando_aprofundamento":

@@ -12,7 +12,7 @@ import re
 import random
 from typing import Optional
 
-from schema import Acao, slice_historico_para_ia
+from schema import Acao
 from api.cakto_api import CaktoAPIClient
 from copy_sanitizer import (
     MOBILE_CHARS_POR_LINHA,
@@ -20,10 +20,12 @@ from copy_sanitizer import (
     aplicar_substituicoes_proibidas,
     compactar_url_https_monolitica,
     contexto_lead_para_nodes,
+    extrair_blocos_fallback,
     fatiar_texto_ritmo_celular,
     frase_dor_contextualizada,
     genero_efetivo_para_copy,
     genero_hint_para_prompt,
+    historico_limpo_para_ia,
     limpar_colagem_primeira_msg_whatsapp_em_texto,
     normalizar_enxerto_dor_sem_contexto,
     normalizar_link_para_envio,
@@ -43,6 +45,12 @@ from analytics.copy_personalization import (
     norte_editorial_venda_fria_direta_para_prompt,
     perfil_copy_para_prompt,
 )
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    oferta_dare_para_prompt,
+    calcular_intensidade_ressonancia,
+    nome_padrao_invisivel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +61,6 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
-_RE_RUIDO_CURTO_HIST = re.compile(r"(?i)^(ok|sim|oi|opa|pronto|blz|beleza|ta|tá|show|feito|entendi|combinado|👍|🙏|👀)$")
-
-
 def _bloco_e_somente_link(texto: str) -> bool:
     t = (texto or "").strip()
     if not t:
@@ -96,50 +101,6 @@ def _cadencia_oferta(num_bloco: int, delay_pre: int, pausa_pos: int, score: floa
         pos += 2
 
     return pre, pos
-
-
-def _historico_limpo_para_ia(ctx, limite: int = 20) -> list:
-    base = slice_historico_para_ia(ctx, limite)
-    if not base:
-        return []
-    out = []
-    for h in base:
-        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
-        t = str(txt).replace("|", " ").strip()
-        t = re.sub(r"\s+", " ", t).strip()
-        if not t:
-            continue
-        if len(t.split()) <= 3 and _RE_RUIDO_CURTO_HIST.match(t.lower()):
-            continue
-        rem = getattr(h, "remetente", None) if not isinstance(h, dict) else h.get("remetente")
-        tip = getattr(h, "tipo", "text") if not isinstance(h, dict) else h.get("tipo", "text")
-        out.append({"remetente": rem or "", "texto": t, "tipo": tip or "text"})
-    return out
-
-
-def _extrair_blocos_fallback(texto: str, max_blocos: int = 9, min_len: int = 8) -> list[str]:
-    """
-    Recupera blocos de oferta quando a IA não entrega BLOCO_N:: corretamente.
-    """
-    t = (texto or "").strip()
-    if not t:
-        return []
-    partes = re.split(r"\[?BAL[AÃ]O\]?", t, flags=re.I)
-    out: list[str] = []
-    for p in partes:
-        p = re.sub(r"`{3}(?:json|text)?|`{3}", "", p).strip()
-        if not p:
-            continue
-        lines = p.splitlines() if "\n" in p else [p]
-        for ln in lines:
-            ln2 = re.sub(r"^\s*BLOCO[_\s]*\d+\s*::\s*", "", ln.strip(), flags=re.I).strip()
-            if len(ln2) >= min_len and not _bloco_e_somente_link(ln2):
-                out.append(ln2)
-            if len(out) >= max_blocos:
-                break
-        if len(out) >= max_blocos:
-            break
-    return out[:max_blocos]
 
 
 def _normalizar_link_checkout(link: str) -> str:
@@ -446,9 +407,9 @@ def _fallback_oferta(
         )
     )
     return [
-        f"{nome_fmt}, a leitura bateu com o que você vive por dentro? Quero te mostrar o próximo passo com clareza.",
+        f"{nome_fmt}, a leitura que você recebeu tocou em algo real. Posso te mostrar o próximo passo com clareza?",
         b2,
-        f"Ou manter o mesmo ciclo de sempre: {dor_ctx}, arrastando isso há {tempo_ctx} sem tocar a raiz.{gatilho_ctx}",
+        f"O caminho é simples: ou a gente toca a raiz agora, ou o ciclo continua — há {tempo_ctx} você carrega esse peso sem sair do lugar.{gatilho_ctx}",
         f"{mec_linha} Com o que apareceu nas suas linhas, você já era pra estar em um patamar mais alto do que está hoje.",
         bloco_valor,
         "A leitura já mostrou o padrão. A decisão agora é honesta: mudar de verdade ou continuar no mesmo ciclo. "
@@ -480,6 +441,16 @@ def executar_v2(ctx) -> tuple:
     mecanismo = definir_nome_mecanismo_se_generico(meta, dor)
     ctx_desejo_res = contexto_desejo_resultado_para_prompt(meta, mecanismo)
     ancora_quer_fb = str(meta.get("desejo_declarado") or meta.get("desejo_oculto") or "").strip()
+    # Sanitiza: remove apresentações de nome ("me chamo X") que podem ter sido capturadas
+    # junto com o desejo quando o lead enviou duas mensagens simultâneas.
+    _re_nome_n8 = re.compile(
+        r"(?:^|[\s,;])[^\n.]{0,60}(?:me\s+chamo|meu\s+nome\s+[eéh]|chamo[- ]?me|sou\s+(?:o|a)\s+)\s*\w+[^\n.]{0,80}",
+        re.IGNORECASE,
+    )
+    _quer_limpo = _re_nome_n8.sub("", ancora_quer_fb)
+    _quer_limpo = re.sub(r"\s{2,}", " ", _quer_limpo).strip().rstrip(",;.")
+    if _quer_limpo and len(_quer_limpo) > 5:
+        ancora_quer_fb = _quer_limpo
     msg_lead = str(ctx.texto_recebido or "").strip()
     if lead_reportou_problema_entrega(msg_lead):
         ctx.estado_coleta = "node8_reparo_entrega"
@@ -648,6 +619,15 @@ def executar_v2(ctx) -> tuple:
                     conteudo=link_final,
                     metadata={"skip_gancho_final": True},
                 ),
+                Acao(tipo="delay", segundos=random.randint(8, 12)),
+                Acao(
+                    tipo="text",
+                    conteudo=(
+                        "Após o pagamento, me envia o comprovante aqui. "
+                        "Eu monto o seu nome no altar e te mando a foto da firmação na sequência, tudo bem?"
+                    ),
+                    metadata={"skip_gancho_final": True},
+                ),
             ]
             return acoes, "aguardando_pagamento"
 
@@ -685,6 +665,15 @@ def executar_v2(ctx) -> tuple:
                 f"{entregaveis}"
             )
             prompt_ia += sufixo_ancoras_node3_para_prompt(meta)
+            # DARE: oferta personalizada por desejo_tipo (Hormozi value stack + intensidade)
+            _desejo_tipo_n8 = classificar_desejo_tipo(meta, msg_lead)
+            _historico_blob_n8 = " ".join(
+                str((h.get("texto") if isinstance(h, dict) else getattr(h, "texto", "")) or "")
+                for h in (getattr(ctx, "historico", None) or [])[-8:]
+            )
+            _intensidade_n8 = calcular_intensidade_ressonancia(meta, _historico_blob_n8)
+            _padrao_n8 = nome_padrao_invisivel(_desejo_tipo_n8)
+            _dare_oferta_injecao = oferta_dare_para_prompt(_desejo_tipo_n8, meta, p_mat, p_serv)
             sys_oferta = _SYSTEM_OFERTA_SUPREMA.format(
                 nome=nome_fmt,
                 genero=genero,
@@ -709,6 +698,10 @@ def executar_v2(ctx) -> tuple:
                 p_mat=p_mat,
                 p_serv=p_serv,
                 p_promo_total=p_promo_total,
+            ) + (
+                f"\n\nPADRÃO INVISÍVEL IDENTIFICADO: \"{_padrao_n8}\""
+                f"\nINTENSIDADE DE RESSONÂNCIA DO LEAD: {_intensidade_n8.upper()}"
+                f"\n\n{_dare_oferta_injecao}"
             )
             resposta = ""
             ultima_exc: Optional[Exception] = None
@@ -717,7 +710,7 @@ def executar_v2(ctx) -> tuple:
             max_tent = max(1, min(int(ie.get("max_tentativas_ia_por_node", 2) or 2), 3))
             for tentativa in range(max_tent):
                 try:
-                    hist_ia = _historico_limpo_para_ia(ctx)
+                    hist_ia = historico_limpo_para_ia(ctx)
                     resposta = ctx.personalizer.gerar_resposta(
                         system_prompt=sys_oferta,
                         historico_lista=hist_ia,
@@ -730,8 +723,7 @@ def executar_v2(ctx) -> tuple:
                     blocos_gerados = [blocos_dict.get(i, "") for i in range(1, 10) if blocos_dict.get(i)]
                     blocos_gerados = [b for b in blocos_gerados if not _bloco_e_somente_link(b)]
                     if len(blocos_gerados) < 5:
-                        blocos_gerados = _extrair_blocos_fallback(resposta, max_blocos=9, min_len=8)
-                        blocos_gerados = [b for b in blocos_gerados if not _bloco_e_somente_link(b)]
+                        blocos_gerados = extrair_blocos_fallback(resposta, 9, min_len=8, filtrar_links=True)
                     if len(blocos_gerados) >= 4:
                         break
                     if len(blocos_gerados) >= 3:
@@ -782,8 +774,13 @@ def executar_v2(ctx) -> tuple:
                 _ponte_emocional_preco(nome_fmt, dor, tempo_ctx, ancora_quer_fb),
             )
 
+    _DELAY_BUDGET_S = 210
+    _delay_acumulado = 0
+
     acoes: list = []
-    acoes.append(Acao(tipo="delay", segundos=random.randint(9, 15)))
+    _d_inicial = random.randint(9, 15)
+    acoes.append(Acao(tipo="delay", segundos=_d_inicial))
+    _delay_acumulado += _d_inicial
 
     for i, conteudo_raw in enumerate(blocos_gerados):
         if not conteudo_raw:
@@ -824,10 +821,16 @@ def executar_v2(ctx) -> tuple:
             pausa_pos = 16 if num_bloco in _INDICES_IMPACTO else 9
             delay_pre, pausa_pos = _cadencia_oferta(num_bloco, delay_pre, pausa_pos, score_eng)
 
+            if _delay_acumulado >= _DELAY_BUDGET_S:
+                delay_pre = min(delay_pre, 8)
+                pausa_pos = min(pausa_pos, 4)
+
             acoes.append(Acao(tipo="delay", segundos=delay_pre))
+            _delay_acumulado += delay_pre
             if eh_audio and j == 0:
                 acoes.append(Acao(tipo="tts", tts_template=pedaco))
                 acoes.append(Acao(tipo="delay", segundos=15))
+                _delay_acumulado += 15
             else:
                 acoes.append(
                     Acao(
@@ -837,6 +840,7 @@ def executar_v2(ctx) -> tuple:
                     )
                 )
                 acoes.append(Acao(tipo="delay", segundos=pausa_pos))
+                _delay_acumulado += pausa_pos
 
     meta["node8_fase"] = "esperando_firmo"
     meta["node8_ticket_atual"] = int(meta.get("node8_ticket_atual", ticket_inicial) or ticket_inicial)
@@ -844,14 +848,13 @@ def executar_v2(ctx) -> tuple:
     ctx.estado_coleta = "node8_oferta_enviada"
     ctx.metadata = meta
     total_textos = sum(1 for a in acoes if getattr(a, "tipo", "") == "text")
-    total_delays = sum(int(getattr(a, "segundos", 0) or 0) for a in acoes if getattr(a, "tipo", "") == "delay")
     logger.info(
         "event=node8_oferta_ok lead=%s blocos=%s fase=esperando_firmo ticket=%s textos=%s delay_total_s=%s",
         nome_fmt,
         len(blocos_gerados),
         meta.get("node8_ticket_atual"),
         total_textos,
-        total_delays,
+        _delay_acumulado,
     )
 
     return acoes, "8_oferta_principal"
