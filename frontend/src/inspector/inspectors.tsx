@@ -1,5 +1,8 @@
 import { Field, NumberInput, Select, TextArea, TextInput } from './fields';
 import { patchConfig, readNum, readStr, type InspectorProps } from './helpers';
+import CardList from './conteudo/CardList';
+import { type Card } from './conteudo/types';
+import RuleBuilder, { type Logic, type Rule } from './condicao/RuleBuilder';
 
 // ─── Header comum ─────────────────────────────────────────────────────
 
@@ -65,36 +68,32 @@ export function TriggerInspector({ node, onUpdate }: InspectorProps) {
 }
 
 export function ConteudoInspector({ node, onUpdate }: InspectorProps) {
-  const cfg = node.data.config;
-  const text =
-    readStr(cfg, 'text') ||
-    readStr(cfg, 'body') ||
-    readStr(cfg, 'message') ||
-    '';
+  const cards = readCards(node.data.config);
   return (
     <div className="space-y-3">
-      <Field label="Texto principal" hint="Fase 3 simplificada — multi-passos vem depois">
-        <TextArea
-          value={text}
-          onChange={(v) => onUpdate(patchConfig(node, { text: v }))}
-          rows={6}
-          placeholder="Escreva a mensagem que será enviada ao lead…"
-        />
-      </Field>
-      <Field label="Delay após (segundos)">
-        <NumberInput
-          value={readNum(cfg, 'content_delay_sec')}
-          min={0}
-          max={86400}
-          onChange={(v) => onUpdate(patchConfig(node, { content_delay_sec: v === '' ? 0 : v }))}
-        />
-      </Field>
-      <p className="text-[11px] text-slate-500 leading-relaxed">
-        O bloco Conteúdo do dashboard original tem cards multi-passos
-        (texto/imagem/áudio/vídeo/documento + delay sequencial). Aqui só o texto principal —
-        cards completos virão na Fase 4.
-      </p>
+      <CardList
+        cards={cards}
+        onChange={(next) => onUpdate(patchConfig(node, { contents: next }))}
+      />
     </div>
+  );
+}
+
+function readCards(cfg: Record<string, unknown>): Card[] {
+  const raw = cfg.contents;
+  if (!Array.isArray(raw)) {
+    // Compat: campos antigos do inspector simplificado da Fase 3 viram um TextCard.
+    const legacyText = readStr(cfg, 'text') || readStr(cfg, 'body') || readStr(cfg, 'message');
+    return legacyText ? [{ type: 'text', value: legacyText }] : [];
+  }
+  return raw.filter(isCard);
+}
+
+function isCard(x: unknown): x is Card {
+  if (!x || typeof x !== 'object') return false;
+  const t = (x as { type?: unknown }).type;
+  return (
+    t === 'text' || t === 'delay' || t === 'image' || t === 'audio' || t === 'video' || t === 'document'
   );
 }
 
@@ -115,44 +114,44 @@ export function DelayInspector({ node, onUpdate }: InspectorProps) {
 
 export function CondicaoInspector({ node, onUpdate }: InspectorProps) {
   const cfg = node.data.config;
+  const rules = readRules(cfg);
+  const logic = readLogic(cfg);
+
   return (
     <div className="space-y-3">
-      <Field label="Variável" hint="ex.: lead.nome, ctx.metadata.foo">
-        <TextInput
-          value={readStr(cfg, 'variable')}
-          onChange={(v) => onUpdate(patchConfig(node, { variable: v }))}
-          placeholder="lead.nome"
-        />
-      </Field>
-      <Field label="Operador">
-        <Select
-          value={readStr(cfg, 'operator') || 'equals'}
-          onChange={(v) => onUpdate(patchConfig(node, { operator: v }))}
-          options={[
-            { value: 'equals', label: 'igual a' },
-            { value: 'not_equals', label: 'diferente de' },
-            { value: 'contains', label: 'contém' },
-            { value: 'not_contains', label: 'não contém' },
-            { value: 'starts_with', label: 'começa com' },
-            { value: 'gt', label: 'maior que' },
-            { value: 'lt', label: 'menor que' },
-            { value: 'empty', label: 'está vazio' },
-            { value: 'not_empty', label: 'não está vazio' },
-          ]}
-        />
-      </Field>
-      <Field label="Valor">
-        <TextInput
-          value={readStr(cfg, 'value')}
-          onChange={(v) => onUpdate(patchConfig(node, { value: v }))}
-          placeholder="Compare contra…"
-        />
-      </Field>
-      <p className="text-[11px] text-slate-500 leading-relaxed">
-        Rule Builder completo (múltiplas regras com AND/OR) vem depois — aqui só uma regra.
-      </p>
+      <RuleBuilder
+        rules={rules}
+        logic={logic}
+        onRulesChange={(next) => onUpdate(patchConfig(node, { rules: next }))}
+        onLogicChange={(next) => onUpdate(patchConfig(node, { logic: next }))}
+      />
     </div>
   );
+}
+
+function readRules(cfg: Record<string, unknown>): Rule[] {
+  const raw = cfg.rules;
+  if (Array.isArray(raw)) return raw.filter(isRule);
+  // Compat: regra única da Fase 3 vira um item no array.
+  const v = readStr(cfg, 'variable');
+  if (v) {
+    return [
+      {
+        var: v,
+        op: readStr(cfg, 'operator') || 'equals',
+        value: readStr(cfg, 'value'),
+      },
+    ];
+  }
+  return [];
+}
+
+function isRule(x: unknown): x is Rule {
+  return !!x && typeof x === 'object' && 'var' in x && 'op' in x;
+}
+
+function readLogic(cfg: Record<string, unknown>): Logic {
+  return String(cfg.logic ?? 'AND').toUpperCase() === 'OR' ? 'OR' : 'AND';
 }
 
 export function GptInspector({ node, onUpdate }: InspectorProps) {
