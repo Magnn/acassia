@@ -1119,6 +1119,26 @@ class LeadNumerology(Base):
     interpreted_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class LeadAuraImage(Base):
+    """Aura semanal gerada via Stable Diffusion (Frente 4.18)."""
+    __tablename__ = "lead_aura_images"
+    __table_args__ = (
+        UniqueConstraint("lead_id", "week_id", name="uq_aura_lead_week"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    signo = Column(String(20), nullable=False)
+    week_id = Column(String(10), nullable=False, index=True)  # YYYY-Www
+    image_url = Column(String(800), nullable=False)
+    prompt = Column(Text, nullable=True)
+    provider = Column(String(40), nullable=False)
+    sent_to_lead = Column(Boolean, default=False, nullable=False)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class HoroscopeDelivery(Base):
     """
     Log de envios diarios de horoscopo (idempotencia + analytics).

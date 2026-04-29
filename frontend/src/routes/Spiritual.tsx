@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Sparkles, Sun, Moon, Compass, Hash, Heart, Briefcase, Home,
-  Search, Send, RefreshCw, Wand2, Calculator, Star,
+  Search, Send, RefreshCw, Wand2, Calculator, Star, Zap, ImageIcon,
 } from 'lucide-react';
 import { spiritualApi, type SpiritualProfile } from '../api/spiritual';
+import { auraApi } from '../api/aura';
 import { inboxApi, type LeadPreview } from '../api/inbox';
 import { handleApiError } from '../lib/handleApiError';
 import { toast } from '../lib/toast';
@@ -166,6 +167,7 @@ function ProfilePanel({ leadId }: { leadId: number }) {
         onInterpret={() => interpretNumMut.mutate()}
         interpreting={interpretNumMut.isPending}
       />
+      <AuraSection leadId={leadId} signo={profile.lead.signo} />
       <div className="bg-bg-surface border border-border rounded-3xl p-5">
         <button
           onClick={() => sendMut.mutate()}
@@ -361,6 +363,134 @@ function NumerologySection({
               </div>
             )}
           </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function AuraSection({ leadId, signo }: { leadId: number; signo: string | null }) {
+  const qc = useQueryClient();
+  const [mood, setMood] = useState('');
+
+  const statusQ = useQuery({
+    queryKey: ['aura-status'],
+    queryFn: () => auraApi.status(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const auraQ = useQuery({
+    queryKey: ['aura-latest', leadId],
+    queryFn: () => auraApi.getLatest(leadId),
+  });
+
+  const generateMut = useMutation({
+    mutationFn: (force: boolean) => auraApi.generate(leadId, { force, mood: mood || undefined }),
+    onSuccess: (res) => {
+      toast.success(res.cached ? 'Aura desta semana já existia' : 'Aura gerada');
+      qc.invalidateQueries({ queryKey: ['aura-latest', leadId] });
+    },
+    onError: handleApiError('Erro ao gerar aura'),
+  });
+
+  const sendMut = useMutation({
+    mutationFn: () => auraApi.send(leadId, auraQ.data?.aura?.id),
+    onSuccess: () => {
+      toast.success('Aura enviada via WhatsApp');
+      qc.invalidateQueries({ queryKey: ['aura-latest', leadId] });
+    },
+    onError: handleApiError('Erro ao enviar aura'),
+  });
+
+  const status = statusQ.data;
+  const aura = auraQ.data?.aura;
+  const isCurrentWeek = aura && auraQ.data?.current_week === aura.week_id;
+
+  return (
+    <section className="bg-bg-surface border border-border rounded-3xl p-6 space-y-4">
+      <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
+        <Zap className="w-4 h-4 text-accent-amethyst" />
+        Aura desta semana
+      </h2>
+
+      {!status?.available ? (
+        <div className="bg-bg-primary border border-border rounded-2xl p-4 text-xs text-secondary">
+          Provider de imagem não configurado. {status?.hint}
+        </div>
+      ) : !signo ? (
+        <p className="text-xs text-amber-400">
+          Calcule o signo do lead primeiro (seção Mapa Astral acima).
+        </p>
+      ) : (
+        <>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={mood}
+              onChange={(e) => setMood(e.target.value)}
+              placeholder="Mood opcional (ex.: esperança, transformação)"
+              className="flex-1 bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-sm"
+              maxLength={40}
+            />
+            <button
+              onClick={() => generateMut.mutate(false)}
+              disabled={generateMut.isPending}
+              className="px-4 py-2.5 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-30 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2"
+            >
+              <Wand2 className={`w-3.5 h-3.5 ${generateMut.isPending ? 'animate-spin' : ''}`} />
+              {aura && isCurrentWeek ? 'Existente' : 'Gerar'}
+            </button>
+            {aura && isCurrentWeek && (
+              <button
+                onClick={() => generateMut.mutate(true)}
+                disabled={generateMut.isPending}
+                className="px-3 py-2.5 bg-bg-primary border border-border hover:border-accent-amethyst/30 rounded-xl text-xs font-bold flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${generateMut.isPending ? 'animate-spin' : ''}`} />
+                Regen
+              </button>
+            )}
+          </div>
+
+          {generateMut.isPending && (
+            <div className="text-[11px] text-secondary text-center py-4">
+              Gerando aura — pode demorar até 30s…
+            </div>
+          )}
+
+          {aura && (
+            <div className="space-y-3">
+              <div className="aspect-square max-w-md mx-auto bg-bg-primary rounded-2xl overflow-hidden border border-border">
+                <img
+                  src={aura.image_url}
+                  alt={`Aura de ${aura.signo}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="text-center text-[11px] text-secondary">
+                {aura.signo} · semana {aura.week_id} · {aura.provider}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => sendMut.mutate()}
+                  disabled={sendMut.isPending || aura.sent_to_lead}
+                  className="flex-1 px-4 py-2.5 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-30 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {aura.sent_to_lead ? 'Enviada' : 'Enviar via WhatsApp'}
+                </button>
+                <a
+                  href={aura.image_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2.5 bg-bg-primary border border-border hover:border-accent-amethyst/30 rounded-xl text-xs font-bold flex items-center gap-2"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  Abrir
+                </a>
+              </div>
+            </div>
+          )}
         </>
       )}
     </section>
