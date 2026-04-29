@@ -124,22 +124,32 @@ def flow_gemini_generate_text(
     model: str,
     temperature: float,
     api_key: Optional[str],
+    system_instruction: Optional[str] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     Uma chamada `generateContent` ao Gemini (REST v1beta).
     Devolve (texto, erro). Erro None em sucesso.
+
+    ``system_instruction`` (opcional): conteúdo injetado como
+    ``systemInstruction`` no payload — usado para passar a personalidade /
+    instruções do agente Studio publicado pra moldar o output sem poluir o
+    prompt de turno.
     """
     if not (api_key or "").strip():
         return "", "GEMINI_API_KEY ausente"
     m = _sanitize_gemini_model(model)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key.strip()}"
-    payload = {
+    payload: Dict[str, Any] = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": float(temperature),
             "maxOutputTokens": _llm_max_output_tokens(),
         },
     }
+    if system_instruction and system_instruction.strip():
+        payload["systemInstruction"] = {
+            "parts": [{"text": system_instruction.strip()[:8000]}]
+        }
     try:
         to = min(90, max(8, int(os.getenv("FLOW_BLUEPRINT_LLM_TIMEOUT_S", "45") or 45)))
     except ValueError:
@@ -158,6 +168,43 @@ def flow_gemini_generate_text(
     if not text:
         return "", "resposta vazia ou bloqueada pelo modelo"
     return text[:4000], None
+
+
+def _build_system_instruction_from_studio(snap: Any) -> Optional[str]:
+    """
+    Constrói o ``systemInstruction`` para o Gemini a partir do snapshot do
+    agente Studio publicado (injetado em ``ctx.metadata['__acassia_studio__']``
+    pelo ``studio_runtime.inject_published_studio_into_metadata``).
+
+    Junta personalidade + instruções + base + FAQ em seções markdown.
+    Retorna None se o snapshot estiver vazio ou malformado.
+    """
+    if not isinstance(snap, dict):
+        return None
+    data = snap.get("data") if isinstance(snap.get("data"), dict) else snap
+    if not isinstance(data, dict):
+        return None
+    parts: List[str] = []
+    persona = str(data.get("personalidade") or "").strip()
+    if persona:
+        parts.append(f"## Personalidade\n{persona}")
+    instrucoes = str(data.get("instrucoes") or "").strip()
+    if instrucoes:
+        parts.append(f"## Instruções operacionais\n{instrucoes}")
+    base = str(data.get("base_conhecimento") or "").strip()
+    if base:
+        parts.append(f"## Base de conhecimento\n{base}")
+    faqs = data.get("faqs") if isinstance(data.get("faqs"), list) else []
+    faq_lines: List[str] = []
+    for f in faqs:
+        if isinstance(f, dict):
+            q = str(f.get("q") or "").strip()
+            a = str(f.get("a") or "").strip()
+            if q and a:
+                faq_lines.append(f"P: {q}\nR: {a}")
+    if faq_lines:
+        parts.append("## FAQ\n" + "\n\n".join(faq_lines))
+    return "\n\n".join(parts) if parts else None
 
 
 def _flow_http_var_key(node_id: str) -> str:
@@ -575,12 +622,24 @@ def steps_to_acoes(
                 if v is not None and str(v).strip() != "":
                     lmeta[key] = str(v).strip()[:64]
 
+            # Agente Studio publicado: vira systemInstruction (personalidade + base + FAQ).
+            studio_snap = fv.get("__acassia_studio__")
+            system_instruction = _build_system_instruction_from_studio(studio_snap)
+            if system_instruction:
+                lmeta["studio_agent"] = (
+                    studio_snap.get("agent_name") if isinstance(studio_snap, dict) else None
+                ) or "?"
+                vn = studio_snap.get("version_number") if isinstance(studio_snap, dict) else None
+                if vn is not None:
+                    lmeta["studio_version"] = int(vn) if isinstance(vn, int) else 0
+
             if _ALLOW_LLM and api_key.strip():
                 text, err = flow_gemini_generate_text(
                     prompt,
                     model=model_raw or _DEFAULT_FLOW_LLM_MODEL,
                     temperature=temp,
                     api_key=api_key,
+                    system_instruction=system_instruction,
                 )
                 if err:
                     logger.warning("flow_executor llm: %s", err)
