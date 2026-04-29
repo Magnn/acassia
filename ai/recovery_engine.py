@@ -459,7 +459,12 @@ class RecoveryEngine:
                     from flows.fase_3_oferta import node_9_recuperacao as n9
 
                     lead_meta = self._metadata_lead_como_dict(lead)
-                    lead_meta["__config__"] = CONFIG_CLIENTE
+                    # Migrado pra tenant_config (façade com fallback ao CONFIG_CLIENTE).
+                    # deepcopy: lead_meta pode ser mutado downstream; tenant_config retorna proxy.
+                    import copy as _copy
+                    from api.tenant_config import get_tenant_config
+                    _tid = getattr(lead, "tenant_id", None) or "default"
+                    lead_meta["__config__"] = _copy.deepcopy(dict(get_tenant_config(_tid)))
                     if getattr(lead, "resumo_dor", None):
                         lead_meta.setdefault("resumo_dor", lead.resumo_dor)
                     if getattr(lead, "objecao_silenciosa", None):

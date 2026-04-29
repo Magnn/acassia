@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Onboarding — Cigana SaaS{% endblock %}
+{% block main_class %}max-w-2xl mx-auto py-12 px-6{% endblock %}
+{% block content %}
+
+<div class="mb-8">
+  <h1 class="text-3xl font-bold mb-2">🔮 Configurar tua cigana</h1>
+  <p class="text-slate-400 text-sm">Passo {{ {'persona': 1, 'oferta': 2, 'template': 3, 'whatsapp': 4}[current_step] }} de 4</p>
+
+  {# Progress bar #}
+  <div class="mt-4 flex gap-1">
+    {% for step in ['persona', 'oferta', 'template', 'whatsapp'] %}
+      {% set step_idx = {'persona': 1, 'oferta': 2, 'template': 3, 'whatsapp': 4}[step] %}
+      {% set current_idx = {'persona': 1, 'oferta': 2, 'template': 3, 'whatsapp': 4}[current_step] %}
+      <div class="h-1 flex-1 rounded {% if step_idx <= current_idx %}bg-cigana-purple{% else %}bg-cigana-border{% endif %}"></div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if current_step == 'persona' %}
+  {# ─── Step 1: Persona ─── #}
+  <h2 class="text-xl font-bold mb-1">Persona da cigana</h2>
+  <p class="text-sm text-slate-400 mb-6">Quem é tua cigana? Define o tom de voz e as regras dela.</p>
+  <form method="POST" action="{{ url_for('saas_onboarding.persona') }}" class="space-y-5">
+    <div>
+      <label class="block mb-1 text-sm">Nome</label>
+      <input type="text" name="name" required maxlength="200"
+             placeholder="Ex: Madame Eros"
+             class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none">
+    </div>
+    <div>
+      <label class="block mb-1 text-sm">Tom de voz</label>
+      <select name="tone" required
+              class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none">
+        <option value="acolhedor">Acolhedora — calorosa, acolhe a dor</option>
+        <option value="direto">Direta — vai ao ponto, sem rodeio</option>
+        <option value="mistico">Mística — dramática, etérea</option>
+        <option value="sedutor">Sedutora — envolvente, magnética</option>
+      </select>
+    </div>
+    <div>
+      <label class="block mb-1 text-sm">História de origem (mínimo 20 chars)</label>
+      <textarea name="backstory" required minlength="20" maxlength="2000" rows="4"
+                placeholder="Sou uma cigana ancestral com dom de leitura espiritual. Aprendi as cartas com minha avó..."
+                class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none"></textarea>
+    </div>
+    <div>
+      <label class="block mb-2 text-sm">Restrições (recomendadas — protegem você e o cliente)</label>
+      <div class="space-y-2 text-sm">
+        <label class="flex gap-2 items-center"><input type="checkbox" name="restrictions" value="nao_promete_cura" checked> Não promete cura</label>
+        <label class="flex gap-2 items-center"><input type="checkbox" name="restrictions" value="nao_da_conselho_medico" checked> Não dá conselho médico</label>
+        <label class="flex gap-2 items-center"><input type="checkbox" name="restrictions" value="nao_da_conselho_juridico" checked> Não dá conselho jurídico</label>
+        <label class="flex gap-2 items-center"><input type="checkbox" name="restrictions" value="nao_promete_resultado_financeiro" checked> Não promete resultado financeiro</label>
+      </div>
+    </div>
+    <button type="submit" class="w-full bg-cigana-purple hover:bg-purple-600 transition py-2 rounded-lg font-bold">Próximo</button>
+  </form>
+
+{% elif current_step == 'oferta' %}
+  {# ─── Step 2: Oferta ─── #}
+  <h2 class="text-xl font-bold mb-1">Oferta principal</h2>
+  <p class="text-sm text-slate-400 mb-6">Qual produto a cigana vai vender? Você pode mudar depois.</p>
+  <form method="POST" action="{{ url_for('saas_onboarding.oferta') }}" class="space-y-5">
+    <div>
+      <label class="block mb-1 text-sm">Nome do produto</label>
+      <input type="text" name="nome" required maxlength="300"
+             placeholder="Ex: Tiragem de Emergência"
+             class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none">
+    </div>
+    <div>
+      <label class="block mb-1 text-sm">Preço (R$)</label>
+      <input type="text" name="preco" required pattern="[0-9]+([.,][0-9]+)?"
+             placeholder="19,90"
+             class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none">
+    </div>
+    <div>
+      <label class="block mb-1 text-sm">Descrição (opcional)</label>
+      <textarea name="descricao" maxlength="1000" rows="3"
+                placeholder="3 cartas reveladas em até 5 minutos"
+                class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none"></textarea>
+    </div>
+    <div>
+      <label class="block mb-2 text-sm">Gateway de pagamento</label>
+      <div class="space-y-2 text-sm">
+        <label class="flex gap-2 items-start cursor-pointer">
+          <input type="radio" name="gateway" value="stripe" checked class="mt-1">
+          <div>
+            <strong>Stripe Connect</strong> <span class="text-cigana-purple">(recomendado)</span>
+            <div class="text-xs text-slate-400">Split automático, KYC integrado, internacional</div>
+          </div>
+        </label>
+        <label class="flex gap-2 items-start cursor-pointer">
+          <input type="radio" name="gateway" value="cakto" class="mt-1">
+          <div>
+            <strong>Cakto</strong> <span class="text-amber-500">(legado)</span>
+            <div class="text-xs text-slate-400">Brasil-only, mais simples mas será descontinuado</div>
+          </div>
+        </label>
+      </div>
+    </div>
+    <button type="submit" class="w-full bg-cigana-purple hover:bg-purple-600 transition py-2 rounded-lg font-bold">Próximo</button>
+  </form>
+
+{% elif current_step == 'template' %}
+  {# ─── Step 3: Template ─── #}
+  <h2 class="text-xl font-bold mb-1">Template do funil</h2>
+  <p class="text-sm text-slate-400 mb-6">Escolhe um ponto de partida pro fluxo pós-pagamento. Edita depois no canvas.</p>
+  <form method="POST" action="{{ url_for('saas_onboarding.template_step') }}" class="space-y-3">
+    <label class="block cursor-pointer">
+      <input type="radio" name="template" value="tarot_express" checked class="sr-only peer">
+      <div class="p-5 rounded-lg bg-cigana-surface border-2 border-cigana-border peer-checked:border-cigana-purple transition">
+        <div class="font-bold mb-1">🔮 Tarot Express</div>
+        <div class="text-xs text-slate-400">78 cartas Marselha · ticket R$19-49 · alto volume + recorrência</div>
+      </div>
+    </label>
+    <label class="block cursor-pointer">
+      <input type="radio" name="template" value="quiromancia_premium" class="sr-only peer">
+      <div class="p-5 rounded-lg bg-cigana-surface border-2 border-cigana-border peer-checked:border-cigana-purple transition">
+        <div class="font-bold mb-1">✋ Quiromancia Premium</div>
+        <div class="text-xs text-slate-400">Linhas da mão · ticket R$197+ · funil longo + LTV</div>
+      </div>
+    </label>
+    <label class="block cursor-pointer">
+      <input type="radio" name="template" value="em_branco" class="sr-only peer">
+      <div class="p-5 rounded-lg bg-cigana-surface border-2 border-cigana-border peer-checked:border-cigana-purple transition">
+        <div class="font-bold mb-1">📋 Em branco</div>
+        <div class="text-xs text-slate-400">Canvas vazio — você desenha do zero</div>
+      </div>
+    </label>
+    <button type="submit" class="w-full bg-cigana-purple hover:bg-purple-600 transition py-2 rounded-lg font-bold mt-4">Próximo</button>
+  </form>
+
+{% elif current_step == 'whatsapp' %}
+  {# ─── Step 4: WhatsApp (modo manual) ─── #}
+  <h2 class="text-xl font-bold mb-1">Conectar WhatsApp</h2>
+  <p class="text-sm text-slate-400 mb-6">Modo manual (Embedded Signup vem após App Review da Meta — ver ADR_002).</p>
+  <div class="bg-amber-900/30 border border-amber-800 rounded-lg p-3 text-sm text-amber-200 mb-4">
+    Este modo exige que você já tenha um número WhatsApp Cloud API ativo no Meta Business Manager. Se não tem, fala com a equipe pra te ajudar a provisionar.
+  </div>
+  <form method="POST" action="{{ url_for('saas_onboarding.whatsapp') }}" class="space-y-5">
+    <div>
+      <label class="block mb-1 text-sm">phone_number_id <span class="text-xs text-slate-500">(numérico)</span></label>
+      <input type="text" name="phone_number_id" required pattern="[0-9]+"
+             placeholder="106540152569312"
+             class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none font-mono">
+    </div>
+    <div>
+      <label class="block mb-1 text-sm">waba_id <span class="text-xs text-slate-500">(WhatsApp Business Account ID)</span></label>
+      <input type="text" name="waba_id" required pattern="[0-9]+"
+             placeholder="103845942681542"
+             class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none font-mono">
+    </div>
+    <div>
+      <label class="block mb-1 text-sm">access_token <span class="text-xs text-slate-500">(System User token, permanente)</span></label>
+      <input type="password" name="access_token" required minlength="20"
+             placeholder="EAAxxxxxxxxxxxxxxx..."
+             class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none font-mono">
+      <p class="mt-1 text-xs text-slate-500">Armazenado cifrado em TenantFlowSecret. Nunca aparece em logs.</p>
+    </div>
+    <button type="submit" class="w-full bg-cigana-purple hover:bg-purple-600 transition py-2 rounded-lg font-bold">Concluir onboarding</button>
+  </form>
+
+{% endif %}
+
+{% endblock %}

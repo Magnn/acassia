@@ -31,7 +31,7 @@ from typing import Any, Optional, List, Set
 import requests
 
 from db.database import SessionLocal
-from db.models import Lead, Mensagem, EventoAudit, LeadBehaviorEvent
+from db.models import Lead, Mensagem, EventoAudit, LeadBehaviorEvent, FlowBlueprint
 from ai.intent_classifier import IntentClassifier
 from ai.context_compressor import ContextCompressor
 from ai.sentiment_analyzer import SentimentAnalyzer
@@ -586,7 +586,7 @@ class Engine:
                     return {"status": "paused_pos_funil"}
 
                 # INJEÇÃO DA CONFIGURAÇÃO CENTRALIZADA
-                ctx.metadata["__config__"] = CONFIG_CLIENTE
+                ctx.metadata["__config__"] = self._config_para_ctx()
                 ctx.metadata["tts_ativo"]  = self.tts_ativo
                 # Funil estático: nunca NLU/Gemini nem stage_intel — mesmo se FUNIL_ESTATICO_ATIVO=0 no .env.
                 _node_static_mm = str(getattr(lead, "node_atual", "") or "").startswith("static_meumisterio_")
@@ -942,7 +942,7 @@ class Engine:
                 historico=[], texto_recebido="SISTEMA_WEBHOOK", tipo_mensagem="system", 
                 interactive_reply_id=None, nome_lead=(getattr(lead, "nome", "") or ""), personalizer=self.personalizer
             )
-            ctx.metadata["__config__"] = CONFIG_CLIENTE
+            ctx.metadata["__config__"] = self._config_para_ctx()
             try:
                 from studio_runtime import inject_published_studio_into_metadata
 
@@ -960,10 +960,66 @@ class Engine:
             except Exception as e:
                 logger.warning("⚠️ [ENGINE] flow_executor inject falhou (pos_venda): %s", e)
             self._restaurar_memoria(lead, ctx)
-            acoes = self._executar_node(target_entrega, ctx, db, lead)
+            # Tenta blueprint customizado do tenant (ADR_006); se ausente/falha,
+            # cai no caminho legado _executar_node. Mantém retrocompat.
+            acoes = self._compile_post_payment_blueprint(db, ctx, lead) \
+                or self._executar_node(target_entrega, ctx, db, lead)
             self._processar_fila(lead.id, ctx, acoes)
         finally:
             db.close()
+
+    def _config_para_ctx(self) -> dict:
+        """
+        Devolve config consolidada do tenant (deep-copy mutável) pra injetar em
+        ``ctx.metadata["__config__"]``. Usa ``api.tenant_config.get_tenant_config``
+        com fallback automático ao CONFIG_CLIENTE legado quando tenant não tem
+        overrides em DB. Ver docs/MIGRACAO_CONFIG_CLIENTE.md.
+        """
+        import copy as _copy
+        from api.tenant_config import get_tenant_config
+        return _copy.deepcopy(dict(get_tenant_config(self.tenant_id)))
+
+    def _compile_post_payment_blueprint(self, db, ctx, lead) -> Optional[List[Acao]]:
+        """
+        Compila o blueprint slug='post_payment' do tenant numa lista de Acao.
+
+        Retorna None se:
+          - tenant não tem blueprint slug='post_payment' (fallback ao caminho legado)
+          - compilação levanta exceção (logged via logger.exception, fallback)
+
+        Caller deve usar fluxo legado (_executar_node) quando retornar None.
+        Ver ADR_006 (post-payment híbrido).
+        """
+        try:
+            bp = db.query(FlowBlueprint).filter_by(
+                tenant_id=self.tenant_id, slug="post_payment"
+            ).first()
+            if not bp:
+                return None
+            from flow_executor import document_to_acoes
+            ctx_dict: dict = {
+                "lead_id": lead.id,
+                "telefone": getattr(lead, "telefone", "") or "",
+                "nome": getattr(lead, "nome", "") or "",
+                "node_atual": ctx.node_atual,
+            }
+            ctx_dict.update(ctx.metadata or {})
+            acoes = document_to_acoes(
+                bp.body_json or {},
+                context=ctx_dict,
+                tenant_id=self.tenant_id,
+                blueprint_id=bp.id,
+            )
+            logger.info(
+                "[engine] post_venda usando blueprint customizado: tenant=%s blueprint=%s acoes=%d",
+                self.tenant_id, bp.id, len(acoes) if acoes else 0,
+            )
+            return acoes
+        except Exception:
+            logger.exception(
+                "[engine] _compile_post_payment_blueprint falhou — fallback ao _executar_node"
+            )
+            return None
 
     def iniciar_fluxo_recuperacao_abandono(self, telefone: str, motivo: str = "abandonou"):
         db = SessionLocal()
@@ -983,7 +1039,7 @@ class Engine:
                 nome_lead=_nome_lead_rec,
                 personalizer=self.personalizer
             )
-            ctx.metadata["__config__"] = CONFIG_CLIENTE
+            ctx.metadata["__config__"] = self._config_para_ctx()
             try:
                 from studio_runtime import inject_published_studio_into_metadata
 
@@ -1501,7 +1557,7 @@ class Engine:
         """
         Última barreira global contra mensagem cortada.
         1) tenta recuperar final truncado;
-        2) se ainda parecer "aberto", não envia.
+        2) se ainda parecer "aberto" ou começar em fragmento, não envia.
         """
         t = (texto or "").strip()
         if not t:
@@ -1512,6 +1568,12 @@ class Engine:
         t2 = normalizar_enxerto_dor_sem_contexto(t2)
         # Se ainda termina em conectivo/pontuação aberta, suprime.
         if re.search(BALAO_IA_REGEX_CORTE_FINAL, t2.lower()):
+            return ""
+        # Suprime fragmento curto / início claramente truncado (ex.: "za sua;…" sobrou após corte).
+        if len(t2) < 10:
+            return ""
+        primeiro_tok = t2.split()[0] if t2.split() else ""
+        if primeiro_tok and len(primeiro_tok) <= 3 and primeiro_tok[0].islower() and primeiro_tok.isalpha():
             return ""
         return t2
 

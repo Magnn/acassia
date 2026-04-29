@@ -1,0 +1,99 @@
+{
+  "format": "acassia-flow",
+  "version": 1,
+  "title": "Pós-pagamento Premium (Quiromancia)",
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "label": "Pagamento aprovado",
+        "config": {
+          "event": "webhook.payment.approved",
+          "step_name": "Trigger pós-pagamento"
+        }
+      },
+      {
+        "id": "msg_confirm",
+        "type": "conteudo",
+        "label": "Confirmação acolhedora",
+        "config": {
+          "content_text": "Recebi teu pagamento. Obrigada pela confiança 🙏\nVou organizar tudo o que vi nas tuas linhas. Em alguns minutos te mando o link pra agendarmos a sessão.",
+          "content_typing": true
+        }
+      },
+      {
+        "id": "delay_5min",
+        "type": "delay",
+        "label": "Pausa intencional",
+        "config": {
+          "delay_amount": 5,
+          "delay_unit": "min"
+        }
+      },
+      {
+        "id": "msg_link_agendar",
+        "type": "conteudo",
+        "label": "Link de agendamento",
+        "config": {
+          "content_text": "Aqui está o link da minha agenda: {{link_agendamento}}\nReserva o horário que melhor cabe pra ti — sessão dura 60 minutos, em vídeo-chamada.\nJá bloqueei essa semana priorizando teu caso.",
+          "content_typing": true
+        }
+      },
+      {
+        "id": "delay_3d",
+        "type": "delay",
+        "label": "Aguarda 3 dias (após sessão)",
+        "config": {
+          "delay_amount": 3,
+          "delay_unit": "dia"
+        }
+      },
+      {
+        "id": "msg_nutricao",
+        "type": "conteudo",
+        "label": "Nutrição: aprofunda valor",
+        "config": {
+          "content_text": "Olha, sobre o que vi nas tuas linhas...\nHá uma camada profunda que merece mais que uma sessão isolada. Algumas coisas precisam de tempo pra se mover."
+        }
+      },
+      {
+        "id": "delay_7d",
+        "type": "delay",
+        "label": "Aguarda 7 dias",
+        "config": {
+          "delay_amount": 7,
+          "delay_unit": "dia"
+        }
+      },
+      {
+        "id": "msg_upsell_mentoria",
+        "type": "conteudo",
+        "label": "Convite à mentoria",
+        "config": {
+          "content_text": "Tenho um trabalho mais profundo que abre 4 vagas por trimestre — Mentoria de Caminho.\nSe sentires que essa primeira sessão tocou onde precisava, me fala. Posso te explicar como funciona antes de qualquer compromisso."
+        }
+      },
+      {
+        "id": "tag_convertido",
+        "type": "acao",
+        "label": "Tag de conversão",
+        "config": {
+          "action_kind": "add_tag",
+          "payload": "convertido_premium",
+          "step_name": "Marca conversão Premium pra audit/analytics"
+        }
+      }
+    ],
+    "edges": [
+      {"id": "e1", "from": "trigger",            "to": "msg_confirm"},
+      {"id": "e2", "from": "msg_confirm",        "to": "delay_5min"},
+      {"id": "e3", "from": "delay_5min",         "to": "msg_link_agendar"},
+      {"id": "e4", "from": "msg_link_agendar",   "to": "delay_3d"},
+      {"id": "e5", "from": "delay_3d",           "to": "msg_nutricao"},
+      {"id": "e6", "from": "msg_nutricao",       "to": "delay_7d"},
+      {"id": "e7", "from": "delay_7d",           "to": "msg_upsell_mentoria"},
+      {"id": "e8", "from": "msg_upsell_mentoria","to": "tag_convertido"}
+    ]
+  }
+}

@@ -370,3 +370,43 @@ class FlowSchedule(Base):
     meta_json = Column(JSON, default=dict)
     criado_em = Column(DateTime(timezone=True), default=_agora_utc)
     atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
+
+
+class User(Base):
+    """
+    Usuário do SaaS (tarólogo). 1 user = 1 tenant_id (relação 1:1 inicial).
+    Pode evoluir pra many-to-one (multi-team) numa fase futura.
+    """
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, unique=True, index=True)
+    email = Column(String(200), nullable=False, unique=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    name = Column(String(200), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+
+
+class PaymentEventReceipt(Base):
+    """
+    Idempotência durável de webhooks de pagamento (at-least-once delivery).
+    Mesmo (provider, event_id, tenant) não reentra após restart do processo —
+    análogo ao WhatsAppInboundReceipt mas pra Stripe / Cakto. Ver ADR_006 (G4).
+    """
+
+    __tablename__ = "payment_event_receipts"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "provider", "event_id", name="uq_payment_event_receipt"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    provider = Column(String(32), nullable=False, index=True)   # 'stripe' | 'cakto'
+    event_id = Column(String(128), nullable=False, index=True)
+    event_type = Column(String(64), nullable=True)              # ex 'payment_intent.succeeded'
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
+    raw_payload = Column(JSON, default=dict)
+    processed_at = Column(DateTime(timezone=True), default=_agora_utc, index=True)

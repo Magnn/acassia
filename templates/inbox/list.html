@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Inbox — Cigana SaaS{% endblock %}
+{% block main_class %}max-w-5xl mx-auto py-8 px-6{% endblock %}
+{% block content %}
+
+<div class="flex justify-between items-end mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">Inbox</h1>
+    <p class="text-sm text-slate-400">{{ total }} conversa{{ 's' if total != 1 else '' }}</p>
+  </div>
+  <a href="?filtro=todos" class="text-xs text-slate-400 hover:text-slate-200">Atualizar</a>
+</div>
+
+{# Filtros #}
+<div class="flex gap-2 mb-4 text-sm">
+  {% for f in filtros_disponiveis %}
+    <a href="?filtro={{ f }}"
+       class="px-3 py-1 rounded-full transition
+              {% if filtro == f %}bg-cigana-purple text-white{% else %}bg-cigana-surface border border-cigana-border hover:border-cigana-purple{% endif %}">
+      {{ f }}
+    </a>
+  {% endfor %}
+</div>
+
+{# Lista #}
+<div class="bg-cigana-surface border border-cigana-border rounded-lg overflow-hidden">
+  {% if not items %}
+    <div class="p-8 text-center text-slate-500 text-sm">Nenhuma conversa nesse filtro.</div>
+  {% else %}
+    {% for item in items %}
+      <a href="{{ url_for('saas_inbox.conversation', lead_id=item.id) }}"
+         class="block p-4 border-b border-cigana-border last:border-0 hover:bg-cigana-bg transition">
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <strong class="truncate">{{ item.nome }}</strong>
+              <span class="text-xs text-slate-500 font-mono">{{ item.telefone }}</span>
+              {% if item.convertido %}<span class="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300">convertido</span>{% endif %}
+              {% if item.bot_pausado %}<span class="text-xs px-2 py-0.5 rounded bg-amber-900/40 text-amber-300">bot pausado</span>{% endif %}
+              {% if item.opt_out %}<span class="text-xs px-2 py-0.5 rounded bg-red-900/40 text-red-300">opt-out</span>{% endif %}
+            </div>
+            <div class="text-sm text-slate-400 truncate">{{ item.ultima_msg or '(sem mensagens)' }}</div>
+            <div class="text-xs text-slate-600 mt-1">node: {{ item.node_atual or '—' }}</div>
+          </div>
+          {% if item.ultima_em %}
+            <div class="text-xs text-slate-500 whitespace-nowrap">{{ item.ultima_em.strftime('%d/%m %H:%M') }}</div>
+          {% endif %}
+        </div>
+      </a>
+    {% endfor %}
+  {% endif %}
+</div>
+
+{% endblock %}
