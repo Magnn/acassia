@@ -1235,6 +1235,70 @@ def api_health():
     }), 200
 
 
+@app.route("/api/health/deep", methods=["GET"])
+def api_health_deep():
+    """
+    Readiness probe — checa dependências críticas (DB, Redis, Gemini).
+    Retorna 200 se tudo OK ou Redis/Gemini estão "disabled" (não configurados).
+    Retorna 503 se algum check obrigatório falhou (DB).
+
+    Use em load balancer / k8s readinessProbe pra evitar rotear tráfego pra
+    instância com DB caindo. Liveness (/api/health) continua barato.
+    """
+    started = time.perf_counter()
+    checks: dict[str, dict] = {}
+
+    # ── DB: SELECT 1 ─────────────────────────────────────────────────
+    db_ok = False
+    try:
+        from db.database import SessionLocal
+        from sqlalchemy import text
+        _db = SessionLocal()
+        try:
+            _db.execute(text("SELECT 1"))
+            db_ok = True
+            checks["database"] = {"status": "ok"}
+        finally:
+            _db.close()
+    except Exception as exc:
+        checks["database"] = {"status": "error", "error": str(exc)[:200]}
+
+    # ── Redis: ping (skip se REDIS_URL ausente) ──────────────────────
+    if (os.getenv("REDIS_URL") or "").strip():
+        try:
+            from reliability.redis_inbound import _client as _redis_client_fn
+            _r = _redis_client_fn()
+            if _r is not None:
+                _r.ping()
+                checks["redis"] = {"status": "ok"}
+            else:
+                checks["redis"] = {"status": "error", "error": "client not available"}
+        except Exception as exc:
+            checks["redis"] = {"status": "error", "error": str(exc)[:200]}
+    else:
+        checks["redis"] = {"status": "disabled", "reason": "REDIS_URL not set"}
+
+    # ── Gemini: API key configurada (não chama API — caro pra probe) ─
+    if (os.getenv("GEMINI_API_KEY") or "").strip():
+        checks["gemini"] = {"status": "ok", "note": "key configured (not pinged)"}
+    else:
+        checks["gemini"] = {"status": "disabled", "reason": "GEMINI_API_KEY not set"}
+
+    # DB é o único check obrigatório — Redis e Gemini podem estar "disabled".
+    overall_ok = db_ok and all(
+        c.get("status") in ("ok", "disabled") for c in checks.values()
+    )
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+
+    return jsonify({
+        "ok": overall_ok,
+        "service": "cigana",
+        "uptime_s": int(time.time() - _APP_STARTED_AT),
+        "elapsed_ms": elapsed_ms,
+        "checks": checks,
+    }), (200 if overall_ok else 503)
+
+
 def _scan_flows_motor_nodes():
     """Lista ordenada de nós Python reais (node_*.py) para alinhamento UI ↔ motor."""
     flows_root = os.path.join(_ROOT, "flows")
