@@ -81,6 +81,7 @@ def _is_admin(roles: Iterable[str]) -> bool:
 
 from db import models
 from db.database import SessionLocal
+from extensions import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +230,7 @@ def _touch_last_login(user_id: int) -> None:
 
 
 @auth_bp.route("/signup", methods=["GET", "POST"])
+@limiter.limit("3/minute", methods=["POST"])
 def signup():
     if current_user.is_authenticated:
         return redirect(url_for("saas_auth.signup_done"))
@@ -258,6 +260,7 @@ def signup_done():
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5/minute", methods=["POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("saas_auth.signup_done"))

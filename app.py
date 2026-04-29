@@ -190,7 +190,43 @@ if not _secret:
     )
 app.config["SECRET_KEY"] = _secret
 
-CORS(app) # Libera acesso para o Dashboard não ser bloqueado
+
+# ── CORS ─────────────────────────────────────────────────────────────
+# Em prod, FRONTEND_ORIGINS deve listar origens permitidas (vírgula-separadas).
+# Ex.: FRONTEND_ORIGINS=https://app.acassia.com.br,https://acassia.com.br
+# Em dev, fallback liberal pra localhost:5173 (Vite) e 5000 (Flask same-origin).
+_cors_env = (os.getenv("FRONTEND_ORIGINS") or "").strip()
+if _cors_env:
+    _cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    _cors_origins = [
+        "http://localhost:5000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5000",
+        "http://127.0.0.1:5173",
+    ]
+    logger.warning(
+        "⚠️ [SECURITY] FRONTEND_ORIGINS não definida — usando lista dev (localhost). "
+        "Em prod, defina no .env com domínios reais separados por vírgula.",
+    )
+CORS(app, origins=_cors_origins, supports_credentials=True)
+
+# ── Rate limiting ────────────────────────────────────────────────────
+# Protege endpoints sensíveis contra brute-force.
+# Storage: Redis (se REDIS_URL setada) ou memória (single-process só).
+# Limiter vive em extensions.py pra ser importável de blueprints sem
+# import circular (auth.py decora rotas com @limiter.limit(...)).
+from extensions import limiter
+
+_limiter_storage = (os.getenv("REDIS_URL") or "").strip()
+app.config["RATELIMIT_STORAGE_URI"] = _limiter_storage if _limiter_storage else "memory://"
+app.config["RATELIMIT_HEADERS_ENABLED"] = True  # X-RateLimit-* nas respostas
+limiter.init_app(app)
+if not _limiter_storage:
+    logger.warning(
+        "⚠️ [SECURITY] flask-limiter usando storage in-memory — limites zeram a cada restart "
+        "e não são compartilhados entre workers. Configure REDIS_URL pra prod.",
+    )
 
 # ─────────────────────────────────────────────────────────────────────
 # REGISTRO DE BLUEPRINTS SaaS
