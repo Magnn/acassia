@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Activity,
+  ArrowLeftRight,
   Bot,
   FolderTree,
   KeyRound,
@@ -9,8 +10,8 @@ import {
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
-  Phone,
   Plug,
+  Power,
   Settings as SettingsIcon,
   Users,
 } from 'lucide-react';
@@ -30,16 +31,14 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/blueprints', icon: FolderTree, label: 'Fluxos', group: 'oraculo' },
   { to: '/agents', icon: Bot, label: 'Atendentes', group: 'oraculo' },
   { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo' },
-  { to: '/whatsapp', icon: Phone, label: 'WhatsApp', group: 'config' },
-  { to: '/integrations', icon: Plug, label: 'Integrações', group: 'config' },
-  { to: '/tenant-config', icon: KeyRound, label: 'Variáveis & Segredos', group: 'config' },
-  { to: '/settings', icon: SettingsIcon, label: 'Ajustes', group: 'config' },
+  { to: '/integrations', icon: Plug, label: 'Integrações', group: 'avancado' },
+  { to: '/tenant-config', icon: KeyRound, label: 'Variáveis & Segredos', group: 'avancado' },
 ];
 
 const GROUP_LABELS: Record<string, string> = {
   painel: 'Painel',
   oraculo: 'Oráculo',
-  config: 'Configuração',
+  avancado: 'Avançado',
 };
 
 const PAGE_TITLES: Record<string, string> = {
@@ -49,16 +48,20 @@ const PAGE_TITLES: Record<string, string> = {
   '/blueprints': 'Fluxos',
   '/agents': 'Atendentes — Studio',
   '/runs': 'Execuções',
-  '/whatsapp': 'Conexão WhatsApp',
   '/integrations': 'Integrações',
   '/tenant-config': 'Variáveis & Segredos',
-  '/settings': 'Ajustes',
 };
+
+function pageTitleFor(pathname: string): string {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+  if (pathname.startsWith('/settings')) return 'Configurações';
+  return '';
+}
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const pageTitle = PAGE_TITLES[location.pathname] ?? '';
+  const pageTitle = pageTitleFor(location.pathname);
 
   // Agrupa items por group preservando ordem.
   const groups: { id: string; items: NavItem[] }[] = [];
@@ -154,19 +157,58 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* Collapse toggle */}
-        <div className="px-2 py-2 border-t border-sibila-mist flex-shrink-0">
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="w-full flex items-center justify-center p-1.5 rounded-md text-sibila-smoke hover:text-sibila-moonlight hover:bg-sibila-obsidian/60 transition-colors"
-            title={collapsed ? 'Expandir' : 'Recolher'}
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="w-4 h-4" strokeWidth={1.8} />
-            ) : (
-              <PanelLeftClose className="w-4 h-4" strokeWidth={1.8} />
-            )}
-          </button>
+        {/* Rodapé: swap workspace / configurações / logout / collapse */}
+        <div className="border-t border-sibila-mist flex-shrink-0">
+          <div className={[
+            'p-2 flex items-center gap-1',
+            collapsed ? 'flex-col' : 'justify-around',
+          ].join(' ')}>
+            <button
+              type="button"
+              title="Trocar workspace (em breve)"
+              className="p-2 rounded-md text-sibila-smoke hover:text-sibila-moonlight hover:bg-sibila-obsidian/60 transition-colors"
+            >
+              <ArrowLeftRight className="w-[18px] h-[18px]" strokeWidth={1.8} />
+            </button>
+            <NavLink
+              to="/settings/devices"
+              title="Configurações"
+              className={({ isActive }) =>
+                [
+                  'p-2 rounded-md transition-colors',
+                  isActive
+                    ? 'text-sibila-amethyst bg-sibila-obsidian shadow-glow-amethyst'
+                    : 'text-sibila-smoke hover:text-sibila-amethyst hover:bg-sibila-obsidian/60',
+                ].join(' ')
+              }
+              style={location.pathname.startsWith('/settings') ? {
+                color: '#7c6a99',
+                backgroundColor: '#14101e',
+              } : undefined}
+            >
+              <SettingsIcon className="w-[18px] h-[18px]" strokeWidth={1.8} />
+            </NavLink>
+            <a
+              href="/saas/auth/logout"
+              title="Sair"
+              className="p-2 rounded-md text-sibila-smoke hover:text-sibila-crimson hover:bg-sibila-obsidian/60 transition-colors"
+            >
+              <Power className="w-[18px] h-[18px]" strokeWidth={1.8} />
+            </a>
+          </div>
+          <div className="px-2 pb-2">
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="w-full flex items-center justify-center p-1.5 rounded-md text-sibila-smoke hover:text-sibila-moonlight hover:bg-sibila-obsidian/60 transition-colors"
+              title={collapsed ? 'Expandir' : 'Recolher'}
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="w-4 h-4" strokeWidth={1.8} />
+              ) : (
+                <PanelLeftClose className="w-4 h-4" strokeWidth={1.8} />
+              )}
+            </button>
+          </div>
         </div>
       </aside>
 
