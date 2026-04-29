@@ -704,6 +704,45 @@ class TarotCard(Base):
     keywords = Column(JSON, nullable=True)
 
 
+class VoiceClone(Base):
+    """
+    Voz clonada por user para TTS (Frente 4.14).
+    Provider primário: ElevenLabs. Outros TBD (Coqui, OpenAI TTS).
+    """
+    __tablename__ = "voice_clones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=True)
+    provider = Column(String(40), nullable=False)  # elevenlabs|coqui|openai
+    provider_voice_id = Column(String(120), nullable=False)
+    enrollment_audio_url = Column(Text, nullable=True)
+    sample_audio_url = Column(Text, nullable=True)  # áudio de teste gerado
+    status = Column(String(20), default="pending", nullable=False)  # pending|active|failed
+    consented_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class AudioGeneration(Base):
+    """Histórico de TTS gerados (Frente 4.16). Conta tokens consumidos."""
+    __tablename__ = "audio_generations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    voice_clone_id = Column(Integer, ForeignKey("voice_clones.id"), nullable=True)
+    text = Column(Text, nullable=False)
+    chars_count = Column(Integer, nullable=False)
+    audio_url = Column(Text, nullable=True)
+    duration_s = Column(Float, nullable=True)
+    provider = Column(String(40), nullable=False)
+    status = Column(String(20), default="pending", nullable=False)  # pending|done|failed
+    error_message = Column(Text, nullable=True)
+    cost_usd_cents = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class PixPayment(Base):
     """
     Pix QR dinâmico (Frente 7.1).
