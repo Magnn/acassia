@@ -22,6 +22,7 @@ import {
   type WhatsAppDraft,
 } from '../api/onboarding';
 import { toast } from '../lib/toast';
+import { track } from '../lib/analytics';
 
 const STEPS = [
   { id: 'persona', label: 'Persona', icon: Sparkles, desc: 'Defina a alma da sua cigana' },
@@ -59,25 +60,35 @@ export default function Onboarding() {
 
   const personaMutation = useMutation({
     mutationFn: onboardingApi.savePersona,
-    onSuccess: (res) => setCurrentStep(res.next_step),
+    onSuccess: (res) => {
+      track('onboarding_step_completed', { step: 'persona', next: res.next_step });
+      setCurrentStep(res.next_step);
+    },
     onError: (e) => toast.error(errMsg(e, 'Erro ao salvar persona')),
   });
 
   const ofertaMutation = useMutation({
     mutationFn: onboardingApi.saveOferta,
-    onSuccess: (res) => setCurrentStep(res.next_step),
+    onSuccess: (res) => {
+      track('onboarding_step_completed', { step: 'oferta', next: res.next_step });
+      setCurrentStep(res.next_step);
+    },
     onError: (e) => toast.error(errMsg(e, 'Erro ao salvar oferta')),
   });
 
   const templateMutation = useMutation({
     mutationFn: onboardingApi.saveTemplate,
-    onSuccess: (res) => setCurrentStep(res.next_step),
+    onSuccess: (res) => {
+      track('onboarding_step_completed', { step: 'template', next: res.next_step });
+      setCurrentStep(res.next_step);
+    },
     onError: (e) => toast.error(errMsg(e, 'Erro ao salvar template')),
   });
 
   const whatsappMutation = useMutation({
     mutationFn: onboardingApi.saveWhatsApp,
     onSuccess: () => {
+      track('onboarding_step_completed', { step: 'whatsapp', next: 'done' });
       toast.success('Onboarding concluído!');
       navigate('/dashboard');
     },

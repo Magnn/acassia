@@ -82,6 +82,7 @@ def _is_admin(roles: Iterable[str]) -> bool:
 from db import models
 from db.database import SessionLocal
 from extensions import limiter
+from analytics_telemetry import track as _track_event
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +248,12 @@ def signup():
             return render_template("auth/signup.html"), 400
 
         login_user(AuthenticatedUser(user.id, user.email, user.tenant_id, user.role))
+        _track_event(
+            "signup_completed",
+            tenant_id=user.tenant_id,
+            user_id=user.id,
+            email=user.email,
+        )
         return redirect(url_for("saas_auth.signup_done"))
 
     return render_template("auth/signup.html")
