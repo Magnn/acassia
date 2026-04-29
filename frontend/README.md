@@ -54,8 +54,8 @@ frontend/
 
 ## Roadmap
 
-- **Fase 0** (atual): andaime + lista de blueprints
-- **Fase 1**: canvas read-only com React Flow
+- **Fase 0**: andaime + lista de blueprints ✅
+- **Fase 1** (atual): canvas read-only com React Flow ✅
 - **Fase 2**: edição (DnD da paleta, criar/mover/deletar nodes e arestas)
 - **Fase 3**: inspetores (Cérebro IA / API / Conteúdo, Rule Builder)
 - **Fase 4**: simulador WhatsApp + lint visual
