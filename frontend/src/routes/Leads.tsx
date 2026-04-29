@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MessageSquare,
@@ -12,6 +12,10 @@ import {
   LayoutList,
   ChevronRight,
   MoreVertical,
+  Rows3,
+  StretchHorizontal,
+  Flame,
+  Snowflake,
 } from 'lucide-react';
 import { inboxApi } from '../api/inbox';
 import { toast } from '../lib/toast';
@@ -19,19 +23,78 @@ import ScoreBadge from '../components/ScoreBadge';
 import LeadContextPanel from '../components/LeadContextPanel';
 
 type ViewMode = 'chat' | 'table';
+type ScoreFilter = null | 'hot' | 'warm' | 'cold';
+type Density = 'comfy' | 'compact';
+
+const DENSITY_KEY = 'acassia.inbox.density';
+
+function ScoreChip({
+  label, Icon, color, active, onClick,
+}: {
+  label: string;
+  Icon: typeof Flame;
+  color: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border transition-all ${
+        active
+          ? 'bg-accent-amethyst text-white border-accent-amethyst'
+          : 'bg-bg-primary/50 border-border/50 text-secondary hover:text-primary'
+      }`}
+    >
+      <Icon className={`w-3 h-3 ${active ? 'text-white' : color}`} />
+      {label}
+    </button>
+  );
+}
+
+function formatRelativeTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (!t) return '';
+  const diff = Date.now() - t;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `${min}min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return 'ontem';
+  if (d < 30) return `${d}d`;
+  return '+30d';
+}
 
 export default function Leads() {
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const [filtro, setFiltro] = useState('todos');
+  const [scoreFilter, setScoreFilter] = useState<ScoreFilter>(null);
   const [search, setSearch] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
+  const [density, setDensity] = useState<Density>(() => {
+    const saved = localStorage.getItem(DENSITY_KEY);
+    return saved === 'compact' ? 'compact' : 'comfy';
+  });
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem(DENSITY_KEY, density);
+  }, [density]);
 
   const { data: leadsData, isLoading: isLoadingLeads } = useQuery({
-    queryKey: ['leads-list', filtro],
-    queryFn: () => inboxApi.getLeads({ filtro, sort: 'score', limit: 200 }),
+    queryKey: ['leads-list', filtro, scoreFilter],
+    queryFn: () => inboxApi.getLeads({
+      filtro,
+      score_band: scoreFilter || undefined,
+      sort: 'score',
+      limit: 200,
+    }),
     refetchInterval: 10000,
   });
 
@@ -66,10 +129,40 @@ export default function Leads() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationData?.messages]);
 
-  const leads = (leadsData?.items || []).filter(l => 
-    l.nome?.toLowerCase().includes(search.toLowerCase()) || 
-    l.telefone?.includes(search)
+  const leads = useMemo(() =>
+    (leadsData?.items || []).filter(l =>
+      l.nome?.toLowerCase().includes(search.toLowerCase()) ||
+      l.telefone?.includes(search),
+    ),
+    [leadsData?.items, search],
   );
+
+  // Atalhos de teclado: j/k navegar, / busca, Esc desselecionar
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const inField = !!target?.closest('input, textarea, [contenteditable]');
+      if (e.key === '/' && !inField) {
+        e.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      if (inField) return;
+      if (e.key === 'Escape') {
+        setSelectedLeadId(null);
+        return;
+      }
+      if (e.key !== 'j' && e.key !== 'k') return;
+      if (leads.length === 0) return;
+      const currentIdx = leads.findIndex((l) => l.id === selectedLeadId);
+      let next = currentIdx;
+      if (e.key === 'j') next = currentIdx < 0 ? 0 : Math.min(leads.length - 1, currentIdx + 1);
+      else next = currentIdx <= 0 ? 0 : currentIdx - 1;
+      setSelectedLeadId(leads[next].id);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [leads, selectedLeadId]);
   
   const selectedLead = conversationData?.lead;
   const messages = conversationData?.messages || [];
@@ -103,16 +196,17 @@ export default function Leads() {
             {/* Search Bar Unificada */}
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary group-focus-within:text-accent-amethyst transition-colors" />
-              <input 
+              <input
+                ref={searchRef}
                 type="text"
-                placeholder="Buscar lead..."
+                placeholder="Buscar lead… (/)"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full bg-bg-primary/50 border border-border/50 rounded-2xl pl-11 pr-4 py-2.5 text-xs outline-none focus:border-accent-amethyst focus:bg-bg-primary transition-all shadow-inner"
               />
             </div>
 
-            {/* Filtros Unificados */}
+            {/* Filtros Status */}
             <div className="flex bg-bg-primary/50 p-1 rounded-xl border border-border/50 overflow-x-auto scrollbar-hide">
               {['todos', 'ativas', 'pausadas'].map((f) => (
                 <button
@@ -126,6 +220,42 @@ export default function Leads() {
                 </button>
               ))}
             </div>
+
+            {/* Filtros Score + Densidade */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <ScoreChip
+                label="Hot"
+                Icon={Flame}
+                color="text-rose-400"
+                active={scoreFilter === 'hot'}
+                onClick={() => setScoreFilter(scoreFilter === 'hot' ? null : 'hot')}
+              />
+              <ScoreChip
+                label="Warm"
+                Icon={Flame}
+                color="text-amber-400"
+                active={scoreFilter === 'warm'}
+                onClick={() => setScoreFilter(scoreFilter === 'warm' ? null : 'warm')}
+              />
+              <ScoreChip
+                label="Cold"
+                Icon={Snowflake}
+                color="text-sky-400"
+                active={scoreFilter === 'cold'}
+                onClick={() => setScoreFilter(scoreFilter === 'cold' ? null : 'cold')}
+              />
+              <button
+                onClick={() => setDensity(density === 'comfy' ? 'compact' : 'comfy')}
+                title={density === 'comfy' ? 'Densidade compacta' : 'Densidade confortável'}
+                className="ml-auto p-1.5 rounded-lg border border-border/50 text-secondary hover:text-primary hover:bg-bg-surface/50"
+              >
+                {density === 'comfy' ? (
+                  <Rows3 className="w-3.5 h-3.5" />
+                ) : (
+                  <StretchHorizontal className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -138,41 +268,67 @@ export default function Leads() {
                <p className="text-[10px] font-black uppercase tracking-widest">Nenhuma conversa encontrada</p>
             </div>
           ) : (
-            leads.map((l) => (
-              <div
-                key={l.id}
-                onClick={() => setSelectedLeadId(l.id)}
-                className={`p-4 rounded-2xl cursor-pointer transition-all border border-transparent relative group mb-1 ${
-                  selectedLeadId === l.id ? 'bg-bg-surface border-border shadow-md' : 'hover:bg-bg-surface/40'
-                }`}
-              >
-                {selectedLeadId === l.id && (
-                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-amethyst rounded-r-full shadow-[0_0_15px_rgba(var(--accent-amethyst-rgb),0.5)]" />
-                )}
-                <div className="flex justify-between items-start mb-1 gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {l.score_band && l.score_band !== 'cold' && (
-                      <ScoreBadge band={l.score_band} value={l.score_value} />
-                    )}
-                    <div className="font-black text-sm truncate tracking-tight group-hover:text-accent-amethyst transition-colors">
-                      {l.nome || l.telefone}
+            leads.map((l) => {
+              const isCompact = density === 'compact';
+              const isInbound = l.ultima_remetente === 'lead';
+              const previewIcon = isInbound ? '📩' : '📤';
+              return (
+                <div
+                  key={l.id}
+                  onClick={() => setSelectedLeadId(l.id)}
+                  className={`${isCompact ? 'p-2.5' : 'p-4'} rounded-2xl cursor-pointer transition-all border border-transparent relative group mb-1 ${
+                    selectedLeadId === l.id ? 'bg-bg-surface border-border shadow-md' : 'hover:bg-bg-surface/40'
+                  }`}
+                >
+                  {selectedLeadId === l.id && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-amethyst rounded-r-full shadow-[0_0_15px_rgba(var(--accent-amethyst-rgb),0.5)]" />
+                  )}
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {l.score_band && l.score_band !== 'cold' && (
+                        <ScoreBadge band={l.score_band} value={l.score_value} />
+                      )}
+                      <div className={`font-black truncate tracking-tight group-hover:text-accent-amethyst transition-colors ${isCompact ? 'text-xs' : 'text-sm'}`}>
+                        {l.nome || l.telefone}
+                      </div>
                     </div>
+                    {l.ultima_em && (
+                      <div className="text-[9px] text-secondary font-black tabular-nums flex-shrink-0">
+                        {formatRelativeTime(l.ultima_em)}
+                      </div>
+                    )}
                   </div>
-                  {l.ultima_em && (
-                    <div className="text-[9px] text-secondary font-black tabular-nums flex-shrink-0">
-                      {new Date(l.ultima_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {!isCompact && (
+                    <div className="text-[11px] text-secondary/80 font-medium line-clamp-1 mt-1.5">
+                      <span className="opacity-60 mr-1">{previewIcon}</span>
+                      {l.ultima_msg || '(Sem mensagens)'}
+                    </div>
+                  )}
+                  {!isCompact && (
+                    <div className="flex gap-1.5 mt-2 flex-wrap">
+                      {l.bot_pausado && (
+                        <span className="bg-amber-500/10 text-amber-500 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-amber-500/20">
+                          Pausado
+                        </span>
+                      )}
+                      {l.convertido && (
+                        <span className="bg-emerald-500/10 text-emerald-500 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-emerald-500/20">
+                          Venda
+                        </span>
+                      )}
+                      {(l.tags || []).slice(0, 2).map((tag) => (
+                        <span
+                          key={tag}
+                          className="bg-bg-primary text-secondary text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-border/50"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
-                <div className="text-[11px] text-secondary/80 font-medium line-clamp-1 mb-2">
-                  {l.ultima_msg || '(Sem mensagens)'}
-                </div>
-                <div className="flex gap-1.5">
-                   {l.bot_pausado && <span className="bg-amber-500/10 text-amber-500 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-amber-500/20">Pausado</span>}
-                   {l.convertido && <span className="bg-emerald-500/10 text-emerald-500 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-emerald-500/20">Venda</span>}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -317,6 +473,11 @@ export default function Leads() {
                 </div>
                 <h3 className="text-xl font-black tracking-tight text-primary mb-2">Central de Atendimento</h3>
                 <p className="text-xs font-bold uppercase tracking-widest opacity-40">Selecione uma conversa para começar</p>
+                <div className="mt-4 flex items-center gap-3 text-[9px] font-black uppercase tracking-widest opacity-40">
+                  <span><kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border">/</kbd> buscar</span>
+                  <span><kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border">j/k</kbd> navegar</span>
+                  <span><kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border">Esc</kbd> sair</span>
+                </div>
                 
                 <button 
                   onClick={() => setViewMode('table')}
