@@ -203,4 +203,17 @@ export const adminApi = {
       target?: { user_id: number | null; email: string; name: string | null; tenant_id: string };
       admin?: { user_id: number | null; email: string };
     }>('/api/admin/impersonate/active'),
+
+  // Lifecycle (Frente 1.8 / 1.9)
+  suspendTenant: (tenantId: string, reason: string) =>
+    api.post<{ ok: boolean; suspended_at: string }>(`/api/admin/tenants/${tenantId}/suspend`, { reason }),
+  reactivateTenant: (tenantId: string, reason: string) =>
+    api.post<{ ok: boolean; reactivated_at: string }>(`/api/admin/tenants/${tenantId}/reactivate`, { reason }),
+  deleteTenant: (tenantId: string, confirm_email: string, reason: string) =>
+    api.post<{ ok: boolean; deleted_at: string; recovery_window_days: number }>(
+      `/api/admin/tenants/${tenantId}/delete`,
+      { confirm_email, reason },
+    ),
+  restoreTenant: (tenantId: string, reason: string) =>
+    api.post<{ ok: boolean; restored_at: string }>(`/api/admin/tenants/${tenantId}/restore`, { reason }),
 };

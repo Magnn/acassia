@@ -192,14 +192,7 @@ function ImpersonateButton({ overview }: { overview: AdminTenantOverview }) {
           <Eye className="w-3.5 h-3.5" />
           Impersonate
         </button>
-        <button
-          disabled
-          title="Em breve (Frente 1.8)"
-          className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest opacity-40 cursor-not-allowed"
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          Suspender
-        </button>
+        <LifecycleActions overview={overview} />
       </div>
     );
   }
@@ -294,6 +287,246 @@ function ImpersonateButton({ overview }: { overview: AdminTenantOverview }) {
             className="flex-1 px-5 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl text-sm font-black uppercase tracking-widest"
           >
             {startMut.isPending ? 'Entrando...' : `Entrar como ${overview.user.name || 'user'}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type LifecycleAction = 'suspend' | 'reactivate' | 'delete' | 'restore';
+
+function LifecycleActions({ overview }: { overview: AdminTenantOverview }) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [action, setAction] = useState<LifecycleAction | null>(null);
+  const [reason, setReason] = useState('');
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [confirmCheckbox, setConfirmCheckbox] = useState(false);
+
+  const { tenant_id } = overview;
+  const isSuspended = overview.lifecycle.is_suspended;
+  const isDeleted = overview.lifecycle.is_deleted;
+  const isAdminTarget = overview.user.role === 'admin';
+
+  const onSuccess = () => {
+    qc.invalidateQueries({ queryKey: ['admin-tenant-overview', tenant_id] });
+    qc.invalidateQueries({ queryKey: ['admin-tenants'] });
+    setAction(null);
+    setReason(''); setConfirmEmail(''); setConfirmCheckbox(false);
+  };
+
+  const onError = (e: unknown) => {
+    const body = e instanceof ApiError ? (e.body as { error?: string }) : null;
+    const msgs: Record<string, string> = {
+      reason_too_short: 'Motivo precisa de ao menos 5 caracteres',
+      already_suspended: 'Tenant já está suspenso',
+      not_suspended: 'Tenant não está suspenso',
+      already_deleted: 'Tenant já está deletado',
+      not_deleted: 'Tenant não está deletado',
+      cannot_suspend_admin: 'Não pode suspender admin protegido',
+      cannot_delete_admin: 'Não pode deletar admin protegido',
+      confirm_email_mismatch: 'Email digitado não bate com o do tenant',
+      tenant_not_found: 'Tenant não encontrado',
+    };
+    toast.error(msgs[body?.error || ''] || 'Erro');
+  };
+
+  const suspendMut = useMutation({
+    mutationFn: () => adminApi.suspendTenant(tenant_id, reason),
+    onSuccess: () => { toast.success('Tenant suspenso'); onSuccess(); },
+    onError,
+  });
+  const reactivateMut = useMutation({
+    mutationFn: () => adminApi.reactivateTenant(tenant_id, reason),
+    onSuccess: () => { toast.success('Tenant reativado'); onSuccess(); },
+    onError,
+  });
+  const deleteMut = useMutation({
+    mutationFn: () => adminApi.deleteTenant(tenant_id, confirmEmail, reason),
+    onSuccess: () => { toast.success('Tenant deletado (recuperável por 30d)'); navigate('/admin/tenants'); },
+    onError,
+  });
+  const restoreMut = useMutation({
+    mutationFn: () => adminApi.restoreTenant(tenant_id, reason),
+    onSuccess: () => { toast.success('Tenant restaurado'); onSuccess(); },
+    onError,
+  });
+
+  // Botões de ação dependendo do estado atual
+  if (!action) {
+    return (
+      <>
+        {isDeleted ? (
+          <button
+            onClick={() => setAction('restore')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-900/40 hover:bg-emerald-800/40 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-900/40 text-emerald-300"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Restaurar
+          </button>
+        ) : isSuspended ? (
+          <>
+            <button
+              onClick={() => setAction('reactivate')}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-900/40 hover:bg-emerald-800/40 rounded-xl text-xs font-black uppercase tracking-widest border border-emerald-900/40 text-emerald-300"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Reativar
+            </button>
+            {!isAdminTarget && (
+              <button
+                onClick={() => setAction('delete')}
+                className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-red-900/40 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-400 hover:text-red-400"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Deletar
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setAction('suspend')}
+              disabled={isAdminTarget}
+              title={isAdminTarget ? 'Não pode suspender admin' : undefined}
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-900/40 hover:bg-amber-800/40 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl text-xs font-black uppercase tracking-widest border border-amber-900/40 text-amber-300"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Suspender
+            </button>
+            {!isAdminTarget && (
+              <button
+                onClick={() => setAction('delete')}
+                className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-red-900/40 rounded-xl text-xs font-black uppercase tracking-widest text-zinc-400 hover:text-red-400"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Deletar
+              </button>
+            )}
+          </>
+        )}
+      </>
+    );
+  }
+
+  // Modal pra cada action
+  const config: Record<LifecycleAction, { title: string; desc: string; cta: string; ctaColor: string; onConfirm: () => void; pending: boolean }> = {
+    suspend: {
+      title: 'Suspender tenant',
+      desc: 'O tenant não conseguirá logar. Webhooks WhatsApp irão pra DLQ. Dados preservados.',
+      cta: 'Suspender',
+      ctaColor: 'bg-amber-600 hover:bg-amber-500',
+      onConfirm: () => suspendMut.mutate(),
+      pending: suspendMut.isPending,
+    },
+    reactivate: {
+      title: 'Reativar tenant',
+      desc: 'Tenant volta a logar normalmente. Mensagens da DLQ no período suspenso são descartadas.',
+      cta: 'Reativar',
+      ctaColor: 'bg-emerald-600 hover:bg-emerald-500',
+      onConfirm: () => reactivateMut.mutate(),
+      pending: reactivateMut.isPending,
+    },
+    delete: {
+      title: 'Deletar tenant',
+      desc: 'Soft-delete: dados ficam preservados por 30 dias para recuperação. Após esse prazo, hard-delete permanente.',
+      cta: 'Deletar',
+      ctaColor: 'bg-red-600 hover:bg-red-500',
+      onConfirm: () => deleteMut.mutate(),
+      pending: deleteMut.isPending,
+    },
+    restore: {
+      title: 'Restaurar tenant',
+      desc: 'Desfaz a deleção e reativa a conta. Disponível durante a janela de 30 dias.',
+      cta: 'Restaurar',
+      ctaColor: 'bg-emerald-600 hover:bg-emerald-500',
+      onConfirm: () => restoreMut.mutate(),
+      pending: restoreMut.isPending,
+    },
+  };
+
+  const cfg = config[action];
+  const canSubmit =
+    reason.length >= 5 &&
+    (action !== 'delete' || (confirmEmail.toLowerCase() === overview.user.email.toLowerCase() && confirmCheckbox));
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-lg w-full space-y-5">
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+            action === 'delete' ? 'bg-red-500/10' :
+            action === 'suspend' ? 'bg-amber-500/10' :
+            'bg-emerald-500/10'
+          }`}>
+            {action === 'delete' ? <Trash2 className="w-6 h-6 text-red-500" /> :
+             action === 'suspend' ? <AlertTriangle className="w-6 h-6 text-amber-500" /> :
+             <CheckCircle2 className="w-6 h-6 text-emerald-500" />}
+          </div>
+          <div>
+            <h2 className="text-lg font-black">{cfg.title}</h2>
+            <p className="text-xs text-zinc-500 font-medium">{overview.user.email}</p>
+          </div>
+        </div>
+
+        <p className="text-sm text-zinc-400">{cfg.desc}</p>
+
+        <div>
+          <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+            Motivo (mín. 5 chars)
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            placeholder="Ex: violou TOS, abuso de spam..."
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 resize-none"
+          />
+        </div>
+
+        {action === 'delete' && (
+          <>
+            <div>
+              <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+                Digite o email pra confirmar
+              </label>
+              <input
+                type="text"
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+                placeholder={overview.user.email}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm font-mono text-white placeholder:text-zinc-700 focus:outline-none focus:border-red-500/50"
+              />
+            </div>
+            <label className="flex items-start gap-2 text-xs text-zinc-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={confirmCheckbox}
+                onChange={(e) => setConfirmCheckbox(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Entendo que após 30 dias os dados serão removidos permanentemente e
+                não poderão ser recuperados.
+              </span>
+            </label>
+          </>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => { setAction(null); setReason(''); setConfirmEmail(''); setConfirmCheckbox(false); }}
+            className="flex-1 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm font-bold"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={cfg.onConfirm}
+            disabled={!canSubmit || cfg.pending}
+            className={`flex-1 px-5 py-3 ${cfg.ctaColor} disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl text-sm font-black uppercase tracking-widest`}
+          >
+            {cfg.pending ? 'Processando...' : cfg.cta}
           </button>
         </div>
       </div>
