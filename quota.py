@@ -26,8 +26,6 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import text
-
 from db import models
 from db.database import SessionLocal
 import plans as plans_module
@@ -37,6 +35,10 @@ logger = logging.getLogger(__name__)
 
 
 VALID_KINDS = ("leads_month", "wa_msgs_month", "gemini_tokens_month")
+
+# State quotas — não são counters mensais, são limites instantâneos do estado
+# atual do tenant (X fluxos publicados, Y agentes, Z conexões WA).
+STATE_KINDS = ("flows", "agents", "wa_connections", "team_seats")
 
 
 def _current_yyyymm(when: Optional[datetime] = None) -> int:
@@ -211,6 +213,41 @@ def get_usage(
                     )
                     usage_by_kind[row.kind]["remaining"] = max(0, limit - (row.count or 0))
         return usage_by_kind
+    finally:
+        if own_session:
+            db.close()
+
+
+def check_state_quota(
+    tenant_id: str,
+    kind: str,
+    current_count: int,
+    *,
+    db_session=None,
+) -> tuple[bool, int, int]:
+    """
+    State quota check — pra recursos com cardinality limitada (não-mensal):
+        flows, agents, wa_connections, team_seats.
+
+    Diferença pra consume_quota:
+    - Não há "consumo" — só verifica se current_count + 1 <= limit
+    - Sem persistência de counter (state é fonte direta)
+    - Não há "refund"
+
+    Retorna (allowed, current_count, limit). allowed=True se +1 ainda cabe.
+    """
+    if kind not in STATE_KINDS:
+        return True, current_count, plans_module.UNLIMITED
+
+    own_session = db_session is None
+    db = db_session or SessionLocal()
+    try:
+        plan_key, _ = plans_module.effective_plan(tenant_id, db_session=db)
+        cfg = plans_module.get_plan_config(plan_key)
+        limit = cfg["limits"].get(kind, 0)
+        if limit == plans_module.UNLIMITED:
+            return True, current_count, plans_module.UNLIMITED
+        return current_count < limit, current_count, limit
     finally:
         if own_session:
             db.close()

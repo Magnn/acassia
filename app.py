@@ -1605,6 +1605,24 @@ def api_flows_blueprints():
         existing = db.query(models.FlowBlueprint).filter_by(tenant_id=tid, slug=slug).first()
         if existing:
             return jsonify({"ok": False, "error": "slug já existe neste tenant"}), 409
+
+        # Quota check (Frente 2.7) — limite de fluxos por plano
+        try:
+            import quota
+            current = db.query(models.FlowBlueprint).filter_by(tenant_id=tid).count()
+            allowed, current_count, limit = quota.check_state_quota(tid, "flows", current, db_session=db)
+            if not allowed:
+                return jsonify({
+                    "ok": False,
+                    "error": "quota_exceeded",
+                    "kind": "flows",
+                    "current": current_count,
+                    "limit": limit,
+                    "message": f"Seu plano permite {limit} fluxo(s). Faça upgrade pra criar mais.",
+                }), 402  # Payment Required
+        except Exception:
+            pass  # fail open
+
         doc = body.get("body") if isinstance(body.get("body"), dict) else {}
         row = models.FlowBlueprint(tenant_id=tid, slug=slug[:128], title=title[:300], body_json=doc)
         db.add(row)
@@ -2277,6 +2295,21 @@ def api_studio_agents():
         name = (body.get("name") or "").strip()
         if not name:
             return jsonify({"ok": False, "error": "name obrigatório"}), 400
+
+        # Quota check (Frente 2.8) — limite de agentes por plano
+        try:
+            import quota
+            current = db.query(models.StudioAgent).filter_by(tenant_id=tid).count()
+            allowed, current_count, limit = quota.check_state_quota(tid, "agents", current, db_session=db)
+            if not allowed:
+                return jsonify({
+                    "ok": False, "error": "quota_exceeded", "kind": "agents",
+                    "current": current_count, "limit": limit,
+                    "message": f"Seu plano permite {limit} agente(s). Faça upgrade pra criar mais.",
+                }), 402
+        except Exception:
+            pass
+
         avatar = (body.get("avatar") or "#7c3aed").strip()
         agent = models.StudioAgent(
             tenant_id=tid,
