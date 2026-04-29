@@ -1,7 +1,15 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, History, Play, Square } from 'lucide-react';
+import {
+  ArrowLeft,
+  HelpCircle,
+  History,
+  Play,
+  Redo2,
+  Square,
+  Undo2,
+} from 'lucide-react';
 import { blueprintsApi, type BlueprintDetail } from '../api/blueprints';
 import Canvas from '../builder/Canvas';
 import LintPanel from '../builder/LintPanel';
@@ -11,6 +19,7 @@ import { issuesByNode, lintGraph } from '../builder/lint';
 import { useFlowState } from '../builder/useFlowState';
 import Inspector from '../inspector/Inspector';
 import Simulator from '../simulator/Simulator';
+import ShortcutsModal from '../components/ShortcutsModal';
 import type { AcassiaDocument } from '../lib/types';
 import type { FlowNodeData } from '../lib/adapt';
 
@@ -57,8 +66,8 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   const [simOpen, setSimOpen] = useState(false);
   const [simCurrent, setSimCurrent] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ id: string; ts: number } | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
-  // Decora nodes com lintLevel + simActive sem mexer no estado real.
   const decoratedNodes = useMemo(
     () =>
       fs.nodes.map((n) => ({
@@ -87,6 +96,52 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
     if (!fs.selectedNodeId) return;
     fs.onNodesChange([{ type: 'select', id: fs.selectedNodeId, selected: false }]);
   }, [fs]);
+
+  // Atalhos globais do builder (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y, ?, Esc).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable);
+
+      const isMod = e.ctrlKey || e.metaKey;
+
+      if (isMod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        fs.undo();
+        return;
+      }
+      if (
+        (isMod && e.key.toLowerCase() === 'z' && e.shiftKey) ||
+        (isMod && e.key.toLowerCase() === 'y')
+      ) {
+        e.preventDefault();
+        fs.redo();
+        return;
+      }
+      if (e.key === '?' && !isTyping) {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (shortcutsOpen) {
+          setShortcutsOpen(false);
+          return;
+        }
+        if (fs.selectedNodeId) {
+          handleCloseInspector();
+          return;
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [fs, handleCloseInspector, shortcutsOpen]);
 
   const sidePanel = simOpen ? (
     <Simulator
@@ -131,6 +186,34 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           <span>
             {fs.nodes.length} nodes · {fs.edges.length} arestas
           </span>
+          <div className="flex items-center gap-1 border-l border-cigana-border pl-3">
+            <button
+              type="button"
+              onClick={fs.undo}
+              disabled={!fs.canUndo}
+              title="Desfazer (Ctrl+Z)"
+              className="p-1 rounded hover:bg-cigana-bg disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={fs.redo}
+              disabled={!fs.canRedo}
+              title="Refazer (Ctrl+Shift+Z)"
+              className="p-1 rounded hover:bg-cigana-bg disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShortcutsOpen(true)}
+              title="Atalhos (?)"
+              className="p-1 rounded hover:bg-cigana-bg"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <SaveIndicator status={fs.status} error={fs.error} />
           <button
             type="button"
@@ -175,6 +258,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
         </div>
         {sidePanel}
       </div>
+      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
 }

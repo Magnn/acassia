@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '../api/settings';
+import { toast } from '../lib/toast';
 import { MessageCircle, Clock, CreditCard, Save, CheckCircle2 } from 'lucide-react';
 
 export default function Settings() {
@@ -22,10 +23,10 @@ export default function Settings() {
     mutationFn: settingsApi.updateRecovery,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saas-settings'] });
-      alert('Cadência atualizada com sucesso!');
+      toast.success('Cadência de recuperação atualizada.');
     },
-    onError: (err: any) => {
-      alert(`Erro: ${err.message}`);
+    onError: (err: Error) => {
+      toast.error(`Falha ao salvar: ${err.message}`);
     },
   });
 

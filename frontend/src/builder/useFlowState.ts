@@ -13,11 +13,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { blueprintsApi } from '../api/blueprints';
 import { documentToReactFlow, type FlowNodeData } from '../lib/adapt';
 import { newId, reactFlowToDocument } from '../lib/serialize';
+import { toast } from '../lib/toast';
 import type { AcassiaDocument, AcassiaNodeType } from '../lib/types';
 
 export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
 const SAVE_DEBOUNCE_MS = 800;
+const HISTORY_DEBOUNCE_MS = 350;
+const HISTORY_MAX = 50;
+
+interface Snapshot {
+  nodes: Node<FlowNodeData>[];
+  edges: Edge[];
+}
 
 interface UseFlowStateOpts {
   blueprintId: number;
@@ -30,6 +38,17 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
   const [edges, setEdges] = useState<Edge[]>(initial.edges);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+
+  // Histórico para Undo/Redo. Snapshots são referências aos arrays React Flow
+  // (imutáveis após a mutação), então não custa memória adicional além do array.
+  const [history, setHistory] = useState<{ past: Snapshot[]; future: Snapshot[] }>(
+    { past: [], future: [] },
+  );
+  const lastSnapshotRef = useRef<Snapshot>({
+    nodes: initial.nodes,
+    edges: initial.edges,
+  });
+  const isRestoringRef = useRef(false);
 
   const docRef = useRef(initialDoc);
   const queryClient = useQueryClient();
@@ -45,6 +64,7 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     onError: (e) => {
       setStatus('error');
       setError((e as Error).message);
+      toast.error(`Falha ao salvar: ${(e as Error).message}`);
     },
   });
 
@@ -66,6 +86,58 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     dirtyAt.current = Date.now();
     setStatus('dirty');
   }, []);
+
+  // Captura snapshots do estado anterior 350ms após cada mudança "estabilizada".
+  // Estratégia: isRestoring=true durante undo/redo bloqueia push (evita loop).
+  useEffect(() => {
+    if (isRestoringRef.current) {
+      isRestoringRef.current = false;
+      lastSnapshotRef.current = { nodes, edges };
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      const prev = lastSnapshotRef.current;
+      if (prev.nodes === nodes && prev.edges === edges) return;
+      setHistory((h) => ({
+        past: [...h.past, prev].slice(-HISTORY_MAX),
+        future: [],
+      }));
+      lastSnapshotRef.current = { nodes, edges };
+    }, HISTORY_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [nodes, edges]);
+
+  const undo = useCallback(() => {
+    setHistory((h) => {
+      if (h.past.length === 0) return h;
+      const target = h.past[h.past.length - 1];
+      const newPast = h.past.slice(0, -1);
+      isRestoringRef.current = true;
+      setNodes(target.nodes);
+      setEdges(target.edges);
+      markDirty();
+      return {
+        past: newPast,
+        future: [{ nodes, edges }, ...h.future].slice(0, HISTORY_MAX),
+      };
+    });
+  }, [nodes, edges, markDirty]);
+
+  const redo = useCallback(() => {
+    setHistory((h) => {
+      if (h.future.length === 0) return h;
+      const target = h.future[0];
+      const newFuture = h.future.slice(1);
+      isRestoringRef.current = true;
+      setNodes(target.nodes);
+      setEdges(target.edges);
+      markDirty();
+      return {
+        past: [...h.past, { nodes, edges }].slice(-HISTORY_MAX),
+        future: newFuture,
+      };
+    });
+  }, [nodes, edges, markDirty]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<Node<FlowNodeData>>[]) => {
@@ -139,6 +211,10 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     onConnect,
     addNode,
     updateNode,
+    undo,
+    redo,
+    canUndo: history.past.length > 0,
+    canRedo: history.future.length > 0,
   };
 }
 
