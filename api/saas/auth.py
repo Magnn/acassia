@@ -217,7 +217,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def signup_user(email: str, password: str, name: Optional[str] = None) -> models.User:
     """
-    Cria User com tenant_id único.
+    Cria User com tenant_id único + 14d trial Pro automático (Frente 2.19).
 
     Raises:
         ValueError: email inválido, senha < 8 chars, ou email já registrado.
@@ -235,18 +235,30 @@ def signup_user(email: str, password: str, name: Optional[str] = None) -> models
         if existing:
             raise ValueError("email já registrado")
 
+        # Trial farming guard: same email já bloqueado acima.
+        # TODO Frente 2.19: bloquear same phone, same Stripe card.
+
+        from datetime import timedelta
+
         tenant_id = f"tenant_{secrets.token_hex(8)}"
+        now = datetime.now(timezone.utc)
         user = models.User(
             tenant_id=tenant_id,
             email=email,
             password_hash=hash_password(password),
             name=(name or "").strip()[:200] or None,
             is_active=True,
+            # Trial 14d Pro automático
+            trial_started_at=now,
+            trial_ends_at=now + timedelta(days=14),
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-        logger.info("[saas_auth] signup ok email=%s tenant=%s", email, tenant_id)
+        logger.info(
+            "[saas_auth] signup ok email=%s tenant=%s trial_ends=%s",
+            email, tenant_id, user.trial_ends_at.isoformat() if user.trial_ends_at else None,
+        )
         return user
     finally:
         db.close()
