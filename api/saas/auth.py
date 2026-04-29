@@ -93,6 +93,21 @@ login_manager = LoginManager()
 login_manager.login_view = "saas_auth.login"
 
 
+@login_manager.unauthorized_handler
+def _on_unauthorized():
+    """
+    Override default (redirect /saas/auth/login) — quando a request é JSON ou
+    aceita JSON, retorna 401 com payload em vez de redirect 302. Mantém
+    redirect tradicional pra requests HTML (login form).
+    """
+    if request.is_json or (
+        request.accept_mimetypes.accept_json
+        and not request.accept_mimetypes.accept_html
+    ):
+        return jsonify({"error": "unauthorized"}), 401
+    return redirect(url_for("saas_auth.login", next=request.path))
+
+
 # ─── Wrapper pra session de flask-login ──────────────────────────────────────
 
 

@@ -176,6 +176,20 @@ def _try_claim_wamid_db(wamid: str) -> bool:
 
 # ── INICIALIZAÇÃO DA APLICAÇÃO ───────────────────────────────────────
 app = Flask(__name__)
+
+# Secret key — necessária para sessions (flask-login flash, CSRF, etc).
+# Em prod, defina FLASK_SECRET_KEY no .env (estável; mudar invalida sessões).
+# Em dev, gera uma chave volátil ao subir (sessões morrem ao reiniciar — OK).
+import secrets as _secrets_module
+_secret = (os.getenv("FLASK_SECRET_KEY") or "").strip()
+if not _secret:
+    _secret = _secrets_module.token_urlsafe(48)
+    logger.warning(
+        "⚠️ [SECURITY] FLASK_SECRET_KEY não definida — usando chave volátil (sessões morrem ao restart). "
+        "Em prod, defina no .env.",
+    )
+app.config["SECRET_KEY"] = _secret
+
 CORS(app) # Libera acesso para o Dashboard não ser bloqueado
 
 # ─────────────────────────────────────────────────────────────────────
