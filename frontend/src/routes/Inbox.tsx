@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inboxApi } from '../api/inbox';
+import { toast } from '../lib/toast';
 import { Clock, MessageSquare, PauseCircle, PlayCircle, Send, User } from 'lucide-react';
 
 export default function Inbox() {
   const [filtro, setFiltro] = useState('todos');
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -28,7 +30,29 @@ export default function Inbox() {
       queryClient.invalidateQueries({ queryKey: ['inbox-conversation', selectedLeadId] });
       queryClient.invalidateQueries({ queryKey: ['inbox-leads'] });
     },
+    onError: (e) => toast.error((e as Error).message),
   });
+
+  const sendMutation = useMutation({
+    mutationFn: ({ leadId, text }: { leadId: number; text: string }) =>
+      inboxApi.sendMessage(leadId, text),
+    onSuccess: () => {
+      setDraft('');
+      queryClient.invalidateQueries({ queryKey: ['inbox-conversation', selectedLeadId] });
+      queryClient.invalidateQueries({ queryKey: ['inbox-leads'] });
+    },
+    onError: (e) => toast.error(`Falha ao enviar: ${(e as Error).message}`),
+  });
+
+  const handleSend = () => {
+    const text = draft.trim();
+    if (!text || selectedLeadId == null) return;
+    if (!lead?.bot_pausado) {
+      if (!confirm('O bot ainda está ativo neste lead. Enviar mesmo assim pode atropelar a conversa do robô. Continuar?'))
+        return;
+    }
+    sendMutation.mutate({ leadId: selectedLeadId, text });
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -210,17 +234,61 @@ export default function Inbox() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Chat Input (Disabled for now) */}
-            <div className="h-[72px] bg-white border-t border-slate-200 p-4 flex items-center gap-3 flex-shrink-0 z-10">
-              <input
-                type="text"
-                placeholder="A API de envio manual será conectada na Fase 4..."
-                disabled
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none cursor-not-allowed opacity-60"
-              />
-              <button disabled className="w-10 h-10 bg-cigana-purple/50 text-white rounded-xl flex items-center justify-center cursor-not-allowed">
-                <Send className="w-4 h-4" />
-              </button>
+            {/* Chat Input — manda via /api/leads/:id/send */}
+            <div className="bg-white border-t border-slate-200 p-3 flex-shrink-0 z-10 space-y-2">
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder={
+                    lead?.bot_pausado
+                      ? 'Mensagem manual (Enter envia)…'
+                      : 'Pause o bot pra assumir, ou envie mesmo assim…'
+                  }
+                  disabled={sendMutation.isPending}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-cigana-purple disabled:opacity-60"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={sendMutation.isPending || !draft.trim()}
+                  className="w-10 h-10 bg-cigana-purple text-white rounded-xl flex items-center justify-center hover:brightness-110 disabled:bg-cigana-purple/40 disabled:cursor-not-allowed"
+                  title="Enviar (Enter)"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+              {selectedLeadId != null && (
+                <div className="flex items-center justify-end gap-2 text-[11px]">
+                  <button
+                    onClick={() => inboxApi.resumeLastUser(selectedLeadId).then(() => {
+                      toast.success('Reprocessando última mensagem do lead.');
+                      queryClient.invalidateQueries({ queryKey: ['inbox-conversation', selectedLeadId] });
+                    }).catch((e) => toast.error((e as Error).message))}
+                    className="text-slate-500 hover:text-cigana-purple"
+                    title="Roda de novo a última mensagem do lead pelo motor"
+                  >
+                    ↻ reprocessar última
+                  </button>
+                  <span className="text-slate-300">·</span>
+                  <button
+                    onClick={() => inboxApi.resendCurrentBlock(selectedLeadId).then(() => {
+                      toast.success('Reenviando bloco atual.');
+                      queryClient.invalidateQueries({ queryKey: ['inbox-conversation', selectedLeadId] });
+                    }).catch((e) => toast.error((e as Error).message))}
+                    className="text-slate-500 hover:text-cigana-purple"
+                    title="Reenvia o bloco atual do funil"
+                  >
+                    ⟳ reenviar bloco
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}

@@ -34,6 +34,11 @@ export interface ConversationData {
   messages: LeadMessage[];
 }
 
+export interface LeadAction {
+  ok: boolean;
+  message?: string;
+}
+
 export const inboxApi = {
   getLeads: (filtro = 'todos') =>
     api.get<{ items: LeadPreview[]; filtro: string }>(
@@ -47,4 +52,20 @@ export const inboxApi = {
     api.post<{ status: string; bot_pausado: boolean }>(
       `/saas/inbox/${leadId}/takeover/data`,
     ),
+
+  // Ações expostas pelo motor (app.py) — texto livre para tarólogo intervir.
+  sendMessage: (leadId: number, text: string) =>
+    api.post<LeadAction>(`/api/leads/${leadId}/send`, { text }),
+
+  pauseBot: (leadId: number) =>
+    api.post<LeadAction>(`/api/leads/${leadId}/pause`),
+
+  resumeLastUser: (leadId: number) =>
+    api.post<LeadAction>(`/api/leads/${leadId}/resume-last-user`),
+
+  resendCurrentBlock: (leadId: number) =>
+    api.post<LeadAction>(`/api/leads/${leadId}/resend-current-block`),
+
+  advanceNode: (leadId: number, target?: string) =>
+    api.post<LeadAction>(`/api/leads/${leadId}/advance-node`, { target }),
 };
