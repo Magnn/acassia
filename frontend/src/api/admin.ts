@@ -290,6 +290,56 @@ export const adminApi = {
   removeTenantFlag: (tenantId: string, key: string) =>
     api.del<{ ok: boolean }>(`/api/admin/tenants/${tenantId}/feature-flags/${key}`),
 
+  // Métricas de negócio (Frente 1.14)
+  metricsSummary: () =>
+    api.get<{
+      mrr_brl_cents: number;
+      mrr_brl: number;
+      active_tenants: number;
+      paying_tenants: number;
+      new_signups_30d: number;
+      churned_30d: number;
+      churn_rate_30d_pct: number;
+      arpu_brl_cents: number;
+      arpu_brl: number;
+      ltv_brl_cents: number | null;
+      ltv_brl: number | null;
+      ltv_unbounded: boolean;
+      trial_expiring_7d: number;
+      dunning_count: number;
+      plans_distribution: Record<string, number>;
+      computed_at: string;
+    }>('/api/admin/metrics/summary'),
+  metricsMRRHistory: (months = 12) =>
+    api.get<{
+      history: Array<{ month: string; mrr_brl: number; mrr_brl_cents: number; paying_tenants: number }>;
+      months: number;
+    }>(`/api/admin/metrics/mrr-history?months=${months}`),
+  metricsCohort: (months = 12) =>
+    api.get<{
+      cohorts: Array<{
+        cohort: string;
+        size: number;
+        retention: Array<null | { month_offset: number; retained: number; pct: number }>;
+        low_confidence: boolean;
+      }>;
+      months_tracked: number;
+    }>(`/api/admin/metrics/cohort?months=${months}`),
+  metricsFunnel: () =>
+    api.get<{
+      steps: Array<{ key: string; label: string; count: number; pct_total: number; drop_pct?: number }>;
+      period_days: number;
+      computed_at: string;
+    }>('/api/admin/metrics/funnel'),
+  metricsTopTenants: (by: 'mrr' | 'msgs_30d' | 'leads_30d' = 'mrr', limit = 10) =>
+    api.get<{
+      tenants: Array<{
+        tenant_id: string; user_id: number; email: string; name: string | null;
+        mrr_brl: number; leads_30d: number; msgs_30d: number;
+      }>;
+      ordered_by: string;
+    }>(`/api/admin/metrics/top-tenants?by=${by}&limit=${limit}`),
+
   // Audit (Frente 1.12)
   listAudit: (params: { event_type?: string; actor_user_id?: number; tenant_id?: string; since?: string; until?: string; search?: string; cursor?: number; limit?: number } = {}) => {
     const q = new URLSearchParams();

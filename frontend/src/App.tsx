@@ -27,6 +27,7 @@ const SettingsPlaceholder = lazy(() => import('./routes/settings/Placeholder'));
 // Admin God-Mode (Frente 1)
 const AdminTenants = lazy(() => import('./routes/admin/Tenants'));
 const AdminTenantDetail = lazy(() => import('./routes/admin/TenantDetail'));
+const AdminMetrics = lazy(() => import('./routes/admin/Metrics'));
 const AdminSetup2FA = lazy(() => import('./routes/admin/Setup2FA'));
 const AdminRecover = lazy(() => import('./routes/admin/Recover'));
 
@@ -139,6 +140,7 @@ export default function App() {
             <Route index element={<Navigate to="/admin/tenants" replace />} />
             <Route path="tenants" element={<AdminTenants />} />
             <Route path="tenants/:tenantId" element={<AdminTenantDetail />} />
+            <Route path="metrics" element={<AdminMetrics />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
