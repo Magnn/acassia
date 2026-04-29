@@ -352,7 +352,19 @@ def run_hourly():
     hourly_quota_warnings()
     hourly_apply_pending_downgrades()
     hourly_fire_lunar_triggers()
+    hourly_dispatch_daily_horoscopes()
     logger.info("[cron] hourly done")
+
+
+def hourly_dispatch_daily_horoscopes():
+    """Dispara horoscopo diario para tenants cuja hora local bateu (Frente 4.13)."""
+    try:
+        import horoscope as horoscope_engine
+        n = horoscope_engine.hourly_dispatch_due_tenants()
+        if n:
+            logger.info("[cron.hourly_dispatch_daily_horoscopes] tenants_processed=%d", n)
+    except Exception as exc:
+        logger.warning("[cron.daily_horoscope] falha: %s", exc)
 
 
 def hourly_apply_pending_downgrades():

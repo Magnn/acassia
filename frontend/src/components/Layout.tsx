@@ -16,6 +16,7 @@ import {
   CreditCard,
   ShieldCheck,
   Store,
+  Sparkles,
 } from 'lucide-react';
 import Logo, { Wordmark } from './Logo';
 import { useTheme } from '../context/ThemeContext';
@@ -42,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/voice', icon: Bot, label: 'Voice IA', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/coach', icon: Bot, label: 'Cigana Coach', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/lunar', icon: Bot, label: 'Lunar', group: 'oraculo', roles: ['admin', 'user'] },
+  { to: '/horoscope', icon: Sparkles, label: 'Horóscopo Diário', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/affiliate', icon: CreditCard, label: 'Afiliados', group: 'conta', roles: ['admin', 'user'] },
   { to: '/agents', icon: Bot, label: 'Atendentes', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo', roles: ['admin'] },

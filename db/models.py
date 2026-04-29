@@ -7,7 +7,7 @@ Multi-tenant (tenant_id), Studio AcassIA, mensagens com media_url.
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Text, Float,
-    DateTime, ForeignKey, Boolean, JSON, UniqueConstraint,
+    DateTime, Date, ForeignKey, Boolean, JSON, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -67,6 +67,13 @@ class Lead(Base):
     convertido = Column(Boolean, default=False, index=True)
     produto_comprado = Column(String(200), nullable=True)
     bot_pausado = Column(Boolean, default=False, index=True)
+
+    # Astrologia (Frente 4.3 / 4.13)
+    birth_date = Column(Date, nullable=True)
+    signo = Column(String(20), nullable=True, index=True)
+    timezone = Column(String(60), nullable=True)  # IANA tz; default tenant-level
+    # consents: {daily_horoscope: bool, marketing: bool, ...} — LGPD
+    consents = Column(JSON, default=dict, nullable=False)
 
     criado_em = Column(DateTime(timezone=True), default=_agora_utc)
     atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
@@ -1030,3 +1037,67 @@ class PaymentEventReceipt(Base):
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
     raw_payload = Column(JSON, default=dict)
     processed_at = Column(DateTime(timezone=True), default=_agora_utc, index=True)
+
+
+class DailyHoroscope(Base):
+    """
+    Cache de horoscopo diario por signo (Frente 4.13).
+
+    PK composto (date, signo, lang) — uma geracao por signo/idioma/dia.
+    Compartilhado entre tenants (idempotencia global por dia) — assim economiza
+    tokens Gemini quando 100 tenants pedem o mesmo signo no mesmo dia.
+    """
+    __tablename__ = "daily_horoscopes"
+    __table_args__ = (
+        UniqueConstraint("date", "signo", "lang", name="uq_daily_horoscope_date_sign_lang"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False, index=True)
+    signo = Column(String(20), nullable=False, index=True)
+    lang = Column(String(8), default="pt-BR", nullable=False)
+    text = Column(Text, nullable=False)
+    source = Column(String(40), nullable=False)         # gemini|manual|external_api
+    generated_by = Column(String(80), nullable=True)    # model_id ou autor
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class HoroscopeAutomation(Base):
+    """
+    Configuracao por tenant da automacao de horoscopo diario (Frente 4.13).
+    """
+    __tablename__ = "horoscope_automations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, unique=True, index=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    send_hour_local = Column(Integer, default=7, nullable=False)   # 0-23
+    timezone = Column(String(60), default="America/Sao_Paulo", nullable=False)
+    source = Column(String(20), default="gemini", nullable=False)  # gemini|manual
+    # segment: 'all' | 'hot' | 'warm' | 'hot_warm'
+    segment_filter = Column(String(20), default="all", nullable=False)
+    custom_prefix = Column(Text, nullable=True)   # texto fixo antes do horoscopo
+    last_run_date = Column(Date, nullable=True)   # ultima data UTC processada
+    total_sent = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False)
+
+
+class HoroscopeDelivery(Base):
+    """
+    Log de envios diarios de horoscopo (idempotencia + analytics).
+    Garante que mesmo (tenant, lead, date) nao envia duas vezes.
+    """
+    __tablename__ = "horoscope_deliveries"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "lead_id", "date", name="uq_horoscope_delivery_tenant_lead_date"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    signo = Column(String(20), nullable=False)
+    status = Column(String(20), default="sent", nullable=False)  # sent|failed|opted_out|skipped
+    error_message = Column(Text, nullable=True)
+    sent_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
