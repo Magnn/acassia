@@ -1,78 +1,55 @@
+"""
+WhatsApp client legado — agora um shim por cima do sistema multi-provider.
+
+Mantém a API ``whatsapp_client.enviar_mensagem(...)`` que o motor já usa,
+mas internamente delega pro provider configurado do tenant em curso. Em
+runtime, o tenant é resolvido via ``tenant_context.get_request_tenant_id``
+quando há request Flask, ou via env ``ACASSIA_TENANT_ID`` (default)
+em workers / threads.
+
+Para uso explícito multi-tenant, use:
+
+    from api.whatsapp_providers import get_provider_for_tenant
+    p = get_provider_for_tenant(tenant_id)
+    p.enviar_mensagem(...)
+"""
+
+from __future__ import annotations
+
 import logging
 import os
 
-import requests
 from dotenv import load_dotenv
+
+from api.whatsapp_providers import get_provider_for_tenant
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT_CONNECT = 5   # segundos para estabelecer conexão
-_TIMEOUT_READ    = 15  # segundos para receber a resposta completa
+
+def _current_tenant_id() -> str:
+    try:
+        from flask import has_request_context
+        from tenant_context import get_request_tenant_id
+
+        if has_request_context():
+            return get_request_tenant_id()
+    except Exception:
+        pass
+    return os.getenv("ACASSIA_TENANT_ID", "default")
 
 
 class WhatsAppAPI:
-    def __init__(self):
-        self.token    = os.getenv("WEBAPP_TOKEN")
-        self.phone_id = os.getenv("PHONE_NUMBER_ID")
-        self.version  = "v21.0"
-        self.base_url = (
-            f"https://graph.facebook.com/{self.version}/{self.phone_id}/messages"
-        )
-        self.headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
-        }
+    """
+    Compat shim: mantém a forma do client antigo (singleton, método
+    enviar_mensagem) mas resolve provider per-tenant em cada chamada.
+    """
 
     def enviar_mensagem(self, numero: str, conteudo: str, formato: str = "texto") -> bool:
-        if not conteudo or str(conteudo).strip() == "":
-            return False
-
-        payload: dict = {"messaging_product": "whatsapp", "to": numero}
-
-        if formato == "texto":
-            payload["type"] = "text"
-            payload["text"] = {"body": conteudo}
-        elif formato == "audio":
-            payload["type"] = "audio"
-            payload["audio"] = {"link": conteudo}
-        elif formato == "imagem":
-            payload["type"] = "image"
-            payload["image"] = {"link": conteudo}
-        else:
-            logger.warning("[WhatsAppAPI] formato desconhecido: %s", formato)
-            return False
-
-        try:
-            response = requests.post(
-                self.base_url,
-                json=payload,
-                headers=self.headers,
-                timeout=(_TIMEOUT_CONNECT, _TIMEOUT_READ),
-            )
-            if response.status_code == 200:
-                logger.info("[WhatsAppAPI] %s enviado para %s", formato.upper(), numero)
-                return True
-            logger.error(
-                "[WhatsAppAPI] HTTP %s para %s — body: %s",
-                response.status_code,
-                numero,
-                (response.text or "")[:300],
-            )
-            return False
-        except requests.exceptions.Timeout:
-            logger.error(
-                "[WhatsAppAPI] Timeout ao enviar %s para %s (connect=%ss read=%ss)",
-                formato, numero, _TIMEOUT_CONNECT, _TIMEOUT_READ,
-            )
-            return False
-        except requests.exceptions.ConnectionError as exc:
-            logger.error("[WhatsAppAPI] Erro de conexão ao enviar para %s: %s", numero, exc)
-            return False
-        except requests.exceptions.RequestException as exc:
-            logger.error("[WhatsAppAPI] Erro inesperado ao enviar para %s: %s", numero, exc)
-            return False
+        tid = _current_tenant_id()
+        provider = get_provider_for_tenant(tid)
+        return provider.enviar_mensagem(numero, conteudo, formato=formato)
 
 
 whatsapp_client = WhatsAppAPI()

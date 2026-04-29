@@ -16,6 +16,7 @@ const Runs = lazy(() => import('./routes/Runs'));
 const TenantConfig = lazy(() => import('./routes/TenantConfig'));
 const Integrations = lazy(() => import('./routes/Integrations'));
 const AgentStudio = lazy(() => import('./routes/AgentStudio'));
+const WhatsAppConnect = lazy(() => import('./routes/WhatsAppConnect'));
 
 function PageFallback() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/blueprints" element={<BlueprintsList />} />
             <Route path="/agents" element={<AgentStudio />} />
             <Route path="/runs" element={<Runs />} />
+            <Route path="/whatsapp" element={<WhatsAppConnect />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/tenant-config" element={<TenantConfig />} />
             <Route path="/settings" element={<Settings />} />

@@ -169,6 +169,41 @@ def _try_claim_wamid_db(wamid: str) -> bool:
 app = Flask(__name__)
 CORS(app) # Libera acesso para o Dashboard não ser bloqueado
 
+# ─────────────────────────────────────────────────────────────────────
+# REGISTRO DE BLUEPRINTS SaaS
+# Os blueprints abaixo definem rotas /saas/* consumidas pelo painel React.
+# Se algum import falhar, deixa o erro subir — sem fail silencioso.
+# ─────────────────────────────────────────────────────────────────────
+def _register_saas_blueprints():
+    from api.saas.auth import auth_bp, login_manager
+    from api.saas.onboarding import onboarding_bp
+    from api.saas.inbox import inbox_bp
+    from api.saas.metrics import metrics_bp
+    from api.saas.settings import settings_bp
+    from api.saas.connect import connect_bp
+    from api.saas.billing import billing_bp
+    from api.saas.whatsapp import whatsapp_bp
+
+    login_manager.init_app(app)
+    for bp in (
+        auth_bp,
+        onboarding_bp,
+        inbox_bp,
+        metrics_bp,
+        settings_bp,
+        connect_bp,
+        billing_bp,
+        whatsapp_bp,
+    ):
+        app.register_blueprint(bp)
+
+
+try:
+    _register_saas_blueprints()
+except Exception as _e:
+    logger.error("[SAAS] Falha registrando blueprints: %s", _e)
+    raise
+
 # Sincronização Obrigatória do Banco de Dados
 def _ensure_mensagens_media_url_column():
     """Migração leve para bancos existentes: garante `mensagens.media_url`."""
