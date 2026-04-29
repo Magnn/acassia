@@ -868,11 +868,18 @@ def registrar_frases_proibidas(texto: str, contexto: str = "") -> None:
         )
 
 
+_RE_NAME_LABEL_PREFIX = re.compile(
+    r"^\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ '\-]{1,40}(?:\s+[\U0001F300-\U0001FAFF\U00002600-\U000027BF]+)+\s*[:\-—]\s*",
+)
+
+
 def aplicar_substituicoes_proibidas(texto: str) -> str:
     """Substitui ocorrências conhecidas por alternativas seguras."""
     if not texto:
         return ""
     s = texto
+    # Remove rótulo "Nome 📊👨🏻💻💰:" / "Nome 🌟:" que vaza de cabeçalhos de chat coladinhos.
+    s = _RE_NAME_LABEL_PREFIX.sub("", s)
     for pat, repl in _FRASES_PROIBIDAS:
         s = pat.sub(repl, s)
     s = _RE_10_ANOS_SOZINHO.sub("há anos cuido de casos como o seu", s)
