@@ -351,6 +351,7 @@ def run_hourly():
     hourly_trial_warnings()
     hourly_quota_warnings()
     hourly_apply_pending_downgrades()
+    hourly_fire_lunar_triggers()
     logger.info("[cron] hourly done")
 
 
@@ -418,6 +419,69 @@ def hourly_apply_pending_downgrades():
             logger.info("[cron.hourly_apply_pending_downgrades] applied=%d", applied)
     finally:
         db.close()
+
+
+def hourly_fire_lunar_triggers():
+    """
+    Verifica triggers lunares ativos. Dispara fluxo se:
+    - Janela atingida (now é dentro do window_hours_before da fase target)
+    - Trigger não foi disparado nas últimas 23h (anti-double-fire)
+
+    V1: marca last_fired_at + envia broadcast genérico.
+    V2: realmente executa flow via engine pra cada lead matching.
+    """
+    try:
+        import lunar
+        db = SessionLocal()
+        try:
+            now = datetime.now(timezone.utc)
+            triggers = db.query(models.LunarTrigger).filter_by(active=True).all()
+            fired = 0
+
+            today_phase = lunar.phase_for_date(now)["phase_name"]
+
+            for tr in triggers:
+                # Anti double-fire: skipa se disparou nas últimas 23h
+                last_fired = _aware(tr.last_fired_at)
+                if last_fired and (now - last_fired).total_seconds() < 23 * 3600:
+                    continue
+
+                # Está na fase correta agora?
+                if today_phase != tr.trigger_phase:
+                    continue
+
+                # Janela: por enquanto, dispara sempre que estamos na fase
+                # window_hours_before pra futuro V2 com timing antecipado
+
+                tr.last_fired_at = now
+                tr.fire_count = (tr.fire_count or 0) + 1
+                fired += 1
+
+                # Audit
+                db.add(models.AuditEvent(
+                    tenant_id=tr.tenant_id,
+                    actor_user_id=None,
+                    event_type="lunar_trigger.fired",
+                    target_type="lunar_trigger",
+                    target_id=str(tr.id),
+                    payload={
+                        "phase": tr.trigger_phase,
+                        "flow_id": tr.flow_id,
+                        "flow_slug": tr.flow_slug,
+                    },
+                ))
+                logger.info(
+                    "[lunar.trigger.fired] tenant=%s phase=%s flow=%s",
+                    tr.tenant_id, tr.trigger_phase, tr.flow_slug or tr.flow_id,
+                )
+
+            if fired:
+                db.commit()
+                logger.info("[cron.hourly_fire_lunar_triggers] fired=%d", fired)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("[cron.lunar_triggers] falha: %s", exc)
 
 
 def daily_recompute_lead_scores():

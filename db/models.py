@@ -704,6 +704,23 @@ class TarotCard(Base):
     keywords = Column(JSON, nullable=True)
 
 
+class LunarTrigger(Base):
+    """Gatilho lunar pra disparar fluxos automáticos (Frente 4.2)."""
+    __tablename__ = "lunar_triggers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    flow_id = Column(Integer, nullable=True)
+    flow_slug = Column(String(120), nullable=True)
+    trigger_phase = Column(String(20), nullable=False)  # nova|crescente|cheia|minguante
+    window_hours_before = Column(Integer, default=0, nullable=False)
+    segment_filter = Column(JSON, nullable=True)  # {tags: [...], score_band: 'hot', etc}
+    active = Column(Boolean, default=True, nullable=False)
+    last_fired_at = Column(DateTime(timezone=True), nullable=True)
+    fire_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class LunarPhase(Base):
     """Cache de fases lunares pré-calculadas (Frente 4.1)."""
     __tablename__ = "lunar_phases"

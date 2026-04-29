@@ -1312,6 +1312,135 @@ class Engine:
                     else:
                         falhas += 1
 
+                elif acao.tipo == "pix":
+                    # Frente 7.1 — gera Pix QR + envia QR + texto copia-e-cola
+                    try:
+                        meta = getattr(acao, "metadata", None) or {}
+                        amount = float(meta.get("amount_brl") or 0)
+                        description = str(meta.get("description") or acao.conteudo or "Pagamento")
+                        expires_min = int(meta.get("expires_min") or 30)
+                        if amount <= 0:
+                            logger.warning("[engine.pix] amount inválido — pulando")
+                            continue
+                        from api.payments.pix_provider import create_pix_mercadopago, PixProviderError
+                        try:
+                            result = create_pix_mercadopago(
+                                tenant_id=getattr(self, "tenant_id", None) or "default",
+                                amount_brl=amount,
+                                description=description,
+                                expires_min=expires_min,
+                                external_reference=f"lead_{lead_id}",
+                            )
+                            # Persiste PixPayment
+                            from db import models as _models
+                            pix_row = _models.PixPayment(
+                                tenant_id=getattr(self, "tenant_id", None) or "default",
+                                lead_id=lead_id,
+                                provider="mercadopago",
+                                provider_payment_id=result.provider_payment_id,
+                                amount_brl_cents=result.amount_brl_cents,
+                                description=description,
+                                qr_code_image_url=result.qr_code_image_url,
+                                qr_code_text=result.qr_code_text,
+                                expires_at=result.expires_at,
+                                status="pending",
+                                raw_response=result.raw,
+                            )
+                            db.add(pix_row)
+                            db.commit()
+
+                            # Envia mensagem com QR + copia-e-cola
+                            msg_text = (
+                                f"💜 Pagamento de R${amount:.2f} — {description}\n\n"
+                                f"📱 Copia e cola:\n{result.qr_code_text}\n\n"
+                                f"⏱ Vence em {expires_min} minutos."
+                            )
+                            if self._enviar_com_retry(ctx.telefone, "text", msg_text):
+                                _registrar_source_entregue(acao)
+                                self._salvar_mensagem(db, lead_id, "bot", msg_text, "text", auto_commit=False)
+                                enviados += 1
+                                pendentes_db += 1
+                                if pendentes_db >= batch_commit:
+                                    db.commit()
+                                    pendentes_db = 0
+                            else:
+                                falhas += 1
+                        except PixProviderError as exc:
+                            logger.warning(f"⚠️ [PIX] Falha provider: {exc}")
+                            falhas += 1
+                    except Exception as e:
+                        logger.warning(f"⚠️ [PIX] erro inesperado: {e}")
+                        falhas += 1
+
+                elif acao.tipo == "voice_clone":
+                    # Frente 4.16 — gera TTS na voz clonada e manda como audio
+                    try:
+                        meta = getattr(acao, "metadata", None) or {}
+                        text = (acao.conteudo or meta.get("text") or "").strip()
+                        clone_id = meta.get("voice_clone_id")
+                        if not text or not clone_id:
+                            logger.warning("[engine.voice_clone] missing text/clone_id")
+                            continue
+                        from db import models as _models
+                        clone = db.query(_models.VoiceClone).filter_by(id=int(clone_id)).first()
+                        if not clone or clone.deleted_at:
+                            logger.warning("[engine.voice_clone] clone %s não disponível", clone_id)
+                            continue
+                        import voice_provider as vp
+                        try:
+                            audio_bytes = vp.synthesize_elevenlabs(
+                                tenant_id=clone.tenant_id,
+                                voice_id=clone.provider_voice_id,
+                                text=text,
+                            )
+                            # Salva em /media/voice/
+                            import os, secrets
+                            audio_dir = os.path.join(
+                                os.path.dirname(os.path.abspath(__file__)),
+                                "media", "voice",
+                            )
+                            os.makedirs(audio_dir, exist_ok=True)
+                            file_id = secrets.token_hex(8)
+                            filename = f"{clone.tenant_id}_engine_{file_id}.mp3"
+                            filepath = os.path.join(audio_dir, filename)
+                            with open(filepath, "wb") as f:
+                                f.write(audio_bytes)
+
+                            # Audio URL pública (servidor próprio)
+                            audio_url = f"/media/voice/{filename}"
+
+                            # Send via WA com tag voice
+                            if self._enviar_com_retry(
+                                ctx.telefone, "audio", audio_url, audio_voice=True,
+                            ):
+                                _registrar_source_entregue(acao)
+                                self._salvar_mensagem(db, lead_id, "bot", "[voice_clone]", "audio", auto_commit=False)
+                                # Track AudioGeneration
+                                db.add(_models.AudioGeneration(
+                                    tenant_id=clone.tenant_id,
+                                    voice_clone_id=clone.id,
+                                    text=text[:2000],
+                                    chars_count=len(text),
+                                    audio_url=audio_url,
+                                    provider="elevenlabs",
+                                    status="done",
+                                ))
+                                enviados += 1
+                                pendentes_db += 1
+                                if pendentes_db >= batch_commit:
+                                    db.commit()
+                                    pendentes_db = 0
+                                time.sleep(delay_escuta_pos_audio())
+                                ultimo_tipo_enviado = "audio"
+                            else:
+                                falhas += 1
+                        except vp.VoiceProviderError as exc:
+                            logger.warning(f"⚠️ [VOICE] {exc}")
+                            falhas += 1
+                    except Exception as e:
+                        logger.warning(f"⚠️ [VOICE] erro inesperado: {e}")
+                        falhas += 1
+
                 else:
                     payload_url = acao.url or acao.conteudo
                     if acao.tipo in ("image", "video") and ultimo_tipo_enviado == "text":
