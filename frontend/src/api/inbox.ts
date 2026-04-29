@@ -10,6 +10,10 @@ export interface LeadPreview {
   opt_out: boolean;
   ultima_msg: string;
   ultima_em: string | null;
+  ultima_remetente?: string | null;
+  score_value?: number;
+  score_band?: 'hot' | 'warm' | 'cold';
+  tags?: string[];
 }
 
 export interface LeadMessage {
@@ -39,11 +43,39 @@ export interface LeadAction {
   message?: string;
 }
 
+export interface InboxListResp {
+  items: LeadPreview[];
+  filtro: string;
+  total: number;
+  sort: string;
+  score_band: string | null;
+}
+
 export const inboxApi = {
-  getLeads: (filtro = 'todos') =>
-    api.get<{ items: LeadPreview[]; filtro: string }>(
-      `/saas/inbox/data?filtro=${encodeURIComponent(filtro)}`,
-    ),
+  getLeads: (params: {
+    filtro?: string;
+    score_band?: string;
+    search?: string;
+    sort?: 'recency' | 'score' | 'name';
+    limit?: number;
+  } = {}) => {
+    const q = new URLSearchParams();
+    if (params.filtro) q.set('filtro', params.filtro);
+    if (params.score_band) q.set('score_band', params.score_band);
+    if (params.search) q.set('search', params.search);
+    if (params.sort) q.set('sort', params.sort);
+    if (params.limit) q.set('limit', String(params.limit));
+    const qs = q.toString();
+    return api.get<InboxListResp>(`/saas/inbox/data${qs ? '?' + qs : ''}`);
+  },
+
+  refreshLeadScore: (leadId: number) =>
+    api.post<{
+      ok: boolean;
+      score_value: number;
+      score_band: string;
+      components: Record<string, number>;
+    }>(`/saas/inbox/${leadId}/score/refresh`),
 
   getConversation: (leadId: number) =>
     api.get<ConversationData>(`/saas/inbox/${leadId}/data`),

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { inboxApi } from '../api/inbox';
 import { toast } from '../lib/toast';
+import ScoreBadge from '../components/ScoreBadge';
 
 type ViewMode = 'chat' | 'table';
 
@@ -29,7 +30,7 @@ export default function Leads() {
 
   const { data: leadsData, isLoading: isLoadingLeads } = useQuery({
     queryKey: ['leads-list', filtro],
-    queryFn: () => inboxApi.getLeads(filtro),
+    queryFn: () => inboxApi.getLeads({ filtro, sort: 'score', limit: 200 }),
     refetchInterval: 10000,
   });
 
@@ -147,12 +148,17 @@ export default function Leads() {
                 {selectedLeadId === l.id && (
                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-amethyst rounded-r-full shadow-[0_0_15px_rgba(var(--accent-amethyst-rgb),0.5)]" />
                 )}
-                <div className="flex justify-between items-start mb-1">
-                  <div className="font-black text-sm truncate pr-2 tracking-tight group-hover:text-accent-amethyst transition-colors">
-                    {l.nome || l.telefone}
+                <div className="flex justify-between items-start mb-1 gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {l.score_band && l.score_band !== 'cold' && (
+                      <ScoreBadge band={l.score_band} value={l.score_value} />
+                    )}
+                    <div className="font-black text-sm truncate tracking-tight group-hover:text-accent-amethyst transition-colors">
+                      {l.nome || l.telefone}
+                    </div>
                   </div>
                   {l.ultima_em && (
-                    <div className="text-[9px] text-secondary font-black tabular-nums">
+                    <div className="text-[9px] text-secondary font-black tabular-nums flex-shrink-0">
                       {new Date(l.ultima_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   )}
@@ -242,7 +248,10 @@ export default function Leads() {
                                </div>
                             </td>
                             <td className="py-5 px-8">
-                               <div className="flex gap-2">
+                               <div className="flex gap-2 flex-wrap">
+                                  {l.score_band && (
+                                    <ScoreBadge band={l.score_band} value={l.score_value} />
+                                  )}
                                   {l.bot_pausado ? (
                                     <span className="bg-amber-500/10 text-amber-500 text-[8px] uppercase tracking-widest px-2 py-1 rounded-lg font-black border border-amber-500/20">Pausado</span>
                                   ) : (

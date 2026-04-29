@@ -36,6 +36,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/blueprints', icon: FolderTree, label: 'Fluxos', group: 'oraculo', roles: ['admin'] },
   { to: '/agents', icon: Bot, label: 'Atendentes', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo', roles: ['admin'] },
+  { to: '/analytics/funnel', icon: Activity, label: 'Funnel', group: 'oraculo', roles: ['admin', 'user'] },
+  { to: '/analytics/recovery', icon: Activity, label: 'Recuperação', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/integrations', icon: Plug, label: 'Integrações', group: 'avancado', roles: ['admin'] },
   { to: '/tenant-config', icon: KeyRound, label: 'Variáveis & Segredos', group: 'avancado', roles: ['admin'] },
   { to: '/admin/tenants', icon: ShieldCheck, label: 'Admin Console', group: 'platform', roles: ['admin'] },
