@@ -266,6 +266,7 @@ def _register_saas_blueprints():
     from api.saas.horoscope import horoscope_bp as saas_horoscope_bp
     from api.saas.spiritual import spiritual_bp as saas_spiritual_bp
     from api.saas.aura import aura_bp as saas_aura_bp
+    from api.saas.compose import compose_bp as saas_compose_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -300,6 +301,7 @@ def _register_saas_blueprints():
         saas_horoscope_bp,
         saas_spiritual_bp,
         saas_aura_bp,
+        saas_compose_bp,
     ):
         app.register_blueprint(bp)
 

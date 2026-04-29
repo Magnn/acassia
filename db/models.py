@@ -1120,6 +1120,32 @@ class LeadNumerology(Base):
     interpreted_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class QuickReply(Base):
+    """
+    Templates de mensagem rapida para uso na inbox (Frente 3.12).
+    Diferente de TemplateMsg (que serve copy do motor) — esta tabela e
+    de atendentes humanos compose box.
+    """
+    __tablename__ = "quick_replies"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "shortcut_number",
+            name="uq_quick_reply_tenant_shortcut",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    title = Column(String(120), nullable=False)
+    body = Column(Text, nullable=False)               # pode ter {{nome}}, {{signo}}
+    category = Column(String(40), nullable=True)     # saudacao|oferta|fechamento|recuperacao
+    shortcut_number = Column(Integer, nullable=True) # 1-9 (atalho teclado)
+    usage_count = Column(Integer, default=0, nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False)
+
+
 class LeadAuraImage(Base):
     """Aura semanal gerada via Stable Diffusion (Frente 4.18)."""
     __tablename__ = "lead_aura_images"

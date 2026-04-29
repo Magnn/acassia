@@ -18,9 +18,12 @@ import {
   Snowflake,
 } from 'lucide-react';
 import { inboxApi } from '../api/inbox';
+import { composeApi } from '../api/compose';
 import { toast } from '../lib/toast';
 import ScoreBadge from '../components/ScoreBadge';
 import LeadContextPanel from '../components/LeadContextPanel';
+import ComposeToolbar from '../components/ComposeToolbar';
+import QuickReplyManager from '../components/QuickReplyManager';
 
 type ViewMode = 'chat' | 'table';
 type ScoreFilter = null | 'hot' | 'warm' | 'cold';
@@ -79,9 +82,16 @@ export default function Leads() {
     const saved = localStorage.getItem(DENSITY_KEY);
     return saved === 'compact' ? 'compact' : 'comfy';
   });
+  const [showQuickReplyManager, setShowQuickReplyManager] = useState(false);
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const composeRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: quickReplies } = useQuery({
+    queryKey: ['quick-replies'],
+    queryFn: composeApi.list,
+  });
 
   useEffect(() => {
     localStorage.setItem(DENSITY_KEY, density);
@@ -152,17 +162,56 @@ export default function Leads() {
         setSelectedLeadId(null);
         return;
       }
-      if (e.key !== 'j' && e.key !== 'k') return;
-      if (leads.length === 0) return;
-      const currentIdx = leads.findIndex((l) => l.id === selectedLeadId);
-      let next = currentIdx;
-      if (e.key === 'j') next = currentIdx < 0 ? 0 : Math.min(leads.length - 1, currentIdx + 1);
-      else next = currentIdx <= 0 ? 0 : currentIdx - 1;
-      setSelectedLeadId(leads[next].id);
+      if (e.key === 'j' || e.key === 'k') {
+        if (leads.length === 0) return;
+        const currentIdx = leads.findIndex((l) => l.id === selectedLeadId);
+        let next = currentIdx;
+        if (e.key === 'j') next = currentIdx < 0 ? 0 : Math.min(leads.length - 1, currentIdx + 1);
+        else next = currentIdx <= 0 ? 0 : currentIdx - 1;
+        setSelectedLeadId(leads[next].id);
+        return;
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [leads, selectedLeadId]);
+
+  // Atalhos 1-9 para Quick Replies (somente quando textarea está focada)
+  useEffect(() => {
+    const items = quickReplies?.quick_replies ?? [];
+    function onCompKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target !== composeRef.current) return;
+      if (!e.altKey) return;
+      if (!/^[1-9]$/.test(e.key)) return;
+      const num = Number(e.key);
+      const tpl = items.find((q) => q.shortcut_number === num);
+      if (!tpl || !selectedLeadId) return;
+      e.preventDefault();
+      composeApi.render(tpl.id, selectedLeadId)
+        .then((res) => insertAtCursor(res.text))
+        .catch(() => {});
+    }
+    window.addEventListener('keydown', onCompKey);
+    return () => window.removeEventListener('keydown', onCompKey);
+  }, [quickReplies, selectedLeadId]);
+
+  function insertAtCursor(text: string) {
+    const el = composeRef.current;
+    if (!el) {
+      setDraft((d) => (d ? `${d}\n${text}` : text));
+      return;
+    }
+    const start = el.selectionStart ?? draft.length;
+    const end = el.selectionEnd ?? draft.length;
+    const next = draft.slice(0, start) + text + draft.slice(end);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + text.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
   
   const selectedLead = conversationData?.lead;
   const messages = conversationData?.messages || [];
@@ -564,27 +613,50 @@ export default function Leads() {
 
                 {/* Input Unificado */}
                 <div className="bg-bg-surface/80 backdrop-blur-xl border-t border-border p-6 flex-shrink-0 z-10">
-                   <div className="max-w-5xl mx-auto flex items-center gap-4">
-                      <div className="flex-1 relative group">
-                        <input 
-                          type="text"
-                          value={draft}
-                          onChange={(e) => setDraft(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-                          placeholder={selectedLead?.bot_pausado ? "Sua mensagem manual..." : "Pause o robô para responder manualmente..."}
-                          className="w-full bg-bg-primary/50 border-2 border-border/50 rounded-2xl px-6 py-4 text-sm text-primary outline-none focus:border-accent-amethyst/50 focus:bg-bg-primary transition-all shadow-inner"
-                        />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none opacity-20">
-                           <span className="text-[10px] font-black uppercase tracking-widest">ENTER</span>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={handleSend}
-                        disabled={!draft.trim() || sendMutation.isPending}
-                        className="w-[56px] h-[56px] bg-accent-amethyst text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-accent-amethyst/20 disabled:opacity-30 disabled:scale-100"
-                      >
-                         <Send className="w-5 h-5" />
-                      </button>
+                   <div className="max-w-5xl mx-auto">
+                     <div className="relative">
+                       <ComposeToolbar
+                         leadId={selectedLeadId}
+                         onInsert={insertAtCursor}
+                         onOpenManager={() => setShowQuickReplyManager(true)}
+                       />
+                     </div>
+                     <div className="flex items-end gap-4">
+                       <div className="flex-1 relative group">
+                         <textarea
+                           ref={composeRef}
+                           value={draft}
+                           onChange={(e) => setDraft(e.target.value)}
+                           onKeyDown={(e) => {
+                             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                               e.preventDefault();
+                               handleSend();
+                             }
+                           }}
+                           placeholder={
+                             selectedLead?.bot_pausado
+                               ? "Sua mensagem manual… (Ctrl+Enter envia · Alt+1-9 templates)"
+                               : "Pause o robô para responder manualmente…"
+                           }
+                           rows={Math.min(6, Math.max(2, draft.split('\n').length))}
+                           className="w-full bg-bg-primary/50 border-2 border-border/50 rounded-2xl px-6 py-3 text-sm text-primary outline-none focus:border-accent-amethyst/50 focus:bg-bg-primary transition-all shadow-inner resize-none"
+                         />
+                         {draft.length > 800 && (
+                           <div className={`absolute -top-1 right-4 text-[10px] font-black tabular-nums ${
+                             draft.length > 1000 ? 'text-rose-400' : 'text-amber-400'
+                           }`}>
+                             {draft.length}/1000
+                           </div>
+                         )}
+                       </div>
+                       <button
+                         onClick={handleSend}
+                         disabled={!draft.trim() || sendMutation.isPending}
+                         className="w-[56px] h-[56px] bg-accent-amethyst text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-accent-amethyst/20 disabled:opacity-30 disabled:scale-100"
+                       >
+                          <Send className="w-5 h-5" />
+                       </button>
+                     </div>
                    </div>
                    
                    <div className="mt-4 flex items-center justify-center gap-6 opacity-60">
@@ -608,6 +680,10 @@ export default function Leads() {
           </div>
         )}
       </div>
+
+      {showQuickReplyManager && (
+        <QuickReplyManager onClose={() => setShowQuickReplyManager(false)} />
+      )}
 
       {/* 3ª coluna: Contexto do lead — só no chat mode com lead selecionado */}
       {viewMode === 'chat' && selectedLeadId !== null && (
