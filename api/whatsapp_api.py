@@ -89,6 +89,27 @@ class WhatsAppAPI:
     def enviar_mensagem(self, numero: str, conteudo: str, formato: str = "texto") -> bool:
         tid = _current_tenant_id()
 
+        # Opt-out check (Frente 8.17): se lead pediu STOP, não envia
+        try:
+            from db.database import SessionLocal
+            from db import models
+            from api.saas.privacy import is_lead_opted_out
+            db = SessionLocal()
+            try:
+                lead = db.query(models.Lead).filter_by(
+                    tenant_id=tid, telefone=numero,
+                ).first()
+                if lead and is_lead_opted_out(lead):
+                    logger.warning(
+                        "[privacy.opt_out] tenant=%s numero=%s — bloqueado envio (lead opted out)",
+                        tid, numero,
+                    )
+                    return False
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.warning("[privacy.opt_out] check falhou (fail open): %s", exc)
+
         # Quota check ANTES do envio (Frente 2.5)
         try:
             import quota
@@ -100,7 +121,6 @@ class WhatsAppAPI:
                 )
                 return False
         except Exception as exc:
-            # Falha na quota check NÃO deve quebrar envio; apenas loga
             logger.warning("[quota.wa_msgs] check falhou (fail open): %s", exc)
 
         provider = get_provider_for_tenant(tid)
@@ -108,7 +128,6 @@ class WhatsAppAPI:
         if ok:
             _maybe_track_first_message_sent(tid)
         else:
-            # Send falhou: refund quota
             try:
                 import quota as quota_mod
                 quota_mod.refund_quota(tid, "wa_msgs_month", 1, reason="provider_send_failed")

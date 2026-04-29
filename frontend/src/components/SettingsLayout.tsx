@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   ClipboardList,
+  Cookie,
   Globe2,
   MessageSquareText,
   ShieldCheck,
@@ -23,6 +24,7 @@ const SUB_ITEMS: SubItem[] = [
   { to: '/settings/devices', Icon: Smartphone, label: 'Dispositivos', hint: "WhatsApp's conectados" },
   { to: '/settings/account', Icon: User, label: 'Minha Conta', hint: 'Configurar minha conta' },
   { to: '/settings/security', Icon: ShieldCheck, label: 'Segurança', hint: '2FA + sessões' },
+  { to: '/settings/privacy', Icon: Cookie, label: 'Privacidade', hint: 'LGPD + consents' },
   { to: '/settings/labels', Icon: Tag, label: 'Etiquetas', hint: 'Configurar etiquetas' },
   { to: '/settings/fields', Icon: Variable, label: 'Campos', hint: 'Campos personalizados' },
   { to: '/settings/timezone', Icon: Globe2, label: 'Fuso Horário', hint: 'Configurar fuso horário' },

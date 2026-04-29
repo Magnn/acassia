@@ -4026,6 +4026,46 @@ def _triagem_meta(data):
                 media_url = f"/media/{os.path.basename(fp)}"
                 texto_recebido = _transcrever_audio(fp, mime_real or mime)
 
+        # LGPD opt-out detection (Frente 8.17): se lead pediu STOP, marca opt-out
+        # automaticamente (sem entrar na fila do bot, evitando resposta automática).
+        if tipo == "text" and texto_recebido:
+            try:
+                from api.saas.privacy import detect_opt_out
+                if detect_opt_out(texto_recebido):
+                    from db.database import SessionLocal
+                    from db import models as _models
+                    from datetime import datetime as _dt, timezone as _tz
+                    from tenant_context import get_request_tenant_id
+                    _db = SessionLocal()
+                    try:
+                        try:
+                            _tid = get_request_tenant_id()
+                        except Exception:
+                            _tid = "default"
+                        lead = _db.query(_models.Lead).filter_by(
+                            tenant_id=_tid, telefone=telefone,
+                        ).first()
+                        if lead:
+                            tags = list(lead.tags or [])
+                            if "opted_out" not in tags:
+                                tags.append("opted_out")
+                            lead.tags = tags
+                            meta = dict(lead.metadata_json or {})
+                            meta["opted_out"] = True
+                            meta["opted_out_at"] = _dt.now(_tz.utc).isoformat()
+                            meta["opted_out_reason"] = "auto_detected_keyword"
+                            lead.metadata_json = meta
+                            _db.commit()
+                            logger.warning(
+                                "[privacy.opt_out.auto] tenant=%s telefone=%s keyword detected",
+                                _tid, telefone,
+                            )
+                            return  # NÃO entra na fila — não responde automaticamente
+                    finally:
+                        _db.close()
+            except Exception as exc:
+                logger.warning("[privacy.opt_out.detect] falha (fail open): %s", exc)
+
         # Envia para a Fila do Lead via Manager
         payload = {
             "telefone": telefone,

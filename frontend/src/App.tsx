@@ -6,6 +6,7 @@ import AdminLayout from './components/AdminLayout';
 import SettingsLayout from './components/SettingsLayout';
 import Toaster from './components/Toaster';
 import ImpersonateBanner from './components/ImpersonateBanner';
+import CookieBanner from './components/CookieBanner';
 import BlueprintsList from './routes/BlueprintsList';
 
 // Telas SaaS — lazy.
@@ -24,6 +25,7 @@ const BillingUsage = lazy(() => import('./routes/BillingUsage'));
 const SettingsDevices = lazy(() => import('./routes/settings/Devices'));
 const SettingsRecovery = lazy(() => import('./routes/settings/Recovery'));
 const SettingsSecurity = lazy(() => import('./routes/settings/Security'));
+const SettingsPrivacy = lazy(() => import('./routes/settings/Privacy'));
 const SettingsPlaceholder = lazy(() => import('./routes/settings/Placeholder'));
 
 // Admin God-Mode (Frente 1)
@@ -48,6 +50,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ImpersonateBanner />
+      <CookieBanner />
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/onboarding" element={<Onboarding />} />
@@ -70,6 +73,7 @@ export default function App() {
               <Route path="devices" element={<SettingsDevices />} />
               <Route path="recovery" element={<SettingsRecovery />} />
               <Route path="security" element={<SettingsSecurity />} />
+              <Route path="privacy" element={<SettingsPrivacy />} />
               <Route
                 path="account"
                 element={
