@@ -243,6 +243,7 @@ def _register_saas_blueprints():
     from api.saas.billing import billing_bp
     from api.saas.whatsapp import whatsapp_bp
     from api.telemetry import telemetry_bp
+    from api.admin.twofa import twofa_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -255,6 +256,7 @@ def _register_saas_blueprints():
         billing_bp,
         whatsapp_bp,
         telemetry_bp,
+        twofa_bp,
     ):
         app.register_blueprint(bp)
 

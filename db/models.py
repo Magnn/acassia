@@ -390,6 +390,152 @@ class User(Base):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     criado_em = Column(DateTime(timezone=True), default=_agora_utc)
 
+    # ── 2FA TOTP (Frente 8.1, 1.1) ─────────────────────────────────
+    totp_secret = Column(String(64), nullable=True)
+    totp_enabled_at = Column(DateTime(timezone=True), nullable=True)
+    totp_recovery_codes = Column(JSON, nullable=True)  # 10 one-time codes (hashed)
+
+    # ── Verification + lifecycle (Frente 8.11, 1.8, 1.9) ───────────
+    is_verified = Column(Boolean, default=False, nullable=False)
+    phone = Column(String(30), nullable=True)
+    phone_verified_at = Column(DateTime(timezone=True), nullable=True)
+    last_password_change_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    suspended_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    suspended_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    suspension_reason = Column(Text, nullable=True)
+
+    # ── Admin sub-roles (Frente 1.24) ──────────────────────────────
+    # null pra users; "founder|support|billing" pra admins
+    admin_subrole = Column(String(20), nullable=True)
+
+    # ── UX prefs (Frente 5) ────────────────────────────────────────
+    timezone = Column(String(40), default="America/Sao_Paulo", nullable=False)
+    theme_preset = Column(String(40), nullable=True)
+    dashboard_layout = Column(JSON, nullable=True)
+    tours_completed = Column(JSON, default=list)
+    last_changelog_seen_at = Column(DateTime(timezone=True), nullable=True)
+
+    # ── Trial + dunning (Frente 2.19, 2.20) ────────────────────────
+    trial_started_at = Column(DateTime(timezone=True), nullable=True)
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    trial_extended_count = Column(Integer, default=0, nullable=False)
+    dunning_status = Column(String(20), nullable=True)  # null|past_due|cancelled
+    dunning_attempts = Column(Integer, default=0, nullable=False)
+
+
+# ─── Frente 1: Admin tables ──────────────────────────────────────────
+
+
+class ImpersonationSession(Base):
+    """
+    Sessões de admin impersonando user. Toda ação durante a sessão é
+    auditada com link pro impersonator real (Frente 1.2).
+    """
+    __tablename__ = "impersonation_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    target_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    target_tenant_id = Column(String(64), nullable=False, index=True)
+    reason = Column(Text, nullable=False)
+    started_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    ended_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    end_reason = Column(String(20), nullable=True)  # manual|expired|forced|crash
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    actions_count = Column(Integer, default=0, nullable=False)
+
+
+class TenantAdminNote(Base):
+    """Notas internas do admin sobre um tenant (Frente 1.4 / 1.21)."""
+    __tablename__ = "tenant_admin_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    author_admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    pinned = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class TenantPlanOverride(Base):
+    """Override admin do plano comercial de um tenant (Frente 1.5)."""
+    __tablename__ = "tenant_plan_overrides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    plan = Column(String(32), nullable=False)
+    granted_by_admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reason = Column(Text, nullable=False)
+    starts_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=True, index=True)  # null = permanente
+    pauses_stripe = Column(Boolean, default=True, nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    revoked_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class TenantQuotaGrant(Base):
+    """Cota extra concedida pelo admin (Frente 1.6)."""
+    __tablename__ = "tenant_quota_grants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    kind = Column(String(40), nullable=False)  # gemini_tokens|wa_msgs|leads
+    amount = Column(Integer, nullable=False)
+    used_amount = Column(Integer, default=0, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    granted_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class TenantUsageCounter(Base):
+    """
+    Counter atômico de uso por (tenant, period_yyyymm, kind) (Frente 2.2).
+    UPSERT com CAS pra atomicidade.
+    """
+    __tablename__ = "tenant_usage_counters"
+
+    tenant_id = Column(String(64), primary_key=True)
+    period_yyyymm = Column(Integer, primary_key=True)  # 202604
+    kind = Column(String(40), primary_key=True)        # leads|wa_msgs|gemini_tokens
+    count = Column(Integer, default=0, nullable=False)
+    cost_brl_cents = Column(Integer, default=0, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class PlanGlobalOverride(Base):
+    """
+    Override admin de campos globais de um plano (Frente 2.1) — ex.:
+    aumentar limite de leads do Pro de 5k pra 7k sem deploy.
+    """
+    __tablename__ = "plan_global_overrides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plan_key = Column(String(32), nullable=False, index=True)
+    field_path = Column(String(100), nullable=False)  # ex: "limits.leads_month"
+    field_value = Column(JSON, nullable=False)
+    set_by_admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reason = Column(Text, nullable=False)
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class TenantHealth(Base):
+    """Health score composto por tenant (Frente 1.15)."""
+    __tablename__ = "tenant_health"
+
+    tenant_id = Column(String(64), primary_key=True)
+    score = Column(Integer, nullable=False)  # 0-100
+    band = Column(String(10), nullable=False)  # healthy|at_risk|critical
+    components = Column(JSON, nullable=True)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
 
 class PaymentEventReceipt(Base):
     """
