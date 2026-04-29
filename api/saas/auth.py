@@ -114,11 +114,23 @@ def _on_unauthorized():
 
 
 class AuthenticatedUser(UserMixin):
-    def __init__(self, user_id: int, email: str, tenant_id: str, role: str):
+    def __init__(self, user_id: int, email: str, tenant_id: str, role: str,
+                 impersonator_id: Optional[int] = None,
+                 impersonation_session_id: Optional[int] = None,
+                 admin_subrole: Optional[str] = None):
         self.id = user_id
         self.email = email
         self.tenant_id = tenant_id
         self.role = role
+        # Quando setado, indica que o admin (impersonator_id) está vendo a app
+        # como esse user. Frontend renderiza banner persistente.
+        self.impersonator_id = impersonator_id
+        self.impersonation_session_id = impersonation_session_id
+        self.admin_subrole = admin_subrole
+
+    @property
+    def is_impersonating(self) -> bool:
+        return self.impersonator_id is not None
 
     def get_id(self) -> str:
         return str(self.id)
@@ -127,15 +139,56 @@ class AuthenticatedUser(UserMixin):
 @login_manager.user_loader
 def _load_user(user_id_str: str) -> Optional[AuthenticatedUser]:
     try:
-        user_id = int(user_id_str)
+        admin_user_id = int(user_id_str)
     except (TypeError, ValueError):
         return None
+
     db = SessionLocal()
     try:
-        user = db.query(models.User).filter_by(id=user_id, is_active=True).first()
-        if not user:
+        # Carrega o user "real" do session cookie do flask-login
+        admin_user = db.query(models.User).filter_by(id=admin_user_id, is_active=True).first()
+        if not admin_user:
             return None
-        return AuthenticatedUser(user.id, user.email, user.tenant_id, user.role)
+
+        # Verifica cookie de impersonate. Se válido E user real é admin,
+        # retorna AuthenticatedUser com identidade do TARGET + flags impersonator.
+        try:
+            from api.admin.impersonate import get_active_impersonation_session_id
+            sess_id = get_active_impersonation_session_id()
+        except Exception:
+            sess_id = None
+
+        if sess_id and admin_user.role == "admin":
+            from datetime import datetime, timezone
+            sess = db.query(models.ImpersonationSession).filter_by(id=sess_id).first()
+            # SQLite armazena DateTime sem tzinfo mesmo com timezone=True;
+            # normaliza pra comparação confiável.
+            now_utc = datetime.now(timezone.utc)
+            sess_expires = sess.expires_at if sess else None
+            if sess_expires is not None and sess_expires.tzinfo is None:
+                sess_expires = sess_expires.replace(tzinfo=timezone.utc)
+            if (sess and sess.ended_at is None
+                    and sess_expires is not None and sess_expires > now_utc
+                    and sess.admin_user_id == admin_user.id):
+                target = db.query(models.User).filter_by(id=sess.target_user_id).first()
+                if target and target.is_active and target.deleted_at is None:
+                    return AuthenticatedUser(
+                        user_id=target.id,
+                        email=target.email,
+                        tenant_id=target.tenant_id,
+                        role=target.role,
+                        impersonator_id=admin_user.id,
+                        impersonation_session_id=sess.id,
+                        admin_subrole=admin_user.admin_subrole,
+                    )
+
+        return AuthenticatedUser(
+            user_id=admin_user.id,
+            email=admin_user.email,
+            tenant_id=admin_user.tenant_id,
+            role=admin_user.role,
+            admin_subrole=admin_user.admin_subrole,
+        )
     finally:
         db.close()
 
@@ -299,10 +352,42 @@ def logout():
 @auth_bp.route("/me", methods=["GET"])
 @login_required
 def me():
-    """Retorna info do usuário logado para o front-end React."""
-    return jsonify({
+    """
+    Retorna info do usuário logado para o front-end React.
+    Se em sessão impersonate, inclui flag e dados do admin original.
+    """
+    payload = {
         "id": current_user.id,
         "email": current_user.email,
         "tenant_id": current_user.tenant_id,
-        "role": current_user.role
-    })
+        "role": current_user.role,
+    }
+
+    if getattr(current_user, "is_impersonating", False):
+        # Carrega info do admin pra mostrar no banner
+        db = SessionLocal()
+        try:
+            admin = db.query(models.User).filter_by(
+                id=current_user.impersonator_id,
+            ).first()
+            payload["impersonating"] = True
+            payload["impersonator"] = {
+                "id": current_user.impersonator_id,
+                "email": admin.email if admin else "deleted",
+                "name": admin.name if admin else None,
+            }
+        finally:
+            db.close()
+
+    # Buscar nome do user real (campo `name` não está no AuthenticatedUser)
+    db = SessionLocal()
+    try:
+        u = db.query(models.User).filter_by(id=current_user.id).first()
+        if u:
+            payload["name"] = u.name
+            payload["is_verified"] = u.is_verified
+            payload["totp_enabled"] = bool(u.totp_enabled_at)
+    finally:
+        db.close()
+
+    return jsonify(payload)

@@ -19,7 +19,7 @@ import {
   BarChart3,
   Eye,
 } from 'lucide-react';
-import { adminApi, type AdminNote } from '../../api/admin';
+import { adminApi, type AdminNote, type AdminTenantOverview } from '../../api/admin';
 import { toast } from '../../lib/toast';
 import { ApiError } from '../../api/client';
 
@@ -94,24 +94,7 @@ export default function TenantDetail() {
           </div>
 
           {/* Quick actions */}
-          <div className="flex gap-2">
-            <button
-              disabled
-              title="Em breve (Frente 1.2)"
-              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest opacity-40 cursor-not-allowed"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              Impersonate
-            </button>
-            <button
-              disabled
-              title="Em breve (Frente 1.8)"
-              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest opacity-40 cursor-not-allowed"
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              Suspender
-            </button>
-          </div>
+          <ImpersonateButton overview={overview} />
         </div>
 
         {/* Status badges */}
@@ -160,6 +143,160 @@ export default function TenantDetail() {
       {/* Tab content */}
       {tab === 'overview' && <OverviewTab overview={overview} />}
       {tab === 'notes' && <NotesTab tenantId={tenantId!} />}
+    </div>
+  );
+}
+
+function ImpersonateButton({ overview }: { overview: AdminTenantOverview }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [totp, setTotp] = useState('');
+  const [duration, setDuration] = useState(60);
+
+  const isAdminTarget = overview.user.role === 'admin';
+  const isBlocked = isAdminTarget || overview.lifecycle.is_suspended || overview.lifecycle.is_deleted;
+
+  const startMut = useMutation({
+    mutationFn: () =>
+      adminApi.startImpersonate(overview.user.id, reason, totp, duration),
+    onSuccess: (data) => {
+      toast.success(`Entrando como ${data.target.email}`);
+      window.location.href = data.redirect_to;
+    },
+    onError: (e: unknown) => {
+      const body = e instanceof ApiError ? (e.body as { error?: string }) : null;
+      const errMsg: Record<string, string> = {
+        totp_invalid: 'Código TOTP inválido',
+        totp_required: 'Digite o TOTP',
+        cannot_impersonate_admin: 'Não pode impersonar outro admin',
+        cannot_self_impersonate: 'Não pode impersonar a si mesmo',
+        target_suspended: 'Tenant está suspenso',
+        target_deleted: 'Tenant está deletado',
+        target_inactive: 'Conta inativa',
+        reason_too_short: 'Motivo precisa de ao menos 10 caracteres',
+        admin_2fa_not_enabled: 'Configure 2FA no admin primeiro',
+      };
+      toast.error(errMsg[body?.error || ''] || 'Erro ao impersonar');
+    },
+  });
+
+  if (!open) {
+    return (
+      <div className="flex gap-2">
+        <button
+          onClick={() => setOpen(true)}
+          disabled={isBlocked}
+          title={isBlocked ? (isAdminTarget ? 'Não pode impersonar admin' : 'Tenant indisponível') : undefined}
+          className="flex items-center gap-2 px-4 py-2.5 bg-red-900/40 hover:bg-red-800/40 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl text-xs font-black uppercase tracking-widest border border-red-900/40 transition-all text-red-300 hover:text-white"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          Impersonate
+        </button>
+        <button
+          disabled
+          title="Em breve (Frente 1.8)"
+          className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 rounded-xl text-xs font-black uppercase tracking-widest opacity-40 cursor-not-allowed"
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Suspender
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
+      <div className="bg-zinc-900 border border-red-900/40 rounded-3xl p-8 max-w-lg w-full space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
+            <Eye className="w-6 h-6 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black">Entrar como {overview.user.email}</h2>
+            <p className="text-xs text-zinc-500 font-medium">
+              Suas ações ficarão gravadas no audit log
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+              Motivo (mín. 10 chars)
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              placeholder="Ex: ticket #1234 — fluxo não está mandando msg de oferta"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 resize-none"
+            />
+            <div className="text-[10px] text-zinc-600 mt-1 font-mono">
+              {reason.length} chars
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+              Duração da sessão
+            </label>
+            <div className="flex gap-2">
+              {[15, 60, 240].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setDuration(m)}
+                  className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    duration === m
+                      ? 'bg-red-600 text-white'
+                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                  }`}
+                >
+                  {m === 60 ? '1h' : m === 240 ? '4h' : '15min'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+              Verificação 2FA
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={totp}
+              onChange={(e) => setTotp(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+              className="w-full text-center text-xl font-mono tracking-[0.4em] bg-zinc-950 border border-zinc-800 rounded-xl py-3 text-white placeholder:text-zinc-700 focus:outline-none focus:border-red-500/50"
+            />
+          </div>
+        </div>
+
+        <div className="bg-amber-950/20 border border-amber-900/40 rounded-xl p-3 flex gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-[11px] text-amber-200/80">
+            Você verá a interface como o tenant vê. Mudanças que você fizer
+            durante a sessão ficam gravadas em audit log com seu nome.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => { setOpen(false); setReason(''); setTotp(''); }}
+            className="flex-1 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm font-bold"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => startMut.mutate()}
+            disabled={reason.length < 10 || totp.length !== 6 || startMut.isPending}
+            className="flex-1 px-5 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl text-sm font-black uppercase tracking-widest"
+          >
+            {startMut.isPending ? 'Entrando...' : `Entrar como ${overview.user.name || 'user'}`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

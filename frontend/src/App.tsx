@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 import SettingsLayout from './components/SettingsLayout';
 import Toaster from './components/Toaster';
+import ImpersonateBanner from './components/ImpersonateBanner';
 import BlueprintsList from './routes/BlueprintsList';
 
 // Telas SaaS — lazy.
@@ -43,6 +44,7 @@ function PageFallback() {
 export default function App() {
   return (
     <ErrorBoundary>
+      <ImpersonateBanner />
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/onboarding" element={<Onboarding />} />

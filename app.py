@@ -245,6 +245,7 @@ def _register_saas_blueprints():
     from api.telemetry import telemetry_bp
     from api.admin.twofa import twofa_bp
     from api.admin.tenants import admin_tenants_bp
+    from api.admin.impersonate import impersonate_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -259,6 +260,7 @@ def _register_saas_blueprints():
         telemetry_bp,
         twofa_bp,
         admin_tenants_bp,
+        impersonate_bp,
     ):
         app.register_blueprint(bp)
 

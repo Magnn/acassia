@@ -179,4 +179,28 @@ export const adminApi = {
     api.patch<{ ok: boolean }>(`/api/admin/tenants/${tenantId}/notes/${noteId}`, patch),
   deleteNote: (tenantId: string, noteId: number) =>
     api.del<{ ok: boolean }>(`/api/admin/tenants/${tenantId}/notes/${noteId}`),
+
+  // Impersonate (Frente 1.2)
+  startImpersonate: (target_user_id: number, reason: string, totp: string, duration_min = 60) =>
+    api.post<{
+      ok: boolean;
+      session_id: number;
+      target: { user_id: number; email: string; name: string | null; tenant_id: string };
+      expires_at: string;
+      duration_min: number;
+      redirect_to: string;
+    }>('/api/admin/impersonate', { target_user_id, reason, totp, duration_min }),
+  stopImpersonate: () =>
+    api.post<{ ok: boolean; redirect_to: string }>('/api/admin/impersonate/stop'),
+  activeImpersonation: () =>
+    api.get<{
+      active: boolean;
+      session_id?: number;
+      started_at?: string;
+      expires_at?: string;
+      expires_in_s?: number;
+      reason?: string;
+      target?: { user_id: number | null; email: string; name: string | null; tenant_id: string };
+      admin?: { user_id: number | null; email: string };
+    }>('/api/admin/impersonate/active'),
 };
