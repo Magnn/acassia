@@ -704,6 +704,66 @@ class TarotCard(Base):
     keywords = Column(JSON, nullable=True)
 
 
+class MarketplaceListing(Base):
+    """Listing público de template no marketplace (Frente 7.14)."""
+    __tablename__ = "marketplace_listings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    seller_tenant_id = Column(String(64), nullable=False, index=True)
+    seller_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    flow_template_id = Column(String(40), ForeignKey("flow_templates.id"), nullable=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(40), nullable=True)
+    price_brl_cents = Column(Integer, nullable=False)
+    blueprint_json = Column(JSON, nullable=False)
+    agent_json = Column(JSON, nullable=True)
+    metrics = Column(JSON, nullable=True)
+    preview_image_url = Column(String(500), nullable=True)
+    status = Column(String(20), default="pending_review", nullable=False)
+    approved_by_admin = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+    total_sales = Column(Integer, default=0, nullable=False)
+    total_revenue_brl_cents = Column(Integer, default=0, nullable=False)
+    rating_avg = Column(Float, nullable=True)
+    rating_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class MarketplacePurchase(Base):
+    """Compra de listing no marketplace."""
+    __tablename__ = "marketplace_purchases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    buyer_tenant_id = Column(String(64), nullable=False, index=True)
+    buyer_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("marketplace_listings.id"), nullable=False, index=True)
+    amount_brl_cents = Column(Integer, nullable=False)
+    acassia_fee_cents = Column(Integer, nullable=False)
+    seller_payout_cents = Column(Integer, nullable=False)
+    stripe_payment_id = Column(String(120), nullable=True)
+    pix_payment_id = Column(String(120), nullable=True)
+    payment_provider = Column(String(40), nullable=False)
+    status = Column(String(20), default="pending", nullable=False)
+    purchased_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    refunded_at = Column(DateTime(timezone=True), nullable=True)
+    applied_blueprint_id = Column(Integer, nullable=True)
+
+
+class MarketplaceReview(Base):
+    """Reviews de listings."""
+    __tablename__ = "marketplace_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, ForeignKey("marketplace_listings.id"), nullable=False, index=True)
+    purchase_id = Column(Integer, ForeignKey("marketplace_purchases.id"), nullable=False, unique=True)
+    reviewer_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    rating = Column(Integer, nullable=False)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class LunarTrigger(Base):
     """Gatilho lunar pra disparar fluxos automáticos (Frente 4.2)."""
     __tablename__ = "lunar_triggers"

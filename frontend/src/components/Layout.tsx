@@ -15,6 +15,7 @@ import {
   Settings as SettingsIcon,
   CreditCard,
   ShieldCheck,
+  Store,
 } from 'lucide-react';
 import Logo, { Wordmark } from './Logo';
 import { useTheme } from '../context/ThemeContext';
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/billing', icon: CreditCard, label: 'Assinatura', group: 'conta', roles: ['admin', 'user'] },
   { to: '/blueprints', icon: FolderTree, label: 'Fluxos', group: 'oraculo', roles: ['admin'] },
   { to: '/templates', icon: FolderTree, label: 'Templates', group: 'oraculo', roles: ['admin', 'user'] },
+  { to: '/marketplace', icon: Store, label: 'Marketplace', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/tarot', icon: FolderTree, label: 'Tarot Virtual', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/pix', icon: CreditCard, label: 'Pix QR', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/voice', icon: Bot, label: 'Voice IA', group: 'oraculo', roles: ['admin', 'user'] },
@@ -67,6 +69,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/runs': 'Execuções',
   '/integrations': 'Integrações',
   '/tenant-config': 'Variáveis & Segredos',
+  '/marketplace': 'Marketplace de Fluxos',
 };
 
 function pageTitleFor(pathname: string): string {

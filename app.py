@@ -259,6 +259,10 @@ def _register_saas_blueprints():
     from api.saas.coach import coach_bp as saas_coach_bp
     from api.saas.affiliate import affiliate_bp as saas_affiliate_bp, referral_bp as saas_referral_bp
     from api.saas.lunar_api import lunar_bp as saas_lunar_bp
+    from api.saas.marketplace import (
+        marketplace_bp as saas_marketplace_bp,
+        admin_marketplace_bp as saas_admin_marketplace_bp,
+    )
 
     login_manager.init_app(app)
     for bp in (
@@ -288,6 +292,8 @@ def _register_saas_blueprints():
         saas_affiliate_bp,
         saas_referral_bp,
         saas_lunar_bp,
+        saas_marketplace_bp,
+        saas_admin_marketplace_bp,
     ):
         app.register_blueprint(bp)
 
