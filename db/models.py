@@ -537,6 +537,60 @@ class TenantHealth(Base):
     updated_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class FeatureFlag(Base):
+    """Definição global de feature flags (Frente 1.10)."""
+    __tablename__ = "feature_flags"
+
+    key = Column(String(64), primary_key=True)
+    description = Column(Text, nullable=True)
+    default_value = Column(Boolean, default=False, nullable=False)
+    rollout_pct = Column(Integer, default=0, nullable=False)  # 0-100
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class TenantFeatureFlag(Base):
+    """Override por tenant de feature flag (Frente 1.10)."""
+    __tablename__ = "tenant_feature_flags"
+
+    tenant_id = Column(String(64), primary_key=True)
+    flag_key = Column(String(64), ForeignKey("feature_flags.key"), primary_key=True)
+    enabled = Column(Boolean, nullable=False)
+    set_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    set_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class AuditEvent(Base):
+    """
+    Audit log estruturado v2 pra ações administrativas e do user (Frente 1.12, 8.5).
+    Distingue de `eventos_audit` legado (que é específico de eventos de lead).
+    """
+    __tablename__ = "eventos_audit_v2"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime(timezone=True), default=_agora_utc, nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=True, index=True)  # null pra eventos não-tenant
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    impersonator_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    impersonation_id = Column(Integer, ForeignKey("impersonation_sessions.id"), nullable=True)
+    event_type = Column(String(80), nullable=False, index=True)
+    target_type = Column(String(40), nullable=True)
+    target_id = Column(String(120), nullable=True)
+    payload = Column(JSON, nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+
+
+class TenantUsageQuotaWarning(Base):
+    """Tracking de quais warnings de quota já foram enviados (Frente 2.11)."""
+    __tablename__ = "tenant_quota_warnings"
+
+    tenant_id = Column(String(64), primary_key=True)
+    period_yyyymm = Column(Integer, primary_key=True)
+    kind = Column(String(40), primary_key=True)
+    threshold_pct = Column(Integer, primary_key=True)  # 80 / 95 / 100
+    sent_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class PaymentEventReceipt(Base):
     """
     Idempotência durável de webhooks de pagamento (at-least-once delivery).

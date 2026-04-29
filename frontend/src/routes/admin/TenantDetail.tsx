@@ -23,7 +23,7 @@ import { adminApi, type AdminNote, type AdminTenantOverview } from '../../api/ad
 import { toast } from '../../lib/toast';
 import { ApiError } from '../../api/client';
 
-type Tab = 'overview' | 'notes';
+type Tab = 'overview' | 'notes' | 'commercial' | 'audit';
 
 export default function TenantDetail() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -124,25 +124,32 @@ export default function TenantDetail() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-zinc-800">
-        {(['overview', 'notes'] as Tab[]).map((t) => (
+      <div className="flex gap-1 border-b border-zinc-800 overflow-x-auto">
+        {([
+          ['overview', 'Visão Geral'],
+          ['commercial', 'Comercial'],
+          ['notes', `Notas (${overview.notes_count})`],
+          ['audit', 'Audit'],
+        ] as Array<[Tab, string]>).map(([t, label]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-5 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${
+            className={`px-5 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${
               tab === t
                 ? 'border-red-500 text-white'
                 : 'border-transparent text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            {t === 'overview' ? 'Visão Geral' : `Notas (${overview.notes_count})`}
+            {label}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
       {tab === 'overview' && <OverviewTab overview={overview} />}
+      {tab === 'commercial' && <CommercialTab tenantId={tenantId!} overview={overview} />}
       {tab === 'notes' && <NotesTab tenantId={tenantId!} />}
+      {tab === 'audit' && <AuditTab tenantId={tenantId!} />}
     </div>
   );
 }
@@ -821,4 +828,659 @@ function KV({ k, v, icon: Icon }: { k: string; v: string | null; icon?: typeof M
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+function fmtDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+// ─── CommercialTab — Plan overrides + Quota grants + Feature flags ────
+
+function CommercialTab({ tenantId, overview }: { tenantId: string; overview: AdminTenantOverview }) {
+  const [section, setSection] = useState<'plan' | 'quota' | 'flags'>('plan');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1 bg-zinc-900/50 p-1 rounded-xl w-fit">
+        {([
+          ['plan', 'Plano'],
+          ['quota', 'Cotas Extras'],
+          ['flags', 'Feature Flags'],
+        ] as Array<['plan' | 'quota' | 'flags', string]>).map(([s, label]) => (
+          <button
+            key={s}
+            onClick={() => setSection(s)}
+            className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${
+              section === s
+                ? 'bg-zinc-800 text-white'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {section === 'plan' && <PlanOverridesSection tenantId={tenantId} overview={overview} />}
+      {section === 'quota' && <QuotaGrantsSection tenantId={tenantId} />}
+      {section === 'flags' && <FeatureFlagsSection tenantId={tenantId} />}
+    </div>
+  );
+}
+
+function PlanOverridesSection({ tenantId, overview }: { tenantId: string; overview: AdminTenantOverview }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [plan, setPlan] = useState('pro');
+  const [duration, setDuration] = useState<number | null>(90);
+  const [reason, setReason] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-plan-overrides', tenantId],
+    queryFn: () => adminApi.listPlanOverrides(tenantId, true),
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => adminApi.createPlanOverride(tenantId, {
+      plan, duration_days: duration, pauses_stripe: true, reason,
+    }),
+    onSuccess: (data) => {
+      toast.success(`Override aplicado — plano efetivo: ${data.effective_plan_now}`);
+      setOpen(false); setReason('');
+      qc.invalidateQueries({ queryKey: ['admin-plan-overrides', tenantId] });
+      qc.invalidateQueries({ queryKey: ['admin-tenant-overview', tenantId] });
+    },
+    onError: handleAdminError('Erro ao aplicar override'),
+  });
+
+  const revokeMut = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      adminApi.revokePlanOverride(tenantId, id, reason),
+    onSuccess: () => {
+      toast.success('Override revogado');
+      qc.invalidateQueries({ queryKey: ['admin-plan-overrides', tenantId] });
+      qc.invalidateQueries({ queryKey: ['admin-tenant-overview', tenantId] });
+    },
+    onError: handleAdminError('Erro ao revogar'),
+  });
+
+  const overrides = data?.overrides ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-zinc-400">
+            Plano efetivo: <span className="font-black text-white">{overview.plan.label}</span>
+            <span className="text-zinc-600 ml-2">({overview.plan.source})</span>
+          </p>
+        </div>
+        <button
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-900/40 hover:bg-purple-800/40 border border-purple-900/40 rounded-xl text-xs font-black uppercase tracking-widest text-purple-300"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Aplicar override
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-zinc-500 text-sm text-center py-8">Carregando...</div>
+      ) : overrides.length === 0 ? (
+        <div className="text-zinc-600 text-sm text-center py-12 border border-dashed border-zinc-800 rounded-2xl">
+          Nenhum override aplicado.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {overrides.map((o) => (
+            <div
+              key={o.id}
+              className={`p-4 border rounded-2xl ${
+                o.revoked_at ? 'bg-zinc-950 border-zinc-900 opacity-60' : 'bg-purple-950/20 border-purple-900/40'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2 py-0.5 bg-purple-900/40 rounded text-[10px] font-black uppercase tracking-widest text-purple-300">
+                      → {o.plan}
+                    </span>
+                    {o.revoked_at && (
+                      <span className="text-[10px] text-zinc-500">REVOGADO</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-white">{o.reason}</p>
+                  <div className="text-[10px] text-zinc-500 mt-2 space-x-3">
+                    <span>Iniciado: {fmtDateTime(o.starts_at)}</span>
+                    <span>Expira: {o.expires_at ? fmtDateTime(o.expires_at) : 'permanente'}</span>
+                    {o.pauses_stripe && <span className="text-amber-500">⏸ Stripe pausado</span>}
+                  </div>
+                  {o.revoked_at && (
+                    <div className="text-[10px] text-zinc-500 mt-1 italic">
+                      Revogado em {fmtDateTime(o.revoked_at)} — {o.revoked_reason}
+                    </div>
+                  )}
+                </div>
+                {!o.revoked_at && (
+                  <button
+                    onClick={() => {
+                      const r = prompt('Motivo da revogação:');
+                      if (r) revokeMut.mutate({ id: o.id, reason: r });
+                    }}
+                    className="text-[10px] text-zinc-500 hover:text-red-400 font-black uppercase tracking-widest"
+                  >
+                    Revogar
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
+          <div className="bg-zinc-900 border border-purple-900/40 rounded-3xl p-8 max-w-lg w-full space-y-5">
+            <h3 className="text-lg font-black">Aplicar override de plano</h3>
+
+            <div>
+              <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+                Plano forçado
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['starter', 'pro', 'enterprise'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPlan(p)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      plan === p
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+                Duração
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { v: 30, l: '30d' },
+                  { v: 90, l: '90d' },
+                  { v: 365, l: '1 ano' },
+                  { v: null, l: 'Permanente' },
+                ].map(({ v, l }) => (
+                  <button
+                    key={l}
+                    onClick={() => setDuration(v)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      duration === v
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+                Motivo (mín 5 chars)
+              </label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder="Ex: deal afiliado top — comp 90 dias"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/50 resize-none"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setOpen(false)}
+                className="flex-1 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => createMut.mutate()}
+                disabled={reason.length < 5 || createMut.isPending}
+                className="flex-1 px-5 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-30 rounded-2xl text-sm font-black uppercase tracking-widest"
+              >
+                {createMut.isPending ? 'Aplicando...' : 'Aplicar override'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const QUOTA_KIND_LABELS: Record<string, string> = {
+  gemini_tokens_month: 'Tokens Gemini/mês',
+  wa_msgs_month: 'Mensagens WhatsApp/mês',
+  leads_month: 'Leads/mês',
+};
+
+function QuotaGrantsSection({ tenantId }: { tenantId: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState('gemini_tokens_month');
+  const [amount, setAmount] = useState('10000');
+  const [duration, setDuration] = useState<number | null>(30);
+  const [reason, setReason] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-quota-grants', tenantId],
+    queryFn: () => adminApi.listQuotaGrants(tenantId, true),
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => adminApi.createQuotaGrant(tenantId, {
+      kind, amount: parseInt(amount, 10), duration_days: duration, reason,
+    }),
+    onSuccess: (data) => {
+      toast.success(`Cota concedida — total: ${data.new_effective_quota.toLocaleString('pt-BR')}`);
+      setOpen(false); setReason(''); setAmount('10000');
+      qc.invalidateQueries({ queryKey: ['admin-quota-grants', tenantId] });
+      qc.invalidateQueries({ queryKey: ['admin-tenant-overview', tenantId] });
+    },
+    onError: handleAdminError('Erro ao conceder cota'),
+  });
+
+  const revokeMut = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      adminApi.revokeQuotaGrant(tenantId, id, reason),
+    onSuccess: () => {
+      toast.success('Grant revogado');
+      qc.invalidateQueries({ queryKey: ['admin-quota-grants', tenantId] });
+      qc.invalidateQueries({ queryKey: ['admin-tenant-overview', tenantId] });
+    },
+    onError: handleAdminError('Erro ao revogar'),
+  });
+
+  const grants = data?.grants ?? [];
+  const isExpired = (g: { expires_at: string | null }) =>
+    g.expires_at !== null && new Date(g.expires_at) < new Date();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-900/40 hover:bg-emerald-800/40 border border-emerald-900/40 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-300"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Conceder cota extra
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-zinc-500 text-sm text-center py-8">Carregando...</div>
+      ) : grants.length === 0 ? (
+        <div className="text-zinc-600 text-sm text-center py-12 border border-dashed border-zinc-800 rounded-2xl">
+          Nenhuma cota extra concedida.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {grants.map((g) => {
+            const expired = isExpired(g);
+            const used_pct = g.amount > 0 ? (g.used_amount / g.amount) * 100 : 0;
+            return (
+              <div
+                key={g.id}
+                className={`p-4 border rounded-2xl ${
+                  expired ? 'bg-zinc-950 border-zinc-900 opacity-60' : 'bg-emerald-950/20 border-emerald-900/40'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-widest text-zinc-400">
+                      {QUOTA_KIND_LABELS[g.kind] || g.kind}
+                    </div>
+                    <div className="text-2xl font-black font-mono mt-1">
+                      +{g.amount.toLocaleString('pt-BR')}
+                    </div>
+                  </div>
+                  {!expired && (
+                    <button
+                      onClick={() => {
+                        const r = prompt('Motivo da revogação:');
+                        if (r) revokeMut.mutate({ id: g.id, reason: r });
+                      }}
+                      className="text-[10px] text-zinc-500 hover:text-red-400 font-black uppercase tracking-widest"
+                    >
+                      Revogar
+                    </button>
+                  )}
+                </div>
+                {/* Progress used */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-zinc-500">
+                    <span>Usado: {g.used_amount.toLocaleString('pt-BR')}</span>
+                    <span>{used_pct.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, used_pct)}%` }} />
+                  </div>
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-2 space-x-3">
+                  <span>Concedido: {fmtDateTime(g.created_at)}</span>
+                  <span>{g.expires_at ? `Expira: ${fmtDateTime(g.expires_at)}` : 'Sem expiração'}</span>
+                  {expired && <span className="text-red-500">EXPIRADO</span>}
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-2 italic">"{g.reason}"</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
+          <div className="bg-zinc-900 border border-emerald-900/40 rounded-3xl p-8 max-w-lg w-full space-y-5">
+            <h3 className="text-lg font-black">Conceder cota extra</h3>
+
+            <div>
+              <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+                Tipo de cota
+              </label>
+              <select
+                value={kind}
+                onChange={(e) => setKind(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50"
+              >
+                {Object.entries(QUOTA_KIND_LABELS).map(([k, l]) => (
+                  <option key={k} value={k}>{l}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+                Quantidade
+              </label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min={1}
+                max={100_000_000}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-emerald-500/50"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+                Validade
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { v: 30, l: '30d' }, { v: 90, l: '90d' }, { v: 365, l: '1 ano' },
+                  { v: null, l: 'Sem expirar' },
+                ].map(({ v, l }) => (
+                  <button
+                    key={l}
+                    onClick={() => setDuration(v)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      duration === v
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 block">
+                Motivo
+              </label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder="Ex: pico TikTok viral mês 04/2026"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 resize-none"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setOpen(false)}
+                className="flex-1 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => createMut.mutate()}
+                disabled={reason.length < 5 || !amount || parseInt(amount, 10) < 1 || createMut.isPending}
+                className="flex-1 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 rounded-2xl text-sm font-black uppercase tracking-widest"
+              >
+                {createMut.isPending ? 'Concedendo...' : 'Conceder'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeatureFlagsSection({ tenantId }: { tenantId: string }) {
+  const qc = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-tenant-flags', tenantId],
+    queryFn: () => adminApi.listTenantFlags(tenantId),
+  });
+
+  const setMut = useMutation({
+    mutationFn: ({ key, enabled }: { key: string; enabled: boolean }) =>
+      adminApi.setTenantFlag(tenantId, key, enabled),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-tenant-flags', tenantId] }),
+    onError: handleAdminError('Erro ao alterar flag'),
+  });
+
+  const removeMut = useMutation({
+    mutationFn: (key: string) => adminApi.removeTenantFlag(tenantId, key),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-tenant-flags', tenantId] }),
+    onError: handleAdminError('Erro ao remover override'),
+  });
+
+  const flags = data?.flags ?? [];
+
+  return (
+    <div className="space-y-3">
+      {isLoading ? (
+        <div className="text-zinc-500 text-sm text-center py-8">Carregando...</div>
+      ) : flags.length === 0 ? (
+        <div className="text-zinc-600 text-sm text-center py-12 border border-dashed border-zinc-800 rounded-2xl">
+          Nenhuma feature flag global definida.
+          <br />
+          <span className="text-[10px] text-zinc-700 mt-2 block">
+            Crie em /admin/feature-flags (em breve)
+          </span>
+        </div>
+      ) : (
+        flags.map((f) => (
+          <div
+            key={f.key}
+            className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl flex items-center justify-between gap-3"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="font-mono text-sm font-bold">{f.key}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${
+                  f.source === 'tenant_override' ? 'bg-purple-900/40 text-purple-300' :
+                  f.source === 'rollout' ? 'bg-blue-900/40 text-blue-300' :
+                  'bg-zinc-800 text-zinc-500'
+                }`}>
+                  {f.source}
+                </span>
+              </div>
+              {f.description && (
+                <p className="text-[11px] text-zinc-500">{f.description}</p>
+              )}
+              <div className="text-[10px] text-zinc-600 mt-0.5">
+                Default: {f.default_value ? 'on' : 'off'} · Rollout: {f.rollout_pct}%
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setMut.mutate({ key: f.key, enabled: !f.value })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                  f.value
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400'
+                }`}
+              >
+                {f.value ? 'ON' : 'off'}
+              </button>
+              {f.tenant_override && (
+                <button
+                  onClick={() => removeMut.mutate(f.key)}
+                  className="text-[10px] text-zinc-500 hover:text-red-400 font-black uppercase tracking-widest"
+                  title="Remove override (volta pro default)"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ─── AuditTab ────────────────────────────────────────────────────────
+
+function AuditTab({ tenantId }: { tenantId: string }) {
+  const [filter, setFilter] = useState('');
+  const [cursor, setCursor] = useState(0);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-audit', tenantId, filter, cursor],
+    queryFn: () => adminApi.listTenantAudit(tenantId, {
+      event_type: filter || undefined,
+      cursor, limit: 50,
+    }),
+  });
+
+  const events = data?.events ?? [];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => { setFilter(e.target.value); setCursor(0); }}
+          placeholder="Filtrar por event_type (use * pra prefix)"
+          className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+        />
+        <span className="text-xs text-zinc-500">
+          {data?.total ?? 0} eventos
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="text-zinc-500 text-sm text-center py-8">Carregando...</div>
+      ) : events.length === 0 ? (
+        <div className="text-zinc-600 text-sm text-center py-12 border border-dashed border-zinc-800 rounded-2xl">
+          Nenhum evento de audit ainda.
+        </div>
+      ) : (
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+          <table className="w-full text-xs">
+            <thead className="bg-zinc-950/60">
+              <tr className="text-left text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                <th className="px-3 py-2">Quando</th>
+                <th className="px-3 py-2">Tipo</th>
+                <th className="px-3 py-2">Actor</th>
+                <th className="px-3 py-2">Target</th>
+                <th className="px-3 py-2">Detalhe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((e) => (
+                <tr key={e.id} className="border-t border-zinc-900 hover:bg-zinc-900/40">
+                  <td className="px-3 py-2 text-zinc-400 font-mono text-[11px] whitespace-nowrap">
+                    {fmtDateTime(e.timestamp)}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-white">
+                    {e.event_type}
+                  </td>
+                  <td className="px-3 py-2 text-zinc-400">
+                    {e.actor_user_id ? `#${e.actor_user_id}` : '—'}
+                    {e.impersonator_user_id && (
+                      <span className="ml-1 px-1 py-0.5 bg-red-900/40 rounded text-[9px] text-red-300">
+                        via #{e.impersonator_user_id}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-zinc-500 font-mono text-[10px] truncate max-w-[140px]">
+                    {e.target_type ? `${e.target_type}/${e.target_id || '—'}` : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-[10px] text-zinc-500 max-w-[280px] truncate">
+                    {e.payload && Object.keys(e.payload).length > 0
+                      ? JSON.stringify(e.payload)
+                      : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {data && data.cursor_next !== null && (
+            <div className="border-t border-zinc-800 px-3 py-2 flex justify-end">
+              <button
+                onClick={() => setCursor(data.cursor_next!)}
+                className="text-xs text-zinc-500 hover:text-white font-black uppercase tracking-widest"
+              >
+                Próxima página →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Helper unificado de error handler ────────────────────────────────
+
+function handleAdminError(fallback: string) {
+  return (e: unknown) => {
+    const body = e instanceof ApiError ? (e.body as { error?: string }) : null;
+    const known: Record<string, string> = {
+      reason_too_short: 'Motivo precisa de pelo menos 5 caracteres',
+      plan_invalid: 'Plano inválido',
+      kind_invalid: 'Tipo de cota inválido',
+      amount_invalid: 'Quantidade inválida (1 a 100M)',
+      duration_invalid: 'Duração inválida',
+      override_not_found: 'Override não encontrado',
+      already_revoked: 'Já estava revogado',
+      grant_not_found: 'Grant não encontrado',
+      flag_not_found: 'Flag não encontrada — crie em /admin/feature-flags primeiro',
+      key_invalid: 'Chave inválida (use snake_case)',
+      tenant_not_found: 'Tenant não encontrado',
+      tenant_deleted: 'Tenant deletado',
+    };
+    toast.error(known[body?.error || ''] || fallback);
+  };
 }

@@ -216,4 +216,113 @@ export const adminApi = {
     ),
   restoreTenant: (tenantId: string, reason: string) =>
     api.post<{ ok: boolean; restored_at: string }>(`/api/admin/tenants/${tenantId}/restore`, { reason }),
+
+  // Plan overrides (Frente 1.5)
+  createPlanOverride: (
+    tenantId: string,
+    payload: { plan: string; duration_days?: number | null; pauses_stripe?: boolean; reason: string },
+  ) =>
+    api.post<{
+      ok: boolean;
+      override: {
+        id: number; plan: string; expires_at: string | null;
+        starts_at: string; pauses_stripe: boolean; reason: string;
+      };
+      effective_plan_now: string;
+      effective_source: string;
+    }>(`/api/admin/tenants/${tenantId}/plan-overrides`, payload),
+  revokePlanOverride: (tenantId: string, overrideId: number, reason: string) =>
+    api.del<{ ok: boolean }>(`/api/admin/tenants/${tenantId}/plan-overrides/${overrideId}`, { reason }),
+  listPlanOverrides: (tenantId: string, includeRevoked = false) =>
+    api.get<{
+      overrides: Array<{
+        id: number; plan: string; reason: string;
+        starts_at: string; expires_at: string | null;
+        pauses_stripe: boolean;
+        revoked_at: string | null; revoked_reason: string | null;
+        granted_by_admin_id: number; created_at: string;
+      }>;
+    }>(`/api/admin/tenants/${tenantId}/plan-overrides${includeRevoked ? '?include=all' : ''}`),
+
+  // Quota grants (Frente 1.6)
+  createQuotaGrant: (
+    tenantId: string,
+    payload: { kind: string; amount: number; duration_days?: number | null; reason: string },
+  ) =>
+    api.post<{
+      ok: boolean;
+      grant: { id: number; kind: string; amount: number; expires_at: string | null; reason: string };
+      new_effective_quota: number;
+    }>(`/api/admin/tenants/${tenantId}/quota-grants`, payload),
+  revokeQuotaGrant: (tenantId: string, grantId: number, reason: string) =>
+    api.del<{ ok: boolean }>(`/api/admin/tenants/${tenantId}/quota-grants/${grantId}`, { reason }),
+  listQuotaGrants: (tenantId: string, includeExpired = false) =>
+    api.get<{
+      grants: Array<{
+        id: number; kind: string; amount: number; used_amount: number;
+        expires_at: string | null; reason: string;
+        granted_by: number; created_at: string;
+      }>;
+    }>(`/api/admin/tenants/${tenantId}/quota-grants${includeExpired ? '?include=all' : ''}`),
+
+  // Feature flags (Frente 1.10)
+  listGlobalFlags: () =>
+    api.get<{
+      flags: Array<{
+        key: string; description: string | null;
+        default_value: boolean; rollout_pct: number;
+        created_at: string;
+      }>;
+    }>('/api/admin/feature-flags'),
+  upsertGlobalFlag: (payload: { key: string; description?: string; default_value: boolean; rollout_pct: number }) =>
+    api.post<{ ok: boolean; action: 'created' | 'updated'; flag: { key: string } }>('/api/admin/feature-flags', payload),
+  listTenantFlags: (tenantId: string) =>
+    api.get<{
+      flags: Array<{
+        key: string; description: string | null;
+        value: boolean; source: 'tenant_override' | 'rollout' | 'default';
+        default_value: boolean; rollout_pct: number;
+        tenant_override: { enabled: boolean; set_at: string } | null;
+      }>;
+    }>(`/api/admin/tenants/${tenantId}/feature-flags`),
+  setTenantFlag: (tenantId: string, key: string, enabled: boolean) =>
+    api.put<{ ok: boolean }>(`/api/admin/tenants/${tenantId}/feature-flags/${key}`, { enabled }),
+  removeTenantFlag: (tenantId: string, key: string) =>
+    api.del<{ ok: boolean }>(`/api/admin/tenants/${tenantId}/feature-flags/${key}`),
+
+  // Audit (Frente 1.12)
+  listAudit: (params: { event_type?: string; actor_user_id?: number; tenant_id?: string; since?: string; until?: string; search?: string; cursor?: number; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.set(k, String(v));
+    });
+    const qs = q.toString();
+    return api.get<{
+      events: Array<{
+        id: number; timestamp: string; tenant_id: string | null;
+        actor_user_id: number | null; impersonator_user_id: number | null;
+        impersonation_id: number | null; event_type: string;
+        target_type: string | null; target_id: string | null;
+        payload: Record<string, unknown>; ip_address: string | null;
+      }>;
+      total: number; cursor_next: number | null;
+    }>(`/api/admin/audit${qs ? '?' + qs : ''}`);
+  },
+  listTenantAudit: (tenantId: string, params: { event_type?: string; cursor?: number; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.set(k, String(v));
+    });
+    const qs = q.toString();
+    return api.get<{
+      events: Array<{
+        id: number; timestamp: string; tenant_id: string | null;
+        actor_user_id: number | null; impersonator_user_id: number | null;
+        impersonation_id: number | null; event_type: string;
+        target_type: string | null; target_id: string | null;
+        payload: Record<string, unknown>; ip_address: string | null;
+      }>;
+      total: number; cursor_next: number | null;
+    }>(`/api/admin/tenants/${tenantId}/audit${qs ? '?' + qs : ''}`);
+  },
 };

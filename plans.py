@@ -18,7 +18,7 @@ from __future__ import annotations
 import copy
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +278,12 @@ def effective_plan(tenant_id: str, *, db_session=None) -> tuple[str, str]:
     try:
         now = datetime.now(timezone.utc)
 
+        def _aware(dt):
+            """SQLite armazena DateTime sem tzinfo; normaliza pra comparar."""
+            if dt is None:
+                return None
+            return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
         # 1. Override
         override = (
             db.query(models.TenantPlanOverride)
@@ -288,14 +294,17 @@ def effective_plan(tenant_id: str, *, db_session=None) -> tuple[str, str]:
             .order_by(models.TenantPlanOverride.created_at.desc())
             .first()
         )
-        if override and (override.expires_at is None or override.expires_at > now):
-            return override.plan, "override"
+        if override:
+            ovr_expires = _aware(override.expires_at)
+            if ovr_expires is None or ovr_expires > now:
+                return override.plan, "override"
 
         # 2. Stripe (placeholder — TODO: tabela tenant_billing quando 2.16 estiver pronto)
 
         # 3. Trial
         user = db.query(models.User).filter_by(tenant_id=tenant_id, is_active=True).first()
-        if user and user.trial_ends_at and user.trial_ends_at > now:
+        trial_ends = _aware(user.trial_ends_at) if user else None
+        if trial_ends and trial_ends > now:
             return "pro", "trial"
 
         # 4. Free
