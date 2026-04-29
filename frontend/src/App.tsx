@@ -7,6 +7,8 @@ import Contacts from './routes/Contacts';
 import Settings from './routes/Settings';
 import BlueprintsList from './routes/BlueprintsList';
 import Builder from './routes/Builder';
+import Runs from './routes/Runs';
+import TenantConfig from './routes/TenantConfig';
 
 export default function App() {
   return (
@@ -17,6 +19,8 @@ export default function App() {
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/blueprints" element={<BlueprintsList />} />
+          <Route path="/runs" element={<Runs />} />
+          <Route path="/tenant-config" element={<TenantConfig />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
         <Route path="/flows/:id" element={<Builder />} />

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Users, Settings, FolderTree, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Activity, FolderTree, KeyRound, LayoutDashboard, MessageSquare, PanelLeftClose, PanelLeftOpen, Settings, Users } from 'lucide-react';
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -10,6 +10,8 @@ export default function Layout() {
     { to: '/inbox', icon: MessageSquare, label: 'Inbox' },
     { to: '/contacts', icon: Users, label: 'Contatos' },
     { to: '/blueprints', icon: FolderTree, label: 'Flow Builder' },
+    { to: '/runs', icon: Activity, label: 'Execuções' },
+    { to: '/tenant-config', icon: KeyRound, label: 'Variáveis & Segredos' },
     { to: '/settings', icon: Settings, label: 'Configurações' },
   ];
 
