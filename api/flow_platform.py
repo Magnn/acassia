@@ -467,6 +467,7 @@ def register_flow_platform_routes(app: Flask) -> None:
                                 "blueprint_id": r.blueprint_id,
                                 "lead_id": r.lead_id,
                                 "status": r.status,
+                                "meta": r.meta_json if isinstance(r.meta_json, dict) else {},
                                 "started_at": r.started_at.isoformat() if r.started_at else "",
                                 "finished_at": r.finished_at.isoformat() if r.finished_at else None,
                             }
