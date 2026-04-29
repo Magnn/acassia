@@ -246,11 +246,34 @@ class Engine:
         try:
             from tenant_context import get_engine_tenant_id
 
-            self.tenant_id = str(kwargs.get("tenant_id") or get_engine_tenant_id())
+            self._tenant_id_static = str(kwargs.get("tenant_id") or get_engine_tenant_id())
         except Exception:
-            self.tenant_id = "default"
+            self._tenant_id_static = "default"
         self._monitor_retomada_estatica_ativo = False
         self._iniciar_monitor_retomada_estatica()
+
+    @property
+    def tenant_id(self) -> str:
+        """
+        Tenant corrente para esta chamada do engine. Lê:
+            1. ContextVar override (multi-tenant webhook usa
+               ``tenant_override_ctx(...)`` antes de chamar processar_mensagem)
+            2. Tenant estático da construção (single-tenant legado / cron)
+        """
+        try:
+            from tenant_context import _ENGINE_TENANT_OVERRIDE
+
+            override = _ENGINE_TENANT_OVERRIDE.get()
+            if override:
+                return override
+        except Exception:
+            pass
+        return self._tenant_id_static
+
+    @tenant_id.setter
+    def tenant_id(self, value: str) -> None:
+        # Compat: codigos antigos que faziam motor.tenant_id = "x" continuam funcionando.
+        self._tenant_id_static = str(value or "default")
 
     def _iniciar_monitor_retomada_estatica(self) -> None:
         """

@@ -1172,6 +1172,35 @@ class QuickReply(Base):
     updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False)
 
 
+class WaPhoneTenantBinding(Base):
+    """
+    Liga um phone_number_id da Meta WhatsApp Cloud API ao tenant dono dele
+    (Frente 1: multi-tenant onboarding).
+
+    O webhook /webhook é unico, mas a Meta envia phone_number_id no payload
+    (entry[].changes[].value.metadata.phone_number_id). Esse mapeamento e
+    usado para resolver o tenant correto antes do _triagem_meta enfileirar.
+
+    Tambem suporta verify_token e app_secret por tenant — o token global
+    do .env continua funcionando como fallback (single-tenant mode).
+    """
+    __tablename__ = "wa_phone_tenant_bindings"
+
+    phone_number_id = Column(String(64), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    waba_id = Column(String(64), nullable=True)
+    display_phone_number = Column(String(40), nullable=True)
+    verify_token = Column(String(120), nullable=True)
+    app_secret = Column(String(200), nullable=True)
+    status = Column(String(20), default="pending", nullable=False)  # pending|active|failed
+    last_verified_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False,
+    )
+
+
 class SpiritualDate(Base):
     """
     Datas espirituais/ritos (Frente 4.22).

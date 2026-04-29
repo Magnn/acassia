@@ -269,6 +269,7 @@ def _register_saas_blueprints():
     from api.saas.compose import compose_bp as saas_compose_bp
     from api.saas.lead_context import lead_context_bp as saas_lead_context_bp
     from api.saas.calendar_spiritual import calendar_bp as saas_calendar_bp
+    from api.saas.integrations_whatsapp import integrations_wa_bp as saas_integrations_wa_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -306,6 +307,7 @@ def _register_saas_blueprints():
         saas_compose_bp,
         saas_lead_context_bp,
         saas_calendar_bp,
+        saas_integrations_wa_bp,
     ):
         app.register_blueprint(bp)
 
@@ -730,7 +732,15 @@ class LeadInboxManager:
 
                     motor_payload = dict(payload)
                     motor_payload.pop("_inbox_after_text_grace", None)
-                    result = motor.processar_mensagem(**motor_payload) or {}
+                    # Multi-tenant: aplica override per-call se webhook resolveu tenant
+                    _override_tenant = motor_payload.get("tenant_id")
+                    try:
+                        from tenant_context import tenant_override_ctx
+                        with tenant_override_ctx(_override_tenant):
+                            result = motor.processar_mensagem(**motor_payload) or {}
+                    except Exception:
+                        # Fallback se import falhar — mantém comportamento legado
+                        result = motor.processar_mensagem(**motor_payload) or {}
                     if result.get("status") != "busy":
                         self._auditar_batch_pronto(telefone, payload)
                     if result.get("status") == "busy":
@@ -3992,21 +4002,50 @@ def webhook_meta():
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
-        if mode == "subscribe" and token == VERIFY_TOKEN:
-            logger.info("✅ [WEBHOOK] Token Meta validado.")
-            return challenge, 200
+        if mode == "subscribe":
+            # Token global (single-tenant) ou per-tenant binding
+            if token == VERIFY_TOKEN:
+                logger.info("✅ [WEBHOOK] Token Meta validado (global).")
+                return challenge, 200
+            try:
+                from wa_tenant_resolver import resolve_tenant_for_verify_token
+                resolved = resolve_tenant_for_verify_token(token)
+                if resolved is not None:
+                    tenant_id, phone_id = resolved
+                    logger.info(
+                        "✅ [WEBHOOK] Token Meta validado (per-tenant) tenant=%s phone_id=%s",
+                        tenant_id, phone_id,
+                    )
+                    return challenge, 200
+            except Exception as exc:
+                logger.warning("⚠️ [WEBHOOK] resolver per-tenant falhou: %s", exc)
         return "Forbidden", 403
 
-    # Verificação HMAC SHA256 (Segurança Magno)
-    if APP_SECRET:
-        corpo_raw = request.get_data()
+    # Verificação HMAC SHA256 — usa app_secret per-tenant se houver binding
+    corpo_raw = request.get_data()
+    data_preview = request.get_json(silent=True) or {}
+    secret_to_use = APP_SECRET
+    try:
+        from wa_tenant_resolver import (
+            extract_phone_number_id_from_payload,
+            get_app_secret_for_phone_id,
+        )
+        pid = extract_phone_number_id_from_payload(data_preview)
+        if pid:
+            per_tenant_secret = get_app_secret_for_phone_id(pid)
+            if per_tenant_secret:
+                secret_to_use = per_tenant_secret
+    except Exception as exc:
+        logger.warning("⚠️ [WEBHOOK] secret per-tenant lookup falhou: %s", exc)
+
+    if secret_to_use:
         assinatura = request.headers.get("X-Hub-Signature-256", "")
-        mac = hmac.new(APP_SECRET.encode(), corpo_raw, hashlib.sha256).hexdigest()
+        mac = hmac.new(secret_to_use.encode(), corpo_raw, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(f"sha256={mac}", assinatura):
             logger.warning("🚫 [SECURITY] Assinatura inválida detectada.")
             return "Invalid Signature", 403
 
-    data = request.get_json(silent=True)
+    data = data_preview if data_preview else request.get_json(silent=True)
     if not data: return "NO_DATA", 400
 
     # Com REDIS_URL: fila durável (LPUSH) + worker BRPOP → mesma _triagem_meta. Senão: thread in-process.
@@ -4028,8 +4067,18 @@ def _triagem_meta(data):
         entry = data.get("entry", [{}])[0]
         changes = entry.get("changes", [{}])[0]
         value = changes.get("value", {})
-        
+
         if "messages" not in value: return
+
+        # Multi-tenant: resolve tenant a partir do phone_number_id antes de tudo
+        meta_dict = value.get("metadata") or {}
+        phone_number_id = meta_dict.get("phone_number_id") or ""
+        try:
+            from wa_tenant_resolver import resolve_tenant_for_phone_id
+            resolved_tenant = resolve_tenant_for_phone_id(phone_number_id)
+        except Exception as _resolve_exc:
+            logger.warning("⚠️ [TRIAGEM] resolver tenant falhou: %s", _resolve_exc)
+            resolved_tenant = None
 
         msg = value["messages"][0]
         msg_id = msg.get("id")
@@ -4106,10 +4155,14 @@ def _triagem_meta(data):
                     from tenant_context import get_request_tenant_id
                     _db = SessionLocal()
                     try:
-                        try:
-                            _tid = get_request_tenant_id()
-                        except Exception:
-                            _tid = "default"
+                        # Multi-tenant: prefere o tenant resolvido do phone_number_id
+                        if resolved_tenant:
+                            _tid = resolved_tenant
+                        else:
+                            try:
+                                _tid = get_request_tenant_id()
+                            except Exception:
+                                _tid = "default"
                         lead = _db.query(_models.Lead).filter_by(
                             tenant_id=_tid, telefone=telefone,
                         ).first()
@@ -4144,6 +4197,8 @@ def _triagem_meta(data):
             "meta_msg_id": msg_id,
             "meta_media_id": media_id,
             "nome_perfil_whatsapp": nome_perfil_whatsapp,
+            "phone_number_id": phone_number_id,
+            "tenant_id": resolved_tenant,
         }
         inbox_manager.enqueue(telefone, payload)
 

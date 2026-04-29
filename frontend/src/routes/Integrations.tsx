@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { integrationsApi } from '../api/integrations';
 import { toast } from '../lib/toast';
+import WhatsAppConnect from '../components/WhatsAppConnect';
 
 export default function Integrations() {
   const { data, isLoading, error } = useQuery({
@@ -50,6 +51,16 @@ export default function Integrations() {
       </div>
 
       <div className="grid gap-6">
+        {/* WhatsApp Cloud API — onboarding por tenant */}
+        <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
+          <header className="px-6 py-4 border-b border-border bg-bg-primary/20">
+            <h3 className="font-black text-sm uppercase tracking-widest">Conectar WhatsApp</h3>
+          </header>
+          <div className="px-6 py-6">
+            <WhatsAppConnect />
+          </div>
+        </section>
+
         {/* Webhooks */}
         <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
           <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center gap-3">
