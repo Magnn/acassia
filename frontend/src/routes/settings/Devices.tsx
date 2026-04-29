@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ArrowLeft,
   Building2,
   CheckCircle2,
   ChevronDown,
@@ -415,6 +416,9 @@ function ConfigModal({
   onSave: (patch: Parameters<typeof whatsappApi.saveConfig>[0]) => void;
   saving: boolean;
 }) {
+  // Step 1: type picker (compacto, estilo Lailla)
+  // Step 2: form contextual do provider escolhido
+  const [step, setStep] = useState<'type' | 'form'>(form.provider && (form.meta_cloud.phone_number_id || form.coex.api_url || form.evolution.server_url) ? 'form' : 'type');
   const [mode, setMode] = useState<ProviderMode>(form.provider);
   const [secrets, setSecrets] = useState({
     access_token: '',
@@ -448,6 +452,70 @@ function ConfigModal({
     onSave(patch);
   };
 
+  // ── Step 1: type picker ─────────────────────────────────────────────
+  if (step === 'type') {
+    return (
+      <div
+        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white text-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+        >
+          <header className="flex items-center justify-between px-5 py-3 bg-sibila-amethyst text-white">
+            <h3 className="font-display text-base">Escolha o tipo de conexão</h3>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-slate-700 flex items-center justify-center transition-colors"
+              title="Fechar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </header>
+          <ul className="p-4 space-y-3">
+            {PROVIDERS.map((p) => (
+              <li key={p.id}>
+                <button
+                  onClick={() => {
+                    setMode(p.id);
+                    setStep('form');
+                  }}
+                  className={[
+                    'w-full text-left rounded-xl border-2 px-4 py-3.5 flex items-center gap-3 transition-all',
+                    mode === p.id
+                      ? 'border-sibila-amethyst shadow-md'
+                      : 'border-slate-200 hover:border-sibila-amethyst/50 hover:shadow-sm',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                      p.id === 'meta_cloud' ? 'bg-blue-50 text-blue-600' :
+                      p.id === 'coex' ? 'bg-amber-50 text-amber-600' :
+                      'bg-emerald-50 text-emerald-600',
+                    ].join(' ')}
+                  >
+                    <p.Icon className="w-5 h-5" strokeWidth={1.8} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-800">
+                      {modalTitleFor(p.id)}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {modalSubtitleFor(p.id)}
+                    </div>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step 2: form ────────────────────────────────────────────────────
   return (
     <div
       className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
@@ -458,13 +526,22 @@ function ConfigModal({
         className="bg-sibila-obsidian border border-sibila-mist rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
       >
         <header className="flex items-center justify-between px-6 py-4 border-b border-sibila-mist flex-shrink-0">
-          <div>
-            <h3 className="font-display text-lg text-sibila-moonlight">
-              Conectar WhatsApp
-            </h3>
-            <p className="text-[11px] text-sibila-smoke mt-0.5">
-              Escolha o provider e preencha as credenciais.
-            </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setStep('type')}
+              className="text-sibila-fog hover:text-sibila-moonlight p-1 rounded hover:bg-sibila-veil"
+              title="Voltar"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div>
+              <h3 className="font-display text-lg text-sibila-moonlight">
+                {modalTitleFor(mode)}
+              </h3>
+              <p className="text-[11px] text-sibila-smoke mt-0.5">
+                {modalSubtitleFor(mode)}
+              </p>
+            </div>
           </div>
           <button onClick={onClose} className="text-sibila-fog hover:text-sibila-moonlight p-1">
             <X className="w-4 h-4" />
@@ -472,35 +549,6 @@ function ConfigModal({
         </header>
 
         <div className="overflow-y-auto px-6 py-5 space-y-5">
-          {/* Picker de provider — pills */}
-          <div className="grid grid-cols-3 gap-2">
-            {PROVIDERS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setMode(p.id)}
-                className={[
-                  'text-left rounded-lg border p-3 transition-all',
-                  mode === p.id
-                    ? 'border-sibila-amethyst bg-sibila-veil shadow-glow-amethyst'
-                    : 'border-sibila-mist bg-sibila-onyx hover:border-sibila-stone',
-                ].join(' ')}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <p.Icon
-                    className={`w-4 h-4 ${mode === p.id ? 'text-sibila-amethyst' : 'text-sibila-fog'}`}
-                  />
-                  <span className={`text-[9px] uppercase tracking-wider px-1 py-0.5 rounded border ${p.badgeTone}`}>
-                    {p.badge}
-                  </span>
-                </div>
-                <div className="text-xs font-medium text-sibila-moonlight">{p.title}</div>
-                <p className="text-[10px] text-sibila-smoke mt-0.5 leading-tight">
-                  {p.description}
-                </p>
-              </button>
-            ))}
-          </div>
-
           {/* Form contextual */}
           {mode === 'meta_cloud' && (
             <div className="space-y-3">
@@ -705,6 +753,18 @@ function Secret({
       />
     </label>
   );
+}
+
+function modalTitleFor(p: ProviderMode): string {
+  if (p === 'meta_cloud') return 'API Oficial (Meta Cloud)';
+  if (p === 'coex') return 'API Oficial · Coex (BSP)';
+  return 'WhatsApp Business (não oficial)';
+}
+
+function modalSubtitleFor(p: ProviderMode): string {
+  if (p === 'meta_cloud') return 'Conecte direto na Graph API da Meta';
+  if (p === 'coex') return 'Provedor BSP brasileiro parceiro Meta';
+  return 'Conexão por QR (Evolution API) — pode ser banido';
 }
 
 // Marca usado pra evitar warning do TS noUnusedLocals
