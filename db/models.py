@@ -1172,6 +1172,29 @@ class QuickReply(Base):
     updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False)
 
 
+class SpiritualDate(Base):
+    """
+    Datas espirituais/ritos (Frente 4.22).
+
+    Recurring rule:
+        annual_fixed   — mesmo dia/mes todo ano (ex: 2/2 Iemanja)
+        annual_movable — varia por ano (Pascoa, Samhain por equinocio)
+        lunar          — atrelado a fase lunar (calculado em tempo real)
+    """
+    __tablename__ = "spiritual_dates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tradition = Column(String(40), nullable=False, index=True)  # crista|afro|paga|astronomica|pessoal
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    recurring = Column(String(20), default="annual_fixed", nullable=False)
+    month = Column(Integer, nullable=True)  # 1-12 para annual_fixed
+    day = Column(Integer, nullable=True)    # 1-31 para annual_fixed
+    fixed_date = Column(Date, nullable=True)  # caso especifico (ex: eclipse 2026)
+    tenant_id = Column(String(64), nullable=True, index=True)  # null = global; senao custom do tenant
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class LeadAuraImage(Base):
     """Aura semanal gerada via Stable Diffusion (Frente 4.18)."""
     __tablename__ = "lead_aura_images"

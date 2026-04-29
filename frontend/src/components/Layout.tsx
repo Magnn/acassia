@@ -18,6 +18,7 @@ import {
   Store,
   Sparkles,
   Compass,
+  CalendarDays,
 } from 'lucide-react';
 import Logo, { Wordmark } from './Logo';
 import { useTheme } from '../context/ThemeContext';
@@ -46,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/lunar', icon: Bot, label: 'Lunar', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/horoscope', icon: Sparkles, label: 'Horóscopo Diário', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/spiritual', icon: Compass, label: 'Perfil Espiritual', group: 'oraculo', roles: ['admin', 'user'] },
+  { to: '/calendar', icon: CalendarDays, label: 'Calendário Espiritual', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/affiliate', icon: CreditCard, label: 'Afiliados', group: 'conta', roles: ['admin', 'user'] },
   { to: '/agents', icon: Bot, label: 'Atendentes', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo', roles: ['admin'] },

@@ -268,6 +268,7 @@ def _register_saas_blueprints():
     from api.saas.aura import aura_bp as saas_aura_bp
     from api.saas.compose import compose_bp as saas_compose_bp
     from api.saas.lead_context import lead_context_bp as saas_lead_context_bp
+    from api.saas.calendar_spiritual import calendar_bp as saas_calendar_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -304,6 +305,7 @@ def _register_saas_blueprints():
         saas_aura_bp,
         saas_compose_bp,
         saas_lead_context_bp,
+        saas_calendar_bp,
     ):
         app.register_blueprint(bp)
 
