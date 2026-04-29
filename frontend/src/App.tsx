@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
+import AdminLayout from './components/AdminLayout';
 import SettingsLayout from './components/SettingsLayout';
 import Toaster from './components/Toaster';
 import BlueprintsList from './routes/BlueprintsList';
@@ -21,6 +22,12 @@ const Billing = lazy(() => import('./routes/Billing'));
 const SettingsDevices = lazy(() => import('./routes/settings/Devices'));
 const SettingsRecovery = lazy(() => import('./routes/settings/Recovery'));
 const SettingsPlaceholder = lazy(() => import('./routes/settings/Placeholder'));
+
+// Admin God-Mode (Frente 1)
+const AdminTenants = lazy(() => import('./routes/admin/Tenants'));
+const AdminTenantDetail = lazy(() => import('./routes/admin/TenantDetail'));
+const AdminSetup2FA = lazy(() => import('./routes/admin/Setup2FA'));
+const AdminRecover = lazy(() => import('./routes/admin/Recover'));
 
 function PageFallback() {
   return (
@@ -122,6 +129,16 @@ export default function App() {
             </Route>
           </Route>
           <Route path="/flows/:id" element={<Builder />} />
+
+          {/* Admin God-Mode (Frente 1) — tema escuro/sóbrio distinto */}
+          <Route path="/admin/setup-2fa" element={<AdminSetup2FA />} />
+          <Route path="/admin/recover" element={<AdminRecover />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/tenants" replace />} />
+            <Route path="tenants" element={<AdminTenants />} />
+            <Route path="tenants/:tenantId" element={<AdminTenantDetail />} />
+          </Route>
+
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>

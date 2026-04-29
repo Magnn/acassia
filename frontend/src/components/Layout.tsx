@@ -14,6 +14,7 @@ import {
   Power,
   Settings as SettingsIcon,
   CreditCard,
+  ShieldCheck,
 } from 'lucide-react';
 import Logo, { Wordmark } from './Logo';
 import { useTheme } from '../context/ThemeContext';
@@ -37,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo', roles: ['admin'] },
   { to: '/integrations', icon: Plug, label: 'Integrações', group: 'avancado', roles: ['admin'] },
   { to: '/tenant-config', icon: KeyRound, label: 'Variáveis & Segredos', group: 'avancado', roles: ['admin'] },
+  { to: '/admin/tenants', icon: ShieldCheck, label: 'Admin Console', group: 'platform', roles: ['admin'] },
 ];
 
 const GROUP_LABELS: Record<string, string> = {
@@ -45,6 +47,7 @@ const GROUP_LABELS: Record<string, string> = {
   conta: 'Minha Conta',
   oraculo: 'Oráculo',
   avancado: 'Avançado',
+  platform: 'Plataforma',
 };
 
 const PAGE_TITLES: Record<string, string> = {
