@@ -642,6 +642,24 @@ class ConsentRecord(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class FlowNodeVisit(Base):
+    """
+    Visita de lead em um nó específico do fluxo (Frente 3.26).
+    Persistido cada vez que lead entra/sai de um nó pra calcular funnel.
+    """
+    __tablename__ = "flow_node_visits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    flow_id = Column(Integer, nullable=True, index=True)  # FlowBlueprint.id (null se motor estático)
+    flow_slug = Column(String(120), nullable=True, index=True)
+    node_id = Column(String(120), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    entered_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    exited_at = Column(DateTime(timezone=True), nullable=True)
+    exit_reason = Column(String(40), nullable=True)  # response|timeout|exit|next|error
+
+
 class TenantBilling(Base):
     """
     Estado canônico de assinatura Stripe por tenant (Frente 2.16).

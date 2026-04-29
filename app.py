@@ -251,6 +251,7 @@ def _register_saas_blueprints():
     from api.admin.metrics import metrics_bp as admin_metrics_bp
     from api.saas.security import security_bp
     from api.saas.privacy import privacy_bp
+    from api.saas.analytics import analytics_bp as saas_analytics_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -271,6 +272,7 @@ def _register_saas_blueprints():
         admin_metrics_bp,
         security_bp,
         privacy_bp,
+        saas_analytics_bp,
     ):
         app.register_blueprint(bp)
 

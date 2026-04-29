@@ -1825,6 +1825,18 @@ class Engine:
             node_antes = lead.node_atual
             lead.node_atual = prox
             ctx.node_atual = prox
+            # Funnel analytics (Frente 3.26)
+            try:
+                import funnel_analytics
+                funnel_analytics.record_node_entry(
+                    lead_id=lead.id,
+                    tenant_id=lead.tenant_id or "default",
+                    node_id=prox,
+                    flow_slug=getattr(ctx, "flow_slug", None),
+                    db_session=db,
+                )
+            except Exception as exc:
+                logger.debug("[funnel] record_entry falhou: %s", exc)
             try:
                 registrar_node_transition(
                     db,
