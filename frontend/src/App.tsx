@@ -9,7 +9,7 @@ export default function App() {
         <Link to="/" className="font-semibold text-cigana-purple">
           Cigana · Flow Builder
         </Link>
-        <span className="text-xs text-slate-400">Fase 2 — edição com paleta + auto-save</span>
+        <span className="text-xs text-slate-400">Fase 3 — inspetores por tipo</span>
       </header>
       <main className="flex-1 min-h-0">
         <Routes>

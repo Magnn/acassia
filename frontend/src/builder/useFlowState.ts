@@ -112,15 +112,33 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     [markDirty],
   );
 
+  const updateNode = useCallback(
+    (id: string, patch: Partial<FlowNodeData>) => {
+      setNodes((curr) =>
+        curr.map((n) =>
+          n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
+        ),
+      );
+      markDirty();
+    },
+    [markDirty],
+  );
+
+  const selectedNodeId = nodes.find((n) => n.selected)?.id ?? null;
+  const selectedNode = nodes.find((n) => n.selected) ?? null;
+
   return {
     nodes,
     edges,
     status,
     error,
+    selectedNodeId,
+    selectedNode,
     onNodesChange,
     onEdgesChange,
     onConnect,
     addNode,
+    updateNode,
   };
 }
 

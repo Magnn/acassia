@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { blueprintsApi, type BlueprintDetail } from '../api/blueprints';
@@ -5,7 +6,9 @@ import Canvas from '../builder/Canvas';
 import Palette from '../builder/Palette';
 import SaveIndicator from '../builder/SaveIndicator';
 import { useFlowState } from '../builder/useFlowState';
+import Inspector from '../inspector/Inspector';
 import type { AcassiaDocument } from '../lib/types';
+import type { FlowNodeData } from '../lib/adapt';
 
 export default function Builder() {
   const { id } = useParams<{ id: string }>();
@@ -44,6 +47,22 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   const initialDoc = (blueprint.body ?? {}) as AcassiaDocument;
   const fs = useFlowState({ blueprintId: blueprint.id, initialDoc });
 
+  // Atualiza node selecionado.
+  const handleUpdateSelected = useCallback(
+    (patch: Partial<FlowNodeData>) => {
+      if (fs.selectedNodeId) fs.updateNode(fs.selectedNodeId, patch);
+    },
+    [fs],
+  );
+
+  // Fecha inspetor: deseleciona via onNodesChange.
+  const handleCloseInspector = useCallback(() => {
+    if (!fs.selectedNodeId) return;
+    fs.onNodesChange([
+      { type: 'select', id: fs.selectedNodeId, selected: false },
+    ]);
+  }, [fs]);
+
   return (
     <div className="h-full flex flex-col">
       <div className="border-b border-cigana-border bg-cigana-surface px-4 py-2 flex items-center justify-between flex-shrink-0">
@@ -76,6 +95,13 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
             onAddNode={fs.addNode}
           />
         </div>
+        {fs.selectedNode && (
+          <Inspector
+            node={fs.selectedNode}
+            onUpdate={handleUpdateSelected}
+            onClose={handleCloseInspector}
+          />
+        )}
       </div>
     </div>
   );
