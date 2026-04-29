@@ -39,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/pix', icon: CreditCard, label: 'Pix QR', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/voice', icon: Bot, label: 'Voice IA', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/coach', icon: Bot, label: 'Cigana Coach', group: 'oraculo', roles: ['admin', 'user'] },
+  { to: '/lunar', icon: Bot, label: 'Lunar', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/affiliate', icon: CreditCard, label: 'Afiliados', group: 'conta', roles: ['admin', 'user'] },
   { to: '/agents', icon: Bot, label: 'Atendentes', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo', roles: ['admin'] },

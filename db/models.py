@@ -704,6 +704,18 @@ class TarotCard(Base):
     keywords = Column(JSON, nullable=True)
 
 
+class LunarPhase(Base):
+    """Cache de fases lunares pré-calculadas (Frente 4.1)."""
+    __tablename__ = "lunar_phases"
+
+    date = Column(DateTime(timezone=True), primary_key=True)  # always 00:00 UTC do dia
+    phase_name = Column(String(20), nullable=False)  # nova|crescente|cheia|minguante
+    illumination_pct = Column(Float, nullable=False)
+    zodiac_sign = Column(String(20), nullable=True)  # se computado
+    is_special = Column(Boolean, default=False, nullable=False)
+    special_label = Column(String(60), nullable=True)
+
+
 class Affiliate(Base):
     """Programa de afiliados (Frente 7.15) — referência → comissão recorrente."""
     __tablename__ = "affiliates"
