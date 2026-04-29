@@ -18,6 +18,7 @@ const Integrations = lazy(() => import('./routes/Integrations'));
 const AgentStudio = lazy(() => import('./routes/AgentStudio'));
 const Onboarding = lazy(() => import('./routes/Onboarding'));
 const Billing = lazy(() => import('./routes/Billing'));
+const BillingUsage = lazy(() => import('./routes/BillingUsage'));
 
 // Settings sub-rotas
 const SettingsDevices = lazy(() => import('./routes/settings/Devices'));
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/contacts" element={<Navigate to="/leads" replace />} />
             <Route path="/blueprints" element={<BlueprintsList />} />
             <Route path="/billing" element={<Billing />} />
+            <Route path="/billing/usage" element={<BillingUsage />} />
             <Route path="/agents" element={<AgentStudio />} />
             <Route path="/runs" element={<Runs />} />
             <Route path="/integrations" element={<Integrations />} />
