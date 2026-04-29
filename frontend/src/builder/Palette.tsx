@@ -19,8 +19,8 @@ const ITEMS: AcassiaNodeType[] = [
 
 export default function Palette() {
   return (
-    <aside className="w-56 flex-shrink-0 border-r border-cigana-border bg-cigana-surface overflow-y-auto">
-      <div className="px-3 py-3 flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400 border-b border-cigana-border">
+    <aside className="w-56 flex-shrink-0 border-r border-sibila-mist bg-sibila-obsidian overflow-y-auto">
+      <div className="px-3 py-3 flex items-center gap-2 text-[11px] uppercase tracking-wide text-sibila-fog border-b border-sibila-mist">
         <Layers className="w-3.5 h-3.5" />
         <span>Paleta</span>
       </div>
@@ -29,7 +29,7 @@ export default function Palette() {
           <PaletteItem key={t} type={t} />
         ))}
       </ul>
-      <div className="p-3 text-[11px] text-slate-500 border-t border-cigana-border">
+      <div className="p-3 text-[11px] text-sibila-smoke border-t border-sibila-mist">
         Arraste para o canvas
       </div>
     </aside>
@@ -54,7 +54,7 @@ function PaletteItem({ type }: { type: AcassiaNodeType }) {
       ].join(' ')}
     >
       <v.Icon className={`w-4 h-4 ${v.accent}`} strokeWidth={2.25} />
-      <span className="text-slate-100">{v.label}</span>
+      <span className="text-sibila-moonlight">{v.label}</span>
     </li>
   );
 }

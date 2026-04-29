@@ -77,7 +77,7 @@ export default function BlueprintsList() {
           <button
             type="button"
             onClick={handleAddFolder}
-            className="text-xs text-slate-300 hover:text-slate-100 flex items-center gap-1 px-2 py-1 rounded border border-cigana-border hover:border-cigana-purple"
+            className="text-xs text-sibila-fog hover:text-sibila-moonlight flex items-center gap-1 px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst"
             title="Criar nova pasta"
           >
             <FolderPlus className="w-3 h-3" />
@@ -86,7 +86,7 @@ export default function BlueprintsList() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="text-xs text-slate-300 hover:text-slate-100 flex items-center gap-1 px-2 py-1 rounded border border-cigana-border hover:border-cigana-purple"
+            className="text-xs text-sibila-fog hover:text-sibila-moonlight flex items-center gap-1 px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst"
             title="Importar fluxo de arquivo JSON"
           >
             <Upload className="w-3 h-3" />
@@ -94,7 +94,7 @@ export default function BlueprintsList() {
           </button>
           <a
             href="/dashboard?legacy=1"
-            className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1"
+            className="text-xs text-sibila-smoke hover:text-sibila-fog flex items-center gap-1"
             title="Builder antigo (dashboard.html)"
           >
             <History className="w-3 h-3" />
@@ -114,10 +114,10 @@ export default function BlueprintsList() {
         </div>
       </div>
 
-      {isLoading && <p className="text-slate-400">Carregando…</p>}
+      {isLoading && <p className="text-sibila-fog">Carregando…</p>}
       {error && <p className="text-red-400">Erro: {(error as Error).message}</p>}
       {data && data.length === 0 && (
-        <p className="text-slate-400">Nenhum fluxo cadastrado neste tenant.</p>
+        <p className="text-sibila-fog">Nenhum fluxo cadastrado neste tenant.</p>
       )}
 
       {data && data.length > 0 && (
@@ -133,7 +133,7 @@ export default function BlueprintsList() {
                     onClick={() =>
                       setCollapsed((s) => ({ ...s, [folder.id]: !s[folder.id] }))
                     }
-                    className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-slate-100"
+                    className="flex items-center gap-1.5 text-sm text-sibila-fog hover:text-sibila-moonlight"
                   >
                     {isCollapsed ? (
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -141,7 +141,7 @@ export default function BlueprintsList() {
                       <ChevronDown className="w-3.5 h-3.5" />
                     )}
                     <span className="font-medium">{folder.name}</span>
-                    <span className="text-xs text-slate-500">({items.length})</span>
+                    <span className="text-xs text-sibila-smoke">({items.length})</span>
                   </button>
                   {!folder.system && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
@@ -152,7 +152,7 @@ export default function BlueprintsList() {
                             updateFolders(renameFolder(folders, folder.id, name));
                           }
                         }}
-                        className="text-slate-500 hover:text-slate-200 p-1 rounded hover:bg-cigana-surface"
+                        className="text-sibila-smoke hover:text-sibila-moonlight p-1 rounded hover:bg-sibila-obsidian"
                         title="Renomear"
                       >
                         <Pencil className="w-3 h-3" />
@@ -168,7 +168,7 @@ export default function BlueprintsList() {
                             toast.success('Pasta removida.');
                           }
                         }}
-                        className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-cigana-surface"
+                        className="text-sibila-smoke hover:text-red-400 p-1 rounded hover:bg-sibila-obsidian"
                         title="Apagar"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -180,7 +180,7 @@ export default function BlueprintsList() {
                 {!isCollapsed && (
                   <ul className="space-y-2">
                     {items.length === 0 ? (
-                      <li className="text-xs text-slate-500 italic px-1">
+                      <li className="text-xs text-sibila-smoke italic px-1">
                         Pasta vazia.
                       </li>
                     ) : (
@@ -221,21 +221,21 @@ function BlueprintRow({
       <div className="flex items-center gap-2">
         <Link
           to={`/flows/${bp.id}`}
-          className="flex-1 rounded border border-cigana-border bg-cigana-surface px-4 py-3 flex items-baseline justify-between hover:border-cigana-purple transition-colors"
+          className="flex-1 rounded border border-sibila-mist bg-sibila-obsidian px-4 py-3 flex items-baseline justify-between hover:border-sibila-amethyst transition-colors"
         >
           <div>
             <div className="font-medium">{bp.title}</div>
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-sibila-smoke">
               #{bp.id} · {bp.slug}
             </div>
           </div>
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-sibila-smoke">
             {bp.updated_at ? new Date(bp.updated_at).toLocaleString() : '—'}
           </div>
         </Link>
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className="p-2 rounded text-slate-400 hover:text-slate-100 hover:bg-cigana-surface"
+          className="p-2 rounded text-sibila-fog hover:text-sibila-moonlight hover:bg-sibila-obsidian"
           title="Mover para pasta"
         >
           <MoreHorizontal className="w-4 h-4" />
@@ -247,8 +247,8 @@ function BlueprintRow({
             className="fixed inset-0 z-10"
             onClick={() => setMenuOpen(false)}
           />
-          <ul className="absolute right-0 mt-1 z-20 min-w-[180px] bg-cigana-surface border border-cigana-border rounded shadow-lg py-1">
-            <li className="px-3 py-1 text-[10px] uppercase tracking-wide text-slate-500">
+          <ul className="absolute right-0 mt-1 z-20 min-w-[180px] bg-sibila-obsidian border border-sibila-mist rounded shadow-lg py-1">
+            <li className="px-3 py-1 text-[10px] uppercase tracking-wide text-sibila-smoke">
               Mover para
             </li>
             {folders.folders.map((f) => (
@@ -258,7 +258,7 @@ function BlueprintRow({
                     onMoveTo(f.id);
                     setMenuOpen(false);
                   }}
-                  className="w-full text-left px-3 py-1.5 text-sm text-slate-200 hover:bg-cigana-bg/60"
+                  className="w-full text-left px-3 py-1.5 text-sm text-sibila-moonlight hover:bg-sibila-onyx/60"
                 >
                   {f.name}
                 </button>

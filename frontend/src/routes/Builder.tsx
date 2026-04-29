@@ -50,7 +50,7 @@ export default function Builder() {
   }
 
   if (isLoading) {
-    return <div className="p-6 text-slate-400">Carregando fluxo…</div>;
+    return <div className="p-6 text-sibila-fog">Carregando fluxo…</div>;
   }
   if (error || !data) {
     return (
@@ -240,14 +240,14 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="border-b border-cigana-border bg-cigana-surface px-4 py-2 flex items-center justify-between flex-shrink-0">
+      <div className="border-b border-sibila-mist bg-sibila-obsidian px-4 py-2 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/blueprints" className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <Link to="/blueprints" className="text-xs text-sibila-fog hover:text-sibila-moonlight flex items-center gap-1">
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Fluxos</span>
           </Link>
           <h2 className="text-sm font-medium">{blueprint.title}</h2>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-sibila-smoke">
             #{blueprint.id} · {blueprint.slug}
           </span>
           {isPublished && (
@@ -261,25 +261,25 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           )}
           <a
             href="/dashboard?legacy=1"
-            className="text-[11px] text-slate-500 hover:text-slate-300 flex items-center gap-1 hover:underline underline-offset-2"
+            className="text-[11px] text-sibila-smoke hover:text-sibila-fog flex items-center gap-1 hover:underline underline-offset-2"
             title="Abrir o builder antigo (dashboard.html) — fallback de emergência"
           >
             <History className="w-3 h-3" />
             <span>builder antigo</span>
           </a>
         </div>
-        <div className="flex items-center gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-3 text-xs text-sibila-smoke">
           <span>
             {fs.nodes.length} nodes · {fs.edges.length} arestas
           </span>
 
-          <div className="flex items-center gap-1 border-l border-cigana-border pl-3">
+          <div className="flex items-center gap-1 border-l border-sibila-mist pl-3">
             <button
               type="button"
               onClick={fs.undo}
               disabled={!fs.canUndo}
               title="Desfazer (Ctrl+Z)"
-              className="p-1 rounded hover:bg-cigana-bg disabled:opacity-30 disabled:hover:bg-transparent"
+              className="p-1 rounded hover:bg-sibila-onyx disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <Undo2 className="w-3.5 h-3.5" />
             </button>
@@ -288,7 +288,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
               onClick={fs.redo}
               disabled={!fs.canRedo}
               title="Refazer (Ctrl+Shift+Z)"
-              className="p-1 rounded hover:bg-cigana-bg disabled:opacity-30 disabled:hover:bg-transparent"
+              className="p-1 rounded hover:bg-sibila-onyx disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <Redo2 className="w-3.5 h-3.5" />
             </button>
@@ -296,7 +296,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
               type="button"
               onClick={() => setShortcutsOpen(true)}
               title="Atalhos (?)"
-              className="p-1 rounded hover:bg-cigana-bg"
+              className="p-1 rounded hover:bg-sibila-onyx"
             >
               <HelpCircle className="w-3.5 h-3.5" />
             </button>
@@ -305,13 +305,13 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           <SaveIndicator status={fs.status} error={fs.error} />
 
           {/* Ações de fluxo */}
-          <div className="flex items-center gap-1 border-l border-cigana-border pl-3">
+          <div className="flex items-center gap-1 border-l border-sibila-mist pl-3">
             <button
               type="button"
               onClick={() => validateMutation.mutate()}
               disabled={validateMutation.isPending}
               title="Validar no servidor"
-              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-cigana-border hover:border-cigana-purple disabled:opacity-50"
+              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-sibila-mist hover:border-sibila-amethyst disabled:opacity-50"
             >
               <CheckCircle2 className="w-3 h-3" />
               {validateMutation.isPending ? 'Validando…' : 'Validar'}
@@ -320,7 +320,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
               type="button"
               onClick={() => exportBlueprint(blueprint.id, blueprint.slug)}
               title="Exportar JSON"
-              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-cigana-border hover:border-cigana-purple"
+              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-sibila-mist hover:border-sibila-amethyst"
             >
               <Download className="w-3 h-3" />
               Export
@@ -334,8 +334,8 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
               className={[
                 'px-2 py-1 rounded text-xs flex items-center gap-1',
                 rightPanel === 'versions'
-                  ? 'bg-cigana-purple text-white'
-                  : 'border border-cigana-border hover:border-cigana-purple',
+                  ? 'bg-sibila-amethyst text-white'
+                  : 'border border-sibila-mist hover:border-sibila-amethyst',
               ].join(' ')}
             >
               <HistoryIcon className="w-3 h-3" />
@@ -380,8 +380,8 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
             className={[
               'px-2 py-1 rounded text-xs flex items-center gap-1',
               rightPanel === 'simulator'
-                ? 'bg-cigana-purple text-white'
-                : 'border border-cigana-border hover:border-cigana-purple',
+                ? 'bg-sibila-amethyst text-white'
+                : 'border border-sibila-mist hover:border-sibila-amethyst',
             ].join(' ')}
           >
             {rightPanel === 'simulator' ? (

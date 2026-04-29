@@ -72,18 +72,18 @@ export default function AgentStudio() {
   const publishedVersionId = pubStatus?.published?.version_id ?? null;
 
   return (
-    <div className="flex h-full bg-cigana-bg text-slate-100">
+    <div className="flex h-full bg-sibila-onyx text-sibila-moonlight">
       {/* Lista */}
-      <aside className="w-64 flex-shrink-0 border-r border-cigana-border bg-cigana-surface flex flex-col">
-        <div className="px-3 py-3 border-b border-cigana-border flex items-center justify-between">
-          <span className="text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5">
+      <aside className="w-64 flex-shrink-0 border-r border-sibila-mist bg-sibila-obsidian flex flex-col">
+        <div className="px-3 py-3 border-b border-sibila-mist flex items-center justify-between">
+          <span className="text-[11px] uppercase tracking-wide text-sibila-fog flex items-center gap-1.5">
             <Bot className="w-3.5 h-3.5" />
             Agentes
           </span>
           <button
             onClick={handleNew}
             disabled={createMutation.isPending}
-            className="text-xs px-2 py-0.5 rounded bg-cigana-purple text-white hover:brightness-110 flex items-center gap-1"
+            className="text-xs px-2 py-0.5 rounded bg-sibila-amethyst text-white hover:brightness-110 flex items-center gap-1"
           >
             <Plus className="w-3 h-3" />
             Novo
@@ -91,7 +91,7 @@ export default function AgentStudio() {
         </div>
         <ul className="flex-1 overflow-y-auto">
           {agents.length === 0 && (
-            <li className="px-3 py-3 text-xs text-slate-500">
+            <li className="px-3 py-3 text-xs text-sibila-smoke">
               Nenhum agente. Crie o primeiro.
             </li>
           )}
@@ -102,8 +102,8 @@ export default function AgentStudio() {
                 className={[
                   'w-full text-left px-3 py-2.5 flex items-center gap-2 border-l-2 transition-colors',
                   selectedId === a.id
-                    ? 'bg-cigana-bg/60 border-cigana-purple'
-                    : 'border-transparent hover:bg-cigana-bg/40',
+                    ? 'bg-sibila-onyx/60 border-sibila-amethyst'
+                    : 'border-transparent hover:bg-sibila-onyx/40',
                 ].join(' ')}
               >
                 <span
@@ -113,8 +113,8 @@ export default function AgentStudio() {
                   {a.name?.charAt(0).toUpperCase() || '?'}
                 </span>
                 <span className="flex-1 min-w-0">
-                  <div className="text-sm text-slate-200 truncate">{a.name}</div>
-                  <div className="text-[10px] text-slate-500">
+                  <div className="text-sm text-sibila-moonlight truncate">{a.name}</div>
+                  <div className="text-[10px] text-sibila-smoke">
                     #{a.id}
                     {a.published_version_id && (
                       <span className="ml-2 text-emerald-400">● ativo</span>
@@ -140,7 +140,7 @@ export default function AgentStudio() {
             }}
           />
         ) : (
-          <div className="p-12 text-center text-slate-500">
+          <div className="p-12 text-center text-sibila-smoke">
             <Bot className="w-10 h-10 mx-auto opacity-30 mb-3" />
             <p>Selecione ou crie um agente.</p>
           </div>
@@ -232,14 +232,14 @@ function AgentEditor({
             setName(e.target.value);
             setDirty(true);
           }}
-          className="flex-1 text-xl font-bold bg-transparent outline-none border-b border-transparent focus:border-cigana-purple"
+          className="flex-1 text-xl font-bold bg-transparent outline-none border-b border-transparent focus:border-sibila-amethyst"
         />
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-sibila-smoke">
           {dirty && <span className="text-amber-400">● não salvo</span>}
           <button
             onClick={() => saveMutation.mutate()}
             disabled={!dirty || saveMutation.isPending}
-            className="px-2 py-1 rounded bg-cigana-purple text-white disabled:opacity-40"
+            className="px-2 py-1 rounded bg-sibila-amethyst text-white disabled:opacity-40"
           >
             {saveMutation.isPending ? 'Salvando…' : 'Salvar'}
           </button>
@@ -249,14 +249,14 @@ function AgentEditor({
               snapshotMutation.mutate(note);
             }}
             disabled={snapshotMutation.isPending}
-            className="px-2 py-1 rounded border border-cigana-border hover:border-cigana-purple flex items-center gap-1"
+            className="px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst flex items-center gap-1"
           >
             <Camera className="w-3 h-3" />
             Snapshot
           </button>
           <button
             onClick={onDelete}
-            className="px-2 py-1 rounded border border-cigana-border hover:border-red-500 hover:text-red-400"
+            className="px-2 py-1 rounded border border-sibila-mist hover:border-red-500 hover:text-red-400"
             title="Apagar agente"
           >
             <Trash2 className="w-3 h-3" />
@@ -265,7 +265,7 @@ function AgentEditor({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-cigana-border">
+      <div className="flex gap-1 border-b border-sibila-mist">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -273,8 +273,8 @@ function AgentEditor({
             className={[
               'flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 -mb-px transition-colors',
               tab === t.id
-                ? 'border-cigana-purple text-slate-100'
-                : 'border-transparent text-slate-400 hover:text-slate-200',
+                ? 'border-sibila-amethyst text-sibila-moonlight'
+                : 'border-transparent text-sibila-fog hover:text-sibila-moonlight',
             ].join(' ')}
           >
             <t.Icon className="w-3.5 h-3.5" />
@@ -290,7 +290,7 @@ function AgentEditor({
           onChange={(e) => update({ personalidade: e.target.value })}
           rows={12}
           placeholder="Como o agente se comporta? Tom, vocabulário, estilo, limites…"
-          className="w-full bg-cigana-surface border border-cigana-border rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cigana-purple"
+          className="w-full bg-sibila-obsidian border border-sibila-mist rounded-lg px-3 py-2 text-sm text-sibila-moonlight focus:outline-none focus:border-sibila-amethyst"
         />
       )}
       {tab === 'instrucoes' && (
@@ -299,7 +299,7 @@ function AgentEditor({
           onChange={(e) => update({ instrucoes: e.target.value })}
           rows={12}
           placeholder="Instruções operacionais — o que o agente DEVE e NÃO DEVE fazer."
-          className="w-full bg-cigana-surface border border-cigana-border rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cigana-purple"
+          className="w-full bg-sibila-obsidian border border-sibila-mist rounded-lg px-3 py-2 text-sm text-sibila-moonlight focus:outline-none focus:border-sibila-amethyst"
         />
       )}
       {tab === 'base' && (
@@ -308,7 +308,7 @@ function AgentEditor({
           onChange={(e) => update({ base_conhecimento: e.target.value })}
           rows={12}
           placeholder="Conhecimento que o agente domina — produtos, preços, políticas…"
-          className="w-full bg-cigana-surface border border-cigana-border rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cigana-purple"
+          className="w-full bg-sibila-obsidian border border-sibila-mist rounded-lg px-3 py-2 text-sm text-sibila-moonlight focus:outline-none focus:border-sibila-amethyst"
         />
       )}
       {tab === 'faq' && (
@@ -319,13 +319,13 @@ function AgentEditor({
       )}
 
       {/* Versões */}
-      <div className="bg-cigana-surface border border-cigana-border rounded-xl p-4 mt-6">
+      <div className="bg-sibila-obsidian border border-sibila-mist rounded-xl p-4 mt-6">
         <h3 className="font-bold text-sm mb-3 flex items-center gap-2">
-          <Rocket className="w-4 h-4 text-cigana-purple" />
+          <Rocket className="w-4 h-4 text-sibila-amethyst" />
           Versões publicáveis
         </h3>
         {versions.length === 0 ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-sibila-smoke">
             Nenhuma versão ainda. Faça <strong>Snapshot</strong> pra criar a primeira.
           </p>
         ) : (
@@ -338,8 +338,8 @@ function AgentEditor({
                   className="flex items-center justify-between text-sm"
                 >
                   <span>
-                    <span className="font-mono text-slate-300">v{v.version_number}</span>{' '}
-                    <span className="text-xs text-slate-500">
+                    <span className="font-mono text-sibila-fog">v{v.version_number}</span>{' '}
+                    <span className="text-xs text-sibila-smoke">
                       {v.created_at ? new Date(v.created_at).toLocaleString() : ''}
                     </span>
                     {isActive && (
@@ -388,15 +388,15 @@ function FaqEditor({
       {faqs.map((f, i) => (
         <div
           key={i}
-          className="bg-cigana-surface border border-cigana-border rounded-lg p-3 space-y-2"
+          className="bg-sibila-obsidian border border-sibila-mist rounded-lg p-3 space-y-2"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wide text-slate-400">
+            <span className="text-[11px] uppercase tracking-wide text-sibila-fog">
               Pergunta {i + 1}
             </span>
             <button
               onClick={() => remove(i)}
-              className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-cigana-bg"
+              className="text-sibila-smoke hover:text-red-400 p-1 rounded hover:bg-sibila-onyx"
             >
               <Trash2 className="w-3 h-3" />
             </button>
@@ -406,20 +406,20 @@ function FaqEditor({
             value={f.q}
             onChange={(e) => update(i, { q: e.target.value })}
             placeholder="Pergunta…"
-            className="w-full bg-cigana-bg border border-cigana-border rounded px-2 py-1.5 text-sm focus:outline-none focus:border-cigana-purple"
+            className="w-full bg-sibila-onyx border border-sibila-mist rounded px-2 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst"
           />
           <textarea
             value={f.a}
             onChange={(e) => update(i, { a: e.target.value })}
             placeholder="Resposta…"
             rows={3}
-            className="w-full bg-cigana-bg border border-cigana-border rounded px-2 py-1.5 text-sm focus:outline-none focus:border-cigana-purple"
+            className="w-full bg-sibila-onyx border border-sibila-mist rounded px-2 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst"
           />
         </div>
       ))}
       <button
         onClick={add}
-        className="w-full text-xs px-2 py-2 rounded border border-dashed border-cigana-border text-slate-400 hover:text-slate-100 hover:border-cigana-purple flex items-center justify-center gap-1"
+        className="w-full text-xs px-2 py-2 rounded border border-dashed border-sibila-mist text-sibila-fog hover:text-sibila-moonlight hover:border-sibila-amethyst flex items-center justify-center gap-1"
       >
         <Plus className="w-3.5 h-3.5" />
         adicionar FAQ

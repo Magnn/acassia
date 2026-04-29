@@ -53,10 +53,10 @@ export default function RuleBuilder({
     <div className="space-y-3">
       {rules.length > 1 && (
         <div className="flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">
+          <span className="text-[11px] uppercase tracking-wide text-sibila-fog">
             Combinar regras
           </span>
-          <div className="inline-flex rounded border border-cigana-border overflow-hidden text-xs">
+          <div className="inline-flex rounded border border-sibila-mist overflow-hidden text-xs">
             {(['AND', 'OR'] as const).map((l) => (
               <button
                 key={l}
@@ -65,8 +65,8 @@ export default function RuleBuilder({
                 className={[
                   'px-3 py-1',
                   logic === l
-                    ? 'bg-cigana-purple text-white'
-                    : 'bg-cigana-bg text-slate-300 hover:bg-cigana-surface',
+                    ? 'bg-sibila-amethyst text-white'
+                    : 'bg-sibila-onyx text-sibila-fog hover:bg-sibila-obsidian',
                 ].join(' ')}
               >
                 {l === 'AND' ? 'Todas (E)' : 'Qualquer (OU)'}
@@ -80,14 +80,14 @@ export default function RuleBuilder({
         {rules.map((r, i) => (
           <li
             key={i}
-            className="rounded border border-cigana-border bg-cigana-bg p-2 space-y-2"
+            className="rounded border border-sibila-mist bg-sibila-onyx p-2 space-y-2"
           >
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-400">
+            <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-sibila-fog">
               <span>Regra {i + 1}</span>
               <button
                 type="button"
                 onClick={() => remove(i)}
-                className="p-1 rounded hover:text-red-400 hover:bg-cigana-surface"
+                className="p-1 rounded hover:text-red-400 hover:bg-sibila-obsidian"
                 title="Remover regra"
               >
                 <X className="w-3 h-3" />
@@ -117,7 +117,7 @@ export default function RuleBuilder({
       <button
         type="button"
         onClick={add}
-        className="w-full text-xs px-2 py-1.5 rounded border border-dashed border-cigana-border text-slate-400 hover:text-slate-100 hover:border-cigana-purple flex items-center justify-center gap-1"
+        className="w-full text-xs px-2 py-1.5 rounded border border-dashed border-sibila-mist text-sibila-fog hover:text-sibila-moonlight hover:border-sibila-amethyst flex items-center justify-center gap-1"
       >
         <Plus className="w-3.5 h-3.5" />
         adicionar regra

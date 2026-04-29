@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react';
 
 const baseInput =
-  'w-full rounded border border-cigana-border bg-cigana-bg px-2 py-1.5 text-sm text-slate-100 ' +
-  'placeholder:text-slate-500 focus:outline-none focus:border-cigana-purple';
+  'w-full rounded border border-sibila-mist bg-sibila-onyx px-2 py-1.5 text-sm text-sibila-moonlight ' +
+  'placeholder:text-sibila-smoke focus:outline-none focus:border-sibila-amethyst';
 
 export function Field({
   label,
@@ -16,10 +16,10 @@ export function Field({
   return (
     <label className="block">
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-[11px] uppercase tracking-wide text-slate-400">
+        <span className="text-[11px] uppercase tracking-wide text-sibila-fog">
           {label}
         </span>
-        {hint && <span className="text-[10px] text-slate-500">{hint}</span>}
+        {hint && <span className="text-[10px] text-sibila-smoke">{hint}</span>}
       </div>
       {children}
     </label>

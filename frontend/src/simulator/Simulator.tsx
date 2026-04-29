@@ -103,10 +103,10 @@ export default function Simulator({
   }, [nodes, edges, persona, running, append, onCurrentNodeChange]);
 
   return (
-    <aside className="w-96 flex-shrink-0 border-l border-cigana-border bg-cigana-surface flex flex-col h-full animate-slide-in-right shadow-xl">
-      <header className="flex items-center justify-between px-3 py-2 border-b border-cigana-border flex-shrink-0">
-        <span className="text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5">
-          <Play className="w-3.5 h-3.5 text-cigana-purple" fill="currentColor" />
+    <aside className="w-96 flex-shrink-0 border-l border-sibila-mist bg-sibila-obsidian flex flex-col h-full animate-slide-in-right shadow-xl">
+      <header className="flex items-center justify-between px-3 py-2 border-b border-sibila-mist flex-shrink-0">
+        <span className="text-[11px] uppercase tracking-wide text-sibila-fog flex items-center gap-1.5">
+          <Play className="w-3.5 h-3.5 text-sibila-amethyst" fill="currentColor" />
           Simulador
         </span>
         <div className="flex items-center gap-2">
@@ -114,7 +114,7 @@ export default function Simulator({
             <button
               type="button"
               onClick={reset}
-              className="text-xs px-2 py-0.5 rounded border border-cigana-border hover:border-red-400 hover:text-red-400 flex items-center gap-1"
+              className="text-xs px-2 py-0.5 rounded border border-sibila-mist hover:border-red-400 hover:text-red-400 flex items-center gap-1"
             >
               <Square className="w-3 h-3" fill="currentColor" />
               parar
@@ -123,7 +123,7 @@ export default function Simulator({
             <button
               type="button"
               onClick={run}
-              className="text-xs px-2 py-0.5 rounded bg-cigana-purple text-white hover:brightness-110 flex items-center gap-1"
+              className="text-xs px-2 py-0.5 rounded bg-sibila-amethyst text-white hover:brightness-110 flex items-center gap-1"
             >
               <Play className="w-3 h-3" fill="currentColor" />
               executar
@@ -132,7 +132,7 @@ export default function Simulator({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-100 p-1 rounded hover:bg-cigana-bg"
+            className="text-sibila-fog hover:text-sibila-moonlight p-1 rounded hover:bg-sibila-onyx"
             title="Fechar simulador"
           >
             <X className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function Simulator({
           className="flex-1 overflow-y-auto bg-gradient-to-b from-[#f8f9fd] to-[#f5f7fc] px-3 py-3 space-y-2"
         >
           {bubbles.length === 0 && (
-            <p className="text-xs text-slate-500 text-center mt-4">
+            <p className="text-xs text-sibila-smoke text-center mt-4">
               Clique em <strong>executar</strong> para simular o fluxo.
               {' '}Conteúdo, Delay, Condição e Fim são interpretados; outros tipos
               aparecem como stubs.
@@ -179,7 +179,7 @@ export default function Simulator({
           )}
         </div>
 
-        <div className="border-t border-cigana-border p-3">
+        <div className="border-t border-sibila-mist p-3">
           <PersonaPicker persona={persona} onChange={setPersona} />
         </div>
       </div>
@@ -225,7 +225,7 @@ function Bubble({ step }: { step: SimStep }) {
   }
   if (step.kind === 'delay') {
     return (
-      <div className="text-[10px] text-slate-500 italic flex items-center gap-1">
+      <div className="text-[10px] text-sibila-smoke italic flex items-center gap-1">
         <Clock className="w-3 h-3 animate-pulse" />
         <span>aguardando {step.seconds}s</span>
       </div>
@@ -241,19 +241,19 @@ function Bubble({ step }: { step: SimStep }) {
   }
   if (step.kind === 'enter') {
     return (
-      <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+      <div className="text-[10px] text-sibila-smoke font-mono flex items-center gap-1">
         <ArrowRight className="w-3 h-3" />
         <span>
-          entra em <span className="text-slate-300">{step.label}</span>{' '}
-          <span className="text-slate-600">[{step.type}]</span>
+          entra em <span className="text-sibila-fog">{step.label}</span>{' '}
+          <span className="text-sibila-smoke/70">[{step.type}]</span>
         </span>
       </div>
     );
   }
   if (step.kind === 'stub') {
     return (
-      <div className="rounded border border-cigana-border bg-cigana-surface px-3 py-2 text-xs text-slate-300">
-        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+      <div className="rounded border border-sibila-mist bg-sibila-obsidian px-3 py-2 text-xs text-sibila-fog">
+        <div className="text-[10px] uppercase tracking-wide text-sibila-smoke">
           {step.label}
         </div>
         <div className="mt-0.5 break-words">{step.detail}</div>

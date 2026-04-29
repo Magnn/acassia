@@ -10,14 +10,14 @@ export default function TenantConfig() {
   const [tab, setTab] = useState<Tab>('variables');
 
   return (
-    <div className="p-8 max-w-4xl mx-auto text-slate-100">
+    <div className="p-8 max-w-4xl mx-auto text-sibila-moonlight">
       <h2 className="text-2xl font-bold mb-2 font-display">Variáveis & Segredos</h2>
-      <p className="text-sm text-slate-400 mb-6">
+      <p className="text-sm text-sibila-fog mb-6">
         Valores reutilizáveis pelos blocos do construtor — variáveis em JSON
         (não-sensíveis) e segredos cifrados (chaves de API, tokens).
       </p>
 
-      <div className="flex gap-1 mb-6 border-b border-cigana-border">
+      <div className="flex gap-1 mb-6 border-b border-sibila-mist">
         <TabBtn active={tab === 'variables'} onClick={() => setTab('variables')}>
           <Variable className="w-3.5 h-3.5" />
           Variáveis
@@ -48,8 +48,8 @@ function TabBtn({
       className={[
         'flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 -mb-px transition-colors',
         active
-          ? 'border-cigana-purple text-slate-100'
-          : 'border-transparent text-slate-400 hover:text-slate-200',
+          ? 'border-sibila-amethyst text-sibila-moonlight'
+          : 'border-transparent text-sibila-fog hover:text-sibila-moonlight',
       ].join(' ')}
     >
       {children}
@@ -115,8 +115,8 @@ function VariablesPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-cigana-surface border border-cigana-border rounded-xl p-4 space-y-2">
-        <div className="text-[11px] uppercase tracking-wide text-slate-400">
+      <div className="bg-sibila-obsidian border border-sibila-mist rounded-xl p-4 space-y-2">
+        <div className="text-[11px] uppercase tracking-wide text-sibila-fog">
           Adicionar variável
         </div>
         <div className="flex gap-2">
@@ -124,18 +124,18 @@ function VariablesPanel() {
             value={newKey}
             onChange={(e) => setNewKey(e.target.value)}
             placeholder="chave (ex.: oferta_principal_url)"
-            className="flex-1 rounded border border-cigana-border bg-cigana-bg px-3 py-1.5 text-sm focus:outline-none focus:border-cigana-purple font-mono"
+            className="flex-1 rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst font-mono"
           />
           <input
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
             placeholder='valor (string ou JSON: 42, true, "x", {"k":1})'
-            className="flex-[2] rounded border border-cigana-border bg-cigana-bg px-3 py-1.5 text-sm focus:outline-none focus:border-cigana-purple"
+            className="flex-[2] rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst"
           />
           <button
             onClick={handleAdd}
             disabled={setVar.isPending}
-            className="px-3 py-1.5 rounded bg-cigana-purple text-white text-sm hover:brightness-110 disabled:opacity-50 flex items-center gap-1"
+            className="px-3 py-1.5 rounded bg-sibila-amethyst text-white text-sm hover:brightness-110 disabled:opacity-50 flex items-center gap-1"
           >
             <Plus className="w-3.5 h-3.5" />
             Salvar
@@ -143,20 +143,20 @@ function VariablesPanel() {
         </div>
       </div>
 
-      {isLoading && <p className="text-xs text-slate-500">Carregando…</p>}
+      {isLoading && <p className="text-xs text-sibila-smoke">Carregando…</p>}
       {!isLoading && variables.length === 0 && (
-        <p className="text-xs text-slate-500">Nenhuma variável definida.</p>
+        <p className="text-xs text-sibila-smoke">Nenhuma variável definida.</p>
       )}
 
-      <ul className="bg-cigana-surface border border-cigana-border rounded-xl divide-y divide-cigana-border/50 overflow-hidden">
+      <ul className="bg-sibila-obsidian border border-sibila-mist rounded-xl divide-y divide-sibila-mist/50 overflow-hidden">
         {variables.map((v) => (
           <li
             key={v.key}
-            className="px-4 py-3 flex items-center gap-3 hover:bg-cigana-bg/40"
+            className="px-4 py-3 flex items-center gap-3 hover:bg-sibila-onyx/40"
           >
             <div className="flex-1 min-w-0">
-              <div className="font-mono text-sm text-slate-200 truncate">{v.key}</div>
-              <div className="font-mono text-xs text-slate-500 break-all">
+              <div className="font-mono text-sm text-sibila-moonlight truncate">{v.key}</div>
+              <div className="font-mono text-xs text-sibila-smoke break-all">
                 {JSON.stringify(v.value)}
               </div>
             </div>
@@ -164,7 +164,7 @@ function VariablesPanel() {
               onClick={() => {
                 if (confirm(`Remover variável "${v.key}"?`)) delVar.mutate(v.key);
               }}
-              className="p-1.5 rounded text-slate-400 hover:text-red-400 hover:bg-cigana-bg"
+              className="p-1.5 rounded text-sibila-fog hover:text-red-400 hover:bg-sibila-onyx"
               title="Remover"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -222,8 +222,8 @@ function SecretsPanel() {
         </div>
       )}
 
-      <div className="bg-cigana-surface border border-cigana-border rounded-xl p-4 space-y-2">
-        <div className="text-[11px] uppercase tracking-wide text-slate-400">
+      <div className="bg-sibila-obsidian border border-sibila-mist rounded-xl p-4 space-y-2">
+        <div className="text-[11px] uppercase tracking-wide text-sibila-fog">
           Adicionar segredo
         </div>
         <div className="flex gap-2">
@@ -231,14 +231,14 @@ function SecretsPanel() {
             value={newKey}
             onChange={(e) => setNewKey(e.target.value)}
             placeholder="chave (ex.: stripe_api_key)"
-            className="flex-1 rounded border border-cigana-border bg-cigana-bg px-3 py-1.5 text-sm focus:outline-none focus:border-cigana-purple font-mono"
+            className="flex-1 rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst font-mono"
           />
           <input
             type="password"
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
             placeholder="valor (será cifrado)"
-            className="flex-[2] rounded border border-cigana-border bg-cigana-bg px-3 py-1.5 text-sm focus:outline-none focus:border-cigana-purple font-mono"
+            className="flex-[2] rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst font-mono"
             autoComplete="new-password"
           />
           <button
@@ -249,44 +249,44 @@ function SecretsPanel() {
               setSecret.mutate({ key: k, value: newValue });
             }}
             disabled={setSecret.isPending || isMissingKey}
-            className="px-3 py-1.5 rounded bg-cigana-purple text-white text-sm hover:brightness-110 disabled:opacity-50 flex items-center gap-1"
+            className="px-3 py-1.5 rounded bg-sibila-amethyst text-white text-sm hover:brightness-110 disabled:opacity-50 flex items-center gap-1"
           >
             <Plus className="w-3.5 h-3.5" />
             Salvar
           </button>
         </div>
-        <p className="text-[10px] text-slate-500">
+        <p className="text-[10px] text-sibila-smoke">
           Valores são cifrados em repouso. Após salvar, só os 4 últimos
           caracteres aparecem mascarados.
         </p>
       </div>
 
-      {isLoading && <p className="text-xs text-slate-500">Carregando…</p>}
+      {isLoading && <p className="text-xs text-sibila-smoke">Carregando…</p>}
       {!isLoading && !error && secrets.length === 0 && (
-        <p className="text-xs text-slate-500">Nenhum segredo armazenado.</p>
+        <p className="text-xs text-sibila-smoke">Nenhum segredo armazenado.</p>
       )}
 
       {!isMissingKey && secrets.length > 0 && (
-        <ul className="bg-cigana-surface border border-cigana-border rounded-xl divide-y divide-cigana-border/50 overflow-hidden">
+        <ul className="bg-sibila-obsidian border border-sibila-mist rounded-xl divide-y divide-sibila-mist/50 overflow-hidden">
           {secrets.map((s) => (
             <li
               key={s.key}
-              className="px-4 py-3 flex items-center gap-3 hover:bg-cigana-bg/40"
+              className="px-4 py-3 flex items-center gap-3 hover:bg-sibila-onyx/40"
             >
               <div className="flex-1 min-w-0">
-                <div className="font-mono text-sm text-slate-200 truncate">
+                <div className="font-mono text-sm text-sibila-moonlight truncate">
                   {s.key}
                 </div>
-                <div className="font-mono text-xs text-slate-500">{s.masked}</div>
+                <div className="font-mono text-xs text-sibila-smoke">{s.masked}</div>
               </div>
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-sibila-smoke">
                 {s.updated_at ? new Date(s.updated_at).toLocaleDateString() : '—'}
               </span>
               <button
                 onClick={() => {
                   if (confirm(`Remover segredo "${s.key}"?`)) delSecret.mutate(s.key);
                 }}
-                className="p-1.5 rounded text-slate-400 hover:text-red-400 hover:bg-cigana-bg"
+                className="p-1.5 rounded text-sibila-fog hover:text-red-400 hover:bg-sibila-onyx"
                 title="Remover"
               >
                 <Trash2 className="w-3.5 h-3.5" />

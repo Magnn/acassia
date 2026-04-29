@@ -48,9 +48,9 @@ export default function CardList({ cards, onChange }: Props) {
           return (
             <li
               key={i}
-              className="rounded border border-cigana-border bg-cigana-bg p-2"
+              className="rounded border border-sibila-mist bg-sibila-onyx p-2"
             >
-              <div className="flex items-center justify-between mb-2 text-[11px] uppercase tracking-wide text-slate-400">
+              <div className="flex items-center justify-between mb-2 text-[11px] uppercase tracking-wide text-sibila-fog">
                 <span className="flex items-center gap-1.5">
                   <Meta.Icon className="w-3.5 h-3.5" />
                   <span>{i + 1}. {Meta.label}</span>
@@ -60,7 +60,7 @@ export default function CardList({ cards, onChange }: Props) {
                     type="button"
                     onClick={() => move(i, -1)}
                     disabled={i === 0}
-                    className="p-1 rounded hover:text-slate-200 hover:bg-cigana-surface disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="p-1 rounded hover:text-sibila-moonlight hover:bg-sibila-obsidian disabled:opacity-30 disabled:hover:bg-transparent"
                     title="Mover acima"
                   >
                     <ChevronUp className="w-3 h-3" />
@@ -69,7 +69,7 @@ export default function CardList({ cards, onChange }: Props) {
                     type="button"
                     onClick={() => move(i, 1)}
                     disabled={i === cards.length - 1}
-                    className="p-1 rounded hover:text-slate-200 hover:bg-cigana-surface disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="p-1 rounded hover:text-sibila-moonlight hover:bg-sibila-obsidian disabled:opacity-30 disabled:hover:bg-transparent"
                     title="Mover abaixo"
                   >
                     <ChevronDown className="w-3 h-3" />
@@ -77,7 +77,7 @@ export default function CardList({ cards, onChange }: Props) {
                   <button
                     type="button"
                     onClick={() => remove(i)}
-                    className="p-1 rounded hover:text-red-400 hover:bg-cigana-surface"
+                    className="p-1 rounded hover:text-red-400 hover:bg-sibila-obsidian"
                     title="Remover"
                   >
                     <X className="w-3 h-3" />
@@ -99,7 +99,7 @@ export default function CardList({ cards, onChange }: Props) {
                 key={k}
                 type="button"
                 onClick={() => add(k)}
-                className="flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded border border-cigana-border bg-cigana-bg hover:border-cigana-purple hover:text-slate-100"
+                className="flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded border border-sibila-mist bg-sibila-onyx hover:border-sibila-amethyst hover:text-sibila-moonlight"
                 title={`Adicionar card de ${Meta.label}`}
               >
                 <Meta.Icon className="w-3.5 h-3.5" />
@@ -109,7 +109,7 @@ export default function CardList({ cards, onChange }: Props) {
           })}
         </div>
       ) : (
-        <p className="text-[11px] text-slate-500 flex items-center gap-1">
+        <p className="text-[11px] text-sibila-smoke flex items-center gap-1">
           <Plus className="w-3 h-3 opacity-50" />
           Máximo de {MAX_CARDS} cards por bloco Conteúdo (política WhatsApp).
         </p>

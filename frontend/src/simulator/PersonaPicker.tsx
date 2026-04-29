@@ -17,12 +17,12 @@ export default function PersonaPicker({ persona, onChange }: Props) {
   const keys = Array.from(new Set([...DEFAULT_KEYS, ...Object.keys(persona)]));
   return (
     <div className="space-y-2">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400">
+      <div className="text-[11px] uppercase tracking-wide text-sibila-fog">
         Persona — variáveis do lead
       </div>
       {keys.map((k) => (
         <div key={k} className="grid grid-cols-[140px,1fr] gap-2 items-center">
-          <span className="text-[11px] text-slate-400 font-mono truncate" title={k}>
+          <span className="text-[11px] text-sibila-fog font-mono truncate" title={k}>
             {k}
           </span>
           <TextInput
@@ -32,8 +32,8 @@ export default function PersonaPicker({ persona, onChange }: Props) {
           />
         </div>
       ))}
-      <p className="text-[10px] text-slate-500 leading-relaxed">
-        Use <code className="text-slate-400">{'{{lead.nome}}'}</code> nos textos
+      <p className="text-[10px] text-sibila-smoke leading-relaxed">
+        Use <code className="text-sibila-fog">{'{{lead.nome}}'}</code> nos textos
         — substituído ao simular.
       </p>
     </div>

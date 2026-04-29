@@ -19,7 +19,7 @@ export default function Integrations() {
 
   if (isLoading) {
     return (
-      <div className="p-8 text-slate-400">Carregando integrações…</div>
+      <div className="p-8 text-sibila-fog">Carregando integrações…</div>
     );
   }
   if (error || !data) {
@@ -40,41 +40,41 @@ export default function Integrations() {
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto text-slate-100 space-y-6">
+    <div className="p-8 max-w-5xl mx-auto text-sibila-moonlight space-y-6">
       <div>
         <h2 className="text-2xl font-bold font-display">Integrações</h2>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-sibila-fog mt-1">
           Webhooks expostos, configuração da Meta WhatsApp Cloud API e estado da
           fila Redis.
         </p>
       </div>
 
       {/* Webhooks */}
-      <section className="bg-cigana-surface border border-cigana-border rounded-xl overflow-hidden">
-        <header className="px-5 py-3 border-b border-cigana-border bg-slate-800/20 flex items-center gap-2">
-          <Webhook className="w-4 h-4 text-cigana-purple" />
+      <section className="bg-sibila-obsidian border border-sibila-mist rounded-xl overflow-hidden">
+        <header className="px-5 py-3 border-b border-sibila-mist bg-sibila-veil/40 flex items-center gap-2">
+          <Webhook className="w-4 h-4 text-sibila-amethyst" />
           <h3 className="font-bold text-sm">Webhooks expostos</h3>
         </header>
-        <ul className="divide-y divide-cigana-border/50">
+        <ul className="divide-y divide-sibila-mist/50">
           {data.webhooks.map((w) => {
             const url = `${data.base_url}${w.path}`;
             return (
               <li key={w.id} className="px-5 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-medium text-slate-200">{w.label}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{w.hint}</div>
+                    <div className="font-medium text-sibila-moonlight">{w.label}</div>
+                    <div className="text-xs text-sibila-smoke mt-0.5">{w.hint}</div>
                   </div>
                   <button
                     onClick={() => copy(url)}
-                    className="text-xs px-2 py-1 rounded border border-cigana-border hover:border-cigana-purple flex items-center gap-1 flex-shrink-0"
+                    className="text-xs px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst flex items-center gap-1 flex-shrink-0"
                     title="Copiar URL completa"
                   >
                     <Copy className="w-3 h-3" />
                     copiar URL
                   </button>
                 </div>
-                <code className="block mt-2 text-[11px] text-sky-300 bg-cigana-bg/60 rounded px-2 py-1 font-mono break-all">
+                <code className="block mt-2 text-[11px] text-sky-300 bg-sibila-onyx/60 rounded px-2 py-1 font-mono break-all">
                   {url}
                 </code>
               </li>
@@ -84,18 +84,18 @@ export default function Integrations() {
       </section>
 
       {/* Meta Cloud API */}
-      <section className="bg-cigana-surface border border-cigana-border rounded-xl overflow-hidden">
-        <header className="px-5 py-3 border-b border-cigana-border bg-slate-800/20">
+      <section className="bg-sibila-obsidian border border-sibila-mist rounded-xl overflow-hidden">
+        <header className="px-5 py-3 border-b border-sibila-mist bg-sibila-veil/40">
           <h3 className="font-bold text-sm">Meta WhatsApp Cloud API</h3>
         </header>
-        <ul className="divide-y divide-cigana-border/50 text-sm">
+        <ul className="divide-y divide-sibila-mist/50 text-sm">
           <ConfigRow label="WABA ID" ok={data.meta.waba_configured} />
           <ConfigRow label="Phone number ID" ok={data.meta.phone_number_configured} />
           <ConfigRow label="Token de acesso" ok={data.meta.token_configured} />
           <ConfigRow label="Verify token (webhook)" ok={data.meta.verify_token_configured} />
         </ul>
         {data.docs.whatsapp_cloud && (
-          <div className="px-5 py-2 border-t border-cigana-border bg-cigana-bg/30">
+          <div className="px-5 py-2 border-t border-sibila-mist bg-sibila-onyx/30">
             <a
               href={data.docs.whatsapp_cloud}
               target="_blank"
@@ -110,8 +110,8 @@ export default function Integrations() {
       </section>
 
       {/* Redis inbound */}
-      <section className="bg-cigana-surface border border-cigana-border rounded-xl overflow-hidden">
-        <header className="px-5 py-3 border-b border-cigana-border bg-slate-800/20 flex items-center gap-2">
+      <section className="bg-sibila-obsidian border border-sibila-mist rounded-xl overflow-hidden">
+        <header className="px-5 py-3 border-b border-sibila-mist bg-sibila-veil/40 flex items-center gap-2">
           <Database className="w-4 h-4 text-rose-400" />
           <h3 className="font-bold text-sm">Fila durável (Redis inbound)</h3>
         </header>
@@ -134,17 +134,17 @@ export default function Integrations() {
                 </span>
               </div>
               {data.redis_inbound.queue_key && (
-                <div className="text-xs text-slate-400 font-mono">
+                <div className="text-xs text-sibila-fog font-mono">
                   queue_key:{' '}
-                  <span className="text-slate-300">
+                  <span className="text-sibila-fog">
                     {data.redis_inbound.queue_key}
                   </span>
                 </div>
               )}
               {data.redis_inbound.depth != null && (
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-sibila-fog">
                   Profundidade da fila:{' '}
-                  <span className="text-slate-300 font-mono">
+                  <span className="text-sibila-fog font-mono">
                     {data.redis_inbound.depth}
                   </span>
                 </div>
@@ -155,30 +155,30 @@ export default function Integrations() {
       </section>
 
       {/* Telas Jinja não migradas — atalhos */}
-      <section className="bg-cigana-surface border border-cigana-border rounded-xl p-5">
+      <section className="bg-sibila-obsidian border border-sibila-mist rounded-xl p-5">
         <h3 className="font-bold text-sm mb-3">Outras telas (Jinja)</h3>
-        <p className="text-xs text-slate-500 mb-3">
+        <p className="text-xs text-sibila-smoke mb-3">
           Estas telas ainda usam os templates Flask. Migração pra React vem nas
           próximas sprints.
         </p>
         <div className="flex flex-wrap gap-2">
           <a
             href="/saas/onboarding"
-            className="text-xs px-3 py-1.5 rounded border border-cigana-border hover:border-cigana-purple flex items-center gap-1"
+            className="text-xs px-3 py-1.5 rounded border border-sibila-mist hover:border-sibila-amethyst flex items-center gap-1"
           >
             <ExternalLink className="w-3 h-3" />
             Onboarding
           </a>
           <a
             href="/saas/billing"
-            className="text-xs px-3 py-1.5 rounded border border-cigana-border hover:border-cigana-purple flex items-center gap-1"
+            className="text-xs px-3 py-1.5 rounded border border-sibila-mist hover:border-sibila-amethyst flex items-center gap-1"
           >
             <ExternalLink className="w-3 h-3" />
             Billing / Planos
           </a>
           <a
             href="/saas/connect/status"
-            className="text-xs px-3 py-1.5 rounded border border-cigana-border hover:border-cigana-purple flex items-center gap-1"
+            className="text-xs px-3 py-1.5 rounded border border-sibila-mist hover:border-sibila-amethyst flex items-center gap-1"
           >
             <ExternalLink className="w-3 h-3" />
             Status WhatsApp Embedded
@@ -192,7 +192,7 @@ export default function Integrations() {
 function ConfigRow({ label, ok }: { label: string; ok: boolean }) {
   return (
     <li className="px-5 py-2.5 flex items-center justify-between">
-      <span className="text-slate-300">{label}</span>
+      <span className="text-sibila-fog">{label}</span>
       {ok ? (
         <span className="flex items-center gap-1 text-xs text-emerald-300">
           <CheckCircle2 className="w-3.5 h-3.5" />

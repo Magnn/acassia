@@ -271,7 +271,7 @@ export function AbSplitInspector({ node, onUpdate }: InspectorProps) {
           />
         </Field>
       </div>
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-sibila-smoke">
         Conecte 2 arestas saindo deste node — A pega a primeira, B pega a segunda
         (ordem dos handles do React Flow).
       </p>
@@ -284,11 +284,11 @@ export function MotorRefInspector({ node }: InspectorProps) {
   return (
     <div className="space-y-3">
       <Field label="Módulo Python" hint="referência (read-only)">
-        <div className="rounded border border-cigana-border bg-cigana-bg px-2 py-1.5 text-sm text-slate-300 font-mono">
+        <div className="rounded border border-sibila-mist bg-sibila-onyx px-2 py-1.5 text-sm text-sibila-fog font-mono">
           {moduleHint || '— sem referência —'}
         </div>
       </Field>
-      <p className="text-[11px] text-slate-500 leading-relaxed">
+      <p className="text-[11px] text-sibila-smoke leading-relaxed">
         Este bloco delega execução a um módulo Python. Edição do código é fora do
         builder — abra o arquivo no IDE.
       </p>
@@ -313,7 +313,7 @@ export function AnotacaoInspector({ node, onUpdate }: InspectorProps) {
 
 export function EndInspector() {
   return (
-    <p className="text-[11px] text-slate-500 leading-relaxed">
+    <p className="text-[11px] text-sibila-smoke leading-relaxed">
       Bloco terminal. Marca o fim de um caminho do funil.
     </p>
   );

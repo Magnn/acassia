@@ -25,7 +25,7 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
         v.border,
         v.bg,
         d.simActive ? 'ring-2 ring-emerald-400 animate-pulse' : '',
-        !d.simActive && selected ? 'ring-2 ring-cigana-purple' : '',
+        !d.simActive && selected ? 'ring-2 ring-sibila-amethyst' : '',
         !d.simActive && d.lintLevel === 'error' ? 'ring-2 ring-red-500' : '',
         !d.simActive && d.lintLevel === 'warning' && !selected ? 'ring-1 ring-amber-400' : '',
       ].join(' ')}
@@ -33,7 +33,7 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
       {d.lintLevel && (
         <span
           className={[
-            'absolute -top-2 -right-2 rounded-full w-5 h-5 flex items-center justify-center border border-cigana-bg',
+            'absolute -top-2 -right-2 rounded-full w-5 h-5 flex items-center justify-center border border-sibila-onyx',
             d.lintLevel === 'error' ? 'bg-red-500 text-white' : 'bg-amber-400 text-slate-900',
           ].join(' ')}
           title={d.lintLevel === 'error' ? 'erro de validação' : 'aviso de validação'}
@@ -45,7 +45,7 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
           )}
         </span>
       )}
-      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-slate-500">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-sibila-smoke">
         <v.Icon className={`w-3.5 h-3.5 ${v.accent}`} strokeWidth={2.25} />
         <span>{v.label}</span>
       </div>
@@ -58,14 +58,14 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
         <Handle
           type="target"
           position={Position.Left}
-          className="!w-2 !h-2 !bg-cigana-purple !border-cigana-bg"
+          className="!w-2 !h-2 !bg-sibila-amethyst !border-sibila-onyx"
         />
       )}
       {!isEnd && (
         <Handle
           type="source"
           position={Position.Right}
-          className="!w-2 !h-2 !bg-cigana-purple !border-cigana-bg"
+          className="!w-2 !h-2 !bg-sibila-amethyst !border-sibila-onyx"
         />
       )}
     </div>
@@ -86,7 +86,7 @@ function renderConfigHint(d: FlowNodeData) {
 
   if (!hint) return null;
   return (
-    <div className="mt-1 text-[11px] text-slate-500 break-words line-clamp-2">
+    <div className="mt-1 text-[11px] text-sibila-smoke break-words line-clamp-2">
       {hint}
     </div>
   );

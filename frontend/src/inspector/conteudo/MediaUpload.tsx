@@ -34,7 +34,7 @@ export default function MediaUpload({ kind, url, onChange }: Props) {
           type="button"
           disabled={busy}
           onClick={() => inputRef.current?.click()}
-          className="text-xs px-2 py-1 rounded border border-cigana-border bg-cigana-bg hover:border-cigana-purple disabled:opacity-50"
+          className="text-xs px-2 py-1 rounded border border-sibila-mist bg-sibila-onyx hover:border-sibila-amethyst disabled:opacity-50"
         >
           {busy ? 'Enviando…' : url ? 'Trocar arquivo' : 'Escolher arquivo'}
         </button>
@@ -42,7 +42,7 @@ export default function MediaUpload({ kind, url, onChange }: Props) {
           <button
             type="button"
             onClick={() => onChange('')}
-            className="text-xs text-slate-400 hover:text-red-400"
+            className="text-xs text-sibila-fog hover:text-red-400"
           >
             limpar
           </button>
@@ -60,7 +60,7 @@ export default function MediaUpload({ kind, url, onChange }: Props) {
         />
       </div>
       {url && (
-        <div className="text-[10px] text-slate-500 font-mono break-all">{url}</div>
+        <div className="text-[10px] text-sibila-smoke font-mono break-all">{url}</div>
       )}
       {err && <div className="text-xs text-red-400">{err}</div>}
     </div>
@@ -79,7 +79,7 @@ function Preview({
       <img
         src={url}
         alt=""
-        className="max-h-32 rounded border border-cigana-border object-contain bg-cigana-bg"
+        className="max-h-32 rounded border border-sibila-mist object-contain bg-sibila-onyx"
       />
     );
   }
@@ -87,7 +87,7 @@ function Preview({
     return <audio src={url} controls className="w-full" />;
   }
   if (kind === 'video') {
-    return <video src={url} controls className="max-h-32 w-full rounded border border-cigana-border" />;
+    return <video src={url} controls className="max-h-32 w-full rounded border border-sibila-mist" />;
   }
   return (
     <a

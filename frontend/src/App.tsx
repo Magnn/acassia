@@ -19,7 +19,7 @@ const AgentStudio = lazy(() => import('./routes/AgentStudio'));
 
 function PageFallback() {
   return (
-    <div className="p-8 text-slate-400 text-sm animate-pulse">Carregando…</div>
+    <div className="p-8 text-sibila-fog text-sm animate-pulse">Carregando…</div>
   );
 }
 

@@ -15,7 +15,7 @@ interface Copy {
 }
 
 const COPY: Record<SaveStatus, Copy> = {
-  idle: { label: '—', cls: 'text-slate-500', Icon: Circle },
+  idle: { label: '—', cls: 'text-sibila-smoke', Icon: Circle },
   dirty: { label: 'alterações pendentes', cls: 'text-amber-400', Icon: Circle },
   saving: { label: 'salvando…', cls: 'text-sky-400', Icon: Loader2, spin: true },
   saved: { label: 'salvo', cls: 'text-emerald-400', Icon: Check },
