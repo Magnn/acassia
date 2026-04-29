@@ -8,9 +8,20 @@ import type { Config } from 'tailwindcss';
  */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
+        // ── Theme variables ────────────────────────────────────────
+        primary: 'var(--text-primary)',
+        secondary: 'var(--text-secondary)',
+        'bg-primary': 'var(--bg-primary)',
+        'bg-surface': 'var(--bg-surface)',
+        'bg-sidebar': 'var(--bg-sidebar)',
+        'bg-header': 'var(--bg-header)',
+        border: 'var(--border-primary)',
+        'accent-amethyst': 'var(--accent-amethyst)',
+        'accent-ember': 'var(--accent-ember)',
         // ── Sibila (canonical) ──────────────────────────────────────
         sibila: {
           onyx: '#0b0817',

@@ -7,13 +7,14 @@ import BlueprintsList from './routes/BlueprintsList';
 
 // Telas SaaS — lazy.
 const Dashboard = lazy(() => import('./routes/Dashboard'));
-const Inbox = lazy(() => import('./routes/Inbox'));
-const Contacts = lazy(() => import('./routes/Contacts'));
+const Leads = lazy(() => import('./routes/Leads'));
 const Builder = lazy(() => import('./routes/Builder'));
 const Runs = lazy(() => import('./routes/Runs'));
 const TenantConfig = lazy(() => import('./routes/TenantConfig'));
 const Integrations = lazy(() => import('./routes/Integrations'));
 const AgentStudio = lazy(() => import('./routes/AgentStudio'));
+const Onboarding = lazy(() => import('./routes/Onboarding'));
+const Billing = lazy(() => import('./routes/Billing'));
 
 // Settings sub-rotas
 const SettingsDevices = lazy(() => import('./routes/settings/Devices'));
@@ -22,7 +23,12 @@ const SettingsPlaceholder = lazy(() => import('./routes/settings/Placeholder'));
 
 function PageFallback() {
   return (
-    <div className="p-8 text-sibila-fog text-sm animate-pulse">Carregando…</div>
+    <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+      <div className="w-12 h-12 border-4 border-accent-amethyst/20 border-t-accent-amethyst rounded-full animate-spin" />
+      <div className="text-secondary text-[11px] font-black uppercase tracking-[0.2em] animate-pulse">
+        Carregando Acássia Studio…
+      </div>
+    </div>
   );
 }
 
@@ -31,11 +37,14 @@ export default function App() {
     <>
       <Suspense fallback={<PageFallback />}>
         <Routes>
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/inbox" element={<Inbox />} />
-            <Route path="/contacts" element={<Contacts />} />
+            <Route path="/leads" element={<Leads />} />
+            <Route path="/inbox" element={<Navigate to="/leads" replace />} />
+            <Route path="/contacts" element={<Navigate to="/leads" replace />} />
             <Route path="/blueprints" element={<BlueprintsList />} />
+            <Route path="/billing" element={<Billing />} />
             <Route path="/agents" element={<AgentStudio />} />
             <Route path="/runs" element={<Runs />} />
             <Route path="/integrations" element={<Integrations />} />

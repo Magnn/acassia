@@ -86,7 +86,7 @@ function CanvasInner({
 
   return (
     <div
-      className="h-full w-full bg-gradient-to-br from-[#f8fafc] to-[#eef2f7]"
+      className="h-full w-full bg-bg-primary transition-colors duration-500"
       onDragOver={editable ? handleDragOver : undefined}
       onDrop={editable ? handleDrop : undefined}
     >
@@ -108,17 +108,17 @@ function CanvasInner({
           variant={BackgroundVariant.Dots}
           gap={24}
           size={1}
-          color="#cbd5e1"
+          color="var(--border-primary)"
         />
         <MiniMap
           pannable
           zoomable
-          maskColor="rgba(248, 250, 252, 0.7)"
-          nodeColor={() => '#7c3aed'}
+          maskColor="var(--bg-primary)"
+          nodeColor={() => 'var(--accent-amethyst)'}
           nodeStrokeWidth={2}
-          className="bg-white border border-slate-200 rounded-lg shadow-sm"
+          className="bg-bg-surface border border-border rounded-xl shadow-lg !bottom-4 !right-4"
         />
-        <Controls position="bottom-right" showInteractive={false} />
+        <Controls position="bottom-right" showInteractive={false} className="!bottom-4 !left-4 !flex-row !bg-bg-surface !border-border !shadow-lg" />
       </ReactFlow>
     </div>
   );

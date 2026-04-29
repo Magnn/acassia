@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Plus, Trash2, Variable } from 'lucide-react';
+import { AlertCircle, KeyRound, Plus, Trash2, Variable } from 'lucide-react';
 import { tenantConfigApi } from '../api/tenantConfig';
 import { toast } from '../lib/toast';
 
@@ -10,25 +10,29 @@ export default function TenantConfig() {
   const [tab, setTab] = useState<Tab>('variables');
 
   return (
-    <div className="p-8 max-w-4xl mx-auto text-sibila-moonlight">
-      <h2 className="text-2xl font-bold mb-2 font-display">Variáveis & Segredos</h2>
-      <p className="text-sm text-sibila-fog mb-6">
-        Valores reutilizáveis pelos blocos do construtor — variáveis em JSON
-        (não-sensíveis) e segredos cifrados (chaves de API, tokens).
-      </p>
+    <div className="p-8 max-w-4xl mx-auto text-primary space-y-8">
+      <div>
+        <h2 className="text-3xl font-black tracking-tight mb-2">Variáveis & Segredos</h2>
+        <p className="text-sm text-secondary max-w-2xl leading-relaxed">
+          Valores reutilizáveis pelos blocos do construtor — variáveis em JSON
+          (não-sensíveis) e segredos cifrados (chaves de API, tokens).
+        </p>
+      </div>
 
-      <div className="flex gap-1 mb-6 border-b border-sibila-mist">
+      <div className="flex gap-2 p-1.5 bg-bg-surface rounded-2xl border border-border shadow-sm max-w-md">
         <TabBtn active={tab === 'variables'} onClick={() => setTab('variables')}>
-          <Variable className="w-3.5 h-3.5" />
+          <Variable className="w-4 h-4" />
           Variáveis
         </TabBtn>
         <TabBtn active={tab === 'secrets'} onClick={() => setTab('secrets')}>
-          <KeyRound className="w-3.5 h-3.5" />
+          <KeyRound className="w-4 h-4" />
           Segredos
         </TabBtn>
       </div>
 
-      {tab === 'variables' ? <VariablesPanel /> : <SecretsPanel />}
+      <div className="mt-8">
+        {tab === 'variables' ? <VariablesPanel /> : <SecretsPanel />}
+      </div>
     </div>
   );
 }
@@ -46,10 +50,10 @@ function TabBtn({
     <button
       onClick={onClick}
       className={[
-        'flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 -mb-px transition-colors',
+        'flex-1 flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-bold rounded-xl transition-all',
         active
-          ? 'border-sibila-amethyst text-sibila-moonlight'
-          : 'border-transparent text-sibila-fog hover:text-sibila-moonlight',
+          ? 'bg-accent-amethyst text-white shadow-md'
+          : 'text-secondary hover:bg-bg-primary hover:text-primary',
       ].join(' ')}
     >
       {children}
@@ -73,7 +77,7 @@ function VariablesPanel() {
     mutationFn: ({ key, value }: { key: string; value: unknown }) =>
       tenantConfigApi.setVariable(key, value),
     onSuccess: () => {
-      toast.success('Variável salva.');
+      toast.success('Variável salva com sucesso.');
       qc.invalidateQueries({ queryKey: ['tenant-variables'] });
       setNewKey('');
       setNewValue('');
@@ -92,9 +96,8 @@ function VariablesPanel() {
 
   const handleAdd = () => {
     const k = newKey.trim();
-    if (!k) return toast.warning('Informe uma chave.');
+    if (!k) return toast.warning('Informe uma chave identificadora.');
     let parsed: unknown = newValue;
-    // Tenta parsear JSON se parecer JSON; senão guarda como string.
     const trimmed = newValue.trim();
     if (
       trimmed.startsWith('{') ||
@@ -114,64 +117,71 @@ function VariablesPanel() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-sibila-obsidian border border-sibila-mist rounded-xl p-4 space-y-2">
-        <div className="text-[11px] uppercase tracking-wide text-sibila-fog">
-          Adicionar variável
+    <div className="space-y-6">
+      <div className="bg-bg-surface border border-border rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="text-[10px] uppercase font-black tracking-widest text-secondary">
+          Definir Nova Variável
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col md:flex-row gap-3">
           <input
             value={newKey}
             onChange={(e) => setNewKey(e.target.value)}
-            placeholder="chave (ex.: oferta_principal_url)"
-            className="flex-1 rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst font-mono"
+            placeholder="chave (ex.: site_url)"
+            className="flex-1 rounded-xl border border-border bg-bg-primary px-4 py-2.5 text-sm font-bold focus:outline-none focus:border-accent-amethyst shadow-inner"
           />
           <input
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
-            placeholder='valor (string ou JSON: 42, true, "x", {"k":1})'
-            className="flex-[2] rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst"
+            placeholder='valor (string, número ou objeto JSON)'
+            className="flex-[2] rounded-xl border border-border bg-bg-primary px-4 py-2.5 text-sm focus:outline-none focus:border-accent-amethyst shadow-inner"
           />
           <button
             onClick={handleAdd}
             disabled={setVar.isPending}
-            className="px-3 py-1.5 rounded bg-sibila-amethyst text-white text-sm hover:brightness-110 disabled:opacity-50 flex items-center gap-1"
+            className="px-6 py-2.5 rounded-xl bg-accent-amethyst text-white text-sm font-bold hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm transition-all"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Salvar
+            <Plus className="w-4 h-4" />
+            {setVar.isPending ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </div>
 
-      {isLoading && <p className="text-xs text-sibila-smoke">Carregando…</p>}
-      {!isLoading && variables.length === 0 && (
-        <p className="text-xs text-sibila-smoke">Nenhuma variável definida.</p>
-      )}
+      <div className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
+        {isLoading && <p className="p-8 text-center text-xs text-secondary animate-pulse">Carregando variáveis…</p>}
+        {!isLoading && variables.length === 0 && (
+          <p className="p-8 text-center text-xs text-secondary italic">Nenhuma variável global definida para este tenant.</p>
+        )}
 
-      <ul className="bg-sibila-obsidian border border-sibila-mist rounded-xl divide-y divide-sibila-mist/50 overflow-hidden">
-        {variables.map((v) => (
-          <li
-            key={v.key}
-            className="px-4 py-3 flex items-center gap-3 hover:bg-sibila-onyx/40"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="font-mono text-sm text-sibila-moonlight truncate">{v.key}</div>
-              <div className="font-mono text-xs text-sibila-smoke break-all">
-                {JSON.stringify(v.value)}
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                if (confirm(`Remover variável "${v.key}"?`)) delVar.mutate(v.key);
-              }}
-              className="p-1.5 rounded text-sibila-fog hover:text-red-400 hover:bg-sibila-onyx"
-              title="Remover"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </li>
-        ))}
-      </ul>
+        {variables.length > 0 && (
+          <ul className="divide-y divide-border/40">
+            {variables.map((v) => (
+              <li
+                key={v.key}
+                className="px-6 py-4 flex items-center gap-4 hover:bg-bg-primary/10 transition-colors group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-bg-primary border border-border flex items-center justify-center text-accent-amethyst flex-shrink-0">
+                  <Variable className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm text-primary truncate">{v.key}</div>
+                  <div className="font-mono text-[11px] text-secondary mt-1 break-all bg-bg-primary/50 px-2 py-0.5 rounded border border-border/30 inline-block">
+                    {JSON.stringify(v.value)}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm(`Deseja remover a variável "${v.key}"?`)) delVar.mutate(v.key);
+                  }}
+                  className="p-2.5 rounded-xl text-secondary hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                  title="Remover"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -192,7 +202,7 @@ function SecretsPanel() {
     mutationFn: ({ key, value }: { key: string; value: string }) =>
       tenantConfigApi.setSecret(key, value),
     onSuccess: () => {
-      toast.success('Segredo salvo.');
+      toast.success('Segredo armazenado com segurança.');
       qc.invalidateQueries({ queryKey: ['tenant-secrets'] });
       setNewKey('');
       setNewValue('');
@@ -203,7 +213,7 @@ function SecretsPanel() {
   const delSecret = useMutation({
     mutationFn: (key: string) => tenantConfigApi.deleteSecret(key),
     onSuccess: () => {
-      toast.success('Segredo removido.');
+      toast.success('Segredo removido do servidor.');
       qc.invalidateQueries({ queryKey: ['tenant-secrets'] });
     },
     onError: (e) => toast.error((e as Error).message),
@@ -213,88 +223,91 @@ function SecretsPanel() {
   const isMissingKey = errMsg?.includes('ACASSIA_FLOW_SECRETS_KEY');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {isMissingKey && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-xs text-amber-200">
-          <strong>ACASSIA_FLOW_SECRETS_KEY</strong> não está configurada no
-          servidor — segredos exigem essa chave de criptografia. Defina no .env
-          e reinicie.
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-700 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span>
+            <strong>Configuração Necessária:</strong> A chave de criptografia <strong>ACASSIA_FLOW_SECRETS_KEY</strong> não foi encontrada no ambiente. Segredos não podem ser salvos até que ela seja definida no arquivo .env do servidor.
+          </span>
         </div>
       )}
 
-      <div className="bg-sibila-obsidian border border-sibila-mist rounded-xl p-4 space-y-2">
-        <div className="text-[11px] uppercase tracking-wide text-sibila-fog">
-          Adicionar segredo
+      <div className="bg-bg-surface border border-border rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="text-[10px] uppercase font-black tracking-widest text-secondary">
+          Cifrar Novo Segredo
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col md:flex-row gap-3">
           <input
             value={newKey}
             onChange={(e) => setNewKey(e.target.value)}
-            placeholder="chave (ex.: stripe_api_key)"
-            className="flex-1 rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst font-mono"
+            placeholder="chave (ex.: openai_api_key)"
+            className="flex-1 rounded-xl border border-border bg-bg-primary px-4 py-2.5 text-sm font-bold focus:outline-none focus:border-accent-amethyst shadow-inner"
           />
           <input
             type="password"
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
-            placeholder="valor (será cifrado)"
-            className="flex-[2] rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm focus:outline-none focus:border-sibila-amethyst font-mono"
+            placeholder="valor sensível"
+            className="flex-[2] rounded-xl border border-border bg-bg-primary px-4 py-2.5 text-sm focus:outline-none focus:border-accent-amethyst shadow-inner"
             autoComplete="new-password"
           />
           <button
             onClick={() => {
               const k = newKey.trim();
-              if (!k) return toast.warning('Informe uma chave.');
-              if (!newValue) return toast.warning('Informe um valor.');
+              if (!k) return toast.warning('Informe o nome do segredo.');
+              if (!newValue) return toast.warning('Informe o valor do segredo.');
               setSecret.mutate({ key: k, value: newValue });
             }}
             disabled={setSecret.isPending || isMissingKey}
-            className="px-3 py-1.5 rounded bg-sibila-amethyst text-white text-sm hover:brightness-110 disabled:opacity-50 flex items-center gap-1"
+            className="px-6 py-2.5 rounded-xl bg-accent-amethyst text-white text-sm font-bold hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm transition-all"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Salvar
+            <Plus className="w-4 h-4" />
+            {setSecret.isPending ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
-        <p className="text-[10px] text-sibila-smoke">
-          Valores são cifrados em repouso. Após salvar, só os 4 últimos
-          caracteres aparecem mascarados.
+        <p className="text-[10px] text-secondary italic">
+          ⚠️ Os valores são criptografados no servidor. Após salvar, você só poderá visualizar os últimos caracteres para identificação.
         </p>
       </div>
 
-      {isLoading && <p className="text-xs text-sibila-smoke">Carregando…</p>}
-      {!isLoading && !error && secrets.length === 0 && (
-        <p className="text-xs text-sibila-smoke">Nenhum segredo armazenado.</p>
-      )}
+      <div className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
+        {isLoading && <p className="p-8 text-center text-xs text-secondary animate-pulse">Carregando segredos…</p>}
+        {!isLoading && !error && secrets.length === 0 && (
+          <p className="p-8 text-center text-xs text-secondary italic">Nenhum segredo cifrado armazenado.</p>
+        )}
 
-      {!isMissingKey && secrets.length > 0 && (
-        <ul className="bg-sibila-obsidian border border-sibila-mist rounded-xl divide-y divide-sibila-mist/50 overflow-hidden">
-          {secrets.map((s) => (
-            <li
-              key={s.key}
-              className="px-4 py-3 flex items-center gap-3 hover:bg-sibila-onyx/40"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="font-mono text-sm text-sibila-moonlight truncate">
-                  {s.key}
-                </div>
-                <div className="font-mono text-xs text-sibila-smoke">{s.masked}</div>
-              </div>
-              <span className="text-[10px] text-sibila-smoke">
-                {s.updated_at ? new Date(s.updated_at).toLocaleDateString() : '—'}
-              </span>
-              <button
-                onClick={() => {
-                  if (confirm(`Remover segredo "${s.key}"?`)) delSecret.mutate(s.key);
-                }}
-                className="p-1.5 rounded text-sibila-fog hover:text-red-400 hover:bg-sibila-onyx"
-                title="Remover"
+        {!isMissingKey && secrets.length > 0 && (
+          <ul className="divide-y divide-border/40">
+            {secrets.map((s) => (
+              <li
+                key={s.key}
+                className="px-6 py-4 flex items-center gap-4 hover:bg-bg-primary/10 transition-colors group"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                <div className="w-10 h-10 rounded-xl bg-bg-primary border border-border flex items-center justify-center text-amber-500 flex-shrink-0">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm text-primary truncate">{s.key}</div>
+                  <div className="font-mono text-xs text-secondary mt-1">{s.masked}</div>
+                </div>
+                <div className="text-[10px] text-secondary font-medium">
+                  {s.updated_at ? new Date(s.updated_at).toLocaleDateString() : '—'}
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm(`Deseja deletar permanentemente o segredo "${s.key}"?`)) delSecret.mutate(s.key);
+                  }}
+                  className="p-2.5 rounded-xl text-secondary hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                  title="Remover"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

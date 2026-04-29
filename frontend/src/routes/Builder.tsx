@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Download,
   HelpCircle,
-  History,
   History as HistoryIcon,
   Play,
   Redo2,
@@ -50,7 +49,7 @@ export default function Builder() {
   }
 
   if (isLoading) {
-    return <div className="p-6 text-sibila-fog">Carregando fluxo…</div>;
+    return <div className="p-6 text-secondary">Carregando fluxo…</div>;
   }
   if (error || !data) {
     return (
@@ -239,64 +238,56 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   const editable = rightPanel !== 'simulator';
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="border-b border-sibila-mist bg-sibila-obsidian px-4 py-2 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <Link to="/blueprints" className="text-xs text-sibila-fog hover:text-sibila-moonlight flex items-center gap-1">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Fluxos</span>
-          </Link>
-          <h2 className="text-sm font-medium">{blueprint.title}</h2>
-          <span className="text-xs text-sibila-smoke">
-            #{blueprint.id} · {blueprint.slug}
-          </span>
-          {isPublished && (
-            <span
-              className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"
-              title="Este fluxo está ativo no motor"
-            >
-              <CheckCircle2 className="w-2.5 h-2.5" />
-              publicado
-            </span>
-          )}
-          <a
-            href="/dashboard?legacy=1"
-            className="text-[11px] text-sibila-smoke hover:text-sibila-fog flex items-center gap-1 hover:underline underline-offset-2"
-            title="Abrir o builder antigo (dashboard.html) — fallback de emergência"
+    <div className="h-full flex flex-col bg-bg-primary">
+      {/* Barra de ferramentas */}
+      <div className="h-[60px] border-b border-border bg-bg-header backdrop-blur-sm px-4 flex items-center justify-between flex-shrink-0 z-20">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/flows"
+            className="p-2 rounded-md text-secondary hover:text-primary hover:bg-bg-surface transition-colors"
+            title="Voltar para lista"
           >
-            <History className="w-3 h-3" />
-            <span>builder antigo</span>
-          </a>
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h2 className="font-display text-base text-primary leading-tight flex items-center gap-2">
+              {blueprint.title}
+              <span className="text-[10px] bg-bg-surface px-1.5 py-0.5 rounded border border-border text-secondary font-mono font-normal uppercase tracking-wider">
+                {blueprint.slug}
+              </span>
+            </h2>
+            <div className="text-[11px] text-secondary">
+              última alteração: {blueprint.updated_at ? new Date(blueprint.updated_at).toLocaleString() : '—'}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3 text-xs text-sibila-smoke">
+        
+        <div className="flex items-center gap-3 text-xs text-secondary">
           <span>
             {fs.nodes.length} nodes · {fs.edges.length} arestas
           </span>
 
-          <div className="flex items-center gap-1 border-l border-sibila-mist pl-3">
+          <div className="flex items-center gap-1 border-l border-border pl-3">
             <button
-              type="button"
               onClick={fs.undo}
               disabled={!fs.canUndo}
+              className="p-1.5 rounded text-secondary hover:text-primary hover:bg-bg-surface disabled:opacity-30"
               title="Desfazer (Ctrl+Z)"
-              className="p-1 rounded hover:bg-sibila-onyx disabled:opacity-30 disabled:hover:bg-transparent"
             >
-              <Undo2 className="w-3.5 h-3.5" />
+              <Undo2 className="w-4 h-4" />
             </button>
             <button
-              type="button"
               onClick={fs.redo}
               disabled={!fs.canRedo}
-              title="Refazer (Ctrl+Shift+Z)"
-              className="p-1 rounded hover:bg-sibila-onyx disabled:opacity-30 disabled:hover:bg-transparent"
+              className="p-1.5 rounded text-secondary hover:text-primary hover:bg-bg-surface disabled:opacity-30"
+              title="Refazer (Ctrl+Y)"
             >
-              <Redo2 className="w-3.5 h-3.5" />
+              <Redo2 className="w-4 h-4" />
             </button>
             <button
-              type="button"
               onClick={() => setShortcutsOpen(true)}
-              title="Atalhos (?)"
-              className="p-1 rounded hover:bg-sibila-onyx"
+              className="p-1.5 rounded text-secondary hover:text-primary hover:bg-bg-surface"
+              title="Atalhos"
             >
               <HelpCircle className="w-3.5 h-3.5" />
             </button>
@@ -305,13 +296,13 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           <SaveIndicator status={fs.status} error={fs.error} />
 
           {/* Ações de fluxo */}
-          <div className="flex items-center gap-1 border-l border-sibila-mist pl-3">
+          <div className="flex items-center gap-1 border-l border-border pl-3">
             <button
               type="button"
               onClick={() => validateMutation.mutate()}
               disabled={validateMutation.isPending}
               title="Validar no servidor"
-              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-sibila-mist hover:border-sibila-amethyst disabled:opacity-50"
+              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-border hover:border-accent-amethyst text-primary bg-bg-surface disabled:opacity-50"
             >
               <CheckCircle2 className="w-3 h-3" />
               {validateMutation.isPending ? 'Validando…' : 'Validar'}
@@ -320,7 +311,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
               type="button"
               onClick={() => exportBlueprint(blueprint.id, blueprint.slug)}
               title="Exportar JSON"
-              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-sibila-mist hover:border-sibila-amethyst"
+              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-border hover:border-accent-amethyst text-primary bg-bg-surface"
             >
               <Download className="w-3 h-3" />
               Export
@@ -332,58 +323,58 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
               }
               title="Histórico de versões"
               className={[
-                'px-2 py-1 rounded text-xs flex items-center gap-1',
+                'px-2 py-1 rounded text-xs flex items-center gap-1 transition-all',
                 rightPanel === 'versions'
-                  ? 'bg-sibila-amethyst text-white'
-                  : 'border border-sibila-mist hover:border-sibila-amethyst',
+                  ? 'bg-accent-amethyst text-white shadow-glow-amethyst'
+                  : 'border border-border bg-bg-surface hover:border-accent-amethyst text-primary',
               ].join(' ')}
             >
               <HistoryIcon className="w-3 h-3" />
               Versões
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  confirm(
-                    isPublished
-                      ? `"${blueprint.title}" já está publicado. Republicar?`
-                      : `Publicar "${blueprint.title}"? Será o fluxo ativo no motor.`,
-                  )
-                )
-                  publishMutation.mutate();
-              }}
-              disabled={publishMutation.isPending}
-              title={isPublished ? 'Republicar' : 'Publicar fluxo'}
-              className={[
-                'px-2 py-1 rounded text-xs flex items-center gap-1',
-                isPublished
-                  ? 'border border-emerald-500/40 text-emerald-300 hover:border-emerald-500'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-500',
-                'disabled:opacity-50',
-              ].join(' ')}
-            >
-              <Rocket className="w-3 h-3" />
-              {publishMutation.isPending
-                ? 'Publicando…'
-                : isPublished
-                ? 'Republicar'
-                : 'Publicar'}
-            </button>
-          </div>
-
           <button
             type="button"
-            onClick={() =>
-              setRightPanel((p) => (p === 'simulator' ? null : 'simulator'))
-            }
+            onClick={() => {
+              if (
+                confirm(
+                  isPublished
+                    ? `"${blueprint.title}" já está publicado. Republicar?`
+                    : `Publicar "${blueprint.title}"? Será o fluxo ativo no motor.`,
+                )
+              )
+                publishMutation.mutate();
+            }}
+            disabled={publishMutation.isPending}
+            title={isPublished ? 'Republicar' : 'Publicar fluxo'}
             className={[
-              'px-2 py-1 rounded text-xs flex items-center gap-1',
-              rightPanel === 'simulator'
-                ? 'bg-sibila-amethyst text-white'
-                : 'border border-sibila-mist hover:border-sibila-amethyst',
+              'px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm',
+              isPublished
+                ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20'
+                : 'bg-emerald-600 text-white hover:bg-emerald-500 hover:shadow-glow-emerald',
+              'disabled:opacity-50',
             ].join(' ')}
           >
+            <Rocket className="w-3.5 h-3.5" />
+            {publishMutation.isPending
+              ? 'Publicando…'
+              : isPublished
+              ? 'Republicar'
+              : 'Publicar'}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() =>
+            setRightPanel((p) => (p === 'simulator' ? null : 'simulator'))
+          }
+          className={[
+            'px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all',
+            rightPanel === 'simulator'
+              ? 'bg-accent-amethyst text-white shadow-glow-amethyst ring-2 ring-accent-amethyst/20'
+              : 'bg-bg-surface border border-border hover:border-accent-amethyst text-primary shadow-sm hover:shadow-md',
+          ].join(' ')}
+        >
             {rightPanel === 'simulator' ? (
               <>
                 <Square className="w-3 h-3" fill="currentColor" />

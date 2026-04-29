@@ -291,70 +291,99 @@ def _set_secret(tenant_id: str, key: str, cipher: str) -> None:
 def index():
     step = detect_current_step(current_user.tenant_id)
     if step == STEP_DONE:
+        if request.accept_mimetypes.accept_json:
+            return jsonify({"current_step": step, "done": True})
         return redirect(url_for("saas_auth.signup_done"))
+    
+    if request.accept_mimetypes.accept_json:
+        return jsonify({"current_step": step})
     return render_template("onboarding/wizard.html", current_step=step)
 
 
 @onboarding_bp.route("/persona", methods=["POST"])
 @login_required
 def persona():
+    data = request.get_json() if request.is_json else request.form
     try:
         save_persona(
             tenant_id=current_user.tenant_id,
-            name=request.form.get("name", ""),
-            tone=request.form.get("tone", ""),
-            backstory=request.form.get("backstory", ""),
-            restrictions=request.form.getlist("restrictions"),
+            name=data.get("name", ""),
+            tone=data.get("tone", ""),
+            backstory=data.get("backstory", ""),
+            restrictions=data.getlist("restrictions") if hasattr(data, 'getlist') else data.get("restrictions", []),
         )
     except ValueError as exc:
+        if request.is_json:
+            return jsonify({"error": str(exc)}), 400
         flash(str(exc), "error")
         return render_template("onboarding/wizard.html", current_step=STEP_PERSONA), 400
+    
+    if request.is_json:
+        return jsonify({"ok": True, "next_step": detect_current_step(current_user.tenant_id)})
     return redirect(url_for("saas_onboarding.index"))
 
 
 @onboarding_bp.route("/oferta", methods=["POST"])
 @login_required
 def oferta():
+    data = request.get_json() if request.is_json else request.form
     try:
         save_oferta(
             tenant_id=current_user.tenant_id,
-            nome=request.form.get("nome", ""),
-            preco=request.form.get("preco", ""),
-            descricao=request.form.get("descricao", ""),
-            gateway=request.form.get("gateway", ""),
+            nome=data.get("nome", ""),
+            preco=data.get("preco", ""),
+            descricao=data.get("descricao", ""),
+            gateway=data.get("gateway", ""),
         )
     except ValueError as exc:
+        if request.is_json:
+            return jsonify({"error": str(exc)}), 400
         flash(str(exc), "error")
         return render_template("onboarding/wizard.html", current_step=STEP_OFERTA), 400
+    
+    if request.is_json:
+        return jsonify({"ok": True, "next_step": detect_current_step(current_user.tenant_id)})
     return redirect(url_for("saas_onboarding.index"))
 
 
 @onboarding_bp.route("/template", methods=["POST"])
 @login_required
 def template_step():
+    data = request.get_json() if request.is_json else request.form
     try:
         save_template(
             tenant_id=current_user.tenant_id,
-            template=request.form.get("template", ""),
+            template=data.get("template", ""),
         )
     except ValueError as exc:
+        if request.is_json:
+            return jsonify({"error": str(exc)}), 400
         flash(str(exc), "error")
         return render_template("onboarding/wizard.html", current_step=STEP_TEMPLATE), 400
+    
+    if request.is_json:
+        return jsonify({"ok": True, "next_step": detect_current_step(current_user.tenant_id)})
     return redirect(url_for("saas_onboarding.index"))
 
 
 @onboarding_bp.route("/whatsapp", methods=["POST"])
 @login_required
 def whatsapp():
+    data = request.get_json() if request.is_json else request.form
     try:
         save_whatsapp(
             tenant_id=current_user.tenant_id,
-            phone_number_id=request.form.get("phone_number_id", ""),
-            waba_id=request.form.get("waba_id", ""),
-            access_token=request.form.get("access_token", ""),
+            phone_number_id=data.get("phone_number_id", ""),
+            waba_id=data.get("waba_id", ""),
+            access_token=data.get("access_token", ""),
         )
     except ValueError as exc:
+        if request.is_json:
+            return jsonify({"error": str(exc)}), 400
         flash(str(exc), "error")
         return render_template("onboarding/wizard.html", current_step=STEP_WHATSAPP), 400
+    
+    if request.is_json:
+        return jsonify({"ok": True, "next_step": STEP_DONE})
     flash("Onboarding concluído! Tua cigana está pronta pra ser ativada.", "success")
     return redirect(url_for("saas_auth.signup_done"))

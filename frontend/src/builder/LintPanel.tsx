@@ -21,7 +21,7 @@ export default function LintPanel({ issues, onFocus }: Props) {
 
   if (issues.length === 0) {
     return (
-      <div className="border-t border-sibila-mist bg-sibila-obsidian px-3 py-1.5 text-[11px] text-emerald-400 flex items-center gap-1.5 flex-shrink-0">
+    <div className="border-t border-border bg-bg-surface px-3 py-2 text-[11px] text-emerald-500 flex items-center gap-1.5 flex-shrink-0 font-bold">
         <CheckCircle2 className="w-3.5 h-3.5" />
         <span>sem avisos de validação</span>
       </div>
@@ -29,27 +29,27 @@ export default function LintPanel({ issues, onFocus }: Props) {
   }
 
   return (
-    <div className="border-t border-sibila-mist bg-sibila-obsidian flex-shrink-0">
+    <div className="border-t border-border bg-bg-surface flex-shrink-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full px-3 py-1.5 flex items-center justify-between text-[11px] hover:bg-sibila-onyx/40"
+        className="w-full px-3 py-2 flex items-center justify-between text-[11px] hover:bg-bg-primary transition-colors"
       >
         <span className="flex items-center gap-3">
           {errors > 0 && (
-            <span className="flex items-center gap-1 text-red-400">
+            <span className="flex items-center gap-1 text-red-500 font-bold">
               <AlertCircle className="w-3.5 h-3.5" />
               {errors} erro(s)
             </span>
           )}
           {warnings > 0 && (
-            <span className="flex items-center gap-1 text-amber-400">
+            <span className="flex items-center gap-1 text-amber-500 font-bold">
               <AlertTriangle className="w-3.5 h-3.5" />
               {warnings} aviso(s)
             </span>
           )}
         </span>
-        <span className="flex items-center gap-1 text-sibila-smoke">
+        <span className="flex items-center gap-1 text-secondary">
           {open ? (
             <>
               <ChevronDown className="w-3 h-3" /> ocultar
@@ -62,29 +62,29 @@ export default function LintPanel({ issues, onFocus }: Props) {
         </span>
       </button>
       {open && (
-        <ul className="max-h-44 overflow-y-auto border-t border-sibila-mist divide-y divide-sibila-mist/50">
+        <ul className="max-h-44 overflow-y-auto border-t border-border divide-y divide-border/30">
           {issues.map((i, idx) => (
             <li
               key={idx}
-              className="px-3 py-1.5 flex items-center gap-2 text-xs hover:bg-sibila-onyx/40"
+              className="px-3 py-2 flex items-center gap-2 text-xs hover:bg-bg-primary transition-colors"
             >
               {i.level === 'error' ? (
-                <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
               ) : (
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
               )}
-              <span className="flex-1 text-sibila-fog">{i.message}</span>
+              <span className="flex-1 text-primary">{i.message}</span>
               {i.nodeId && (
                 <button
                   type="button"
                   onClick={() => onFocus(i.nodeId!)}
-                  className="text-[11px] text-sky-400 hover:underline flex items-center gap-1"
+                  className="text-[11px] text-accent-amethyst hover:underline flex items-center gap-1 font-bold"
                 >
                   <Crosshair className="w-3 h-3" />
                   focar
                 </button>
               )}
-              <span className="text-[10px] text-sibila-smoke/70 font-mono">{i.code}</span>
+              <span className="text-[10px] text-secondary font-mono">{i.code}</span>
             </li>
           ))}
         </ul>

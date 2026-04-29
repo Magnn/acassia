@@ -2,6 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme variables – light (default) */
+:root {
+  --bg-primary: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-sidebar: #f1f5f9;
+  --bg-header: rgba(255, 255, 255, 0.8);
+  --text-primary: #1e1b4b; /* Indigo 950 */
+  --text-secondary: #64748b; /* Slate 500 */
+  --border-primary: #e2e8f0;
+  --accent-amethyst: #7c6a99;
+  --accent-ember: #d4a574;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #0b0817; /* sibila-onyx */
+  --bg-surface: #14101e; /* sibila-obsidian */
+  --bg-sidebar: #1c1828; /* sibila-veil */
+  --bg-header: rgba(28, 24, 40, 0.6); /* sibila-veil with opacity */
+  --text-primary: #f3eee5; /* sibila-moonlight */
+  --text-secondary: #a8a3b3; /* sibila-fog */
+  --border-primary: #2a2538; /* sibila-mist */
+  --accent-amethyst: #7c6a99;
+  --accent-ember: #d4a574;
+}
+
+/* Custom Premium Utilities */
+@layer utilities {
+  .glass {
+    @apply backdrop-blur-md bg-opacity-70 border border-white/20;
+  }
+  
+  .shadow-premium {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15),
+                0 2px 10px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .shadow-glow-amethyst {
+    box-shadow: 0 0 15px -3px rgba(124, 106, 153, 0.4),
+                0 0 30px -10px rgba(124, 106, 153, 0.2);
+  }
+
+  .shadow-glow-emerald {
+    box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.4),
+                0 0 30px -10px rgba(16, 185, 129, 0.2);
+  }
+
+  .node-gradient {
+    background: linear-gradient(135deg, var(--bg-surface) 0%, rgba(255,255,255,0.05) 100%);
+  }
+}
+
+.react-flow__edge-path {
+  stroke-width: 2.5;
+  stroke: var(--border-primary);
+  transition: stroke 0.3s ease;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--accent-amethyst);
+}
+
+.react-flow__handle {
+  width: 10px !important;
+  height: 10px !important;
+  border: 3px solid var(--bg-surface) !important;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.4);
+  filter: brightness(1.1);
+}
+
+
 html,
 body,
 #root {

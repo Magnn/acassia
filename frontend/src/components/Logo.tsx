@@ -6,11 +6,14 @@ interface Props {
 }
 
 /**
- * Sibila — marca visual.
+ * Acássia — marca visual.
  *
  * Composição: lua crescente partida por um eixo vertical (axis mundi)
  * + ponto astral no canto superior direito. Single-color (currentColor)
  * pra herdar de qualquer contexto.
+ *
+ * Tokens internos da paleta usam prefix `sibila-*` (legado, igual aos
+ * `cigana-*` antes) — só nomenclatura interna, não aparece pra usuário.
  */
 export default function Logo({
   size = 24,
@@ -27,27 +30,27 @@ export default function Logo({
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
-      aria-label="Sibila"
+      aria-label="Acássia"
     >
-      {/* Lua crescente — half-arc fechado */}
+      {/* Lua crescente — design mais refinado */}
       <path
-        d="M12 3 A9 9 0 0 1 12 21"
-        strokeWidth="1.6"
+        d="M12 2 A10 10 0 0 1 12 22"
+        strokeWidth="2"
         fill="currentColor"
-        fillOpacity={variant === 'outline' ? 0 : 0.1}
+        fillOpacity={variant === 'outline' ? 0 : 0.15}
       />
-      {/* Eixo vertical — divide a lua */}
-      <line x1="12" y1="3" x2="12" y2="21" strokeWidth="1.6" />
-      {/* Ponto astral (omitido em minimal) */}
+      {/* Eixo vertical */}
+      <line x1="12" y1="2" x2="12" y2="22" strokeWidth="2" />
+      {/* Ponto astral */}
       {variant !== 'minimal' && (
-        <circle cx="20" cy="5" r="1.4" fill="currentColor" stroke="none" />
+        <circle cx="19" cy="6" r="1.5" fill="var(--accent-amethyst)" stroke="none" />
       )}
     </svg>
   );
 }
 
 /**
- * Wordmark "Sibila" em Fraunces — combina com Logo em horizontal.
+ * Wordmark "Acássia" — Marca principal do sistema.
  */
 export function Wordmark({
   className = '',
@@ -56,10 +59,10 @@ export function Wordmark({
 }) {
   return (
     <span
-      className={`font-display font-medium tracking-wide ${className}`}
-      style={{ letterSpacing: '0.02em' }}
+      className={`font-black tracking-tight ${className}`}
+      style={{ letterSpacing: '-0.02em' }}
     >
-      Sibila
+      Acássia
     </span>
   );
 }

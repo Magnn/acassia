@@ -114,4 +114,11 @@ export const blueprintsApi = {
       '/api/flows/blueprints/import',
       payload,
     ),
+  create: async (title: string): Promise<BlueprintDetail> => {
+    const data = await api.post<{ ok: boolean; blueprint: BlueprintDetail }>(
+      '/api/flows/blueprints/import',
+      { title, body: { format: 'acassia-flow', version: 1, graph: { nodes: [], edges: [] } } },
+    );
+    return data.blueprint;
+  },
 };

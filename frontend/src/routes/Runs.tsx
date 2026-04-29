@@ -25,40 +25,40 @@ export default function Runs() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto text-sibila-moonlight h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6 flex-shrink-0">
+    <div className="p-8 max-w-7xl mx-auto text-primary h-full flex flex-col">
+      <div className="flex items-center justify-between mb-8 flex-shrink-0">
         <div>
-          <h2 className="text-2xl font-bold font-display">Execuções de fluxo</h2>
-          <p className="text-sm text-sibila-fog mt-1">
-            Histórico de runs disparados nos blueprints publicados deste tenant.
+          <h2 className="text-3xl font-bold font-display tracking-tight">Execuções</h2>
+          <p className="text-sm text-secondary mt-1">
+            Histórico de disparos nos fluxos ativos deste tenant.
           </p>
         </div>
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="text-xs px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst flex items-center gap-1 disabled:opacity-50"
+          className="text-xs px-3 py-2 rounded-lg border border-border bg-bg-surface hover:border-accent-amethyst text-primary flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
         >
-          <RefreshCw className={`w-3 h-3 ${isFetching ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
           Atualizar
         </button>
       </div>
 
       <div className="flex-1 min-h-0 flex gap-4">
         {/* Lista */}
-        <div className="flex-1 min-w-0 bg-sibila-obsidian border border-sibila-mist rounded-xl overflow-hidden flex flex-col">
-          <div className="px-4 py-2 border-b border-sibila-mist text-[11px] uppercase tracking-wide text-sibila-fog grid grid-cols-[80px,1fr,90px,140px,30px] gap-3 flex-shrink-0">
-            <span>Run</span>
+        <div className="flex-1 min-w-0 bg-bg-surface border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-border bg-bg-primary/30 text-[10px] uppercase tracking-widest font-black text-secondary grid grid-cols-[80px,1fr,110px,160px,30px] gap-3 flex-shrink-0">
+            <span>ID</span>
             <span>Blueprint / Lead</span>
             <span>Status</span>
             <span>Iniciado</span>
             <span></span>
           </div>
-          <ul className="flex-1 overflow-y-auto divide-y divide-sibila-mist/50">
+          <ul className="flex-1 overflow-y-auto divide-y divide-border/30">
             {isLoading && (
-              <li className="px-4 py-4 text-xs text-sibila-smoke">Carregando…</li>
+              <li className="px-4 py-8 text-center text-xs text-secondary animate-pulse">Carregando execuções…</li>
             )}
             {!isLoading && runs.length === 0 && (
-              <li className="px-4 py-4 text-xs text-sibila-smoke">
+              <li className="px-4 py-8 text-center text-xs text-secondary italic">
                 Nenhuma execução registrada ainda.
               </li>
             )}
@@ -67,19 +67,19 @@ export default function Runs() {
                 key={r.id}
                 onClick={() => setSelected(r.id === selected ? null : r.id)}
                 className={[
-                  'px-4 py-2 grid grid-cols-[80px,1fr,90px,140px,30px] gap-3 items-center cursor-pointer text-sm hover:bg-sibila-onyx/40',
-                  selected === r.id ? 'bg-sibila-onyx/60' : '',
+                  'px-4 py-3 grid grid-cols-[80px,1fr,110px,160px,30px] gap-3 items-center cursor-pointer text-sm hover:bg-bg-primary transition-colors',
+                  selected === r.id ? 'bg-bg-primary ring-1 ring-inset ring-accent-amethyst/30' : '',
                 ].join(' ')}
               >
-                <span className="font-mono text-xs text-sibila-fog">#{r.id}</span>
-                <span className="text-sibila-moonlight truncate">
+                <span className="font-mono text-[11px] text-secondary">#{r.id}</span>
+                <span className="text-primary font-medium truncate">
                   bp #{r.blueprint_id}
                   {r.lead_id != null && (
-                    <span className="text-sibila-smoke ml-2">· lead {r.lead_id}</span>
+                    <span className="text-secondary ml-2 font-normal">· lead {r.lead_id}</span>
                   )}
                 </span>
                 <StatusChip status={r.status} />
-                <span className="text-[11px] text-sibila-smoke truncate">
+                <span className="text-[11px] text-secondary truncate">
                   {r.started_at ? new Date(r.started_at).toLocaleString() : '—'}
                 </span>
                 <ChevronRight
@@ -94,7 +94,7 @@ export default function Runs() {
 
         {/* Detalhe */}
         {selected != null && (
-          <div className="w-96 flex-shrink-0 bg-sibila-obsidian border border-sibila-mist rounded-xl overflow-hidden flex flex-col animate-slide-in-right">
+          <div className="w-96 flex-shrink-0 bg-bg-surface border border-border rounded-xl shadow-xl overflow-hidden flex flex-col animate-slide-in-right">
             <RunDetail runId={selected} onClose={() => setSelected(null)} />
           </div>
         )}

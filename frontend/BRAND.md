@@ -1,8 +1,12 @@
-# Sibila — Brand Guidelines
+# Acássia — Brand Guidelines
 
-## Origem do nome
+> **Nome canônico do produto:** Acássia.
+> **Sufixo do app interno:** "Studio" (ex.: "Acássia Studio").
+> **Nome da paleta de cor (interno, não aparece pro usuário):** `sibila-*`.
 
-**Sibila** vem das *sibyls* da antiguidade — profetisas oraculares (Délfica, Cumana, Frígia, Tiburtina, etc.) que serviam de canal entre o divino e o mundano em templos gregos e romanos. O nome substitui "Cigana" — termo etnicamente carregado pelo qual comunidades Roma têm relação ambivalente. **Sibila** mantém a alma mística do produto sem amarrar a uma identidade étnica específica.
+A separação é proposital: usuário lê "Acássia" em todo lugar visível;
+desenvolvedores usam tokens `sibila-*` no Tailwind por consistência com
+o histórico do código (mesmo princípio dos aliases legados `cigana-*`).
 
 ## Tagline
 
@@ -26,14 +30,14 @@ Inspiração: Linear (rigor) + Stripe (clareza) + maturidade ritual de uma carta
 Composição: **lua crescente partida por um eixo vertical (axis mundi) + ponto astral**.
 
 - Lua = ciclo, mistério, intuição
-- Eixo = canal entre alto e baixo (a função da sibila)
+- Eixo = canal entre alto e baixo (a função da oráculo)
 - Ponto astral = alinhamento, visão de longe
 
 Implementação: `frontend/src/components/Logo.tsx`. SVG single-color (currentColor) — herda contexto. Variantes: `default` (com ponto), `outline` (só contorno), `minimal` (sem ponto).
 
 ## Wordmark
 
-**Sibila** — em **Fraunces** (modern serif), peso 500, tracking 0.02em.
+**Acássia** — sans serif, peso black/bold, tracking apertado (`-0.02em`).
 
 ## Tipografia
 
@@ -49,7 +53,7 @@ Fraunces é serif moderno com personalidade — formas variáveis (opsz), serifa
 
 Núcleo escuro quente (não slate frio) + acentos metálicos restritos.
 
-| Token | Hex | Uso |
+| Token (interno) | Hex | Uso |
 |---|---|---|
 | `sibila-onyx` | `#0b0817` | Fundo base |
 | `sibila-obsidian` | `#14101e` | Cards, surfaces |
@@ -66,6 +70,8 @@ Núcleo escuro quente (não slate frio) + acentos metálicos restritos.
 | `sibila-moonlight` | `#f3eee5` | Texto alto — creme quente |
 | `sibila-fog` | `#a8a3b3` | Texto médio |
 | `sibila-smoke` | `#6b6677` | Texto baixo, hints, placeholders |
+
+Tokens semânticos com CSS variables (`bg-bg-primary`, `text-primary`, `bg-accent-amethyst`, etc.) viraram a forma preferida em código novo — habilitam o ThemeContext (light/dark switcher). Os `sibila-*` ficam disponíveis pra estilo direto.
 
 ### Quando usar **amethyst** vs **ember**
 
@@ -88,7 +94,7 @@ Não usar os dois com a mesma intensidade — ember é tempero, não tinta de fu
 
 ## Migração de tokens
 
-Os tokens legados `cigana-bg`, `cigana-surface`, `cigana-border`, `cigana-purple` continuam definidos em `tailwind.config.ts`, **agora apontando para os valores Sibila correspondentes**. Código antigo segue funcionando; código novo deve usar `sibila-*` direto.
+Os tokens legados `cigana-bg`, `cigana-surface`, `cigana-border`, `cigana-purple` continuam definidos em `tailwind.config.ts`, **agora apontando para os valores correspondentes da paleta atual**. Código antigo segue funcionando; código novo deve usar tokens semânticos (`bg-bg-primary`, etc.) ou `sibila-*` direto.
 
 | Legado | Novo equivalente |
 |---|---|
@@ -111,9 +117,9 @@ Manter raridade — não exagerar nos termos místicos. **Um por tela** é mais 
 
 ## Implementação
 
-- `tailwind.config.ts` — tokens
-- `frontend/src/components/Logo.tsx` — marca SVG + Wordmark
+- `tailwind.config.ts` — tokens (CSS variables + `sibila-*` aliases)
+- `frontend/src/components/Logo.tsx` — marca SVG + Wordmark "Acássia"
 - `frontend/src/components/Layout.tsx` — sidebar + header globais aplicando a paleta
-- `frontend/index.html` — carrega Fraunces + Inter via Google Fonts
+- `frontend/index.html` — carrega Fraunces + Inter via Google Fonts; title "Acássia"
 
 Ver também: pt-br nas labels da nav, agrupamento por seção (Painel / Oráculo / Configuração).

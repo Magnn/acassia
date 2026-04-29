@@ -385,6 +385,7 @@ class User(Base):
     email = Column(String(200), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
     name = Column(String(200), nullable=True)
+    role = Column(String(20), nullable=False, default="user", index=True) # 'admin' | 'user'
     is_active = Column(Boolean, default=True, nullable=False)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     criado_em = Column(DateTime(timezone=True), default=_agora_utc)

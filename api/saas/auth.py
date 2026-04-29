@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import bcrypt
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -50,10 +50,11 @@ login_manager.login_view = "saas_auth.login"
 
 
 class AuthenticatedUser(UserMixin):
-    def __init__(self, user_id: int, email: str, tenant_id: str):
+    def __init__(self, user_id: int, email: str, tenant_id: str, role: str):
         self.id = user_id
         self.email = email
         self.tenant_id = tenant_id
+        self.role = role
 
     def get_id(self) -> str:
         return str(self.id)
@@ -70,7 +71,7 @@ def _load_user(user_id_str: str) -> Optional[AuthenticatedUser]:
         user = db.query(models.User).filter_by(id=user_id, is_active=True).first()
         if not user:
             return None
-        return AuthenticatedUser(user.id, user.email, user.tenant_id)
+        return AuthenticatedUser(user.id, user.email, user.tenant_id, user.role)
     finally:
         db.close()
 
@@ -181,7 +182,7 @@ def signup():
             flash(str(exc), "error")
             return render_template("auth/signup.html"), 400
 
-        login_user(AuthenticatedUser(user.id, user.email, user.tenant_id))
+        login_user(AuthenticatedUser(user.id, user.email, user.tenant_id, user.role))
         return redirect(url_for("saas_auth.signup_done"))
 
     return render_template("auth/signup.html")
@@ -209,7 +210,7 @@ def login():
             return render_template("auth/login.html"), 401
 
         _touch_last_login(user.id)
-        login_user(AuthenticatedUser(user.id, user.email, user.tenant_id))
+        login_user(AuthenticatedUser(user.id, user.email, user.tenant_id, user.role))
         next_url = request.args.get("next") or url_for("saas_auth.signup_done")
         return redirect(next_url)
 
@@ -221,3 +222,15 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for("saas_auth.login"))
+
+
+@auth_bp.route("/me", methods=["GET"])
+@login_required
+def me():
+    """Retorna info do usuário logado para o front-end React."""
+    return jsonify({
+        "id": current_user.id,
+        "email": current_user.email,
+        "tenant_id": current_user.tenant_id,
+        "role": current_user.role
+    })

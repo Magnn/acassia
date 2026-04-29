@@ -1,13 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
   FolderPlus,
-  History,
   MoreHorizontal,
   Pencil,
+  Plus,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -32,6 +32,16 @@ export default function BlueprintsList() {
   });
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { mutate: createBlueprint, isPending: isCreating } = useMutation({
+    mutationFn: blueprintsApi.create,
+    onSuccess: (bp: BlueprintSummary) => {
+      qc.invalidateQueries({ queryKey: ['blueprints'] });
+      navigate(`/flows/${bp.id}`);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Erro ao criar fluxo');
+    },
+  });
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [folders, setFolders] = useState<FoldersState>(() => readFolders());
@@ -70,14 +80,31 @@ export default function BlueprintsList() {
   };
 
   return (
-    <section className="max-w-3xl mx-auto px-6 py-8">
-      <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-xl font-semibold">Fluxos do tenant</h1>
+    <section className="max-w-3xl mx-auto px-6 py-8 text-primary">
+      <div className="flex items-baseline justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-primary">Fluxos</h1>
+          <p className="text-sm text-secondary">Gerencie os fluxos de automação do seu tenant</p>
+        </div>
         <div className="flex items-center gap-3">
           <button
             type="button"
+            onClick={() => {
+              const title = window.prompt('Nome do novo fluxo:');
+              if (title?.trim()) createBlueprint(title);
+            }}
+            disabled={isCreating}
+            className="text-xs bg-accent-amethyst text-white hover:bg-accent-amethyst/90 flex items-center gap-1.5 px-3 py-2 rounded-lg shadow-sm transition-all disabled:opacity-50"
+            title="Criar novo fluxo em branco"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{isCreating ? 'Criando...' : 'Novo Fluxo'}</span>
+          </button>
+          <div className="h-4 w-[1px] bg-border mx-1" />
+          <button
+            type="button"
             onClick={handleAddFolder}
-            className="text-xs text-sibila-fog hover:text-sibila-moonlight flex items-center gap-1 px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst"
+            className="text-xs text-secondary hover:text-primary flex items-center gap-1 px-2 py-1 rounded border border-border hover:border-accent-amethyst"
             title="Criar nova pasta"
           >
             <FolderPlus className="w-3 h-3" />
@@ -86,20 +113,13 @@ export default function BlueprintsList() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="text-xs text-sibila-fog hover:text-sibila-moonlight flex items-center gap-1 px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst"
+            className="text-xs text-secondary hover:text-primary flex items-center gap-1 px-2 py-1 rounded border border-border hover:border-accent-amethyst"
             title="Importar fluxo de arquivo JSON"
           >
             <Upload className="w-3 h-3" />
             <span>Importar JSON</span>
           </button>
-          <a
-            href="/dashboard?legacy=1"
-            className="text-xs text-sibila-smoke hover:text-sibila-fog flex items-center gap-1"
-            title="Builder antigo (dashboard.html)"
-          >
-            <History className="w-3 h-3" />
-            <span>builder antigo</span>
-          </a>
+
           <input
             ref={fileRef}
             type="file"
@@ -114,10 +134,10 @@ export default function BlueprintsList() {
         </div>
       </div>
 
-      {isLoading && <p className="text-sibila-fog">Carregando…</p>}
+      {isLoading && <p className="text-secondary">Carregando…</p>}
       {error && <p className="text-red-400">Erro: {(error as Error).message}</p>}
       {data && data.length === 0 && (
-        <p className="text-sibila-fog">Nenhum fluxo cadastrado neste tenant.</p>
+        <p className="text-secondary">Nenhum fluxo cadastrado neste tenant.</p>
       )}
 
       {data && data.length > 0 && (
@@ -133,7 +153,7 @@ export default function BlueprintsList() {
                     onClick={() =>
                       setCollapsed((s) => ({ ...s, [folder.id]: !s[folder.id] }))
                     }
-                    className="flex items-center gap-1.5 text-sm text-sibila-fog hover:text-sibila-moonlight"
+                    className="flex items-center gap-1.5 text-sm text-secondary hover:text-primary"
                   >
                     {isCollapsed ? (
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -141,7 +161,7 @@ export default function BlueprintsList() {
                       <ChevronDown className="w-3.5 h-3.5" />
                     )}
                     <span className="font-medium">{folder.name}</span>
-                    <span className="text-xs text-sibila-smoke">({items.length})</span>
+                    <span className="text-xs text-secondary/60">({items.length})</span>
                   </button>
                   {!folder.system && (
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
@@ -152,7 +172,7 @@ export default function BlueprintsList() {
                             updateFolders(renameFolder(folders, folder.id, name));
                           }
                         }}
-                        className="text-sibila-smoke hover:text-sibila-moonlight p-1 rounded hover:bg-sibila-obsidian"
+                        className="text-secondary hover:text-primary p-1 rounded hover:bg-bg-surface"
                         title="Renomear"
                       >
                         <Pencil className="w-3 h-3" />
@@ -168,7 +188,7 @@ export default function BlueprintsList() {
                             toast.success('Pasta removida.');
                           }
                         }}
-                        className="text-sibila-smoke hover:text-red-400 p-1 rounded hover:bg-sibila-obsidian"
+                        className="text-secondary hover:text-red-400 p-1 rounded hover:bg-bg-surface"
                         title="Apagar"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -180,7 +200,7 @@ export default function BlueprintsList() {
                 {!isCollapsed && (
                   <ul className="space-y-2">
                     {items.length === 0 ? (
-                      <li className="text-xs text-sibila-smoke italic px-1">
+                      <li className="text-xs text-secondary/60 italic px-1">
                         Pasta vazia.
                       </li>
                     ) : (
@@ -221,21 +241,21 @@ function BlueprintRow({
       <div className="flex items-center gap-2">
         <Link
           to={`/flows/${bp.id}`}
-          className="flex-1 rounded border border-sibila-mist bg-sibila-obsidian px-4 py-3 flex items-baseline justify-between hover:border-sibila-amethyst transition-colors"
+          className="flex-1 rounded border border-border bg-bg-surface px-4 py-3 flex items-baseline justify-between hover:border-accent-amethyst transition-colors"
         >
           <div>
-            <div className="font-medium">{bp.title}</div>
-            <div className="text-xs text-sibila-smoke">
+            <div className="font-medium text-primary">{bp.title}</div>
+            <div className="text-xs text-secondary">
               #{bp.id} · {bp.slug}
             </div>
           </div>
-          <div className="text-xs text-sibila-smoke">
+          <div className="text-xs text-secondary">
             {bp.updated_at ? new Date(bp.updated_at).toLocaleString() : '—'}
           </div>
         </Link>
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className="p-2 rounded text-sibila-fog hover:text-sibila-moonlight hover:bg-sibila-obsidian"
+          className="p-2 rounded text-secondary hover:text-primary hover:bg-bg-surface"
           title="Mover para pasta"
         >
           <MoreHorizontal className="w-4 h-4" />
@@ -247,8 +267,8 @@ function BlueprintRow({
             className="fixed inset-0 z-10"
             onClick={() => setMenuOpen(false)}
           />
-          <ul className="absolute right-0 mt-1 z-20 min-w-[180px] bg-sibila-obsidian border border-sibila-mist rounded shadow-lg py-1">
-            <li className="px-3 py-1 text-[10px] uppercase tracking-wide text-sibila-smoke">
+          <ul className="absolute right-0 mt-1 z-20 min-w-[180px] bg-bg-surface border border-border rounded shadow-lg py-1">
+            <li className="px-3 py-1 text-[10px] uppercase tracking-wide text-secondary">
               Mover para
             </li>
             {folders.folders.map((f) => (
@@ -258,7 +278,7 @@ function BlueprintRow({
                     onMoveTo(f.id);
                     setMenuOpen(false);
                   }}
-                  className="w-full text-left px-3 py-1.5 text-sm text-sibila-moonlight hover:bg-sibila-onyx/60"
+                  className="w-full text-left px-3 py-1.5 text-sm text-primary hover:bg-bg-primary"
                 >
                   {f.name}
                 </button>

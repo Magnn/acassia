@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, jsonify
 from flask_login import current_user, login_required
 
 from api.payments.stripe_client import (
@@ -67,11 +67,19 @@ def plans():
     """Seletor de plano. Renderiza template com 3 cards."""
     tenant_id = current_user.tenant_id
     current_status = _stripe_var(tenant_id, "subscription_status")
+    
+    data = {
+        "plan_labels": PLAN_LABELS,
+        "current_status": current_status,
+        "stripe_configured": is_configured(),
+    }
+    
+    if request.accept_mimetypes.accept_json:
+        return jsonify(data)
+        
     return render_template(
         "billing/plans.html",
-        plan_labels=PLAN_LABELS,
-        current_status=current_status,
-        stripe_configured=is_configured(),
+        **data
     )
 
 

@@ -14,7 +14,8 @@ export interface AgentSummary {
   name: string;
   avatar: string;
   draft?: AgentDraft;
-  versions?: { id: number; version_number: number; created_at: string }[];
+  draft_version?: number;
+  versions?: { id: number; version_number: number; note?: string | null; created_at: string }[];
   published_version_id?: number | null;
   criado_em?: string;
   atualizado_em?: string;
