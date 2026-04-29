@@ -18,6 +18,7 @@ const Builder = lazy(() => import('./routes/Builder'));
 const Runs = lazy(() => import('./routes/Runs'));
 const Funnel = lazy(() => import('./routes/Funnel'));
 const Recovery = lazy(() => import('./routes/Recovery'));
+const Templates = lazy(() => import('./routes/Templates'));
 const TenantConfig = lazy(() => import('./routes/TenantConfig'));
 const Integrations = lazy(() => import('./routes/Integrations'));
 const AgentStudio = lazy(() => import('./routes/AgentStudio'));
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="/runs" element={<Runs />} />
             <Route path="/analytics/funnel" element={<Funnel />} />
             <Route path="/analytics/recovery" element={<Recovery />} />
+            <Route path="/templates" element={<Templates />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/tenant-config" element={<TenantConfig />} />
 
