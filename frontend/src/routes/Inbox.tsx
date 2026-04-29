@@ -156,7 +156,7 @@ export default function Inbox() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800 leading-tight">{lead?.nome || lead?.telefone}</h3>
-                  <div className="text-[11px] text-sibila-smoke font-mono">{lead?.telefone} · {lead?.node_atual || 'Início'}</div>
+                  <div className="text-[11px] text-slate-500 font-mono">{lead?.telefone} · {lead?.node_atual || 'Início'}</div>
                 </div>
               </div>
               <div>
@@ -187,7 +187,7 @@ export default function Inbox() {
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-[#f8f9fd] to-[#f5f7fc]">
               <div className="text-center my-4">
-                <span className="bg-white border border-slate-200 text-sibila-fog text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-full shadow-sm">
+                <span className="bg-white border border-slate-200 text-slate-500 text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-full shadow-sm">
                   Início da Conversa
                 </span>
               </div>
@@ -222,7 +222,7 @@ export default function Inbox() {
                           </div>
                         )}
                         <div className="whitespace-pre-wrap break-words">{m.texto || '(Mídia)'}</div>
-                        <div className={`text-[9px] mt-1 text-right flex items-center justify-end gap-1 ${isUser ? 'text-sibila-fog' : 'text-[#5b9679]'}`}>
+                        <div className={`text-[9px] mt-1 text-right flex items-center justify-end gap-1 ${isUser ? 'text-slate-400' : 'text-[#5b9679]'}`}>
                           {m.timestamp && new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           {!isUser && <Clock className="w-2.5 h-2.5 inline" />}
                         </div>
