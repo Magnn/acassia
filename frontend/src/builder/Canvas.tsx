@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -23,6 +23,8 @@ interface CanvasProps {
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
   editable: boolean;
+  /** quando muda, centra a viewport no nó indicado (botão "focar" no lint). */
+  focusRequest?: { id: string; ts: number } | null;
   onNodesChange: (changes: NodeChange<Node<FlowNodeData>>[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (conn: Connection) => void;
@@ -46,12 +48,24 @@ function CanvasInner({
   nodes,
   edges,
   editable,
+  focusRequest,
   onNodesChange,
   onEdgesChange,
   onConnect,
   onAddNode,
 }: CanvasProps) {
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setCenter } = useReactFlow();
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    const node = nodes.find((n) => n.id === focusRequest.id);
+    if (!node) return;
+    const cx = node.position.x + (node.measured?.width ?? 200) / 2;
+    const cy = node.position.y + (node.measured?.height ?? 80) / 2;
+    setCenter(cx, cy, { duration: 400, zoom: 1.1 });
+    onNodesChange([{ type: 'select', id: focusRequest.id, selected: true }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (!e.dataTransfer.types.includes(DRAG_MIME)) return;

@@ -20,12 +20,25 @@ export default function AcassiaNode({ data, selected }: NodeProps<AcassiaFlowNod
   return (
     <div
       className={[
-        'rounded-lg border px-3 py-2 min-w-[180px] max-w-[260px] shadow-sm',
+        'rounded-lg border px-3 py-2 min-w-[180px] max-w-[260px] shadow-sm relative',
         v.border,
         v.bg,
         selected ? 'ring-2 ring-cigana-purple' : '',
+        d.lintLevel === 'error' ? 'ring-2 ring-red-500' : '',
+        d.lintLevel === 'warning' && !selected ? 'ring-1 ring-amber-400' : '',
       ].join(' ')}
     >
+      {d.lintLevel && (
+        <span
+          className={[
+            'absolute -top-2 -right-2 rounded-full text-[10px] w-5 h-5 flex items-center justify-center border border-cigana-bg',
+            d.lintLevel === 'error' ? 'bg-red-500 text-white' : 'bg-amber-400 text-slate-900',
+          ].join(' ')}
+          title={d.lintLevel === 'error' ? 'erro de validação' : 'aviso de validação'}
+        >
+          {d.lintLevel === 'error' ? '!' : '⚠'}
+        </span>
+      )}
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
         <span>{v.emoji}</span>
         <span>{v.label}</span>

@@ -1,10 +1,12 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { blueprintsApi, type BlueprintDetail } from '../api/blueprints';
 import Canvas from '../builder/Canvas';
+import LintPanel from '../builder/LintPanel';
 import Palette from '../builder/Palette';
 import SaveIndicator from '../builder/SaveIndicator';
+import { issuesByNode, lintGraph } from '../builder/lint';
 import { useFlowState } from '../builder/useFlowState';
 import Inspector from '../inspector/Inspector';
 import type { AcassiaDocument } from '../lib/types';
@@ -47,7 +49,28 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   const initialDoc = (blueprint.body ?? {}) as AcassiaDocument;
   const fs = useFlowState({ blueprintId: blueprint.id, initialDoc });
 
-  // Atualiza node selecionado.
+  // Lint derivado do estado atual (memoizado).
+  const issues = useMemo(() => lintGraph(fs.nodes, fs.edges), [fs.nodes, fs.edges]);
+  const issueLevels = useMemo(() => issuesByNode(issues), [issues]);
+
+  // Decora nodes com lintLevel sem mexer no estado real (mantém serialize limpo).
+  const decoratedNodes = useMemo(
+    () =>
+      fs.nodes.map((n) => ({
+        ...n,
+        data: { ...n.data, lintLevel: issueLevels.get(n.id) },
+      })),
+    [fs.nodes, issueLevels],
+  );
+
+  const [focusRequest, setFocusRequest] = useState<{
+    id: string;
+    ts: number;
+  } | null>(null);
+  const requestFocus = useCallback((nodeId: string) => {
+    setFocusRequest({ id: nodeId, ts: Date.now() });
+  }, []);
+
   const handleUpdateSelected = useCallback(
     (patch: Partial<FlowNodeData>) => {
       if (fs.selectedNodeId) fs.updateNode(fs.selectedNodeId, patch);
@@ -55,7 +78,6 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
     [fs],
   );
 
-  // Fecha inspetor: deseleciona via onNodesChange.
   const handleCloseInspector = useCallback(() => {
     if (!fs.selectedNodeId) return;
     fs.onNodesChange([
@@ -84,16 +106,20 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
       </div>
       <div className="flex-1 min-h-0 flex">
         <Palette />
-        <div className="flex-1 min-w-0">
-          <Canvas
-            nodes={fs.nodes}
-            edges={fs.edges}
-            editable
-            onNodesChange={fs.onNodesChange}
-            onEdgesChange={fs.onEdgesChange}
-            onConnect={fs.onConnect}
-            onAddNode={fs.addNode}
-          />
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="flex-1 min-h-0">
+            <Canvas
+              nodes={decoratedNodes}
+              edges={fs.edges}
+              editable
+              focusRequest={focusRequest}
+              onNodesChange={fs.onNodesChange}
+              onEdgesChange={fs.onEdgesChange}
+              onConnect={fs.onConnect}
+              onAddNode={fs.addNode}
+            />
+          </div>
+          <LintPanel issues={issues} onFocus={requestFocus} />
         </div>
         {fs.selectedNode && (
           <Inspector

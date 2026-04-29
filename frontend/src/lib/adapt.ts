@@ -5,6 +5,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   label: string;
   acassiaType: string;
   config: Record<string, unknown>;
+  /** preenchido em runtime pelo lint — não é persistido. */
+  lintLevel?: 'error' | 'warning';
 }
 
 /** Converte um documento acassia-flow para os arrays que React Flow consome. */
