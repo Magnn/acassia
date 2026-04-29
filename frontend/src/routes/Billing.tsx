@@ -502,6 +502,17 @@ function CurrentSubscriptionCard({
           </button>
         </div>
       )}
+
+      {!billing.cancel_at_period_end && !billing.pending_plan && (
+        <div className="flex justify-end">
+          <Link
+            to="/billing/cancel-subscription"
+            className="text-[11px] text-secondary/60 hover:text-red-400 underline-offset-2 hover:underline"
+          >
+            Cancelar assinatura
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
