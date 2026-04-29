@@ -22,6 +22,12 @@ interface DetailResponse {
   blueprint: BlueprintDetail;
 }
 
+interface UpdateInput {
+  title?: string;
+  slug?: string;
+  body?: Record<string, unknown>;
+}
+
 export const blueprintsApi = {
   list: async (): Promise<BlueprintSummary[]> => {
     const data = await api.get<ListResponse>('/api/flows/blueprints');
@@ -29,6 +35,13 @@ export const blueprintsApi = {
   },
   get: async (id: number): Promise<BlueprintDetail> => {
     const data = await api.get<DetailResponse>(`/api/flows/blueprints/${id}`);
+    return data.blueprint;
+  },
+  update: async (id: number, input: UpdateInput): Promise<BlueprintSummary> => {
+    const data = await api.patch<{ ok: boolean; blueprint: BlueprintSummary }>(
+      `/api/flows/blueprints/${id}`,
+      input,
+    );
     return data.blueprint;
   },
 };

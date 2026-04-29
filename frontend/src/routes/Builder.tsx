@@ -1,7 +1,10 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { blueprintsApi } from '../api/blueprints';
+import { blueprintsApi, type BlueprintDetail } from '../api/blueprints';
 import Canvas from '../builder/Canvas';
+import Palette from '../builder/Palette';
+import SaveIndicator from '../builder/SaveIndicator';
+import { useFlowState } from '../builder/useFlowState';
 import type { AcassiaDocument } from '../lib/types';
 
 export default function Builder() {
@@ -34,28 +37,45 @@ export default function Builder() {
     );
   }
 
-  const doc = (data.body ?? {}) as AcassiaDocument;
-  const nodeCount = doc.graph?.nodes?.length ?? 0;
-  const edgeCount = doc.graph?.edges?.length ?? 0;
+  return <BuilderInner blueprint={data} />;
+}
+
+function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
+  const initialDoc = (blueprint.body ?? {}) as AcassiaDocument;
+  const fs = useFlowState({ blueprintId: blueprint.id, initialDoc });
 
   return (
     <div className="h-full flex flex-col">
-      <div className="border-b border-cigana-border bg-cigana-surface px-4 py-2 flex items-center justify-between">
+      <div className="border-b border-cigana-border bg-cigana-surface px-4 py-2 flex items-center justify-between flex-shrink-0">
         <div className="flex items-baseline gap-3">
           <Link to="/" className="text-xs text-slate-400 hover:text-slate-200">
             ← Fluxos
           </Link>
-          <h2 className="text-sm font-medium">{data.title}</h2>
+          <h2 className="text-sm font-medium">{blueprint.title}</h2>
           <span className="text-xs text-slate-500">
-            #{data.id} · {data.slug}
+            #{blueprint.id} · {blueprint.slug}
           </span>
         </div>
-        <div className="text-xs text-slate-500">
-          {nodeCount} nodes · {edgeCount} arestas · read-only (Fase 1)
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          <span>
+            {fs.nodes.length} nodes · {fs.edges.length} arestas
+          </span>
+          <SaveIndicator status={fs.status} error={fs.error} />
         </div>
       </div>
-      <div className="flex-1 min-h-0">
-        <Canvas doc={doc} />
+      <div className="flex-1 min-h-0 flex">
+        <Palette />
+        <div className="flex-1 min-w-0">
+          <Canvas
+            nodes={fs.nodes}
+            edges={fs.edges}
+            editable
+            onNodesChange={fs.onNodesChange}
+            onEdgesChange={fs.onEdgesChange}
+            onConnect={fs.onConnect}
+            onAddNode={fs.addNode}
+          />
+        </div>
       </div>
     </div>
   );
