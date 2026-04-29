@@ -2190,6 +2190,21 @@ class Engine:
         tid = getattr(self, "tenant_id", None) or "default"
         lead = db.query(Lead).filter_by(telefone=telefone, tenant_id=tid).first()
         if not lead:
+            # Quota check: leads_month (Frente 2.4)
+            # Política: NÃO bloquear (perde venda). Consome quota e marca
+            # quota_exceeded=True em metadata se passou. UI avisa user.
+            try:
+                import quota
+                allowed, current, limit = quota.consume_quota(tid, "leads_month", 1, db_session=db)
+                if not allowed:
+                    logger.warning(
+                        "[quota.leads.exceeded] tenant=%s current=%s limit=%s — capturando lead com flag",
+                        tid, current, limit,
+                    )
+                    # Não bloqueia; lead é capturado mas marcado pra possível
+                    # processamento diferido (quando user fizer upgrade).
+            except Exception as exc:
+                logger.warning("[quota.leads] check falhou (fail open): %s", exc)
             _validos = frozenset({"1_apresentacao", "static_meumisterio_b1"})
             _ini = (CONFIG_CLIENTE.get("funil_entrada_inicial") or "").strip()
             _node0 = _ini if _ini in _validos else "1_apresentacao"

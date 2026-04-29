@@ -88,10 +88,32 @@ class WhatsAppAPI:
 
     def enviar_mensagem(self, numero: str, conteudo: str, formato: str = "texto") -> bool:
         tid = _current_tenant_id()
+
+        # Quota check ANTES do envio (Frente 2.5)
+        try:
+            import quota
+            allowed, current, limit = quota.consume_quota(tid, "wa_msgs_month", 1)
+            if not allowed:
+                logger.warning(
+                    "[quota.wa_msgs.exceeded] tenant=%s current=%s limit=%s — bloqueando envio",
+                    tid, current, limit,
+                )
+                return False
+        except Exception as exc:
+            # Falha na quota check NÃO deve quebrar envio; apenas loga
+            logger.warning("[quota.wa_msgs] check falhou (fail open): %s", exc)
+
         provider = get_provider_for_tenant(tid)
         ok = provider.enviar_mensagem(numero, conteudo, formato=formato)
         if ok:
             _maybe_track_first_message_sent(tid)
+        else:
+            # Send falhou: refund quota
+            try:
+                import quota as quota_mod
+                quota_mod.refund_quota(tid, "wa_msgs_month", 1, reason="provider_send_failed")
+            except Exception:
+                pass
         return ok
 
 

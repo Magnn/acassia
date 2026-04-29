@@ -391,3 +391,36 @@ def me():
         db.close()
 
     return jsonify(payload)
+
+
+@auth_bp.route("/me/plan", methods=["GET"])
+@login_required
+def me_plan():
+    """
+    Plano efetivo do user logado + limits + features (Frente 2.1).
+    Frontend usa via useMyPlan() hook + <FeatureGate>.
+    """
+    import plans as plans_module
+
+    plan_key, source = plans_module.effective_plan(current_user.tenant_id)
+    cfg = plans_module.get_plan_config(plan_key)
+    return jsonify({
+        "plan": plan_key,
+        "label": cfg["label"],
+        "source": source,
+        "price_brl": cfg["price_brl"],
+        "limits": cfg["limits"],
+        "features": cfg["features"],
+    })
+
+
+@auth_bp.route("/me/usage", methods=["GET"])
+@login_required
+def me_usage():
+    """
+    Uso atual + limites pra todos os kinds (Frente 2.27).
+    Frontend usa via useMyUsage() hook + <QuotaGate>.
+    """
+    import quota
+    usage = quota.get_usage(current_user.tenant_id)
+    return jsonify({"usage": usage, "tenant_id": current_user.tenant_id})
