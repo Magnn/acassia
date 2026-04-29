@@ -23,6 +23,7 @@ const Tarot = lazy(() => import('./routes/Tarot'));
 const Pix = lazy(() => import('./routes/Pix'));
 const Voice = lazy(() => import('./routes/Voice'));
 const Coach = lazy(() => import('./routes/Coach'));
+const Affiliate = lazy(() => import('./routes/Affiliate'));
 const TenantConfig = lazy(() => import('./routes/TenantConfig'));
 const Integrations = lazy(() => import('./routes/Integrations'));
 const AgentStudio = lazy(() => import('./routes/AgentStudio'));
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/pix" element={<Pix />} />
             <Route path="/voice" element={<Voice />} />
             <Route path="/coach" element={<Coach />} />
+            <Route path="/affiliate" element={<Affiliate />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/tenant-config" element={<TenantConfig />} />
 

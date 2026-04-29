@@ -268,6 +268,14 @@ def signup_user(email: str, password: str, name: Optional[str] = None) -> models
             "[saas_auth] signup ok email=%s tenant=%s trial_ends=%s",
             email, tenant_id, user.trial_ends_at.isoformat() if user.trial_ends_at else None,
         )
+
+        # Attach referral se cookie acassia_ref está presente (Frente 7.15)
+        try:
+            from api.saas.affiliate import attach_referral_to_signup
+            attach_referral_to_signup(user.id, email)
+        except Exception as exc:
+            logger.debug("[signup.referral] attach falhou: %s", exc)
+
         return user
     finally:
         db.close()

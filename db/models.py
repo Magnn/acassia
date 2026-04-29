@@ -704,6 +704,55 @@ class TarotCard(Base):
     keywords = Column(JSON, nullable=True)
 
 
+class Affiliate(Base):
+    """Programa de afiliados (Frente 7.15) — referência → comissão recorrente."""
+    __tablename__ = "affiliates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    ref_code = Column(String(40), nullable=False, unique=True, index=True)
+    pix_key = Column(String(120), nullable=True)
+    pix_key_type = Column(String(20), nullable=True)  # cpf|email|phone|random
+    total_referrals = Column(Integer, default=0, nullable=False)
+    active_referrals = Column(Integer, default=0, nullable=False)
+    total_earned_brl_cents = Column(Integer, default=0, nullable=False)
+    total_paid_out_brl_cents = Column(Integer, default=0, nullable=False)
+    commission_pct = Column(Integer, default=30, nullable=False)  # 30% padrão
+    tier = Column(String(20), default="standard", nullable=False)  # standard|silver|gold
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class Referral(Base):
+    """Referral entry: lead que veio via afiliado."""
+    __tablename__ = "referrals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    affiliate_id = Column(Integer, ForeignKey("affiliates.id"), nullable=False, index=True)
+    referred_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, unique=True)
+    referred_email = Column(String(200), nullable=True)
+    signed_up_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    first_payment_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(20), default="signup", nullable=False)  # signup|trial|paid|churned
+    total_commission_earned_cents = Column(Integer, default=0, nullable=False)
+    last_recurrence_at = Column(DateTime(timezone=True), nullable=True)
+    cookie_ip = Column(String(45), nullable=True)
+
+
+class AffiliatePayout(Base):
+    """Pagamento de comissão ao afiliado (mensal)."""
+    __tablename__ = "affiliate_payouts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    affiliate_id = Column(Integer, ForeignKey("affiliates.id"), nullable=False, index=True)
+    period_yyyymm = Column(Integer, nullable=False, index=True)
+    amount_brl_cents = Column(Integer, nullable=False)
+    status = Column(String(20), default="pending", nullable=False)  # pending|paid|failed
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    pix_receipt_url = Column(String(500), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class VoiceClone(Base):
     """
     Voz clonada por user para TTS (Frente 4.14).

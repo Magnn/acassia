@@ -257,6 +257,7 @@ def _register_saas_blueprints():
     from api.saas.pix import pix_bp as saas_pix_bp
     from api.saas.voice import voice_bp as saas_voice_bp
     from api.saas.coach import coach_bp as saas_coach_bp
+    from api.saas.affiliate import affiliate_bp as saas_affiliate_bp, referral_bp as saas_referral_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -283,6 +284,8 @@ def _register_saas_blueprints():
         saas_pix_bp,
         saas_voice_bp,
         saas_coach_bp,
+        saas_affiliate_bp,
+        saas_referral_bp,
     ):
         app.register_blueprint(bp)
 

@@ -360,13 +360,28 @@ def _handle_trial_will_end(sub: dict, event_id: str) -> None:
 
 
 def _handle_invoice_succeeded(inv: dict, event_id: str) -> None:
-    """Pagamento OK — limpa dunning + audit."""
+    """Pagamento OK — limpa dunning + audit + record affiliate commission."""
     tenant_id = _extract_tenant_id("invoice.payment_succeeded", inv)
     amount = inv.get("amount_paid", 0)
     _set_dunning(tenant_id, None, 0)
     _audit(tenant_id, "stripe.invoice.succeeded", {
         "id": event_id, "amount_paid": amount, "invoice_id": inv.get("id"),
     })
+
+    # Affiliate commission (Frente 7.15)
+    # Stripe amounts vêm em centavos da currency (BRL → BRL cents == BRL cents)
+    try:
+        db = SessionLocal()
+        try:
+            user = db.query(models.User).filter_by(tenant_id=tenant_id).first()
+            if user:
+                from api.saas.affiliate import record_referral_payment
+                record_referral_payment(user.id, int(amount))
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.debug("[stripe.affiliate] record_referral_payment falhou: %s", exc)
+
     logger.info(
         "[stripe_webhook] invoice succeeded tenant=%s amount=%s",
         tenant_id, amount,
