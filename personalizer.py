@@ -9,9 +9,12 @@ MEMÓRIA COMPLETA: Histórico + Metadados (Fatos do Lead)
 import logging
 import os
 import re
+import ssl
 import time
 import requests
 import json
+import certifi
+import httpx
 from PIL import Image
 from io import BytesIO
 from google import genai
@@ -32,13 +35,34 @@ class Personalizer:
         self.client = self._inicializar_gemini()
         self._quota_cooldown_until = 0.0
 
+    # Timeout padrão para chamadas Gemini (connect + read).
+    # Gemini 2.5 Flash responde em <30s para a maioria dos prompts; 90s cobre casos com contexto grande.
+    _GEMINI_TIMEOUT_S: int = 90
+
+    def _criar_httpx_client(self, timeout: float | None = None) -> httpx.Client:
+        """
+        Cliente httpx com SSL explícito via certifi.
+        Bypassa o Windows certificate store (onde antivírus injetam certificados)
+        e ignora proxy settings do ambiente (trust_env=False).
+        """
+        t = float(timeout or self._GEMINI_TIMEOUT_S)
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        return httpx.Client(
+            verify=ssl_ctx,
+            timeout=httpx.Timeout(t, connect=15.0),
+            trust_env=False,
+        )
+
     def _inicializar_gemini(self):
         """Inicializa o cliente Gemini e trata possíveis erros."""
         if not self.api_key:
             logger.error("🚨 ERRO: GEMINI_API_KEY ausente.")
             return None
         try:
-            client = genai.Client(api_key=self.api_key)
+            client = genai.Client(
+                api_key=self.api_key,
+                http_options={"httpx_client": self._criar_httpx_client()},
+            )
             logger.info(f"🔮 Oráculo Conectado: {self.model_name} [Memória Completa Ativa]")
             return client
         except Exception as e:
@@ -421,55 +445,62 @@ class Personalizer:
         if self.em_cooldown_quota():
             return ""
 
-        try:
-            contexto_dialogo = self._formatar_historico(historico_lista, mensagem_lead=mensagem_lead)
-            fatos_cliente = self._montar_fatos_contexto(metadata)
-            prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
-            guard = self._bloco_copy_guardrails(metadata)
-            studio = self._bloco_acassia_studio(metadata)
-            si = (metadata or {}).get("stage_intel") or {}
-            longo = bool(si.get("varias_perguntas_detectadas"))
+        contexto_dialogo = self._formatar_historico(historico_lista, mensagem_lead=mensagem_lead)
+        fatos_cliente = self._montar_fatos_contexto(metadata)
+        prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
+        guard = self._bloco_copy_guardrails(metadata)
+        studio = self._bloco_acassia_studio(metadata)
+        si = (metadata or {}).get("stage_intel") or {}
+        longo = bool(si.get("varias_perguntas_detectadas"))
 
-            prompt_final = (
-                f"{prioridade}{guard}{studio}"
-                f"DIRETRIZ DE PERSONALIDADE:\n{system_prompt}\n\n"
-                f"FATOS CONHECIDOS SOBRE O CLIENTE (Não esqueça disto):\n{fatos_cliente}\n\n"
-                f"HISTÓRICO RECENTE DA CONVERSA:\n{contexto_dialogo}\n\n"
-                f"ÚLTIMA MENSAGEM DO CLIENTE: {mensagem_lead}\n\n"
-                "RESPOSTA DA CIGANA (Mística, acolhedora e direta):"
-            )
-            prompt_final = self._append_instrucao_etapa(metadata, prompt_final)
+        prompt_final = (
+            f"{prioridade}{guard}{studio}"
+            f"DIRETRIZ DE PERSONALIDADE:\n{system_prompt}\n\n"
+            f"FATOS CONHECIDOS SOBRE O CLIENTE (Não esqueça disto):\n{fatos_cliente}\n\n"
+            f"HISTÓRICO RECENTE DA CONVERSA:\n{contexto_dialogo}\n\n"
+            f"ÚLTIMA MENSAGEM DO CLIENTE: {mensagem_lead}\n\n"
+            "RESPOSTA DA CIGANA (Mística, acolhedora e direta):"
+        )
+        prompt_final = self._append_instrucao_etapa(metadata, prompt_final)
 
-            if max_output_tokens is not None:
-                max_tokens = max_output_tokens
-            else:
-                max_tokens = 1200 if longo else 1000
-            temp = 0.9 if temperature is None else temperature
-            max_tokens, temp = self._aplicar_guardrails_custo(
-                metadata=metadata,
-                max_tokens_solicitado=max_tokens,
-                temperatura_solicitada=temp,
-            )
-            config = {"max_output_tokens": max_tokens, "temperature": temp}
-            resposta = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt_final,
-                config=config
-            )
-            saida = preparar_texto_envio(self._limpar_saida_ia(resposta.text or ""), "personalizer_text")
-            self._registrar_consumo_ia(metadata, prompt_final, saida)
-            return saida
+        if max_output_tokens is not None:
+            max_tokens = max_output_tokens
+        else:
+            max_tokens = 1200 if longo else 1000
+        temp = 0.9 if temperature is None else temperature
+        max_tokens, temp = self._aplicar_guardrails_custo(
+            metadata=metadata,
+            max_tokens_solicitado=max_tokens,
+            temperatura_solicitada=temp,
+        )
+        config = {"max_output_tokens": max_tokens, "temperature": temp}
 
-        except Exception as e:
-            if self._erro_e_quota_excedida(e):
-                self._ativar_cooldown_quota(75)
-                logger.warning("⚠️ [PERSONALIZER] Quota Gemini excedida: %s", e)
-                # Não vaza erro técnico/quota para o lead.
-                # O node chamador decide o fallback canônico da etapa.
+        for tentativa in range(3):
+            try:
+                resposta = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt_final,
+                    config=config,
+                )
+                saida = preparar_texto_envio(self._limpar_saida_ia(resposta.text or ""), "personalizer_text")
+                self._registrar_consumo_ia(metadata, prompt_final, saida)
+                return saida
+
+            except Exception as e:
+                if self._erro_e_quota_excedida(e):
+                    self._ativar_cooldown_quota(75)
+                    logger.warning("⚠️ [PERSONALIZER] Quota Gemini excedida: %s", e)
+                    return ""
+                err_str = str(e).lower()
+                if ("timeout" in err_str or "timed out" in err_str or "ssl" in err_str or "handshake" in err_str) and tentativa < 2:
+                    logger.warning("⚠️ [PERSONALIZER] Timeout/SSL Gemini (tentativa %s/3). Recriando cliente com certifi...", tentativa + 1)
+                    self.client = genai.Client(api_key=self.api_key, http_options={"httpx_client": self._criar_httpx_client(120)})
+                    time.sleep(2 ** (tentativa + 1))
+                    continue
+                logger.error("🚨 Erro inesperado: %s", e)
                 return ""
-            logger.error(f"🚨 Erro inesperado: {e}")
-            # Mantém fallback no próprio node para preservar tom e objetivo da etapa.
-            return ""
+
+        return ""
 
     def gerar_node1_json(
         self,

@@ -12,7 +12,10 @@ import json
 import logging
 import os
 import re
+import ssl
 import time
+import certifi
+import httpx
 from typing import List, Dict, Any
 from google import genai  # ✨ Nova SDK oficial
 from config_cliente import CONFIG_CLIENTE
@@ -54,6 +57,16 @@ Regras de Score (0.0 a 1.0):
 """
 
 class SentimentAnalyzer:
+    @staticmethod
+    def _criar_httpx_client(timeout: float = 60) -> httpx.Client:
+        """Bypassa Windows certificate store e proxy do antivírus via certifi."""
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        return httpx.Client(
+            verify=ssl_ctx,
+            timeout=httpx.Timeout(timeout, connect=15.0),
+            trust_env=False,
+        )
+
     def __init__(self, api_key: str | None = None, model_name: str | None = None):
         """Inicializa o analisador com o novo padrão Client da Google."""
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
@@ -61,8 +74,10 @@ class SentimentAnalyzer:
 
         try:
             if self.api_key:
-                # ✨ Novo padrão de inicialização SDK 2.0
-                self.client = genai.Client(api_key=self.api_key)
+                self.client = genai.Client(
+                    api_key=self.api_key,
+                    http_options={"httpx_client": self._criar_httpx_client(60)},
+                )
                 logger.info(f"🧠 Analisador Ativo: {self.model_name}")
             else:
                 self.client = None
@@ -114,40 +129,51 @@ class SentimentAnalyzer:
             f"MENSAGEM DO USUÁRIO:\n\"{texto}\""
         )
 
-        try:
-            # Configuração via dicionário na nova SDK
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt_completo,
-                config={
-                    'temperature': 0.1,
-                    'response_mime_type': 'application/json'
+        for tentativa in range(3):
+            try:
+                # Configuração via dicionário na nova SDK
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt_completo,
+                    config={
+                        'temperature': 0.1,
+                        'response_mime_type': 'application/json'
+                    }
+                )
+
+                raw = self._limpar_json_sujo(response.text)
+                data = json.loads(raw)
+
+                sentimento = data.get("sentimento", "padrao").lower()
+                if sentimento not in SENTIMENTOS_VALIDOS:
+                    sentimento = "padrao"
+
+                resultado = {
+                    "sentimento": sentimento,
+                    "score": max(0.0, min(1.0, float(data.get("score", 0.5)))),
+                    "sinais": data.get("sinais", []),
+                    "objecoes_detectadas": str(data.get("objecoes_detectadas", "")).replace("—", "..."),
+                    "recomendacao_tom": str(data.get("recomendacao_tom", "")).replace("—", "..."),
                 }
-            )
 
-            raw = self._limpar_json_sujo(response.text)
-            data = json.loads(raw)
+                logger.info(f"💭 [SENTIMENT] {sentimento.upper()} | Score: {resultado['score']:.2f}")
+                return resultado
 
-            sentimento = data.get("sentimento", "padrao").lower()
-            if sentimento not in SENTIMENTOS_VALIDOS:
-                sentimento = "padrao"
+            except Exception as e:
+                err_str = str(e).lower()
+                if self._erro_e_quota_excedida(e):
+                    self._ativar_cooldown_quota(75)
+                    break
+                if "timeout" in err_str or "timed out" in err_str or "ssl" in err_str or "handshake" in err_str or "503" in err_str:
+                    if tentativa < 2:
+                        logger.warning(f"⚠️ [SENTIMENT] Timeout/SSL Gemini (tentativa {tentativa+1}/3). Recriando cliente...")
+                        self.client = genai.Client(api_key=self.api_key, http_options={"httpx_client": self._criar_httpx_client(90)})
+                        time.sleep(2 ** (tentativa + 1))
+                        continue
+                logger.error(f"🚨 [SENTIMENT] Falha na chamada Gemini: {e}")
+                return self._retorno_padrao()
 
-            resultado = {
-                "sentimento": sentimento,
-                "score": max(0.0, min(1.0, float(data.get("score", 0.5)))),
-                "sinais": data.get("sinais", []),
-                "objecoes_detectadas": str(data.get("objecoes_detectadas", "")).replace("—", "..."),
-                "recomendacao_tom": str(data.get("recomendacao_tom", "")).replace("—", "..."),
-            }
-
-            logger.info(f"💭 [SENTIMENT] {sentimento.upper()} | Score: {resultado['score']:.2f}")
-            return resultado
-
-        except Exception as e:
-            if self._erro_e_quota_excedida(e):
-                self._ativar_cooldown_quota(75)
-            logger.error(f"🚨 [SENTIMENT] Falha na chamada Gemini: {e}")
-            return self._retorno_padrao()
+        return self._retorno_padrao()
 
     def prever_proximo_sentimento(self, historico: list) -> str:
         """Prevê o próximo sentimento do lead com base no histórico."""
@@ -162,21 +188,32 @@ class SentimentAnalyzer:
             "Responda APENAS com a categoria em letras minúsculas."
         )
 
-        try:
-            if self.em_cooldown_quota():
+        for tentativa in range(3):
+            try:
+                if self.em_cooldown_quota():
+                    return "padrao"
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt_prever,
+                    config={'temperature': 0.3}
+                )
+                sentimento = response.text.strip().lower()
+                return sentimento if sentimento in SENTIMENTOS_VALIDOS else "padrao"
+            except Exception as e:
+                err_str = str(e).lower()
+                if self._erro_e_quota_excedida(e):
+                    self._ativar_cooldown_quota(75)
+                    break
+                if "timeout" in err_str or "timed out" in err_str or "ssl" in err_str or "handshake" in err_str or "503" in err_str:
+                    if tentativa < 2:
+                        logger.warning(f"⚠️ [PREDICT] Timeout/SSL Gemini (tentativa {tentativa+1}/3). Recriando cliente...")
+                        self.client = genai.Client(api_key=self.api_key, http_options={"timeout": 90})
+                        time.sleep(2 ** (tentativa + 1))
+                        continue
+                logger.error(f"🚨 [PREDICT] Falha na previsão: {e}")
                 return "padrao"
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt_prever,
-                config={'temperature': 0.3}
-            )
-            sentimento = response.text.strip().lower()
-            return sentimento if sentimento in SENTIMENTOS_VALIDOS else "padrao"
-        except Exception as e:
-            if self._erro_e_quota_excedida(e):
-                self._ativar_cooldown_quota(75)
-            logger.error(f"🚨 [PREDICT] Falha na previsão: {e}")
-            return "padrao"
+        
+        return "padrao"
 
     def _retorno_padrao(self) -> dict:
         return {

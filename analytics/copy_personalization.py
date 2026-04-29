@@ -1,12 +1,30 @@
 """
 Heurísticas de copy personalizada (sem LLM extra): perfil de tom, nome do trabalho espiritual,
 entregáveis da oferta para injeção em prompts dos nodes 6–8.
+
+Integração DARE: re-exporta funções do dare_copy_engine para uso nos nodes existentes
+sem quebrar importações já existentes.
 """
 
 from __future__ import annotations
 
 import re
 from typing import Any, Dict, Mapping, Optional
+
+# Re-exporta o framework DARE para nodes que já importam deste módulo
+from analytics.dare_copy_engine import (  # noqa: F401
+    classificar_desejo_tipo,
+    contexto_dare_para_prompt,
+    calcular_intensidade_ressonancia,
+    hook_abertura_para_prompt,
+    instrucao_diagnostico_para_prompt,
+    revelacao_padrao_para_prompt,
+    ressonancia_para_prompt,
+    oferta_dare_para_prompt,
+    medo_oculto,
+    sonho_declarado,
+    nome_padrao_invisivel,
+)
 
 _DEFAULT_MECANISMO = "Trabalho de Firmação e Resgate nas Linhas"
 

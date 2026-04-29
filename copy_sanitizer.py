@@ -20,6 +20,7 @@ from flows.funnel_gates import (
     nome_util_para_checklist_fase1,
     VOCATIVO_SEM_NOME,
 )
+from schema import slice_historico_para_ia
 
 logger = logging.getLogger(__name__)
 
@@ -397,7 +398,12 @@ def extrair_evidencias_conversa(
     tem_foto = bool(m.get("foto_recebida")) or tp_atual in {"image", "video"}
     tem_desabafo = bool(m.get("desabafo_recebido"))
     tem_desejo = bool((m.get("desejo_declarado") or "").strip())
+    if m.get("node3_estado") == "aguardando_desejo":
+        tem_desejo = False
+
     tem_aprofundamento = bool((m.get("aprofundamento_texto") or "").strip())
+    if m.get("node3_estado") == "aguardando_aprofundamento":
+        tem_aprofundamento = False
 
     for msg in reversed((historico or [])[-18:]):
         rem = getattr(msg, "remetente", None) or (msg.get("remetente") if isinstance(msg, dict) else "")
@@ -453,8 +459,10 @@ def motivo_redundancia_texto(texto_balao: str, evidencias: Mapping[str, bool]) -
     ):
         return "contato_ja_tratado"
     if evidencias.get("tem_foto") and re.search(r"\b(foto|imagem)\b", low, re.I) and re.search(r"\b(palma|m[ãa]o)\b", low, re.I):
+        # Se for um pedido de *outra* foto ou *nova* foto (ex. por erro na validação), não consideramos redundante
         if re.search(r"\b(manda|envia|enviar|preciso|pode\s+mandar|pode\s+enviar)\b", low, re.I):
-            return "foto_ja_recebida"
+            if not re.search(r"\b(outra|nova)\b", low, re.I):
+                return "foto_ja_recebida"
     if evidencias.get("confirmou_agora") and re.search(r"\bmanda\s+um\s+(\*?ok\*?|sim)\b", low, re.I):
         return "confirmacao_ja_recebida"
     # "Conseguiu salvar, meu bem?" (node 3) contém "conseguiu salvar" mas é pergunta legítima — só suprimir
@@ -494,17 +502,23 @@ _RE_ECO_OPERACIONAL_RESIDUAL = re.compile(
     r"(?is)\b(consulta\s+(é\s+)?paga|essa\s+consulta|quanto\s+custa|me\s+chamo|"
     r"cigana\s+esmeralda|pix|comprovante)\b"
 )
+# Meta-perguntas do funil que não são dor real e não devem aparecer no eco
+_RE_ECO_META_PERGUNTA = re.compile(
+    r"(?is)^\s*(?:quero\s+sim|sim\s*,|ok\s*,?).{0,100}(?:porque|por\s+que|pq)\b.*\?",
+)
 
 
 def fragmento_seguro_para_eco_fallback(texto: str, *, max_len: int = 100) -> str:
     """
     Trecho para eco no fallback do Node 6: mesmo pipeline da dor, sem colar abertura comercial
-    nem pergunta de preço. Retorna vazio se só sobrar lixo operacional.
+    nem pergunta de preço. Retorna vazio se só sobrar lixo operacional ou meta-comentário.
     """
     s = resumo_dor_para_copy((texto or "").strip(), max_len=max_len)
     if not s or s == "esse peso que você trouxe":
         return ""
     if _RE_ECO_OPERACIONAL_RESIDUAL.search(s):
+        return ""
+    if _RE_ECO_META_PERGUNTA.search(s):
         return ""
     return s
 
@@ -1221,7 +1235,7 @@ def fatiar_texto_ritmo_celular(
             buf.append(fr)
     if buf:
         out.append(" ".join(buf).strip())
-    # Frase única gigante: corta duro por orçamento de caracteres
+    # Frase única gigante: corta na fronteira de palavra mais próxima
     out2: List[str] = []
     for chunk in out:
         if len(chunk) <= max_chars + 20:
@@ -1229,8 +1243,19 @@ def fatiar_texto_ritmo_celular(
             continue
         start = 0
         while start < len(chunk):
-            out2.append(chunk[start : start + max_chars].rstrip())
-            start += max_chars
+            end = start + max_chars
+            if end >= len(chunk):
+                out2.append(chunk[start:].rstrip())
+                break
+            # Recua até o último espaço para não cortar no meio de palavra
+            boundary = chunk.rfind(" ", start, end)
+            if boundary > start:
+                out2.append(chunk[start:boundary].rstrip())
+                start = boundary + 1
+            else:
+                # Palavra gigante sem espaço: corta forçado
+                out2.append(chunk[start:end].rstrip())
+                start = end
     return [x for x in out2 if x]
 
 
@@ -1251,3 +1276,85 @@ def unificar_vocativos_por_genero(texto: str, genero: str, nome_fmt: str = "") -
     else:
         t = re.sub(r"\b[Mm]eu anjo\b", "meu bem", t)
     return t
+
+
+# ── Shared node utilities (nodes 6, 7, 8) ─────────────────────────────────────
+
+_RE_RUIDO_CURTO_HIST = re.compile(
+    r"(?i)^(ok|sim|oi|opa|pronto|blz|beleza|ta|tá|show|feito|entendi|combinado|👍|🙏|👀)$"
+)
+
+
+def _e_somente_link(texto: str) -> bool:
+    t = re.sub(r"[\s🔗🔒📎]+", "", (texto or "").strip())
+    return t.startswith("http://") or t.startswith("https://")
+
+
+def assinar_semantica_curta(texto: str) -> str:
+    t = re.sub(r"[^a-z0-9\s]", " ", (texto or "").lower())
+    toks = [w for w in t.split() if len(w) > 2]
+    if not toks:
+        return ""
+    return " ".join(toks[:8])
+
+
+def limpar_meta_textual(v: str, max_len: int = 220) -> str:
+    t = " ".join((v or "").split()).strip()
+    if not t:
+        return ""
+    if t.upper() in {"INDEFINIDO", "NONE", "NULL", "N/A"}:
+        return ""
+    return t[:max_len]
+
+
+def historico_limpo_para_ia(ctx, *, ruido_max_palavras: int = 3, limite: int = 20) -> list:
+    base = slice_historico_para_ia(ctx, limite)
+    if not base:
+        return []
+    out = []
+    for h in base:
+        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
+        t = str(txt).replace("|", " ").strip()
+        t = re.sub(r"\s+", " ", t).strip()
+        if not t:
+            continue
+        if len(t.split()) <= ruido_max_palavras and _RE_RUIDO_CURTO_HIST.match(t.lower()):
+            continue
+        rem = getattr(h, "remetente", None) if not isinstance(h, dict) else h.get("remetente")
+        tip = getattr(h, "tipo", "text") if not isinstance(h, dict) else h.get("tipo", "text")
+        out.append({"remetente": rem or "", "texto": t, "tipo": tip or "text"})
+    return out
+
+
+def extrair_blocos_fallback(
+    texto: str,
+    max_blocos: int,
+    *,
+    min_len: int = 8,
+    filtrar_links: bool = False,
+    strip_bullets: bool = False,
+) -> list:
+    t = (texto or "").strip()
+    if not t:
+        return []
+    partes = re.split(r"\[?BAL[AÃ]O\]?", t, flags=re.I)
+    out: list = []
+    for p in partes:
+        p = re.sub(r"`{3}(?:json|text)?|`{3}", "", p).strip()
+        if not p:
+            continue
+        lines = p.splitlines() if "\n" in p else [p]
+        for ln in lines:
+            ln2 = ln.strip()
+            if strip_bullets:
+                ln2 = ln2.strip("-•* ").strip()
+            ln2 = re.sub(r"^\s*BLOCO[_\s]*\d+\s*::\s*", "", ln2, flags=re.I).strip()
+            if len(ln2) >= min_len:
+                if filtrar_links and _e_somente_link(ln2):
+                    continue
+                out.append(ln2)
+            if len(out) >= max_blocos:
+                break
+        if len(out) >= max_blocos:
+            break
+    return out[:max_blocos]

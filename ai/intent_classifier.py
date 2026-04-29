@@ -11,7 +11,10 @@ import json
 import logging
 import os
 import re
+import ssl
 import time
+import certifi
+import httpx
 from typing import List, Dict, Any, Optional
 from google import genai  # ✨ Nova SDK oficial do Google
 from config_cliente import CONFIG_CLIENTE
@@ -73,6 +76,16 @@ Formato de saída:
 """
 
 class IntentClassifier:
+    @staticmethod
+    def _criar_httpx_client(timeout: float = 60) -> httpx.Client:
+        """Bypassa Windows certificate store e proxy do antivírus via certifi."""
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        return httpx.Client(
+            verify=ssl_ctx,
+            timeout=httpx.Timeout(timeout, connect=15.0),
+            trust_env=False,
+        )
+
     def __init__(self, api_key: str | None = None, model_name: str | None = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         # Recomendado usar a versão estável do Gemini Pro para classificação lógica
@@ -98,8 +111,10 @@ class IntentClassifier:
             logger.error("🚨 ERRO: GEMINI_API_KEY ausente.")
             return None
         try:
-            # O novo padrão utiliza a classe Client
-            client = genai.Client(api_key=self.api_key)
+            client = genai.Client(
+                api_key=self.api_key,
+                http_options={"httpx_client": self._criar_httpx_client(60)},
+            )
             logger.info(f"🎯 Intent Classifier (SDK 2.0) Conectado: {self.model_name}")
             return client
         except Exception as e:
@@ -256,44 +271,55 @@ class IntentClassifier:
             categorias=categorias_fmt, exemplos=exemplos_fmt
         ) + f"\n\nNó Atual: {node_atual}\nHistórico:\n{historico_fmt}\nMensagem:\n\"{texto}\"\nClassifique:"
 
-        try:
-            # Configuração de geração para a nova SDK
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt_completo,
-                config={
-                    'temperature': 0.1,
-                    'response_mime_type': 'application/json'
-                }
-            )
-            
-            raw_text = self._limpar_json(response.text)
-            data = json.loads(raw_text)
-            
-            intencao = str(data.get("intencao", "indefinida")).strip().lower()
-            intencao = intencao.replace("preço", "preco").replace("-", "_")
-            if intencao not in INTENCOES:
-                intencao = "indefinida"
-            confianca = float(data.get("confianca", 0.0))
-            intencao = self._ajustar_intencao_primeiro_contato(texto, node_atual, intencao)
+        for tentativa in range(3):
+            try:
+                # Configuração de geração para a nova SDK
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt_completo,
+                    config={
+                        'temperature': 0.1,
+                        'response_mime_type': 'application/json'
+                    }
+                )
+                
+                raw_text = self._limpar_json(response.text)
+                data = json.loads(raw_text)
+                
+                intencao = str(data.get("intencao", "indefinida")).strip().lower()
+                intencao = intencao.replace("preço", "preco").replace("-", "_")
+                if intencao not in INTENCOES:
+                    intencao = "indefinida"
+                confianca = float(data.get("confianca", 0.0))
+                intencao = self._ajustar_intencao_primeiro_contato(texto, node_atual, intencao)
 
-            logger.info(
-                "🎯 [INTENT] '%s' → %s (conf=%.2f)",
-                (texto[:48] + "…") if len(texto) > 48 else texto,
-                intencao,
-                confianca,
-            )
+                logger.info(
+                    "🎯 [INTENT] '%s' → %s (conf=%.2f)",
+                    (texto[:48] + "…") if len(texto) > 48 else texto,
+                    intencao,
+                    confianca,
+                )
 
-            if confianca > 0.8:
-                self._cache[cache_key] = intencao
+                if confianca > 0.8:
+                    self._cache[cache_key] = intencao
 
-            return intencao
+                return intencao
 
-        except Exception as e:
-            if self._erro_e_quota_excedida(e):
-                self._ativar_cooldown_quota(75)
-            logger.error(f"🚨 [INTENT] Erro na nova SDK: {e}. Usando fallback.")
-            return self._fallback(texto)
+            except Exception as e:
+                err_str = str(e).lower()
+                if self._erro_e_quota_excedida(e):
+                    self._ativar_cooldown_quota(75)
+                    break
+                if "timeout" in err_str or "timed out" in err_str or "ssl" in err_str or "handshake" in err_str or "503" in err_str:
+                    if tentativa < 2:
+                        logger.warning(f"⚠️ [INTENT] Timeout/SSL Gemini (tentativa {tentativa+1}/3). Recriando cliente...")
+                        self.client = genai.Client(api_key=self.api_key, http_options={"httpx_client": self._criar_httpx_client(90)})
+                        time.sleep(2 ** (tentativa + 1))
+                        continue
+                logger.error(f"🚨 [INTENT] Erro na nova SDK: {e}. Usando fallback.")
+                return self._fallback(texto)
+
+        return self._fallback(texto)
 
     def _formatar_historico(self, historico: List[Any]) -> str:
         linhas = []
