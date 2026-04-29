@@ -633,6 +633,54 @@ class ConsentRecord(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class TenantBilling(Base):
+    """
+    Estado canônico de assinatura Stripe por tenant (Frente 2.16).
+    Atualizado via webhook handlers. Fonte de verdade pro effective_plan.
+    """
+    __tablename__ = "tenant_billing"
+
+    tenant_id = Column(String(64), primary_key=True)
+    plan = Column(String(32), nullable=True)  # starter|pro|enterprise
+    billing_period = Column(String(10), nullable=True)  # monthly|annual
+    status = Column(String(20), nullable=True)
+    # Stripe IDs
+    customer_id = Column(String(120), nullable=True, index=True)
+    subscription_id = Column(String(120), nullable=True)
+    price_id = Column(String(120), nullable=True)
+    # Datas críticas
+    trial_start = Column(DateTime(timezone=True), nullable=True)
+    trial_end = Column(DateTime(timezone=True), nullable=True)
+    current_period_start = Column(DateTime(timezone=True), nullable=True)
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+    cancel_at_period_end = Column(Boolean, default=False, nullable=False)
+    canceled_at = Column(DateTime(timezone=True), nullable=True)
+    # Pending downgrade (Frente 2.18) — aplicar no próximo period_end
+    pending_plan = Column(String(32), nullable=True)
+    pending_billing_period = Column(String(10), nullable=True)
+    pending_effective_at = Column(DateTime(timezone=True), nullable=True)
+    # MRR
+    mrr_brl_cents = Column(Integer, default=0, nullable=False)
+    # Update tracking
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class CancellationSurvey(Base):
+    """Survey ao cancelar assinatura (Frente 2.21)."""
+    __tablename__ = "cancellation_surveys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reason_category = Column(String(40), nullable=True)
+    reason_text = Column(Text, nullable=True)
+    win_back_offered = Column(String(40), nullable=True)
+    win_back_accepted = Column(Boolean, nullable=True)
+    cancelled_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    reactivated_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class UserSession(Base):
     """
     Sessão de login persistida pra session mgmt (Frente 8.4-8.6).

@@ -284,7 +284,7 @@ def effective_plan(tenant_id: str, *, db_session=None) -> tuple[str, str]:
                 return None
             return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
-        # 1. Override
+        # 1. Override admin
         override = (
             db.query(models.TenantPlanOverride)
             .filter(
@@ -299,9 +299,15 @@ def effective_plan(tenant_id: str, *, db_session=None) -> tuple[str, str]:
             if ovr_expires is None or ovr_expires > now:
                 return override.plan, "override"
 
-        # 2. Stripe (placeholder — TODO: tabela tenant_billing quando 2.16 estiver pronto)
+        # 2. Stripe subscription ativa (Frente 2.16)
+        billing = db.query(models.TenantBilling).filter_by(tenant_id=tenant_id).first()
+        if billing and billing.plan and billing.status in ("active", "trialing", "past_due"):
+            period_end = _aware(billing.current_period_end)
+            # past_due ainda dá acesso até period_end (grace via dunning)
+            if period_end is None or period_end > now:
+                return billing.plan, "stripe"
 
-        # 3. Trial
+        # 3. Trial nativo (signup grátis 14d Pro)
         user = db.query(models.User).filter_by(tenant_id=tenant_id, is_active=True).first()
         trial_ends = _aware(user.trial_ends_at) if user else None
         if trial_ends and trial_ends > now:

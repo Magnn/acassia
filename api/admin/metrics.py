@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Any
 
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
@@ -43,12 +42,14 @@ def _aware(dt):
 def _compute_tenant_mrr(user: models.User, db) -> tuple[int, str]:
     """
     Retorna (mrr_brl_cents, source) pra um tenant.
-    Override "comp" (pauses_stripe=True) → MRR=0 (shadow MRR).
-    Caso contrário, usa preço do plano efetivo.
+    Source canônico:
+        stripe   → mrr = price do plano comprado (ou TenantBilling.mrr_brl_cents se gravado)
+        override → 0 se pauses_stripe (comp gratuito), senão price do plano forçado
+        trial    → 0 (pre-revenue)
+        free     → 0
     """
     plan_key, source = plans_module.effective_plan(user.tenant_id, db_session=db)
     if source == "override":
-        # Comp gratuito (pausa Stripe) NÃO conta como MRR
         ovr = (
             db.query(models.TenantPlanOverride)
             .filter(
@@ -62,8 +63,16 @@ def _compute_tenant_mrr(user: models.User, db) -> tuple[int, str]:
             return 0, "override_comp"
     if source in ("trial", "free"):
         return 0, source
+
+    # Stripe — usa MRR gravado se disponível, senão calcula pelo plano
+    if source == "stripe":
+        billing = db.query(models.TenantBilling).filter_by(tenant_id=user.tenant_id).first()
+        if billing and billing.mrr_brl_cents:
+            return billing.mrr_brl_cents, "stripe"
+
     cfg = plans_module.get_plan_config(plan_key)
-    return int(cfg.get("price_brl", 0)) * 100, source  # cents
+    price = int(cfg.get("price_brl", 0)) * 100  # cents
+    return price, source
 
 
 @metrics_bp.route("/summary", methods=["GET"])
@@ -75,8 +84,7 @@ def metrics_summary():
     try:
         now = datetime.now(timezone.utc)
         month_ago = now - timedelta(days=30)
-        period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        prev_period_start = (period_start - timedelta(days=1)).replace(day=1)
+        # period_start usado por queries futuras (cohort comparison)
 
         # Tenants ativos = users.is_active=true, deleted_at=null
         active_users = db.query(models.User).filter(

@@ -350,7 +350,74 @@ def run_hourly():
     logger.info("[cron] starting hourly jobs")
     hourly_trial_warnings()
     hourly_quota_warnings()
+    hourly_apply_pending_downgrades()
     logger.info("[cron] hourly done")
+
+
+def hourly_apply_pending_downgrades():
+    """
+    Aplica downgrades agendados quando current_period_end passou.
+    Chama Stripe pra atualizar o subscription pro plano menor (Frente 2.18).
+    """
+    db = SessionLocal()
+    applied = 0
+    try:
+        from api.payments.stripe_client import update_subscription_to_plan, price_id_for_plan
+        now = datetime.now(timezone.utc)
+
+        rows = db.query(models.TenantBilling).filter(
+            models.TenantBilling.pending_plan.isnot(None),
+        ).all()
+        for billing in rows:
+            effective_at = _aware(billing.pending_effective_at)
+            if effective_at is None or effective_at > now:
+                continue  # ainda não chegou a hora
+            if not billing.subscription_id:
+                continue
+
+            new_price_id = price_id_for_plan(
+                billing.pending_plan,
+                billing_period=billing.pending_billing_period or "monthly",
+            )
+            if not new_price_id:
+                logger.warning(
+                    "[cron.downgrade] tenant=%s sem price_id pra %s — pulando",
+                    billing.tenant_id, billing.pending_plan,
+                )
+                continue
+
+            try:
+                update_subscription_to_plan(
+                    billing.subscription_id, new_price_id,
+                    proration_behavior="none",  # sem cobrar diferença em downgrade
+                    metadata={"tenant_id": billing.tenant_id, "scheduled_downgrade": "true"},
+                )
+            except Exception as exc:
+                logger.exception("[cron.downgrade] stripe error tenant=%s: %s",
+                                billing.tenant_id, exc)
+                continue
+
+            # Webhook customer.subscription.updated vai sincronizar TenantBilling
+            # Limpa pending fields
+            billing.pending_plan = None
+            billing.pending_billing_period = None
+            billing.pending_effective_at = None
+            applied += 1
+
+            db.add(models.AuditEvent(
+                tenant_id=billing.tenant_id,
+                actor_user_id=None,
+                event_type="billing.downgrade.applied",
+                target_type="tenant_billing",
+                target_id=billing.tenant_id,
+                payload={"plan": billing.pending_plan},
+            ))
+
+        if applied:
+            db.commit()
+            logger.info("[cron.hourly_apply_pending_downgrades] applied=%d", applied)
+    finally:
+        db.close()
 
 
 def run_daily():
