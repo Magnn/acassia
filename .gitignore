@@ -46,3 +46,10 @@ htmlcov/
 
 # Binários / ferramentas locais (não versionar)
 ngrok.exe
+
+# Frontend (Vite + React)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+

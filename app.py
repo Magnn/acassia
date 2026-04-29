@@ -647,6 +647,30 @@ def render_dashboard():
     return send_from_directory(_ROOT, "dashboard.html")
 
 
+# ─────────────────────────────────────────────────────────────────────
+# FLOW BUILDER REACT (SPA servido a partir de frontend/dist)
+# ─────────────────────────────────────────────────────────────────────
+_FRONTEND_DIST = os.path.join(_ROOT, "frontend", "dist")
+
+
+@app.route("/builder", defaults={"path": ""})
+@app.route("/builder/", defaults={"path": ""})
+@app.route("/builder/<path:path>")
+def render_builder_spa(path: str):
+    """Serve o SPA do Flow Builder; rota client-side cai em index.html."""
+    if path:
+        candidate = os.path.join(_FRONTEND_DIST, path)
+        if os.path.isfile(candidate):
+            return send_from_directory(_FRONTEND_DIST, path)
+    index_path = os.path.join(_FRONTEND_DIST, "index.html")
+    if not os.path.isfile(index_path):
+        return (
+            "Flow Builder não compilado — rode `cd frontend && npm install && npm run build`.",
+            503,
+        )
+    return send_from_directory(_FRONTEND_DIST, "index.html")
+
+
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
     """Logos e ficheiros estáticos do dashboard (ex.: integrações)."""
