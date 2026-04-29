@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import SettingsLayout from './components/SettingsLayout';
 import Toaster from './components/Toaster';
@@ -34,7 +35,7 @@ function PageFallback() {
 
 export default function App() {
   return (
-    <>
+    <ErrorBoundary>
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/onboarding" element={<Onboarding />} />
@@ -125,6 +126,6 @@ export default function App() {
         </Routes>
       </Suspense>
       <Toaster />
-    </>
+    </ErrorBoundary>
   );
 }
