@@ -7,6 +7,7 @@ import SettingsLayout from './components/SettingsLayout';
 import Toaster from './components/Toaster';
 import ImpersonateBanner from './components/ImpersonateBanner';
 import CookieBanner from './components/CookieBanner';
+import QuotaWarningBanner from './components/QuotaWarningBanner';
 import BlueprintsList from './routes/BlueprintsList';
 
 // Telas SaaS — lazy.
@@ -51,6 +52,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ImpersonateBanner />
+      <QuotaWarningBanner />
       <CookieBanner />
       <Suspense fallback={<PageFallback />}>
         <Routes>

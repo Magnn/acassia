@@ -8,6 +8,27 @@ export class ApiError extends Error {
     this.status = status;
     this.body = body;
   }
+
+  /**
+   * True se erro é "quota exceeded" (HTTP 402 com error="quota_exceeded").
+   * Frontend pode fallback pra mostrar modal de upgrade.
+   */
+  get isQuotaExceeded(): boolean {
+    if (this.status !== 402) return false;
+    const b = this.body as { error?: string } | null;
+    return b?.error === 'quota_exceeded';
+  }
+
+  get quotaInfo(): { kind: string; current: number; limit: number; message: string } | null {
+    if (!this.isQuotaExceeded) return null;
+    const b = this.body as { kind?: string; current?: number; limit?: number; message?: string };
+    return {
+      kind: b.kind || 'unknown',
+      current: b.current || 0,
+      limit: b.limit || 0,
+      message: b.message || 'Limite do plano atingido',
+    };
+  }
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
