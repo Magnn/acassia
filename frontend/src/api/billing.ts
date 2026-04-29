@@ -6,8 +6,15 @@ export interface BillingData {
   stripe_configured: boolean;
 }
 
+interface CheckoutResponse {
+  ok: boolean;
+  url: string;
+  error?: string;
+}
+
 export const billingApi = {
   getPlans: () => api.get<BillingData>('/saas/billing/plans'),
-  startCheckout: (plan: string) => api.post(`/saas/billing/checkout/${plan}`),
-  openPortal: () => api.post<{ url: string }>('/saas/billing/portal'),
+  startCheckout: (plan: string) =>
+    api.post<CheckoutResponse>(`/saas/billing/checkout/${plan}`),
+  openPortal: () => api.post<CheckoutResponse>('/saas/billing/portal'),
 };

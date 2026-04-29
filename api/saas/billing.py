@@ -86,13 +86,21 @@ def plans():
 @billing_bp.route("/checkout/<plan>", methods=["POST"])
 @login_required
 def checkout(plan: str):
+    wants_json = request.is_json or request.accept_mimetypes.accept_json
+
     if not is_configured():
-        flash("Stripe não está configurado neste ambiente.", "error")
+        msg = "Stripe não está configurado neste ambiente."
+        if wants_json:
+            return jsonify({"error": msg}), 503
+        flash(msg, "error")
         return redirect(url_for("saas_billing.plans"))
 
     price_id = price_id_for_plan(plan)
     if not price_id:
-        flash(f"Plano '{plan}' não tem price_id configurado.", "error")
+        msg = f"Plano '{plan}' não tem price_id configurado."
+        if wants_json:
+            return jsonify({"error": msg}), 400
+        flash(msg, "error")
         return redirect(url_for("saas_billing.plans"))
 
     tenant_id = current_user.tenant_id
@@ -113,9 +121,14 @@ def checkout(plan: str):
         )
     except Exception:
         logger.exception("[billing] erro ao criar checkout session tenant=%s", tenant_id)
-        flash("Erro ao iniciar checkout. Tenta de novo em instantes.", "error")
+        msg = "Erro ao iniciar checkout. Tenta de novo em instantes."
+        if wants_json:
+            return jsonify({"error": msg}), 500
+        flash(msg, "error")
         return redirect(url_for("saas_billing.plans"))
 
+    if wants_json:
+        return jsonify({"ok": True, "url": session.url})
     return redirect(session.url, code=303)
 
 
@@ -139,10 +152,14 @@ def cancel():
 @login_required
 def portal():
     """Customer Portal — user gerencia cartão, troca plano, cancela."""
+    wants_json = request.is_json or request.accept_mimetypes.accept_json
     tenant_id = current_user.tenant_id
     customer_id = _stripe_var(tenant_id, "customer_id")
     if not customer_id:
-        flash("Você ainda não tem assinatura ativa.", "error")
+        msg = "Você ainda não tem assinatura ativa."
+        if wants_json:
+            return jsonify({"error": msg}), 400
+        flash(msg, "error")
         return redirect(url_for("saas_billing.plans"))
 
     try:
@@ -152,7 +169,12 @@ def portal():
         )
     except Exception:
         logger.exception("[billing] erro ao criar portal session tenant=%s", tenant_id)
-        flash("Erro ao abrir portal de cobrança.", "error")
+        msg = "Erro ao abrir portal de cobrança."
+        if wants_json:
+            return jsonify({"error": msg}), 500
+        flash(msg, "error")
         return redirect(url_for("saas_billing.plans"))
 
+    if wants_json:
+        return jsonify({"ok": True, "url": portal_session.url})
     return redirect(portal_session.url, code=303)

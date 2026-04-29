@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { ApiError } from '../api/client';
 import { 
   Sparkles, 
   ShoppingBag, 
@@ -13,7 +14,13 @@ import {
   ShieldCheck,
   Zap
 } from 'lucide-react';
-import { onboardingApi } from '../api/onboarding';
+import {
+  onboardingApi,
+  type OfertaDraft,
+  type PersonaDraft,
+  type TemplateDraft,
+  type WhatsAppDraft,
+} from '../api/onboarding';
 import { toast } from '../lib/toast';
 
 const STEPS = [
@@ -32,28 +39,40 @@ export default function Onboarding() {
 
   const [currentStep, setCurrentStep] = useState<string | null>(null);
 
-  // Sincroniza o step inicial com o backend
-  if (status?.current_step && currentStep === null) {
-    if (status.current_step === 'done') navigate('/dashboard');
-    else setCurrentStep(status.current_step);
-  }
+  // Sincroniza o step inicial com o backend (sem setState durante render — usa effect).
+  useEffect(() => {
+    if (!status?.current_step) return;
+    if (status.current_step === 'done') {
+      navigate('/dashboard');
+      return;
+    }
+    if (currentStep === null) setCurrentStep(status.current_step);
+  }, [status, currentStep, navigate]);
+
+  const errMsg = (e: unknown, fallback: string): string => {
+    if (e instanceof ApiError) {
+      const body = e.body as { error?: string } | null;
+      return body?.error || `${fallback} (${e.status})`;
+    }
+    return (e as Error)?.message || fallback;
+  };
 
   const personaMutation = useMutation({
     mutationFn: onboardingApi.savePersona,
     onSuccess: (res) => setCurrentStep(res.next_step),
-    onError: (e: any) => toast.error(e.response?.data?.error || 'Erro ao salvar persona'),
+    onError: (e) => toast.error(errMsg(e, 'Erro ao salvar persona')),
   });
 
   const ofertaMutation = useMutation({
     mutationFn: onboardingApi.saveOferta,
     onSuccess: (res) => setCurrentStep(res.next_step),
-    onError: (e: any) => toast.error(e.response?.data?.error || 'Erro ao salvar oferta'),
+    onError: (e) => toast.error(errMsg(e, 'Erro ao salvar oferta')),
   });
 
   const templateMutation = useMutation({
     mutationFn: onboardingApi.saveTemplate,
     onSuccess: (res) => setCurrentStep(res.next_step),
-    onError: (e: any) => toast.error(e.response?.data?.error || 'Erro ao salvar template'),
+    onError: (e) => toast.error(errMsg(e, 'Erro ao salvar template')),
   });
 
   const whatsappMutation = useMutation({
@@ -62,7 +81,7 @@ export default function Onboarding() {
       toast.success('Onboarding concluído!');
       navigate('/dashboard');
     },
-    onError: (e: any) => toast.error(e.response?.data?.error || 'Erro ao salvar WhatsApp'),
+    onError: (e) => toast.error(errMsg(e, 'Erro ao salvar WhatsApp')),
   });
 
   if (isLoadingStatus || !currentStep) {
@@ -144,7 +163,7 @@ export default function Onboarding() {
 
 // --- Steps ---
 
-function PersonaStep({ onSave, isPending }: { onSave: (d: any) => void, isPending: boolean }) {
+function PersonaStep({ onSave, isPending }: { onSave: (d: PersonaDraft) => void, isPending: boolean }) {
   const [formData, setFormData] = useState({ name: '', tone: 'acolhedor', backstory: '', restrictions: [] as string[] });
 
   return (
@@ -208,7 +227,7 @@ function PersonaStep({ onSave, isPending }: { onSave: (d: any) => void, isPendin
   );
 }
 
-function OfertaStep({ onSave, isPending }: { onSave: (d: any) => void, isPending: boolean }) {
+function OfertaStep({ onSave, isPending }: { onSave: (d: OfertaDraft) => void, isPending: boolean }) {
   const [formData, setFormData] = useState({ nome: '', preco: '', descricao: '', gateway: 'stripe' });
 
   return (
@@ -283,7 +302,7 @@ function OfertaStep({ onSave, isPending }: { onSave: (d: any) => void, isPending
   );
 }
 
-function TemplateStep({ onSave, isPending }: { onSave: (d: any) => void, isPending: boolean }) {
+function TemplateStep({ onSave, isPending }: { onSave: (d: TemplateDraft) => void, isPending: boolean }) {
   const [template, setTemplate] = useState('tarot_express');
 
   return (
@@ -334,7 +353,7 @@ function TemplateStep({ onSave, isPending }: { onSave: (d: any) => void, isPendi
   );
 }
 
-function WhatsAppStep({ onSave, isPending }: { onSave: (d: any) => void, isPending: boolean }) {
+function WhatsAppStep({ onSave, isPending }: { onSave: (d: WhatsAppDraft) => void, isPending: boolean }) {
   const [formData, setFormData] = useState({ phone_number_id: '', waba_id: '', access_token: '' });
 
   return (

@@ -23,18 +23,20 @@ export default function Billing() {
 
   const checkoutMutation = useMutation({
     mutationFn: (plan: string) => billingApi.startCheckout(plan),
-    onSuccess: (res: any) => {
-      if (res.url) window.location.href = res.url;
+    onSuccess: (res) => {
+      if (res?.url) window.location.href = res.url;
+      else toast.error(res?.error || 'Falha ao obter URL de checkout.');
     },
-    onError: () => toast.error('Erro ao iniciar checkout.'),
+    onError: (e: Error) => toast.error(`Erro ao iniciar checkout: ${e.message}`),
   });
 
   const portalMutation = useMutation({
     mutationFn: billingApi.openPortal,
-    onSuccess: (res: any) => {
-      if (res.url) window.location.href = res.url;
+    onSuccess: (res) => {
+      if (res?.url) window.location.href = res.url;
+      else toast.error(res?.error || 'Falha ao abrir portal.');
     },
-    onError: () => toast.error('Erro ao abrir portal.'),
+    onError: (e: Error) => toast.error(`Erro ao abrir portal: ${e.message}`),
   });
 
   if (isLoading) return <div className="p-8 text-center animate-pulse">Carregando planos...</div>;

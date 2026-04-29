@@ -433,7 +433,7 @@ function ErrorBanner({ error }: { error: Error }) {
         </div>
         <div className="text-xs text-sibila-fog mt-1">{error.message}</div>
         <ul className="text-[11px] text-sibila-smoke mt-2 list-disc list-inside space-y-0.5">
-          <li><strong>401</strong>: faça login em <a className="text-sibila-amethyst hover:underline" href="/saas/auth/login">/saas/auth/login</a></li>
+          <li><strong>401</strong>: faça login em <a className="text-sibila-amethyst hover:underline" href="/saas/login">/saas/login</a></li>
           <li><strong>404</strong>: reinicie o Flask (blueprint <code>saas_whatsapp</code> novo)</li>
           <li><strong>500</strong>: cheque o log do Flask</li>
         </ul>

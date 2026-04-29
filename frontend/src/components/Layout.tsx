@@ -68,11 +68,19 @@ export default function Layout() {
   const location = useLocation();
   const { toggle } = useTheme();
   
-  const { data: user } = useQuery({
+  const { data: user, error: userError, isLoading: userLoading } = useQuery({
     queryKey: ['me'],
     queryFn: authApi.me,
     staleTime: Infinity,
+    retry: false,
   });
+
+  // Sem sessão -> backend retorna 401 -> redireciona pro login.
+  // Não bloqueia onboarding (tela própria fora do Layout).
+  if (userError && !userLoading && !location.pathname.startsWith('/onboarding')) {
+    window.location.href = '/saas/login?next=' + encodeURIComponent(location.pathname);
+    return null;
+  }
 
   const pageTitle = pageTitleFor(location.pathname);
 
@@ -203,7 +211,7 @@ export default function Layout() {
               <SettingsIcon className="w-5 h-5" strokeWidth={2} />
             </NavLink>
             <a
-              href="/saas/auth/logout"
+              href="/saas/logout"
               title="Sair"
               className="p-2.5 rounded-xl text-secondary hover:text-red-500 hover:bg-red-500/10 transition-all"
             >
