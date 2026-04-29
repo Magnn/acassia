@@ -29,6 +29,13 @@ interface ProviderMeta {
   badgeTone: string;
 }
 
+const EMPTY_CONFIG: WhatsAppConfig = {
+  provider: 'meta_cloud',
+  meta_cloud: { phone_number_id: '', waba_id: '', has_access_token: false },
+  coex: { api_url: '', instance: '', has_api_key: false },
+  evolution: { server_url: '', instance: '', has_api_key: false },
+};
+
 const PROVIDERS: ProviderMeta[] = [
   {
     id: 'meta_cloud',
@@ -65,15 +72,17 @@ const PROVIDERS: ProviderMeta[] = [
 export default function WhatsAppConnect() {
   const qc = useQueryClient();
 
-  const { data: config, isLoading } = useQuery({
+  const { data: config, isLoading, error: configError } = useQuery({
     queryKey: ['whatsapp-config'],
     queryFn: whatsappApi.getConfig,
+    retry: false,
   });
 
   const { data: status, refetch: refetchStatus } = useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: whatsappApi.status,
     refetchInterval: 30000,
+    retry: false,
   });
 
   const [selectedMode, setSelectedMode] = useState<ProviderMode>('meta_cloud');
@@ -92,8 +101,11 @@ export default function WhatsAppConnect() {
     if (config) {
       setForm(config);
       setSelectedMode(config.provider);
+    } else if (!isLoading && !form) {
+      // Backend falhou (401/404/500) — inicializa form vazio pra permitir edição
+      setForm(EMPTY_CONFIG);
     }
-  }, [config]);
+  }, [config, isLoading, form]);
 
   const saveMutation = useMutation({
     mutationFn: whatsappApi.saveConfig,
@@ -138,8 +150,11 @@ export default function WhatsAppConnect() {
     saveMutation.mutate(patch);
   };
 
-  if (isLoading || !form) {
+  if (isLoading) {
     return <div className="p-12 text-sibila-smoke text-sm animate-pulse-soft">Lendo configuração…</div>;
+  }
+  if (!form) {
+    return <div className="p-12 text-sibila-smoke text-sm">Inicializando…</div>;
   }
 
   return (
@@ -153,6 +168,41 @@ export default function WhatsAppConnect() {
           provedores depois.
         </p>
       </div>
+
+      {/* Erro de carregamento — provavelmente 401 (login) ou 404 (Flask sem reload) */}
+      {configError && (
+        <div className="mb-6 rounded-lg px-4 py-3 border bg-sibila-crimson/10 border-sibila-crimson/30 flex items-start gap-3">
+          <AlertTriangle className="w-4 h-4 text-sibila-crimson mt-0.5 flex-shrink-0" />
+          <div className="flex-1 text-sm">
+            <div className="font-medium text-sibila-moonlight">
+              Não consegui ler a config do servidor
+            </div>
+            <div className="text-xs text-sibila-fog mt-1">
+              {(configError as Error).message}
+            </div>
+            <ul className="text-[11px] text-sibila-smoke mt-2 list-disc list-inside space-y-0.5">
+              <li>
+                Se for <strong>401</strong>: faça login em{' '}
+                <a href="/saas/auth/login" className="text-sibila-amethyst hover:underline">
+                  /saas/auth/login
+                </a>
+                .
+              </li>
+              <li>
+                Se for <strong>404</strong>: reinicie o Flask para registrar o blueprint
+                novo (<code className="text-sibila-fog">saas_whatsapp</code>).
+              </li>
+              <li>
+                Se for <strong>500</strong>: cheque o log do Flask por exceções.
+              </li>
+            </ul>
+            <p className="text-[11px] text-sibila-smoke mt-2">
+              Você pode editar o formulário abaixo mesmo assim, mas o Salvar só funciona
+              quando o backend estiver acessível.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Status atual */}
       {status && (
