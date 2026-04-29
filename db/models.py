@@ -1083,6 +1083,42 @@ class HoroscopeAutomation(Base):
     updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False)
 
 
+class LeadNatalChart(Base):
+    """Mapa astral lite por lead (Frente 4.5/4.6)."""
+    __tablename__ = "lead_natal_charts"
+
+    lead_id = Column(Integer, ForeignKey("leads.id"), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    birth_date = Column(Date, nullable=True)
+    birth_time = Column(String(8), nullable=True)   # "HH:MM" local
+    birth_place = Column(String(200), nullable=True)
+    birth_lat = Column(Float, nullable=True)
+    birth_lon = Column(Float, nullable=True)
+    timezone_offset = Column(Float, default=-3.0, nullable=False)  # horas vs UTC
+    chart_json = Column(JSON, nullable=True)        # output natal_chart_lite()
+    interpretation_text = Column(Text, nullable=True)
+    interpretation_focus = Column(String(40), nullable=True)
+    computed_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    interpreted_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class LeadNumerology(Base):
+    """Numerologia por lead (Frente 4.11/4.12)."""
+    __tablename__ = "lead_numerology"
+
+    lead_id = Column(Integer, ForeignKey("leads.id"), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    full_name = Column(String(300), nullable=True)
+    birth_date = Column(Date, nullable=True)
+    life_path = Column(Integer, nullable=True)
+    expression = Column(Integer, nullable=True)
+    soul = Column(Integer, nullable=True)
+    components = Column(JSON, nullable=True)  # meanings + qualquer extra
+    interpretation_text = Column(Text, nullable=True)
+    computed_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    interpreted_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class HoroscopeDelivery(Base):
     """
     Log de envios diarios de horoscopo (idempotencia + analytics).
