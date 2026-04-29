@@ -206,6 +206,137 @@ def list_view_data():
         db.close()
 
 
+@inbox_bp.route("/<int:lead_id>/context", methods=["GET"])
+@login_required
+def lead_context(lead_id: int):
+    """
+    Painel de contexto rico do lead (Frente 3.18-3.22).
+    Retorna:
+        - dados básicos (signo, idade, cidade, custom_fields)
+        - jornada no fluxo (nó atual, histórico, tempo)
+        - sentimento últimas 10 msgs
+        - LTV / histórico compras
+        - notas livres (futuro)
+        - tarot readings count
+    """
+    from datetime import datetime, timezone
+    tenant_id = current_user.tenant_id
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(id=lead_id, tenant_id=tenant_id).first()
+        if not lead:
+            return jsonify({"error": "lead_not_found"}), 404
+
+        now = datetime.now(timezone.utc)
+
+        # Sentiment últimos 10 user msgs
+        last_user_msgs = db.query(models.Mensagem).filter(
+            models.Mensagem.lead_id == lead_id,
+            models.Mensagem.remetente == "user",
+        ).order_by(models.Mensagem.timestamp.desc()).limit(10).all()
+        sentiments = []
+        pos = 0
+        neg = 0
+        for m in last_user_msgs:
+            s = (m.sentimento or "").lower()
+            if "pos" in s:
+                pos += 1
+                sentiments.append("pos")
+            elif "neg" in s:
+                neg += 1
+                sentiments.append("neg")
+            else:
+                sentiments.append("neutral")
+
+        # Jornada
+        node_historico = lead.node_historico or []
+        if not isinstance(node_historico, list):
+            node_historico = []
+        last_msg = db.query(models.Mensagem).filter_by(lead_id=lead_id).order_by(
+            models.Mensagem.timestamp.desc(),
+        ).first()
+        last_msg_iso = last_msg.timestamp.isoformat() if last_msg and last_msg.timestamp else None
+
+        # Tempo no nó atual (desde última FlowNodeVisit não-fechada)
+        time_in_node_s = None
+        try:
+            last_visit = db.query(models.FlowNodeVisit).filter_by(
+                lead_id=lead_id, exited_at=None,
+            ).order_by(models.FlowNodeVisit.entered_at.desc()).first()
+            if last_visit and last_visit.entered_at:
+                entered_aware = last_visit.entered_at
+                if entered_aware.tzinfo is None:
+                    entered_aware = entered_aware.replace(tzinfo=timezone.utc)
+                time_in_node_s = int((now - entered_aware).total_seconds())
+        except Exception:
+            pass
+
+        # Histórico de pagamentos / LTV
+        payments = db.query(models.PaymentEventReceipt).filter_by(
+            lead_id=lead_id,
+        ).order_by(models.PaymentEventReceipt.processed_at.desc()).all()
+
+        # Total de tarot readings desse lead
+        tarot_count = db.query(models.TarotReading).filter_by(
+            tenant_id=tenant_id, lead_id=lead_id,
+        ).count()
+
+        # Tags
+        tags = lead.tags or []
+        if not isinstance(tags, list):
+            tags = []
+
+        return jsonify({
+            "lead": {
+                "id": lead.id,
+                "telefone": lead.telefone,
+                "nome": lead.nome,
+                "email": lead.email,
+                "signo": getattr(lead, "signo", None),
+                "idade": getattr(lead, "idade", None),
+                "cidade": getattr(lead, "cidade", None),
+                "tags": tags,
+                "custom_fields": getattr(lead, "custom_fields", {}) or {},
+                "criado_em": lead.criado_em.isoformat() if lead.criado_em else None,
+            },
+            "score": {
+                "value": lead.score_value or 0,
+                "band": lead.score_band or "cold",
+                "components": lead.score_components or {},
+                "updated_at": lead.score_updated_at.isoformat() if lead.score_updated_at else None,
+            },
+            "journey": {
+                "node_atual": lead.node_atual,
+                "node_historico": node_historico,
+                "depth": len(node_historico),
+                "time_in_node_s": time_in_node_s,
+                "last_msg_at": last_msg_iso,
+                "convertido": bool(lead.convertido),
+                "bot_pausado": bool(lead.bot_pausado),
+                "opt_out": bool(lead.opt_out),
+            },
+            "sentiment": {
+                "recent": sentiments,
+                "positive_count": pos,
+                "negative_count": neg,
+                "trend": "positive" if pos > neg else ("negative" if neg > pos else "neutral"),
+            },
+            "commercial": {
+                "payments_count": len(payments),
+                "payments": [
+                    {
+                        "id": p.id, "provider": p.provider,
+                        "event_type": p.event_type,
+                        "processed_at": p.processed_at.isoformat() if p.processed_at else None,
+                    } for p in payments[:5]
+                ],
+            },
+            "tarot_readings_count": tarot_count,
+        })
+    finally:
+        db.close()
+
+
 @inbox_bp.route("/<int:lead_id>/score/refresh", methods=["POST"])
 @login_required
 def refresh_lead_score(lead_id: int):

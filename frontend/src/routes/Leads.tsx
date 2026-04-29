@@ -16,6 +16,7 @@ import {
 import { inboxApi } from '../api/inbox';
 import { toast } from '../lib/toast';
 import ScoreBadge from '../components/ScoreBadge';
+import LeadContextPanel from '../components/LeadContextPanel';
 
 type ViewMode = 'chat' | 'table';
 
@@ -446,6 +447,18 @@ export default function Leads() {
           </div>
         )}
       </div>
+
+      {/* 3ª coluna: Contexto do lead — só no chat mode com lead selecionado */}
+      {viewMode === 'chat' && selectedLeadId !== null && (
+        <div className="hidden lg:block w-[320px] flex-shrink-0 border-l border-border bg-bg-sidebar/30 overflow-y-auto">
+          <div className="p-3 border-b border-border bg-bg-sidebar/50">
+            <h3 className="text-xs font-black uppercase tracking-widest text-secondary">
+              Contexto
+            </h3>
+          </div>
+          <LeadContextPanel leadId={selectedLeadId} />
+        </div>
+      )}
     </div>
   );
 }
