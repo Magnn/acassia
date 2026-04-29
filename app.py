@@ -30,7 +30,7 @@ import re
 import uuid
 from decimal import Decimal
 from collections import deque
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, redirect, send_from_directory
 from werkzeug.utils import secure_filename
 from flask_cors import CORS 
 from dotenv import load_dotenv
@@ -641,16 +641,34 @@ inbox_manager = LeadInboxManager()
 # ROTAS DO DASHBOARD E API (INTEGRAÇÃO IMPERIAL)
 # ─────────────────────────────────────────────────────────────────────
 
-@app.route("/dashboard")
-def render_dashboard():
-    """Serve a interface administrativa."""
-    return send_from_directory(_ROOT, "dashboard.html")
-
-
 # ─────────────────────────────────────────────────────────────────────
 # FLOW BUILDER REACT (SPA servido a partir de frontend/dist)
 # ─────────────────────────────────────────────────────────────────────
 _FRONTEND_DIST = os.path.join(_ROOT, "frontend", "dist")
+
+
+def _flow_builder_react_enabled() -> bool:
+    """FLOW_BUILDER_REACT=1/true/yes ativa redirect /dashboard → /builder/."""
+    val = (os.getenv("FLOW_BUILDER_REACT", "") or "").strip().lower()
+    return val in ("1", "true", "yes", "on")
+
+
+@app.route("/dashboard")
+def render_dashboard():
+    """Serve a interface administrativa.
+
+    Se ``FLOW_BUILDER_REACT`` estiver ativo no ambiente E o build React
+    estiver disponível, redireciona pra ``/builder/``. Bypass via
+    ``?legacy=1`` mantém o builder antigo acessível como fallback.
+    """
+    use_react = (
+        _flow_builder_react_enabled()
+        and os.path.isfile(os.path.join(_FRONTEND_DIST, "index.html"))
+        and request.args.get("legacy") not in ("1", "true", "yes")
+    )
+    if use_react:
+        return redirect("/builder/", code=302)
+    return send_from_directory(_ROOT, "dashboard.html")
 
 
 @app.route("/builder", defaults={"path": ""})

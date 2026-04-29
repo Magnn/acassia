@@ -60,8 +60,8 @@ frontend/
 - **Fase 3**: inspetores por tipo de nó ✅
 - **Fase 3.1**: Conteúdo multi-passos + Rule Builder completo + upload de mídia ✅
 - **Fase 4a**: lint visual do grafo ✅
-- **Fase 4b** (atual): simulador WhatsApp com persona ✅
-- **Fase 5**: feature flag, redirect de `/dashboard` para `/builder`
+- **Fase 4b**: simulador WhatsApp com persona ✅
+- **Fase 5** (atual): feature flag `FLOW_BUILDER_REACT` + fallback `?legacy=1` ✅
 - **Fase 6**: descomissionar `dashboard.html`
 
 Ver [docs/roadmap-canvas-orbita.md](../docs/roadmap-canvas-orbita.md) para o contexto maior.

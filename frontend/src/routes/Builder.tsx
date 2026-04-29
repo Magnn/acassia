@@ -116,6 +116,13 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           <span className="text-xs text-slate-500">
             #{blueprint.id} · {blueprint.slug}
           </span>
+          <a
+            href="/dashboard?legacy=1"
+            className="text-[11px] text-slate-500 hover:text-slate-300 underline-offset-2 hover:underline"
+            title="Abrir o builder antigo (dashboard.html) — fallback de emergência"
+          >
+            ↩ builder antigo
+          </a>
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <span>

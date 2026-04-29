@@ -12,9 +12,13 @@ export default function BlueprintsList() {
     <section className="max-w-3xl mx-auto px-6 py-8">
       <div className="flex items-baseline justify-between mb-6">
         <h1 className="text-xl font-semibold">Fluxos do tenant</h1>
-        <span className="text-xs text-slate-500">
-          GET /api/flows/blueprints
-        </span>
+        <a
+          href="/dashboard?legacy=1"
+          className="text-xs text-slate-500 hover:text-slate-300"
+          title="Builder antigo (dashboard.html)"
+        >
+          ↩ builder antigo
+        </a>
       </div>
 
       {isLoading && <p className="text-slate-400">Carregando…</p>}
