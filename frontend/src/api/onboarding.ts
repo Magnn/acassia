@@ -32,16 +32,18 @@ interface StepResponse {
 }
 
 export const onboardingApi = {
+  // Backend index() retorna JSON quando Accept inclui application/json — o
+  // client.ts já manda isso por default; resposta tem { current_step, done? }.
   getStatus: () =>
-    api.get<{ current_step: StepResponse['next_step'] }>(
-      '/saas/onboarding/status/data',
+    api.get<{ current_step: StepResponse['next_step']; done?: boolean }>(
+      '/saas/onboarding/',
     ),
   savePersona: (data: PersonaDraft) =>
-    api.post<StepResponse>('/saas/onboarding/persona/data', data),
+    api.post<StepResponse>('/saas/onboarding/persona', data),
   saveOferta: (data: OfertaDraft) =>
-    api.post<StepResponse>('/saas/onboarding/oferta/data', data),
+    api.post<StepResponse>('/saas/onboarding/oferta', data),
   saveTemplate: (data: TemplateDraft) =>
-    api.post<StepResponse>('/saas/onboarding/template/data', data),
+    api.post<StepResponse>('/saas/onboarding/template', data),
   saveWhatsApp: (data: WhatsAppDraft) =>
-    api.post<StepResponse>('/saas/onboarding/whatsapp/data', data),
+    api.post<StepResponse>('/saas/onboarding/whatsapp', data),
 };

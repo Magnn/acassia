@@ -11,10 +11,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(path, {
     method,
     credentials: 'include',
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
