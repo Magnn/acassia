@@ -591,6 +591,48 @@ class TenantUsageQuotaWarning(Base):
     sent_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class PasswordResetToken(Base):
+    """
+    Token one-time pra reset de senha (Frente 8.9).
+    Token armazena bcrypt hash; URL expira em 1h.
+    """
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    requested_ip = Column(String(45), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class EmailVerificationToken(Base):
+    """Token pra verificar email após signup (Frente 8.11)."""
+    __tablename__ = "email_verification_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class ConsentRecord(Base):
+    """Registro de consents do user pra LGPD (Frente 8.16)."""
+    __tablename__ = "consent_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    visitor_id = Column(String(64), nullable=True, index=True)
+    consents = Column(JSON, nullable=False)  # {analytics: true, marketing: false, ...}
+    policy_version = Column(String(20), nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class PaymentEventReceipt(Base):
     """
     Idempotência durável de webhooks de pagamento (at-least-once delivery).

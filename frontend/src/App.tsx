@@ -23,6 +23,7 @@ const BillingUsage = lazy(() => import('./routes/BillingUsage'));
 // Settings sub-rotas
 const SettingsDevices = lazy(() => import('./routes/settings/Devices'));
 const SettingsRecovery = lazy(() => import('./routes/settings/Recovery'));
+const SettingsSecurity = lazy(() => import('./routes/settings/Security'));
 const SettingsPlaceholder = lazy(() => import('./routes/settings/Placeholder'));
 
 // Admin God-Mode (Frente 1)
@@ -68,6 +69,7 @@ export default function App() {
               <Route index element={<Navigate to="/settings/devices" replace />} />
               <Route path="devices" element={<SettingsDevices />} />
               <Route path="recovery" element={<SettingsRecovery />} />
+              <Route path="security" element={<SettingsSecurity />} />
               <Route
                 path="account"
                 element={

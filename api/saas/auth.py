@@ -226,8 +226,17 @@ def signup_user(email: str, password: str, name: Optional[str] = None) -> models
     password = password or ""
     if "@" not in email or len(email) < 5:
         raise ValueError("email inválido")
-    if len(password) < _MIN_PASSWORD_LEN:
-        raise ValueError(f"senha precisa de no mínimo {_MIN_PASSWORD_LEN} caracteres")
+
+    # Password policy (Frente 8.10)
+    try:
+        from api.saas.security import validate_password_strength, PasswordPolicyError
+        validate_password_strength(password, min_len=_MIN_PASSWORD_LEN)
+    except PasswordPolicyError as exc:
+        raise ValueError(str(exc))
+    except Exception:
+        # Fallback se import circular: check mínimo
+        if len(password) < _MIN_PASSWORD_LEN:
+            raise ValueError(f"senha precisa de no mínimo {_MIN_PASSWORD_LEN} caracteres")
 
     db = SessionLocal()
     try:
@@ -338,13 +347,52 @@ def login():
         return redirect(url_for("saas_auth.signup_done"))
 
     if request.method == "POST":
-        user = authenticate_user(
-            email=request.form.get("email", ""),
-            password=request.form.get("password", ""),
-        )
+        email = request.form.get("email", "")
+        password = request.form.get("password", "")
+        ip = request.remote_addr or "unknown"
+
+        # Resolve user_id ANTES de validar senha (pra checar lockout)
+        candidate_id = None
+        db = SessionLocal()
+        try:
+            u = db.query(models.User).filter_by(email=email.strip().lower()).first()
+            if u:
+                candidate_id = u.id
+        finally:
+            db.close()
+
+        # Lockout check (Frente 8.7-8.8)
+        if candidate_id is not None:
+            try:
+                from api.saas.security import is_locked_out
+                locked, count = is_locked_out(candidate_id)
+                if locked:
+                    logger.warning(
+                        "[saas_auth.lockout] user_id=%s ip=%s count=%d",
+                        candidate_id, ip, count,
+                    )
+                    flash("Conta temporariamente bloqueada — aguarde 15 minutos.", "error")
+                    return render_template("auth/login.html"), 423  # Locked
+            except Exception:
+                pass  # fail open
+
+        user = authenticate_user(email=email, password=password)
         if not user:
+            # Registra falha pra brute-force tracking
+            try:
+                from api.saas.security import record_login_failure
+                record_login_failure(candidate_id, ip)
+            except Exception:
+                pass
             flash("Email ou senha inválidos", "error")
             return render_template("auth/login.html"), 401
+
+        # Sucesso: limpa contador
+        try:
+            from api.saas.security import record_login_success
+            record_login_success(user.id)
+        except Exception:
+            pass
 
         _touch_last_login(user.id)
         login_user(AuthenticatedUser(user.id, user.email, user.tenant_id, user.role))
