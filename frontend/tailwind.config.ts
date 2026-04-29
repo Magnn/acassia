@@ -11,6 +11,10 @@ export default {
         'cigana-surface': '#1e293b',
         'cigana-border': '#334155',
       },
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        display: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+      },
     },
   },
   plugins: [],

@@ -1,3 +1,5 @@
+import { api } from './client';
+
 export interface LeadPreview {
   id: number;
   telefone: string;
@@ -33,23 +35,16 @@ export interface ConversationData {
 }
 
 export const inboxApi = {
-  getLeads: async (filtro = 'todos'): Promise<{ items: LeadPreview[]; filtro: string }> => {
-    const res = await fetch(`/saas/inbox/data?filtro=${filtro}`);
-    if (!res.ok) throw new Error('Failed to fetch leads');
-    return res.json();
-  },
+  getLeads: (filtro = 'todos') =>
+    api.get<{ items: LeadPreview[]; filtro: string }>(
+      `/saas/inbox/data?filtro=${encodeURIComponent(filtro)}`,
+    ),
 
-  getConversation: async (leadId: number): Promise<ConversationData> => {
-    const res = await fetch(`/saas/inbox/${leadId}/data`);
-    if (!res.ok) throw new Error('Failed to fetch conversation');
-    return res.json();
-  },
+  getConversation: (leadId: number) =>
+    api.get<ConversationData>(`/saas/inbox/${leadId}/data`),
 
-  toggleTakeover: async (leadId: number): Promise<{ status: string; bot_pausado: boolean }> => {
-    const res = await fetch(`/saas/inbox/${leadId}/takeover/data`, {
-      method: 'POST',
-    });
-    if (!res.ok) throw new Error('Failed to toggle takeover');
-    return res.json();
-  },
+  toggleTakeover: (leadId: number) =>
+    api.post<{ status: string; bot_pausado: boolean }>(
+      `/saas/inbox/${leadId}/takeover/data`,
+    ),
 };

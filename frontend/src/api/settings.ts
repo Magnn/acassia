@@ -1,3 +1,5 @@
+import { api } from './client';
+
 export interface SettingsData {
   cadence_str: string;
   whatsapp_phone_id: string;
@@ -8,20 +10,11 @@ export interface SettingsData {
 }
 
 export const settingsApi = {
-  get: async (): Promise<SettingsData> => {
-    const res = await fetch('/saas/settings/data');
-    if (!res.ok) throw new Error('Failed to fetch settings');
-    return res.json();
-  },
+  get: () => api.get<SettingsData>('/saas/settings/data'),
 
-  updateRecovery: async (cadenceStr: string): Promise<{ status: string; cadence: number[] }> => {
-    const res = await fetch('/saas/settings/recovery/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cadence_minutes: cadenceStr }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to update recovery');
-    return data;
-  },
+  updateRecovery: (cadenceStr: string) =>
+    api.post<{ status: string; cadence: number[] }>(
+      '/saas/settings/recovery/data',
+      { cadence_minutes: cadenceStr },
+    ),
 };

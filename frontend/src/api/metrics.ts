@@ -1,3 +1,5 @@
+import { api } from './client';
+
 export interface KpiData {
   total_leads: number;
   leads_7d: number;
@@ -11,11 +13,5 @@ export interface KpiData {
 }
 
 export const metricsApi = {
-  get: async (): Promise<KpiData> => {
-    const res = await fetch('/saas/metrics/data');
-    if (!res.ok) {
-      throw new Error(`Failed to fetch metrics: ${res.status}`);
-    }
-    return res.json();
-  },
+  get: () => api.get<KpiData>('/saas/metrics/data'),
 };

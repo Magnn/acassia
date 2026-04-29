@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inboxApi } from '../api/inbox';
-import { User, PauseCircle, PlayCircle, Send, Clock } from 'lucide-react';
+import { Clock, MessageSquare, PauseCircle, PlayCircle, Send, User } from 'lucide-react';
 
 export default function Inbox() {
   const [filtro, setFiltro] = useState('todos');
@@ -115,7 +115,7 @@ export default function Inbox() {
       <div className="flex-1 flex flex-col min-w-0 bg-[#f5f7fc]">
         {!selectedLeadId ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-cigana-bg">
-            <MessageSquareIcon className="w-12 h-12 mb-4 opacity-20" />
+            <MessageSquare className="w-12 h-12 mb-4 opacity-20" />
             <p>Selecione uma conversa para visualizar</p>
           </div>
         ) : isLoadingConv ? (
@@ -226,24 +226,5 @@ export default function Inbox() {
         )}
       </div>
     </div>
-  );
-}
-
-function MessageSquareIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
   );
 }
