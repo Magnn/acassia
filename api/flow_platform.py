@@ -17,10 +17,15 @@ from urllib.parse import urlparse
 
 import requests
 from flask import Flask, jsonify, request
+from flask_login import login_required
 
+from api.saas.auth import require_role
 from db import models
 from db.database import SessionLocal
 from tenant_context import get_request_tenant_id
+
+# Atalho local — todas as rotas deste módulo são restritas a admin no MVP.
+_admin = require_role("admin")
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +188,8 @@ def register_flow_platform_routes(app: Flask) -> None:
     """Registra rotas /api/flows/* da plataforma."""
 
     @app.route("/api/flows/blueprints/<int:bid>/versions", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_bp_versions(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -251,6 +258,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/versions/<int:vid>", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_bp_version_one(bid: int, vid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -288,6 +297,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/versions/<int:vid>/restore", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_bp_version_restore(bid: int, vid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -313,6 +324,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/lock", methods=["GET", "POST", "DELETE"])
+    @login_required
+    @_admin
     def api_flow_bp_lock(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -386,6 +399,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/comments", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_bp_comments(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -444,6 +459,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/runs", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_runs_list():
         tid = get_request_tenant_id()
         blueprint_id = request.args.get("blueprint_id")
@@ -484,6 +501,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/runs/<int:rid>", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_run_one(rid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -515,6 +534,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/runs/<int:rid>/events", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_run_events(rid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -552,6 +573,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/runs", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_bp_runs_create(bid: int):
         tid = get_request_tenant_id()
         body = request.get_json(silent=True) or {}
@@ -598,6 +621,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/webhooks/test", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_webhook_test():
         body = request.get_json(silent=True) or {}
         url = (body.get("url") or "").strip()
@@ -645,6 +670,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             return jsonify({"ok": False, "error": str(e)}), 502
 
     @app.route("/api/flows/schedules", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_schedules():
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -708,6 +735,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/schedules/<int:sid>", methods=["PATCH", "DELETE"])
+    @login_required
+    @_admin
     def api_flow_schedule_one(sid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -738,6 +767,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/tenant/secrets", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_tenant_secrets():
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -779,6 +810,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/tenant/secrets/<string:key>", methods=["DELETE"])
+    @login_required
+    @_admin
     def api_flow_tenant_secret_delete(key: str):
         tid = get_request_tenant_id()
         k = (key or "").strip()
@@ -797,6 +830,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/tenant/variables", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_tenant_variables():
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -840,6 +875,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/tenant/variables/<string:key>", methods=["DELETE"])
+    @login_required
+    @_admin
     def api_flow_tenant_variable_delete(key: str):
         tid = get_request_tenant_id()
         k = (key or "").strip()
@@ -858,6 +895,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/catalog/nodes", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_catalog_nodes():
         from flow_builder_runtime import ALLOWED_NODE_TYPES, NODE_SPECS
 
@@ -876,6 +915,8 @@ def register_flow_platform_routes(app: Flask) -> None:
         return jsonify({"ok": True, "nodes": nodes}), 200
 
     @app.route("/api/flows/blueprints/<int:bid>/export", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_bp_export(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -903,6 +944,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/import", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_bp_import():
         tid = get_request_tenant_id()
         body = request.get_json(silent=True) or {}
@@ -945,6 +988,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/diff", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_bp_diff():
         body = request.get_json(silent=True) or {}
         a = body.get("a")
@@ -956,6 +1001,8 @@ def register_flow_platform_routes(app: Flask) -> None:
         return jsonify({"ok": True, "changes": chg, "truncated": len(changes) > 5000}), 200
 
     @app.route("/api/flows/blueprints/<int:bid>/acl", methods=["GET", "PUT"])
+    @login_required
+    @_admin
     def api_flow_bp_acl(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -1011,6 +1058,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/quotas", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_quotas():
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -1050,6 +1099,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/lint", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_lint():
         from flow_builder_runtime import validate_flow_document
 

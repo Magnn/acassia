@@ -15,11 +15,12 @@ testáveis sem Flask. Endpoints são finos — apenas marshalling HTTP.
 
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import secrets
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Iterable, Optional
 
 import bcrypt
 from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
@@ -31,6 +32,52 @@ from flask_login import (
     login_user,
     logout_user,
 )
+
+
+def require_role(*allowed_roles: str):
+    """
+    Decorator de autorização — exige que ``current_user.role`` esteja em
+    ``allowed_roles``. Combine com ``@login_required`` (ou já presume sessão
+    válida via flask-login).
+
+    Negação:
+      - Request JSON / Accept JSON → 403 com {"error": "forbidden", ...}
+      - Caso contrário → 403 + flash + redirect para o login.
+
+    Uso::
+
+        @app.route("/api/flows/...", methods=["POST"])
+        @login_required
+        @require_role("admin")
+        def my_admin_route():
+            ...
+    """
+    allowed = tuple(r for r in allowed_roles if r)
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not getattr(current_user, "is_authenticated", False):
+                if request.is_json or request.accept_mimetypes.accept_json:
+                    return jsonify({"error": "unauthorized"}), 401
+                return redirect(url_for("saas_auth.login"))
+            user_role = (getattr(current_user, "role", "") or "").strip().lower()
+            if user_role not in allowed:
+                if request.is_json or request.accept_mimetypes.accept_json:
+                    return jsonify({
+                        "error": "forbidden",
+                        "user_role": user_role,
+                        "required": list(allowed),
+                    }), 403
+                flash("Acesso restrito — sua conta não tem permissão.", "error")
+                return redirect(url_for("saas_auth.login"))
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def _is_admin(roles: Iterable[str]) -> bool:
+    return any((r or "").strip().lower() == "admin" for r in roles)
 
 from db import models
 from db.database import SessionLocal

@@ -31,6 +31,15 @@ import uuid
 from decimal import Decimal
 from collections import deque
 from flask import Flask, request, jsonify, redirect, send_from_directory
+from flask_login import login_required
+from api.saas.auth import require_role
+
+# Atalho: rotas administrativas (criar/editar fluxos, agentes, segredos) usam:
+#   @login_required
+#   @require_admin
+# Tarólogos comuns (role='user') ficam restritos às rotas /saas/* já protegidas
+# pelos blueprints SaaS dedicados.
+require_admin = require_role("admin")
 from werkzeug.utils import secure_filename
 from flask_cors import CORS 
 from dotenv import load_dotenv
@@ -1340,6 +1349,8 @@ def api_flows_catalog():
 
 
 @app.route("/api/flows/validate", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_validate():
     """Validação de documento do construtor visual (acassia-flow v1)."""
     try:
@@ -1382,6 +1393,8 @@ def api_flows_schema():
 
 
 @app.route("/api/flows/compile", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_compile():
     """Compila documento validado num plano linear (ordem de execução)."""
     try:
@@ -1400,6 +1413,8 @@ def api_flows_compile():
 
 
 @app.route("/api/flows/simulate", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_simulate():
     """Simulação dry-run (trace legível) — não envia WhatsApp."""
     try:
@@ -1433,6 +1448,8 @@ def _serialize_flow_blueprint_row(row: models.FlowBlueprint) -> dict:
 
 
 @app.route("/api/flows/blueprints", methods=["GET", "POST"])
+@login_required
+@require_admin
 def api_flows_blueprints():
     """Lista ou cria fluxos persistidos no servidor (tenant)."""
     tid = get_request_tenant_id()
@@ -1471,6 +1488,8 @@ def api_flows_blueprints():
 
 
 @app.route("/api/flows/blueprints/<int:bid>", methods=["GET", "PATCH", "DELETE"])
+@login_required
+@require_admin
 def api_flows_blueprint_one(bid: int):
     tid = get_request_tenant_id()
     db = SessionLocal()
@@ -1522,6 +1541,8 @@ def api_flows_blueprint_one(bid: int):
 
 
 @app.route("/api/flows/blueprints/by-slug/<string:slug>", methods=["GET"])
+@login_required
+@require_admin
 def api_flows_blueprint_by_slug(slug: str):
     """Carrega documento acassia-flow por slug estável (uma ida ao servidor)."""
     tid = get_request_tenant_id()
@@ -1553,6 +1574,8 @@ def _ensure_flow_publish_row(db, tenant_id: str) -> models.FlowPublish:
 
 
 @app.route("/api/flows/publish", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_publish_blueprint():
     """Define o blueprint publicado do construtor para este tenant (metadados + executor)."""
     tid = get_request_tenant_id()
@@ -1582,6 +1605,8 @@ def api_flows_publish_blueprint():
 
 
 @app.route("/api/flows/publish/status", methods=["GET"])
+@login_required
+@require_admin
 def api_flows_publish_blueprint_status():
     tid = get_request_tenant_id()
     db = SessionLocal()
@@ -1608,6 +1633,8 @@ def api_flows_publish_blueprint_status():
 
 
 @app.route("/api/flows/blueprints/<int:bid>/execute", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_blueprint_execute(bid: int):
     """
     Executa o fluxo compilado no motor real: gera Acao(s) e envia pela mesma fila WhatsApp.
@@ -2099,6 +2126,8 @@ def _serialize_studio_agent(db, agent: models.StudioAgent, tenant_id: str):
 
 
 @app.route("/api/studio/agents", methods=["GET", "POST"])
+@login_required
+@require_admin
 def api_studio_agents():
     """Lista ou cria agentes do Studio (persistência servidor)."""
     tid = get_request_tenant_id()
@@ -2136,6 +2165,8 @@ def api_studio_agents():
 
 
 @app.route("/api/studio/agents/<int:aid>", methods=["GET", "PATCH", "DELETE"])
+@login_required
+@require_admin
 def api_studio_agent_one(aid: int):
     tid = get_request_tenant_id()
     db = SessionLocal()
@@ -2170,6 +2201,8 @@ def api_studio_agent_one(aid: int):
 
 
 @app.route("/api/studio/agents/<int:aid>/versions", methods=["POST"])
+@login_required
+@require_admin
 def api_studio_agent_version_create(aid: int):
     """Cria snapshot de versão a partir do rascunho atual."""
     tid = get_request_tenant_id()
@@ -2213,6 +2246,8 @@ def api_studio_agent_version_create(aid: int):
 
 
 @app.route("/api/studio/agents/<int:aid>/publish", methods=["POST"])
+@login_required
+@require_admin
 def api_studio_agent_publish(aid: int):
     """Define qual versão está no ar (motor WhatsApp / IA)."""
     from studio_runtime import ensure_publish_row
@@ -2258,6 +2293,8 @@ def api_studio_agent_publish(aid: int):
 
 
 @app.route("/api/studio/publish/status", methods=["GET"])
+@login_required
+@require_admin
 def api_studio_publish_status():
     tid = get_request_tenant_id()
     db = SessionLocal()
