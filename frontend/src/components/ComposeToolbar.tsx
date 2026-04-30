@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Wand2, Zap, Search, RefreshCw, Settings as SettingsIcon, X,
+  Wand2, Zap, Search, RefreshCw, Settings as SettingsIcon, X, Volume2,
 } from 'lucide-react';
 import { composeApi, type QuickReply, type Suggestion } from '../api/compose';
 import { handleApiError } from '../lib/handleApiError';
@@ -10,9 +10,10 @@ interface Props {
   leadId: number;
   onInsert: (text: string) => void;
   onOpenManager: () => void;
+  onOpenAudio?: () => void;
 }
 
-export default function ComposeToolbar({ leadId, onInsert, onOpenManager }: Props) {
+export default function ComposeToolbar({ leadId, onInsert, onOpenManager, onOpenAudio }: Props) {
   const [aiOpen, setAiOpen] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
 
@@ -38,6 +39,16 @@ export default function ComposeToolbar({ leadId, onInsert, onOpenManager }: Prop
       >
         <Zap className="w-3.5 h-3.5" />
       </button>
+      {onOpenAudio && (
+        <button
+          type="button"
+          onClick={onOpenAudio}
+          title="Enviar áudio na voz clonada"
+          className="p-2 rounded-lg border bg-bg-primary border-border hover:border-accent-amethyst/30 text-secondary transition-all"
+        >
+          <Volume2 className="w-3.5 h-3.5" />
+        </button>
+      )}
       <span className="text-[10px] text-secondary ml-1">
         Atalhos: Ctrl+Enter envia · 1-9 templates
       </span>

@@ -24,6 +24,7 @@ import ScoreBadge from '../components/ScoreBadge';
 import LeadContextPanel from '../components/LeadContextPanel';
 import ComposeToolbar from '../components/ComposeToolbar';
 import QuickReplyManager from '../components/QuickReplyManager';
+import AudioComposeModal from '../components/AudioComposeModal';
 
 type ViewMode = 'chat' | 'table';
 type ScoreFilter = null | 'hot' | 'warm' | 'cold';
@@ -90,6 +91,7 @@ export default function Leads() {
     return saved === 'compact' ? 'compact' : 'comfy';
   });
   const [showQuickReplyManager, setShowQuickReplyManager] = useState(false);
+  const [showAudioCompose, setShowAudioCompose] = useState(false);
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -659,6 +661,7 @@ export default function Leads() {
                          leadId={selectedLeadId}
                          onInsert={insertAtCursor}
                          onOpenManager={() => setShowQuickReplyManager(true)}
+                         onOpenAudio={() => setShowAudioCompose(true)}
                        />
                      </div>
                      <div className="flex items-end gap-4">
@@ -723,6 +726,18 @@ export default function Leads() {
 
       {showQuickReplyManager && (
         <QuickReplyManager onClose={() => setShowQuickReplyManager(false)} />
+      )}
+
+      {showAudioCompose && selectedLeadId !== null && (
+        <AudioComposeModal
+          leadId={selectedLeadId}
+          leadName={selectedLead?.nome || selectedLead?.telefone || 'lead'}
+          onClose={() => setShowAudioCompose(false)}
+          onSent={() => {
+            queryClient.invalidateQueries({ queryKey: ['leads-conversation', selectedLeadId] });
+            queryClient.invalidateQueries({ queryKey: ['leads-list'] });
+          }}
+        />
       )}
 
       {/* 3ª coluna: Contexto do lead — só no chat mode com lead selecionado */}

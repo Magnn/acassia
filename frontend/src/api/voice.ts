@@ -63,4 +63,16 @@ export const voiceApi = {
     api.post<{ ok: boolean; is_default: boolean }>(
       `/saas/voice/clones/${cloneId}/unset-default`,
     ),
+  sendToLead: (params: {
+    lead_id: number;
+    text: string;
+    voice_clone_id?: number;
+  }) =>
+    api.post<{
+      ok: boolean;
+      generation_id: number;
+      voice_clone_id: number;
+      audio_url: string;
+      chars_count: number;
+    }>('/saas/voice/send-to-lead', params),
 };

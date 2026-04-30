@@ -13,7 +13,6 @@ Endpoints:
 
 from __future__ import annotations
 
-import io
 import logging
 import os
 import secrets
@@ -381,6 +380,173 @@ def _generate_sample(clone_id: int, sample_text: str):
         clone.sample_audio_url = f"/saas/voice/audio/{file_id}"
         db.commit()
         return jsonify({"ok": True, "sample_audio_url": clone.sample_audio_url})
+    finally:
+        db.close()
+
+
+@voice_bp.route("/send-to-lead", methods=["POST"])
+@login_required
+@limiter.limit("30/hour")
+def send_audio_to_lead():
+    """
+    Sintetiza texto na voz clonada do tenant + envia como audio pro lead
+    via WhatsApp em uma chamada (Frente 4.16).
+
+    Body:
+        {lead_id: int, text: str, voice_clone_id?: int (default = tenant default)}
+
+    Fluxo:
+        1. Resolve voice (explicito ou default do tenant)
+        2. Quota check (gemini_tokens_month como proxy de chars)
+        3. TTS via ElevenLabs
+        4. Salva audio local + cria AudioGeneration
+        5. Envia URL absoluta como audio msg via WhatsApp provider
+        6. Salva no Mensagem como remetente=bot
+    """
+    body = request.get_json(silent=True) or {}
+    lead_id = body.get("lead_id")
+    text = (body.get("text") or "").strip()
+    voice_clone_id = body.get("voice_clone_id")
+
+    if not lead_id:
+        return jsonify({"error": "lead_id_required"}), 422
+    if not text:
+        return jsonify({"error": "text_required"}), 422
+    if len(text) > 5000:
+        return jsonify({"error": "text_too_long", "max": 5000}), 422
+
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(
+            id=int(lead_id), tenant_id=current_user.tenant_id,
+        ).first()
+        if not lead:
+            return jsonify({"error": "lead_not_found"}), 404
+
+        # Resolve voice
+        if voice_clone_id:
+            clone = db.query(models.VoiceClone).filter_by(
+                id=int(voice_clone_id), tenant_id=current_user.tenant_id,
+            ).first()
+        else:
+            clone = vp.get_default_voice_for_tenant(current_user.tenant_id)
+            if clone is None:
+                return jsonify({
+                    "error": "no_default_voice",
+                    "message": "Nenhuma voz clonada padrao. Defina em /voice ou passe voice_clone_id.",
+                }), 422
+        if not clone or clone.deleted_at:
+            return jsonify({"error": "clone_not_found"}), 404
+        if clone.status != "active":
+            return jsonify({"error": "clone_not_active", "status": clone.status}), 422
+
+        # Quota
+        chars_count = len(text)
+        try:
+            import quota
+            allowed, _, _ = quota.consume_quota(
+                current_user.tenant_id, "gemini_tokens_month", chars_count,
+            )
+            if not allowed:
+                return jsonify({"error": "quota_exceeded", "kind": "voice_chars"}), 402
+        except Exception:
+            pass
+
+        # TTS
+        try:
+            audio_bytes = vp.synthesize_elevenlabs(
+                tenant_id=current_user.tenant_id,
+                voice_id=clone.provider_voice_id,
+                text=text,
+            )
+        except vp.VoiceProviderError as exc:
+            return jsonify({"error": "provider_error", "message": str(exc)}), 502
+
+        # Persist local
+        file_id = secrets.token_hex(8)
+        filename = f"{current_user.tenant_id}_{file_id}.mp3"
+        filepath = os.path.join(_AUDIO_DIR, filename)
+        with open(filepath, "wb") as f:
+            f.write(audio_bytes)
+
+        # AudioGeneration row
+        gen = models.AudioGeneration(
+            tenant_id=current_user.tenant_id,
+            voice_clone_id=clone.id,
+            text=text[:2000],
+            chars_count=chars_count,
+            audio_url=f"/saas/voice/audio/{file_id}",
+            provider="elevenlabs",
+            status="done",
+        )
+        db.add(gen)
+        db.commit()
+        db.refresh(gen)
+
+        # URL absoluta pra WhatsApp baixar — Meta precisa de URL publica HTTPS
+        public_base = (os.getenv("PUBLIC_URL") or "").rstrip("/")
+        if not public_base:
+            return jsonify({
+                "error": "public_url_not_configured",
+                "message": "PUBLIC_URL env precisa estar definido para enviar audio pelo WhatsApp",
+                "audio_url_local": gen.audio_url,
+            }), 503
+        absolute_url = f"{public_base}{gen.audio_url}"
+
+        # Envia via provider
+        try:
+            from api.whatsapp_api import whatsapp_client
+            ok = whatsapp_client.enviar_mensagem(
+                lead.telefone, absolute_url, formato="audio",
+            )
+        except Exception as exc:
+            logger.exception("[voice.send_to_lead] envio falhou")
+            return jsonify({
+                "ok": False,
+                "error": "send_failed",
+                "message": str(exc)[:200],
+                "generation_id": gen.id,
+            }), 502
+
+        if not ok:
+            return jsonify({
+                "ok": False,
+                "error": "send_returned_false",
+                "generation_id": gen.id,
+            }), 502
+
+        # Marca msg no historico
+        try:
+            db.add(models.Mensagem(
+                lead_id=lead.id,
+                remetente="bot",
+                texto=text[:2000],
+                tipo="audio",
+                media_url=absolute_url,
+            ))
+            db.add(models.AuditEvent(
+                tenant_id=current_user.tenant_id,
+                actor_user_id=current_user.id,
+                event_type="voice.audio.sent",
+                target_type="lead",
+                target_id=str(lead.id),
+                payload={
+                    "voice_clone_id": clone.id,
+                    "chars_count": chars_count,
+                    "generation_id": gen.id,
+                },
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        return jsonify({
+            "ok": True,
+            "generation_id": gen.id,
+            "voice_clone_id": clone.id,
+            "audio_url": absolute_url,
+            "chars_count": chars_count,
+        })
     finally:
         db.close()
 
