@@ -7,7 +7,6 @@ import {
   ShoppingBag,
   Layout,
   MessageCircle,
-  ChevronRight,
   CheckCircle2,
   Bot,
   ArrowRight,
@@ -31,6 +30,7 @@ import {
   type WhatsAppStepResult,
 } from '../api/onboarding';
 import { integrationsApi } from '../api/integrations';
+import { templatesApi, type FlowTemplate } from '../api/templates';
 import { toast } from '../lib/toast';
 import { track } from '../lib/analytics';
 
@@ -323,53 +323,223 @@ function OfertaStep({ onSave, isPending }: { onSave: (d: OfertaDraft) => void, i
   );
 }
 
+const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
+  amor: { label: 'Amor', color: 'bg-rose-500/20 text-rose-300' },
+  premium: { label: 'High Ticket', color: 'bg-amber-500/20 text-amber-300' },
+  astrologia: { label: 'Astrologia', color: 'bg-purple-500/20 text-purple-300' },
+  recuperacao: { label: 'Win-back', color: 'bg-blue-500/20 text-blue-300' },
+};
+
 function TemplateStep({ onSave, isPending }: { onSave: (d: TemplateDraft) => void, isPending: boolean }) {
-  const [template, setTemplate] = useState('tarot_express');
+  const [selectedId, setSelectedId] = useState<string>('em_branco');
+  const [previewing, setPreviewing] = useState<FlowTemplate | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['onboarding-templates'],
+    queryFn: () => templatesApi.list(),
+  });
+
+  const items = data?.templates ?? [];
 
   return (
     <div className="space-y-10">
       <div className="space-y-4">
-        <h2 className="text-5xl font-black tracking-tighter leading-tight">Escolha seu <br/><span className="text-accent-amethyst">Fluxo Inicial</span></h2>
-        <p className="text-lg text-secondary font-medium">Selecione um modelo de funil validado para começar.</p>
+        <h2 className="text-5xl font-black tracking-tighter leading-tight">
+          Monte sua <br/>
+          <span className="text-accent-amethyst">tarot card</span>
+        </h2>
+        <p className="text-lg text-secondary font-medium">
+          Kits prontos validados — 5min até seu primeiro funil rodando.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        {[
-          { id: 'tarot_express', name: 'Tarot Express', desc: 'Foco em conversão rápida. Ideal para tiragens de 3 cartas.', tag: 'Popular' },
-          { id: 'quiromancia_premium', name: 'Quiromancia Premium', desc: 'Fluxo mais longo com maior valor agregado e leitura detalhada.', tag: 'High Ticket' },
-          { id: 'em_branco', name: 'Começar do Zero', desc: 'Crie sua própria lógica personalizada usando nosso Flow Builder.', tag: 'Expert' },
-        ].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTemplate(t.id)}
-            className={`p-8 rounded-[32px] border-2 text-left transition-all flex items-center justify-between group ${
-              template === t.id ? 'bg-accent-amethyst/10 border-accent-amethyst' : 'bg-bg-surface border-border hover:border-accent-amethyst/30'
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-pulse">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-48 bg-bg-surface rounded-3xl" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {items.map((t) => {
+            const badge = CATEGORY_BADGE[t.category || ''] ?? { label: 'Kit', color: 'bg-bg-primary text-secondary' };
+            const isSelected = selectedId === t.id;
+            return (
+              <div
+                key={t.id}
+                onClick={() => setSelectedId(t.id)}
+                className={`p-6 rounded-[24px] border-2 cursor-pointer transition-all ${
+                  isSelected
+                    ? 'bg-accent-amethyst/10 border-accent-amethyst'
+                    : 'bg-bg-surface border-border hover:border-accent-amethyst/30'
+                }`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <h4 className="text-lg font-black tracking-tight">{t.name}</h4>
+                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${badge.color}`}>
+                    {badge.label}
+                  </span>
+                </div>
+                <p className="text-xs text-secondary leading-relaxed mb-4 line-clamp-3">
+                  {t.description}
+                </p>
+                <div className="flex items-center justify-between text-[11px] text-secondary mb-3">
+                  <span>{t.node_count} nós</span>
+                  {t.ticket_brl_avg > 0 && (
+                    <span className="font-mono">R${t.ticket_brl_avg}</span>
+                  )}
+                  {t.usage_count > 0 && (
+                    <span>{t.usage_count} usos</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPreviewing(t); }}
+                    className="flex-1 px-3 py-1.5 bg-bg-primary border border-border hover:border-accent-amethyst/30 rounded-lg text-[11px] font-bold"
+                  >
+                    Preview
+                  </button>
+                  <span
+                    className={`flex items-center justify-center px-3 rounded-lg text-[11px] font-black uppercase tracking-widest ${
+                      isSelected
+                        ? 'bg-accent-amethyst text-white'
+                        : 'bg-bg-primary text-secondary'
+                    }`}
+                  >
+                    {isSelected ? '✓ Selecionado' : 'Selecionar'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* "Começar do zero" — opção sempre disponível */}
+          <div
+            onClick={() => setSelectedId('em_branco')}
+            className={`p-6 rounded-[24px] border-2 cursor-pointer transition-all ${
+              selectedId === 'em_branco'
+                ? 'bg-accent-amethyst/10 border-accent-amethyst'
+                : 'bg-bg-surface border-dashed border-border hover:border-accent-amethyst/30'
             }`}
           >
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                 <h4 className="text-lg font-black tracking-tight">{t.name}</h4>
-                 <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${template === t.id ? 'bg-accent-amethyst text-white' : 'bg-bg-primary text-secondary'}`}>
-                   {t.tag}
-                 </span>
-              </div>
-              <p className="text-sm text-secondary font-medium">{t.desc}</p>
+            <div className="flex items-start justify-between mb-3">
+              <h4 className="text-lg font-black tracking-tight">Começar do zero</h4>
+              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-bg-primary text-secondary">
+                Expert
+              </span>
             </div>
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${template === t.id ? 'bg-accent-amethyst text-white shadow-lg' : 'bg-bg-primary text-secondary'}`}>
-               {template === t.id ? <CheckCircle2 className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
-            </div>
-          </button>
-        ))}
-      </div>
+            <p className="text-xs text-secondary leading-relaxed mb-4">
+              Crie sua própria lógica personalizada usando nosso Flow Builder.
+            </p>
+            <span
+              className={`block text-center py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest ${
+                selectedId === 'em_branco'
+                  ? 'bg-accent-amethyst text-white'
+                  : 'bg-bg-primary text-secondary'
+              }`}
+            >
+              {selectedId === 'em_branco' ? '✓ Selecionado' : 'Selecionar'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <button
-        onClick={() => onSave({ template })}
+        onClick={() => onSave({ template: selectedId })}
         disabled={isPending}
-        className="w-full py-5 bg-accent-amethyst text-white rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-accent-amethyst/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 mt-8"
+        className="w-full py-5 bg-accent-amethyst text-white rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-accent-amethyst/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 mt-8 disabled:opacity-30 disabled:scale-100"
       >
-        Configurar Fluxo
+        {isPending ? 'Aplicando…' : 'Aplicar este kit'}
         <ArrowRight className="w-5 h-5" />
       </button>
+
+      {previewing && (
+        <KitPreviewModal
+          template={previewing}
+          onClose={() => setPreviewing(null)}
+          onUse={() => {
+            setSelectedId(previewing.id);
+            setPreviewing(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+
+function KitPreviewModal({
+  template, onClose, onUse,
+}: {
+  template: FlowTemplate;
+  onClose: () => void;
+  onUse: () => void;
+}) {
+  const { data: detail, isLoading } = useQuery({
+    queryKey: ['onboarding-template-detail', template.id],
+    queryFn: () => templatesApi.get(template.id),
+  });
+
+  const nodes = detail?.blueprint_json
+    ? (detail.blueprint_json as { nodes?: Array<{ id: string; type: string; text?: string }> }).nodes || []
+    : [];
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
+      <div className="bg-bg-surface border border-border rounded-3xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-border flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xl font-black tracking-tight truncate">{template.name}</h2>
+            <p className="text-xs text-secondary mt-1 line-clamp-2">{template.description}</p>
+          </div>
+          <button onClick={onClose} className="text-secondary hover:text-primary text-2xl leading-none flex-shrink-0">
+            ×
+          </button>
+        </div>
+        <div className="p-6 overflow-y-auto flex-1 space-y-3">
+          {isLoading ? (
+            <div className="text-center text-secondary text-sm py-8">Carregando preview…</div>
+          ) : (
+            <>
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-secondary">
+                {nodes.length} nós no funil
+              </h3>
+              {nodes.map((n, i) => (
+                <div key={n.id} className="flex gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-bg-primary border border-border flex items-center justify-center font-mono text-[10px] font-black">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 bg-bg-primary border border-border rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-[10px] font-mono text-accent-amethyst">{n.type}</span>
+                      <span className="text-[10px] text-secondary">·</span>
+                      <span className="text-[10px] font-mono text-secondary truncate">{n.id}</span>
+                    </div>
+                    {n.text && (
+                      <p className="text-xs text-primary whitespace-pre-wrap leading-relaxed">{n.text}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+        <div className="p-4 border-t border-border flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-5 py-3 bg-bg-primary border border-border rounded-2xl text-sm font-bold"
+          >
+            Fechar
+          </button>
+          <button
+            onClick={onUse}
+            className="flex-1 px-5 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 text-white rounded-2xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Usar este kit
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

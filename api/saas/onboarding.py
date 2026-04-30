@@ -172,14 +172,24 @@ def save_oferta(
 def save_template(tenant_id: str, template: str) -> Optional[int]:
     """
     Clona blueprint semente pro tenant. ``em_branco`` cria blueprint vazio.
+
+    Aceita 3 formas de template (Frente 4.23):
+      1. Constante legada (``tarot_express``, ``quiromancia_premium``,
+         ``em_branco``) -> seeds via load_seed
+      2. ID de FlowTemplate (``tarot-amor-express``, etc) -> clona
+         blueprint_json da tabela
+      3. ``em_branco`` -> blueprint vazio
+
     Returns blueprint_id ou None.
     """
-    template = (template or "").strip().lower()
-    if template not in ALLOWED_TEMPLATES:
-        raise ValueError(f"template inválido; aceitos: {ALLOWED_TEMPLATES}")
-
+    raw_template = (template or "").strip()
+    template = raw_template.lower().replace(" ", "_")
     _set_var(tenant_id, "template_escolhido", template)
 
+    body = None
+    title = None
+
+    # 1. em_branco
     if template == "em_branco":
         body = {
             "format": "acassia-flow",
@@ -188,12 +198,49 @@ def save_template(tenant_id: str, template: str) -> Optional[int]:
             "graph": {"nodes": [], "edges": []},
         }
         title = "Pós-pagamento (em branco)"
-    else:
+    # 2. Tenta constante legada
+    elif template in ALLOWED_TEMPLATES:
         seed_name = "express" if template == "tarot_express" else "premium"
         if seed_name not in AVAILABLE_SEEDS:
             raise ValueError(f"seed inexistente: {seed_name}")
         body = load_seed(seed_name)
         title = body.get("title", f"Pós-pagamento {template}")
+    # 3. Tenta como FlowTemplate.id (suporta hifen e underscore)
+    else:
+        ft_db = SessionLocal()
+        try:
+            ft_id_candidates = [raw_template, raw_template.replace("_", "-"), raw_template.replace("-", "_")]
+            ft = None
+            for cand in ft_id_candidates:
+                ft = ft_db.query(models.FlowTemplate).filter_by(id=cand).first()
+                if ft:
+                    break
+            if ft is None:
+                raise ValueError(
+                    f"template inválido; aceitos: legados {ALLOWED_TEMPLATES} ou "
+                    f"FlowTemplate.id existente"
+                )
+            # Increment usage_count
+            ft.usage_count = (ft.usage_count or 0) + 1
+            ft_db.commit()
+            body_in = ft.blueprint_json or {}
+            # Normaliza pra formato acassia-flow se o seed estiver no formato antigo
+            if "graph" in body_in:
+                body = body_in
+            else:
+                # Converte nodes simples em formato acassia-flow
+                body = {
+                    "format": "acassia-flow",
+                    "version": 1,
+                    "title": ft.name,
+                    "graph": {
+                        "nodes": body_in.get("nodes") or [],
+                        "edges": body_in.get("edges") or [],
+                    },
+                }
+            title = ft.name
+        finally:
+            ft_db.close()
 
     db = SessionLocal()
     try:
