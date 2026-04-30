@@ -1296,6 +1296,114 @@ def api_health():
     }), 200
 
 
+@app.route("/metrics", methods=["GET"])
+def metrics_endpoint():
+    """
+    Prometheus exposition (Frente 1). Sem auth se METRICS_TOKEN nao setada.
+    Com METRICS_TOKEN, exige header "Authorization: Bearer <token>".
+    """
+    try:
+        from metrics_exporter import render_metrics, check_metrics_auth
+    except Exception as exc:
+        return f"# error loading metrics_exporter: {exc}", 500
+
+    if not check_metrics_auth(request.headers.get("Authorization")):
+        return "Unauthorized", 401
+
+    body = render_metrics(app_started_at=_APP_STARTED_AT)
+    return body, 200, {"Content-Type": "text/plain; version=0.0.4; charset=utf-8"}
+
+
+@app.route("/api/health/multi-tenant-summary", methods=["GET"])
+def api_health_multi_tenant_summary():
+    """
+    Visao agregada de todos os tenants — admin only.
+
+    Retorna pra cada tenant com binding:
+        - status, subscribed, has_flow_published
+        - inbound_count_total, last_inbound_at
+        - errors_24h
+    """
+    # Autoriza via mesmo token de metrics (operacional) ou usuario admin
+    if not _is_admin_or_metrics_authorized():
+        return jsonify({"error": "unauthorized"}), 401
+
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    from db.database import SessionLocal
+    from db import models
+    from sqlalchemy import func
+
+    db = SessionLocal()
+    try:
+        bindings = db.query(models.WaPhoneTenantBinding).all()
+        cutoff = _dt.now(_tz.utc) - _td(hours=24)
+
+        # Errors per tenant (24h)
+        err_rows = db.query(
+            models.WaInboundLog.phone_number_id,
+            func.count(models.WaInboundLog.id),
+        ).filter(
+            models.WaInboundLog.created_at >= cutoff,
+            models.WaInboundLog.event_type.in_(
+                ["error", "rate_limited", "hmac_invalid", "tenant_resolve_miss"]
+            ),
+        ).group_by(models.WaInboundLog.phone_number_id).all()
+        errors_by_phone = {pid: int(n) for pid, n in err_rows if pid}
+
+        out = []
+        for b in bindings:
+            pub = db.query(models.FlowPublish).filter_by(tenant_id=b.tenant_id).first()
+            has_flow = bool(pub and pub.published_blueprint_id)
+            out.append({
+                "tenant_id": b.tenant_id,
+                "phone_number_id": b.phone_number_id,
+                "display_phone_number": b.display_phone_number,
+                "status": b.status,
+                "subscribed": b.subscribed_at is not None,
+                "subscribe_error": b.subscribe_error,
+                "has_flow_published": has_flow,
+                "inbound_count_total": b.inbound_count or 0,
+                "first_inbound_at": b.first_inbound_at.isoformat() if b.first_inbound_at else None,
+                "last_inbound_at": b.last_inbound_at.isoformat() if b.last_inbound_at else None,
+                "errors_24h": errors_by_phone.get(b.phone_number_id, 0),
+            })
+
+        return jsonify({
+            "ok": True,
+            "tenants": out,
+            "summary": {
+                "total_bindings": len(bindings),
+                "subscribed_count": sum(1 for b in bindings if b.subscribed_at),
+                "with_flow_published": sum(1 for t in out if t["has_flow_published"]),
+                "with_recent_inbound": sum(
+                    1 for t in out if t["last_inbound_at"] and
+                    _dt.fromisoformat(t["last_inbound_at"]) > cutoff
+                ),
+            },
+        })
+    finally:
+        db.close()
+
+
+def _is_admin_or_metrics_authorized() -> bool:
+    """Helper compartilhado: aceita admin logado OU bearer token de metrics."""
+    try:
+        from metrics_exporter import check_metrics_auth
+        if check_metrics_auth(request.headers.get("Authorization")):
+            # Token bate; tambem valida que o token nao e vazio (ou seria bypass)
+            if (os.getenv("METRICS_TOKEN") or "").strip():
+                return True
+    except Exception:
+        pass
+    try:
+        from flask_login import current_user
+        if current_user.is_authenticated and getattr(current_user, "is_admin", False):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 @app.route("/api/health/deep", methods=["GET"])
 def api_health_deep():
     """
