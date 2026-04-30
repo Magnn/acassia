@@ -246,6 +246,189 @@ def list_readings():
         db.close()
 
 
+@tarot_bp.route("/leads/<int:lead_id>/card-trends", methods=["GET"])
+@login_required
+def lead_card_trends(lead_id: int):
+    """
+    Agrega tiragens de um lead pra gerar insights (Frente 4.29):
+        - Top cartas mais frequentes
+        - Distribuicao por arcano (major vs minor) + naipe
+        - Distribuicao em pe vs invertida
+        - Sentimento de trajetoria (passado→futuro)
+        - Insight IA opcional via query=ai=1
+    """
+    from collections import Counter
+
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(
+            id=lead_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not lead:
+            return jsonify({"error": "lead_not_found"}), 404
+
+        readings = db.query(models.TarotReading).filter_by(
+            tenant_id=current_user.tenant_id,
+            lead_id=lead_id,
+        ).order_by(models.TarotReading.created_at.asc()).all()
+
+        if not readings:
+            return jsonify({
+                "total_readings": 0,
+                "top_cards": [],
+                "arcana_distribution": {},
+                "reversed_pct": 0,
+                "trajectory": None,
+                "ai_insight": None,
+            })
+
+        card_counter: Counter = Counter()
+        arcana_counter: Counter = Counter()
+        suit_counter: Counter = Counter()
+        position_cards: dict[str, list[dict]] = {}
+        total_cards = 0
+        reversed_count = 0
+        readings_history: list[dict] = []
+
+        for r in readings:
+            cards = r.cards or []
+            if not isinstance(cards, list):
+                continue
+            for c in cards:
+                if not isinstance(c, dict):
+                    continue
+                name = c.get("name") or "?"
+                arcana = (c.get("arcana") or "minor").lower()
+                position = (c.get("position") or "").lower()
+                reversed_ = bool(c.get("reversed"))
+
+                card_counter[name] += 1
+                arcana_counter[arcana] += 1
+                if arcana == "minor" and c.get("suit"):
+                    suit_counter[c["suit"]] += 1
+                if reversed_:
+                    reversed_count += 1
+                total_cards += 1
+                position_cards.setdefault(position, []).append({
+                    "name": name,
+                    "reversed": reversed_,
+                    "reading_id": r.id,
+                })
+
+            readings_history.append({
+                "id": r.id,
+                "spread_type": r.spread_type,
+                "card_count": len(cards),
+                "question": r.question,
+                "created_at": r.created_at.isoformat(),
+            })
+
+        top_cards = [
+            {"name": name, "count": cnt, "pct": round(cnt / total_cards * 100, 1)}
+            for name, cnt in card_counter.most_common(8)
+        ]
+
+        # Trajetoria simples: olha a 1a posicao "passado" vs "futuro" da tiragem mais recente
+        trajectory = None
+        try:
+            latest = readings[-1]
+            if isinstance(latest.cards, list) and len(latest.cards) >= 2:
+                past = next(
+                    (c for c in latest.cards if (c.get("position") or "").lower() == "passado"),
+                    None,
+                )
+                future = next(
+                    (c for c in latest.cards if (c.get("position") or "").lower() == "futuro"),
+                    None,
+                )
+                if past and future:
+                    trajectory = {
+                        "from": past.get("name"),
+                        "from_reversed": bool(past.get("reversed")),
+                        "to": future.get("name"),
+                        "to_reversed": bool(future.get("reversed")),
+                    }
+        except Exception:
+            pass
+
+        # Recurring themes (carta com >= 3 aparicoes — sinal de "tema fixo")
+        recurring = [
+            {"name": name, "count": cnt}
+            for name, cnt in card_counter.most_common(5)
+            if cnt >= 3
+        ]
+
+        ai_insight = None
+        if request.args.get("ai") in ("1", "true") and total_cards > 0:
+            try:
+                import quota
+                allowed, _, _ = quota.consume_quota(
+                    current_user.tenant_id, "gemini_tokens_month", 800,
+                )
+                if allowed:
+                    ai_insight = _generate_trends_insight(
+                        lead, readings, top_cards, recurring, trajectory,
+                    )
+            except Exception:
+                pass
+
+        return jsonify({
+            "total_readings": len(readings),
+            "total_cards_drawn": total_cards,
+            "top_cards": top_cards,
+            "arcana_distribution": dict(arcana_counter),
+            "suit_distribution": dict(suit_counter),
+            "reversed_count": reversed_count,
+            "reversed_pct": round(reversed_count / total_cards * 100, 1) if total_cards else 0,
+            "trajectory": trajectory,
+            "recurring_cards": recurring,
+            "readings_history": readings_history,
+            "ai_insight": ai_insight,
+        })
+    finally:
+        db.close()
+
+
+def _generate_trends_insight(lead, readings, top_cards, recurring, trajectory) -> str | None:
+    """Insight conciso via Gemini sobre padroes nas tiragens do lead."""
+    try:
+        from app import personalizer as client
+        if client is None or not hasattr(client, "client"):
+            return None
+
+        bits = []
+        bits.append(f"Lead: {lead.nome or 'sem nome'}")
+        if lead.signo:
+            bits.append(f"Signo: {lead.signo}")
+        bits.append(f"Tiragens totais: {len(readings)}")
+        if top_cards:
+            top_str = ", ".join([f"{c['name']} ({c['count']}x)" for c in top_cards[:5]])
+            bits.append(f"Cartas mais frequentes: {top_str}")
+        if recurring:
+            rec_str = ", ".join([f"{c['name']}" for c in recurring])
+            bits.append(f"Cartas recorrentes (>=3x): {rec_str}")
+        if trajectory:
+            bits.append(
+                f"Ultima tiragem: passado={trajectory['from']} -> futuro={trajectory['to']}"
+            )
+
+        prompt = (
+            "Voce e tarologa veterana analisando padroes nas tiragens deste lead. "
+            "Em ate 180 chars, em pt-BR, escreva insight unico que conecte os "
+            "padroes acima a uma narrativa coerente. Tom acolhedor e mistico, sem "
+            "previsao determinista. NAO use emoji.\n\n"
+            f"{chr(10).join(bits)}"
+        )
+        resp = client.client.models.generate_content(
+            model=client.model_name,
+            contents=prompt,
+            config={"max_output_tokens": 200, "temperature": 0.85},
+        )
+        return (resp.text or "").strip()[:280] or None
+    except Exception:
+        return None
+
+
 @tarot_bp.route("/readings/<int:reading_id>/send", methods=["POST"])
 @login_required
 def send_reading_to_lead(reading_id: int):

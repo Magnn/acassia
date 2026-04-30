@@ -95,4 +95,32 @@ export const tarotApi = {
 
   deleteReading: (id: number) =>
     api.del<{ ok: boolean }>(`/saas/tarot/readings/${id}`),
+
+  cardTrends: (leadId: number, opts: { ai?: boolean } = {}) => {
+    const qs = opts.ai ? '?ai=1' : '';
+    return api.get<{
+      total_readings: number;
+      total_cards_drawn: number;
+      top_cards: { name: string; count: number; pct: number }[];
+      arcana_distribution: Record<string, number>;
+      suit_distribution: Record<string, number>;
+      reversed_count: number;
+      reversed_pct: number;
+      trajectory: {
+        from: string;
+        from_reversed: boolean;
+        to: string;
+        to_reversed: boolean;
+      } | null;
+      recurring_cards: { name: string; count: number }[];
+      readings_history: {
+        id: number;
+        spread_type: string;
+        card_count: number;
+        question: string | null;
+        created_at: string;
+      }[];
+      ai_insight: string | null;
+    }>(`/saas/tarot/leads/${leadId}/card-trends${qs}`);
+  },
 };
