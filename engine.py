@@ -1403,6 +1403,19 @@ class Engine:
                                 continue
                         if not _meta_ac.get("engine_copy_estatica"):
                             balao_limpo = preparar_texto_envio(balao_limpo, "engine_fila_text")
+                        # Smart greeting (Frente 4.26): {{smart_greeting}} -> texto dinamico
+                        if balao_limpo and "{{" in balao_limpo:
+                            try:
+                                from smart_greeting import render_smart_greeting_in_text
+                                # Carrega lead lazy — so quando {{...}} esta presente.
+                                _lead_for_greeting = db.query(Lead).filter_by(id=lead_id).first()
+                                if _lead_for_greeting is not None:
+                                    balao_limpo = render_smart_greeting_in_text(
+                                        balao_limpo, _lead_for_greeting,
+                                        tenant_id=self.tenant_id,
+                                    )
+                            except Exception as _sg_exc:
+                                logger.warning("[engine.smart_greeting] falha: %s", _sg_exc)
                         chave_dedup = self._normalizar_para_dedup(balao_limpo)
                         if chave_dedup and chave_dedup in dedup_texto_neste_lote:
                             logger.info(

@@ -270,6 +270,7 @@ def _register_saas_blueprints():
     from api.saas.lead_context import lead_context_bp as saas_lead_context_bp
     from api.saas.calendar_spiritual import calendar_bp as saas_calendar_bp
     from api.saas.integrations_whatsapp import integrations_wa_bp as saas_integrations_wa_bp
+    from api.saas.audio_library import audio_lib_bp as saas_audio_lib_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -308,6 +309,7 @@ def _register_saas_blueprints():
         saas_lead_context_bp,
         saas_calendar_bp,
         saas_integrations_wa_bp,
+        saas_audio_lib_bp,
     ):
         app.register_blueprint(bp)
 

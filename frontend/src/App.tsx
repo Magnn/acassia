@@ -29,6 +29,7 @@ const Marketplace = lazy(() => import('./routes/Marketplace'));
 const Horoscope = lazy(() => import('./routes/Horoscope'));
 const Spiritual = lazy(() => import('./routes/Spiritual'));
 const CalendarRoute = lazy(() => import('./routes/Calendar'));
+const AudioLibraryRoute = lazy(() => import('./routes/AudioLibrary'));
 const TenantConfig = lazy(() => import('./routes/TenantConfig'));
 const Integrations = lazy(() => import('./routes/Integrations'));
 const AgentStudio = lazy(() => import('./routes/AgentStudio'));
@@ -96,6 +97,7 @@ export default function App() {
             <Route path="/horoscope" element={<Horoscope />} />
             <Route path="/spiritual" element={<Spiritual />} />
             <Route path="/calendar" element={<CalendarRoute />} />
+            <Route path="/audio-library" element={<AudioLibraryRoute />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/tenant-config" element={<TenantConfig />} />
 

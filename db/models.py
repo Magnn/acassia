@@ -886,6 +886,30 @@ class VoiceClone(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class AudioLibraryItem(Base):
+    """
+    Biblioteca de audios pre-gravados/curados (Frente 4.17).
+
+    Tarologos sobem uploads de "saudacao manha", "oracao protecao", etc.
+    Reutilizaveis em conversas inbound e em flow nodes (audio prontos).
+    Cada audio sofre soft delete via deleted_at.
+    """
+    __tablename__ = "audio_library"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    category = Column(String(40), nullable=True, index=True)
+    tags = Column(JSON, default=list, nullable=False)
+    audio_url = Column(String(500), nullable=False)  # /saas/voice/audio/<file_id>
+    file_path = Column(String(500), nullable=True)   # caminho absoluto local (debug)
+    duration_s = Column(Integer, nullable=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    usage_count = Column(Integer, default=0, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class AudioGeneration(Base):
     """Histórico de TTS gerados (Frente 4.16). Conta tokens consumidos."""
     __tablename__ = "audio_generations"
