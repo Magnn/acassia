@@ -228,8 +228,21 @@ def save_whatsapp(
     phone_number_id: str,
     waba_id: str,
     access_token: str,
-) -> None:
-    """Salva credenciais WhatsApp. Token vira TenantFlowSecret; ids são vars."""
+    *,
+    skip_validation: bool = False,
+) -> dict:
+    """
+    Salva credenciais WhatsApp + cria/atualiza WaPhoneTenantBinding (multi-tenant
+    ready). Auto-subscribe ao WABA é tentado se waba_id presente.
+
+    Token vira TenantFlowSecret; ids são vars; binding mapeia phone_id->tenant.
+
+    Retorna dict {binding, verify_token, webhook_url} pra UI mostrar
+    instruções da Meta.
+    """
+    import secrets as _secrets
+    from datetime import datetime as _dt, timezone as _tz
+
     phone_number_id = (phone_number_id or "").strip()
     waba_id = (waba_id or "").strip()
     access_token = (access_token or "").strip()
@@ -241,13 +254,118 @@ def save_whatsapp(
     if len(access_token) < 20:
         raise ValueError("access_token parece inválido (muito curto)")
 
+    # 1) Validação Graph API (best-effort: se falhar e skip_validation=False, levanta)
+    info: dict = {}
+    if not skip_validation:
+        try:
+            from api.saas.integrations_whatsapp import _validate_token_and_phone
+            ok, info = _validate_token_and_phone(access_token, phone_number_id)
+            if not ok:
+                err = (info.get("error") or {}).get("message") if isinstance(info, dict) else None
+                raise ValueError(f"credenciais inválidas: {err or 'verifique token e phone_number_id'}")
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.warning("[onboarding.whatsapp] validacao falhou (fail-open): %s", exc)
+
+    # 2) Persist secrets/vars
     _set_var(tenant_id, "whatsapp.phone_number_id", phone_number_id)
     _set_var(tenant_id, "whatsapp.waba_id", waba_id)
+    _set_var(tenant_id, "whatsapp.provider", "meta_cloud")
     _set_secret(tenant_id, "whatsapp.access_token", access_token)
-    logger.info(
-        "[onboarding] whatsapp saved tenant=%s phone_id=%s",
-        tenant_id, phone_number_id,
-    )
+
+    # 3) Upsert binding + auto-subscribe
+    db = SessionLocal()
+    try:
+        existing = db.query(models.WaPhoneTenantBinding).filter_by(
+            phone_number_id=phone_number_id,
+        ).first()
+        if existing and existing.tenant_id != tenant_id:
+            raise ValueError("phone_number_id já vinculado a outro tenant")
+
+        if existing:
+            binding = existing
+        else:
+            binding = models.WaPhoneTenantBinding(phone_number_id=phone_number_id)
+            db.add(binding)
+
+        binding.tenant_id = tenant_id
+        binding.waba_id = waba_id
+        binding.display_phone_number = info.get("display_phone_number") if isinstance(info, dict) else None
+        binding.verify_token = binding.verify_token or _secrets.token_urlsafe(32)
+        binding.status = "pending" if skip_validation else "active"
+        binding.last_verified_at = None if skip_validation else _dt.now(_tz.utc)
+        binding.last_error = None
+        binding.updated_at = _dt.now(_tz.utc)
+
+        # Auto-subscribe (best-effort)
+        if not skip_validation and waba_id:
+            try:
+                from meta_graph_admin import subscribe_apps_to_waba
+                ok_sub, body_sub = subscribe_apps_to_waba(waba_id, access_token)
+                if ok_sub and (body_sub.get("success") is True or body_sub.get("data") is not None):
+                    binding.subscribed_at = _dt.now(_tz.utc)
+                    binding.subscribe_error = None
+                else:
+                    binding.subscribe_error = str(
+                        (body_sub.get("error") or {}).get("message") or "unknown"
+                    )[:500]
+            except Exception as exc:
+                binding.subscribe_error = str(exc)[:500]
+
+        db.commit()
+        db.refresh(binding)
+
+        # Audit
+        try:
+            db.add(models.AuditEvent(
+                tenant_id=tenant_id,
+                actor_user_id=None,
+                event_type="onboarding.whatsapp.bound",
+                target_type="phone_number_id",
+                target_id=phone_number_id,
+                payload={
+                    "waba_id": waba_id,
+                    "display_phone_number": binding.display_phone_number,
+                    "subscribed": binding.subscribed_at is not None,
+                },
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        # Cache invalidation
+        try:
+            from api.tenant_config import clear_cache as _clear_cfg
+            _clear_cfg(tenant_id)
+        except Exception:
+            pass
+        try:
+            from wa_tenant_resolver import invalidate_cache as _invalidate_resolver
+            _invalidate_resolver(phone_number_id)
+        except Exception:
+            pass
+
+        logger.info(
+            "[onboarding] whatsapp saved tenant=%s phone_id=%s subscribed=%s",
+            tenant_id, phone_number_id, binding.subscribed_at is not None,
+        )
+
+        # Webhook URL pra UI mostrar
+        import os
+        public_url = (os.getenv("PUBLIC_URL") or "").rstrip("/")
+        webhook_url = f"{public_url}/webhook" if public_url else "/webhook"
+
+        return {
+            "phone_number_id": binding.phone_number_id,
+            "verify_token": binding.verify_token,
+            "webhook_url": webhook_url,
+            "subscribed": binding.subscribed_at is not None,
+            "subscribe_error": binding.subscribe_error,
+            "display_phone_number": binding.display_phone_number,
+        }
+    finally:
+        db.close()
 
 
 # ─── Helpers DB ──────────────────────────────────────────────────────────────
@@ -370,20 +488,33 @@ def template_step():
 @login_required
 def whatsapp():
     data = request.get_json() if request.is_json else request.form
+    skip_validation = bool(data.get("skip_validation"))
     try:
-        save_whatsapp(
+        result = save_whatsapp(
             tenant_id=current_user.tenant_id,
             phone_number_id=data.get("phone_number_id", ""),
             waba_id=data.get("waba_id", ""),
             access_token=data.get("access_token", ""),
+            skip_validation=skip_validation,
         )
     except ValueError as exc:
         if request.is_json:
             return jsonify({"error": str(exc)}), 400
         flash(str(exc), "error")
         return render_template("onboarding/wizard.html", current_step=STEP_WHATSAPP), 400
-    
+
     if request.is_json:
-        return jsonify({"ok": True, "next_step": STEP_DONE})
+        return jsonify({
+            "ok": True,
+            "next_step": STEP_DONE,
+            "binding": result,
+            "instructions": [
+                "1. Va em developers.facebook.com -> seu app -> WhatsApp -> Configuracao",
+                f"2. Cole '{result['webhook_url']}' no Webhook callback URL",
+                f"3. Cole o verify_token: {result['verify_token']}",
+                "4. Em 'Webhook fields', assine ao menos: messages",
+                "5. Mande uma msg pro numero pra confirmar — vai aparecer aqui em segundos",
+            ],
+        })
     flash("Onboarding concluído! Tua cigana está pronta pra ser ativada.", "success")
     return redirect(url_for("saas_auth.signup_done"))

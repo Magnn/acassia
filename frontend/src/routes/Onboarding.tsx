@@ -2,17 +2,25 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
-import { 
-  Sparkles, 
-  ShoppingBag, 
-  Layout, 
-  MessageCircle, 
-  ChevronRight, 
+import {
+  Sparkles,
+  ShoppingBag,
+  Layout,
+  MessageCircle,
+  ChevronRight,
   CheckCircle2,
   Bot,
   ArrowRight,
   ShieldCheck,
-  Zap
+  Zap,
+  Copy,
+  ExternalLink,
+  Inbox,
+  Eye,
+  EyeOff,
+  Shield,
+  XCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   onboardingApi,
@@ -20,7 +28,9 @@ import {
   type PersonaDraft,
   type TemplateDraft,
   type WhatsAppDraft,
+  type WhatsAppStepResult,
 } from '../api/onboarding';
+import { integrationsApi } from '../api/integrations';
 import { toast } from '../lib/toast';
 import { track } from '../lib/analytics';
 
@@ -366,66 +376,318 @@ function TemplateStep({ onSave, isPending }: { onSave: (d: TemplateDraft) => voi
 
 function WhatsAppStep({ onSave, isPending }: { onSave: (d: WhatsAppDraft) => void, isPending: boolean }) {
   const [formData, setFormData] = useState({ phone_number_id: '', waba_id: '', access_token: '' });
+  const [showToken, setShowToken] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [savedBinding, setSavedBinding] = useState<WhatsAppStepResult | null>(null);
+
+  const testMut = useMutation({
+    mutationFn: () => integrationsApi.whatsapp.test({
+      access_token: formData.access_token.trim(),
+      phone_number_id: formData.phone_number_id.trim(),
+    }),
+    onSuccess: (res) => {
+      if (res.ok) {
+        setTestResult({
+          ok: true,
+          message: `OK — ${res.display_phone_number || ''} (${res.verified_name || 'sem nome'})`,
+        });
+      } else {
+        const err = (res.error as { message?: string } | undefined)?.message || 'desconhecido';
+        setTestResult({ ok: false, message: `Falhou: ${err}` });
+      }
+    },
+    onError: (e) => toast.error((e as Error).message || 'Erro ao testar'),
+  });
+
+  const handleSave = () => {
+    setSavedBinding(null);
+    onSave({
+      phone_number_id: formData.phone_number_id.trim(),
+      waba_id: formData.waba_id.trim(),
+      access_token: formData.access_token.trim(),
+    });
+  };
+
+  const valid = formData.phone_number_id.length >= 6 &&
+                formData.waba_id.length >= 6 &&
+                formData.access_token.length > 20;
+
+  // Recebe binding via custom event (simples) ou via callback no parent —
+  // como onSave é fire-and-forget via parent mutation, observamos via /saas/integrations
+  const { data: bindingStatus } = useQuery({
+    queryKey: ['onboarding-binding-status'],
+    queryFn: integrationsApi.whatsapp.status,
+    enabled: savedBinding !== null,
+    refetchInterval: 5_000,
+  });
+
+  // Quando salva com sucesso (parent chama onSave que retorna), capturamos
+  // o resultado fazendo nosso próprio call em paralelo com o save do parent.
+  // Para isso, fazemos save direto via integrations endpoint — mais robusto:
+  const saveMut = useMutation({
+    mutationFn: () => integrationsApi.whatsapp.save({
+      access_token: formData.access_token.trim(),
+      phone_number_id: formData.phone_number_id.trim(),
+      waba_id: formData.waba_id.trim() || undefined,
+    }),
+    onSuccess: (res) => {
+      setSavedBinding({
+        phone_number_id: res.binding.phone_number_id,
+        verify_token: res.verify_token,
+        webhook_url: res.webhook_url,
+        subscribed: res.binding.subscribed_at !== null,
+        subscribe_error: res.binding.subscribe_error,
+        display_phone_number: res.binding.display_phone_number,
+      });
+      // Também marca o step do onboarding como done
+      handleSave();
+      track('onboarding_whatsapp_bound', {
+        subscribed: res.binding.subscribed_at !== null,
+      });
+    },
+    onError: (e) => toast.error((e as Error).message || 'Erro ao conectar'),
+  });
+
+  const copy = (text: string, label = 'Copiado') => {
+    navigator.clipboard.writeText(text);
+    toast.success(label);
+  };
+
+  if (savedBinding) {
+    return (
+      <PostSaveSuccess
+        binding={savedBinding}
+        currentStatus={bindingStatus?.binding ?? null}
+        onCopy={copy}
+      />
+    );
+  }
 
   return (
     <div className="space-y-10">
       <div className="space-y-4">
         <h2 className="text-5xl font-black tracking-tighter leading-tight">Conecte sua conta <br/><span className="text-accent-amethyst">WhatsApp</span></h2>
-        <p className="text-lg text-secondary font-medium">Insira as credenciais da API da Meta para ativar o bot.</p>
+        <p className="text-lg text-secondary font-medium">
+          Cole as credenciais da Meta WhatsApp Cloud API. A gente valida na hora antes de salvar.
+        </p>
       </div>
 
       <div className="bg-amber-500/10 border border-amber-500/20 p-6 rounded-3xl flex gap-4">
-         <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-            <ShieldCheck className="w-6 h-6 text-amber-500" />
-         </div>
-         <p className="text-xs text-amber-600/90 leading-relaxed font-medium">
-            Seus dados de conexão são criptografados e nunca compartilhados. <br/>
-            Precisa de ajuda para encontrar essas chaves? <a href="#" className="underline font-bold">Veja o tutorial.</a>
-         </p>
+        <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+          <ShieldCheck className="w-6 h-6 text-amber-500" />
+        </div>
+        <div className="text-xs text-amber-600/90 leading-relaxed font-medium space-y-1">
+          <div>Token de acesso e app secret são criptografados por tenant.</div>
+          <a
+            href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 underline font-bold"
+          >
+            Tutorial Meta Cloud API
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
       </div>
 
-      <div className="space-y-8 bg-bg-surface p-10 rounded-[40px] border border-border shadow-premium">
+      <div className="space-y-6 bg-bg-surface p-10 rounded-[40px] border border-border shadow-premium">
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-3">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">Phone Number ID</label>
-            <input 
+            <input
               type="text"
               value={formData.phone_number_id}
               onChange={e => setFormData({ ...formData, phone_number_id: e.target.value })}
-              placeholder="Ex: 123456789"
-              className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-bold focus:border-accent-amethyst transition-all outline-none"
+              placeholder="Ex: 123456789012345"
+              className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-mono focus:border-accent-amethyst transition-all outline-none"
             />
           </div>
           <div className="space-y-3">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">WABA ID</label>
-            <input 
+            <input
               type="text"
               value={formData.waba_id}
               onChange={e => setFormData({ ...formData, waba_id: e.target.value })}
-              placeholder="Ex: 987654321"
-              className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-bold focus:border-accent-amethyst transition-all outline-none"
+              placeholder="Ex: 987654321098765"
+              className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-mono focus:border-accent-amethyst transition-all outline-none"
             />
           </div>
         </div>
 
         <div className="space-y-3">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">System Access Token (Meta)</label>
-          <textarea 
-            rows={4}
-            value={formData.access_token}
-            onChange={e => setFormData({ ...formData, access_token: e.target.value })}
-            placeholder="EAAB..."
-            className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-mono break-all focus:border-accent-amethyst transition-all outline-none resize-none"
-          />
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">
+            System User Access Token
+          </label>
+          <div className="relative">
+            <textarea
+              rows={3}
+              value={formData.access_token}
+              onChange={e => setFormData({ ...formData, access_token: e.target.value })}
+              placeholder="EAAB..."
+              className={`w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-mono break-all focus:border-accent-amethyst transition-all outline-none resize-none pr-12 ${showToken ? '' : 'text-transparent caret-primary'}`}
+              style={!showToken ? { WebkitTextSecurity: 'disc' as never, textSecurity: 'disc' as never } : undefined}
+            />
+            <button
+              type="button"
+              onClick={() => setShowToken(!showToken)}
+              className="absolute right-4 top-4 text-secondary hover:text-primary"
+            >
+              {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <div className="text-[10px] text-secondary">
+            System User permanente, com permissões whatsapp_business_messaging + whatsapp_business_management.
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            onClick={() => testMut.mutate()}
+            disabled={!valid || testMut.isPending}
+            className="px-5 py-3 bg-bg-primary border border-border hover:border-accent-amethyst/30 disabled:opacity-30 rounded-xl text-xs font-bold flex items-center gap-2"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            {testMut.isPending ? 'Testando…' : 'Testar credenciais'}
+          </button>
+          {testResult && (
+            <span className={`text-xs flex items-center gap-1 font-bold ${testResult.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {testResult.ok ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+              {testResult.message}
+            </span>
+          )}
         </div>
 
         <button
-          onClick={() => onSave(formData)}
-          disabled={isPending || !formData.phone_number_id || !formData.access_token}
-          className="w-full py-5 bg-accent-amethyst text-white rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-accent-amethyst/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 mt-4"
+          onClick={() => saveMut.mutate()}
+          disabled={!valid || saveMut.isPending || isPending}
+          className="w-full py-5 bg-accent-amethyst text-white rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-accent-amethyst/40 hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:scale-100 transition-all flex items-center justify-center gap-3"
         >
-          {isPending ? 'Finalizando...' : 'Concluir Configuração'}
+          {(saveMut.isPending || isPending) ? 'Conectando…' : 'Conectar WhatsApp'}
           <ArrowRight className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+function PostSaveSuccess({
+  binding, currentStatus, onCopy,
+}: {
+  binding: WhatsAppStepResult;
+  currentStatus: import('../api/integrations').WaBinding | null;
+  onCopy: (t: string, l?: string) => void;
+}) {
+  const navigate = useNavigate();
+  const inboundReceived = (currentStatus?.inbound_count ?? 0) > 0;
+
+  return (
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <h2 className="text-5xl font-black tracking-tighter leading-tight">
+          Quase lá. <br/>
+          <span className="text-accent-amethyst">Configure o webhook na Meta.</span>
+        </h2>
+        <p className="text-lg text-secondary font-medium">
+          Cole estes 2 valores no painel do app no developers.facebook.com → WhatsApp → Configuração:
+        </p>
+      </div>
+
+      <div className="grid gap-3">
+        <CopyRow
+          label="Webhook callback URL"
+          value={binding.webhook_url}
+          onCopy={() => onCopy(binding.webhook_url, 'URL copiada')}
+        />
+        <CopyRow
+          label="Verify Token"
+          value={binding.verify_token}
+          onCopy={() => onCopy(binding.verify_token, 'Token copiado')}
+        />
+      </div>
+
+      <div className="bg-bg-surface border border-border rounded-3xl p-6 space-y-3">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-secondary">
+          Passos no painel da Meta
+        </h3>
+        <ol className="text-xs text-primary space-y-1.5 list-decimal list-inside leading-relaxed">
+          <li>Abra <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-accent-amethyst underline">developers.facebook.com</a> → seu app → WhatsApp → Configuração.</li>
+          <li>Clique em <strong>Editar</strong> ao lado de "Webhook" e cole a URL e o Verify Token acima.</li>
+          <li>Em <strong>Webhook fields</strong>, assine ao menos: <code className="bg-bg-primary px-1 rounded">messages</code>.</li>
+          <li>Mande uma mensagem de qualquer celular para o número conectado pra confirmar.</li>
+        </ol>
+      </div>
+
+      <div
+        className={`rounded-2xl p-5 border ${
+          inboundReceived
+            ? 'bg-emerald-500/5 border-emerald-500/30'
+            : 'bg-amber-500/5 border-amber-500/30'
+        }`}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          {inboundReceived ? (
+            <Inbox className="w-5 h-5 text-emerald-400" />
+          ) : (
+            <Zap className="w-5 h-5 text-amber-300 animate-pulse" />
+          )}
+          <span className={`text-[10px] font-black uppercase tracking-widest ${inboundReceived ? 'text-emerald-400' : 'text-amber-300'}`}>
+            {inboundReceived ? 'Tudo conectado — primeira mensagem chegou' : 'Aguardando primeira mensagem'}
+          </span>
+        </div>
+        <p className="text-xs text-secondary leading-relaxed">
+          {inboundReceived
+            ? `Total recebido: ${currentStatus?.inbound_count}. Você já pode publicar seu fluxo no /blueprints.`
+            : 'Confirme o webhook na Meta acima — assim que chegar a primeira msg, você verá aqui em tempo real.'}
+        </p>
+        {!inboundReceived && binding.subscribe_error && (
+          <div className="mt-3 text-[11px] text-amber-300 flex items-start gap-1">
+            <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+            <span>Auto-subscribe falhou: {binding.subscribe_error}. Você pode rodar manualmente no /integrations depois.</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="flex-1 py-4 bg-bg-primary border-2 border-border hover:border-accent-amethyst/30 rounded-2xl text-xs font-black uppercase tracking-widest"
+        >
+          Pular pro dashboard
+        </button>
+        <button
+          onClick={() => navigate('/integrations')}
+          className="flex-1 py-4 bg-accent-amethyst text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          Ver detalhes em Integrações
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+function CopyRow({
+  label, value, onCopy,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="bg-bg-primary border border-border rounded-2xl p-4">
+      <div className="text-[10px] font-black uppercase tracking-widest text-secondary mb-1.5">
+        {label}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <code className="font-mono text-xs break-all flex-1">{value}</code>
+        <button
+          onClick={onCopy}
+          className="px-3 py-1.5 bg-bg-surface border border-border hover:border-accent-amethyst/30 rounded-lg text-[11px] font-bold flex items-center gap-1.5 flex-shrink-0"
+        >
+          <Copy className="w-3 h-3" />
+          Copiar
         </button>
       </div>
     </div>

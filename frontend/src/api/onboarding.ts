@@ -22,6 +22,16 @@ export interface WhatsAppDraft {
   phone_number_id: string;
   waba_id: string;
   access_token: string;
+  skip_validation?: boolean;
+}
+
+export interface WhatsAppStepResult {
+  phone_number_id: string;
+  verify_token: string;
+  webhook_url: string;
+  subscribed: boolean;
+  subscribe_error: string | null;
+  display_phone_number: string | null;
 }
 
 interface StepResponse {
@@ -29,6 +39,8 @@ interface StepResponse {
   next_step: 'persona' | 'oferta' | 'template' | 'whatsapp' | 'done';
   current_step?: string;
   error?: string;
+  binding?: WhatsAppStepResult;
+  instructions?: string[];
 }
 
 export const onboardingApi = {
