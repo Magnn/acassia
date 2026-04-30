@@ -106,5 +106,36 @@ export const integrationsApi = {
         error?: string;
         graph_error?: { message?: string; code?: number };
       }>('/saas/integrations/whatsapp/test-send', payload),
+
+    inboundStats: () =>
+      api.get<{
+        binding_status: string;
+        inbound_count_total: number;
+        first_inbound_at: string | null;
+        last_inbound_at: string | null;
+        rate_limiter: {
+          tokens_remaining: number;
+          burst_capacity: number;
+          rate_per_min: number;
+        };
+        events_last_24h: Record<string, number>;
+      }>('/saas/integrations/whatsapp/inbound-stats'),
+
+    inboundLogs: (params: { limit?: number; event_type?: string } = {}) => {
+      const q = new URLSearchParams();
+      if (params.limit) q.set('limit', String(params.limit));
+      if (params.event_type) q.set('event_type', params.event_type);
+      const qs = q.toString();
+      return api.get<{
+        logs: {
+          id: number;
+          event_type: string;
+          message: string | null;
+          phone_number_id: string | null;
+          tenant_id: string | null;
+          created_at: string;
+        }[];
+      }>(`/saas/integrations/whatsapp/inbound-logs${qs ? '?' + qs : ''}`);
+    },
   },
 };

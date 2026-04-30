@@ -4043,6 +4043,15 @@ def webhook_meta():
         mac = hmac.new(secret_to_use.encode(), corpo_raw, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(f"sha256={mac}", assinatura):
             logger.warning("🚫 [SECURITY] Assinatura inválida detectada.")
+            try:
+                _log_wa_inbound(
+                    event_type="hmac_invalid",
+                    phone_number_id=None,
+                    tenant_id=None,
+                    message="Assinatura HMAC nao bate (possivel ataque ou config errada)",
+                )
+            except Exception:
+                pass
             return "Invalid Signature", 403
 
     data = data_preview if data_preview else request.get_json(silent=True)
@@ -4060,6 +4069,34 @@ def webhook_meta():
     if not enqueued:
         threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()
     return "EVENT_RECEIVED", 200
+
+def _log_wa_inbound(
+    *,
+    event_type: str,
+    phone_number_id: str | None,
+    tenant_id: str | None,
+    message: str | None = None,
+    payload_excerpt: str | None = None,
+) -> None:
+    """Persiste evento no WaInboundLog. Best-effort — falha aqui nao propaga."""
+    try:
+        from db.database import SessionLocal as _SS
+        from db import models as _models
+        _db = _SS()
+        try:
+            _db.add(_models.WaInboundLog(
+                tenant_id=tenant_id,
+                phone_number_id=phone_number_id,
+                event_type=event_type,
+                message=(message or "")[:2000] or None,
+                payload_excerpt=(payload_excerpt or "")[:2000] or None,
+            ))
+            _db.commit()
+        finally:
+            _db.close()
+    except Exception as exc:
+        logger.warning("⚠️ [TRIAGEM] log_wa_inbound falhou: %s", exc)
+
 
 def _triagem_meta(data):
     """Extrai informações do JSON da Meta e gerencia Idempotência."""
@@ -4080,6 +4117,25 @@ def _triagem_meta(data):
             logger.warning("⚠️ [TRIAGEM] resolver tenant falhou: %s", _resolve_exc)
             resolved_tenant = None
 
+        # Rate limit per phone_number_id (Frente 1 — anti-flood)
+        if phone_number_id:
+            try:
+                from wa_rate_limiter import allow_inbound
+                if not allow_inbound(phone_number_id):
+                    logger.warning(
+                        "⚠️ [RATE-LIMIT] inbound dropado tenant=%s phone_id=%s",
+                        resolved_tenant, phone_number_id,
+                    )
+                    _log_wa_inbound(
+                        event_type="rate_limited",
+                        phone_number_id=phone_number_id,
+                        tenant_id=resolved_tenant,
+                        message=f"Rate limit excedido para phone_id={phone_number_id}",
+                    )
+                    return
+            except Exception as _rl_exc:
+                logger.warning("⚠️ [RATE-LIMIT] check falhou (fail open): %s", _rl_exc)
+
         # Telemetria inbound: first_inbound_at / last_inbound_at / inbound_count
         # Best-effort — falha aqui nao deve interromper o pipeline de mensagem.
         if phone_number_id:
@@ -4092,6 +4148,14 @@ def _triagem_meta(data):
                     _binding = _db_t.query(_models.WaPhoneTenantBinding).filter_by(
                         phone_number_id=phone_number_id,
                     ).first()
+                    if _binding is None:
+                        # Phone desconhecido → loga e continua processamento no tenant default
+                        _log_wa_inbound(
+                            event_type="tenant_resolve_miss",
+                            phone_number_id=phone_number_id,
+                            tenant_id=None,
+                            message=f"phone_id={phone_number_id} sem binding — caindo em {resolved_tenant}",
+                        )
                     if _binding is not None:
                         _now_t = _dt.now(_tz.utc)
                         _is_first = _binding.first_inbound_at is None
@@ -4246,6 +4310,28 @@ def _triagem_meta(data):
 
     except Exception as e:
         logger.error(f"🚨 [TRIAGEM] Erro crítico na extração: {e}", exc_info=True)
+        try:
+            # Tenta extrair phone_id do payload pra contextualizar o erro
+            _pid = ""
+            _tid = None
+            try:
+                from wa_tenant_resolver import (
+                    extract_phone_number_id_from_payload,
+                    resolve_tenant_for_phone_id,
+                )
+                _pid = extract_phone_number_id_from_payload(data) or ""
+                _tid = resolve_tenant_for_phone_id(_pid) if _pid else None
+            except Exception:
+                pass
+            _log_wa_inbound(
+                event_type="error",
+                phone_number_id=_pid or None,
+                tenant_id=_tid,
+                message=str(e)[:500],
+                payload_excerpt=str(data)[:1000] if data else None,
+            )
+        except Exception:
+            pass
 
 
 def _bootstrap_redis_inbound_consumer():

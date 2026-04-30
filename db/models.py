@@ -1208,6 +1208,31 @@ class WaPhoneTenantBinding(Base):
     )
 
 
+class WaInboundLog(Base):
+    """
+    Log lightweight de eventos do webhook inbound (Frente 1 — observabilidade).
+
+    Persistido apenas em casos relevantes:
+        - rate_limited     (msg dropada por excesso de inbound)
+        - tenant_resolve_miss (phone_id desconhecido)
+        - hmac_invalid     (assinatura rejeitada)
+        - error            (excecao no _triagem_meta)
+        - first_inbound    (1a msg de um phone_id)
+
+    Nao logamos every-msg por questoes de espaco. Sucessos sao contados
+    em WaPhoneTenantBinding.inbound_count.
+    """
+    __tablename__ = "wa_inbound_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=True, index=True)
+    phone_number_id = Column(String(64), nullable=True, index=True)
+    event_type = Column(String(40), nullable=False, index=True)
+    message = Column(Text, nullable=True)
+    payload_excerpt = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False, index=True)
+
+
 class SpiritualDate(Base):
     """
     Datas espirituais/ritos (Frente 4.22).

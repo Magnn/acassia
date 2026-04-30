@@ -526,6 +526,103 @@ def test_send():
         db.close()
 
 
+@integrations_wa_bp.route("/inbound-stats", methods=["GET"])
+@login_required
+def inbound_stats():
+    """
+    Retorna estatisticas observabilidade pro tenant:
+        - rate_now (tokens restantes no bucket)
+        - rate_per_min / burst (config)
+        - bins_per_hour: contagem de inbound por intervalo (ultima hora)
+        - errors_last_24h: contagem por event_type
+    """
+    from datetime import timedelta
+    from sqlalchemy import func
+
+    db = SessionLocal()
+    try:
+        binding = db.query(models.WaPhoneTenantBinding).filter_by(
+            tenant_id=current_user.tenant_id,
+        ).first()
+        if not binding:
+            return jsonify({"error": "no_binding"}), 404
+
+        rate_now = 0
+        rate_per_min = 120
+        burst = 30
+        try:
+            from wa_rate_limiter import remaining, RATE_PER_MIN, BURST
+            rate_now = remaining(binding.phone_number_id)
+            rate_per_min = RATE_PER_MIN
+            burst = BURST
+        except Exception:
+            pass
+
+        cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+        rows = db.query(
+            models.WaInboundLog.event_type,
+            func.count(models.WaInboundLog.id),
+        ).filter(
+            models.WaInboundLog.phone_number_id == binding.phone_number_id,
+            models.WaInboundLog.created_at >= cutoff_24h,
+        ).group_by(models.WaInboundLog.event_type).all()
+        events_by_type = {evt: int(n) for evt, n in rows}
+
+        return jsonify({
+            "binding_status": binding.status,
+            "inbound_count_total": binding.inbound_count or 0,
+            "first_inbound_at": binding.first_inbound_at.isoformat() if binding.first_inbound_at else None,
+            "last_inbound_at": binding.last_inbound_at.isoformat() if binding.last_inbound_at else None,
+            "rate_limiter": {
+                "tokens_remaining": rate_now,
+                "burst_capacity": burst,
+                "rate_per_min": rate_per_min,
+            },
+            "events_last_24h": events_by_type,
+        })
+    finally:
+        db.close()
+
+
+@integrations_wa_bp.route("/inbound-logs", methods=["GET"])
+@login_required
+def inbound_logs():
+    """Ultimos logs do webhook pro tenant (eventos relevantes — nao every-msg)."""
+    limit = max(1, min(int(request.args.get("limit") or 50), 200))
+    event_filter = (request.args.get("event_type") or "").strip().lower() or None
+
+    db = SessionLocal()
+    try:
+        binding = db.query(models.WaPhoneTenantBinding).filter_by(
+            tenant_id=current_user.tenant_id,
+        ).first()
+
+        q = db.query(models.WaInboundLog)
+        if binding:
+            q = q.filter(models.WaInboundLog.phone_number_id == binding.phone_number_id)
+        else:
+            q = q.filter(models.WaInboundLog.tenant_id == current_user.tenant_id)
+        if event_filter:
+            q = q.filter(models.WaInboundLog.event_type == event_filter)
+
+        rows = q.order_by(models.WaInboundLog.created_at.desc()).limit(limit).all()
+        return jsonify({
+            "logs": [
+                {
+                    "id": r.id,
+                    "event_type": r.event_type,
+                    "message": r.message,
+                    "phone_number_id": r.phone_number_id,
+                    "tenant_id": r.tenant_id,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+                for r in rows
+            ],
+        })
+    finally:
+        db.close()
+
+
 @integrations_wa_bp.route("/rotate-verify-token", methods=["POST"])
 @login_required
 def rotate_verify_token():

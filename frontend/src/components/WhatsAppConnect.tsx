@@ -165,6 +165,7 @@ export default function WhatsAppConnect() {
             subscribing={subscribeMut.isPending}
           />
           <InboundTelemetry binding={binding} />
+          <ObservabilityPanel />
           <TestSendForm />
         </>
       ) : !editing && !binding ? (
@@ -395,6 +396,119 @@ function InboundTelemetry({
           Mande uma msg do seu celular para o número conectado pra confirmar
           o webhook. Costuma chegar em 1-2 segundos.
         </p>
+      )}
+    </div>
+  );
+}
+
+
+function ObservabilityPanel() {
+  const statsQ = useQuery({
+    queryKey: ['wa-inbound-stats'],
+    queryFn: integrationsApi.whatsapp.inboundStats,
+    refetchInterval: 15_000,
+  });
+  const logsQ = useQuery({
+    queryKey: ['wa-inbound-logs'],
+    queryFn: () => integrationsApi.whatsapp.inboundLogs({ limit: 30 }),
+    refetchInterval: 30_000,
+  });
+
+  const stats = statsQ.data;
+  const logs = logsQ.data?.logs ?? [];
+
+  if (!stats) {
+    return null;
+  }
+
+  const events = stats.events_last_24h || {};
+  const errorEvents = ['error', 'rate_limited', 'hmac_invalid', 'tenant_resolve_miss'].filter(
+    (k) => (events[k] || 0) > 0,
+  );
+  const hasErrors = errorEvents.length > 0;
+
+  const eventColor: Record<string, string> = {
+    rate_limited: 'text-amber-300',
+    hmac_invalid: 'text-rose-400',
+    tenant_resolve_miss: 'text-amber-300',
+    error: 'text-rose-400',
+    first_inbound: 'text-emerald-400',
+  };
+
+  return (
+    <div className="bg-bg-primary border border-border rounded-2xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+          <Activity className="w-3 h-3 text-accent-amethyst" />
+          Observabilidade do webhook
+        </h4>
+        {hasErrors && (
+          <span className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            {errorEvents.length} tipo{errorEvents.length === 1 ? '' : 's'} de evento nas últimas 24h
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 text-[11px]">
+        <div className="bg-bg-surface border border-border rounded-lg p-2">
+          <div className="text-[9px] uppercase tracking-widest text-secondary">Rate atual</div>
+          <div className="text-xs font-black tabular-nums mt-0.5">
+            {stats.rate_limiter.tokens_remaining}/{stats.rate_limiter.burst_capacity}
+          </div>
+          <div className="text-[9px] text-secondary mt-0.5">
+            {stats.rate_limiter.rate_per_min}/min
+          </div>
+        </div>
+        <div className="bg-bg-surface border border-border rounded-lg p-2">
+          <div className="text-[9px] uppercase tracking-widest text-secondary">Inbound 24h</div>
+          <div className="text-xs font-black tabular-nums mt-0.5">
+            {Object.values(events).reduce((a, b) => a + b, 0)}
+          </div>
+          <div className="text-[9px] text-secondary mt-0.5">eventos logados</div>
+        </div>
+        <div className="bg-bg-surface border border-border rounded-lg p-2">
+          <div className="text-[9px] uppercase tracking-widest text-secondary">Total inbound</div>
+          <div className="text-xs font-black tabular-nums mt-0.5">
+            {stats.inbound_count_total}
+          </div>
+          <div className="text-[9px] text-secondary mt-0.5">desde a conexão</div>
+        </div>
+      </div>
+
+      {hasErrors && (
+        <div className="space-y-1">
+          {errorEvents.map((evt) => (
+            <div key={evt} className={`text-[11px] font-bold ${eventColor[evt] || 'text-secondary'}`}>
+              {evt}: {events[evt]}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {logs.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer text-[10px] text-secondary hover:text-primary uppercase tracking-widest font-bold list-none flex items-center gap-1">
+            <span className="group-open:rotate-90 transition-transform">▸</span>
+            Eventos recentes ({logs.length})
+          </summary>
+          <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+            {logs.map((log) => (
+              <div
+                key={log.id}
+                className="bg-bg-surface border border-border rounded p-1.5 text-[10px] flex items-start gap-2"
+              >
+                <span className={`font-bold uppercase tracking-widest ${eventColor[log.event_type] || 'text-secondary'} flex-shrink-0`}>
+                  {log.event_type}
+                </span>
+                <span className="text-secondary truncate flex-1">{log.message || ''}</span>
+                <span className="text-secondary text-[9px] flex-shrink-0">
+                  {new Date(log.created_at).toLocaleTimeString('pt-BR')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </div>
   );
