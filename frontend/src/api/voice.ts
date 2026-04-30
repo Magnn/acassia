@@ -75,4 +75,29 @@ export const voiceApi = {
       audio_url: string;
       chars_count: number;
     }>('/saas/voice/send-to-lead', params),
+
+  sendRecordedToLead: async (form: FormData) => {
+    const res = await fetch('/saas/voice/send-recorded-to-lead', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+      body: form,
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok) {
+      const err = new Error(`POST send-recorded → ${res.status}`) as Error & {
+        status?: number;
+        body?: unknown;
+      };
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data as {
+      ok: boolean;
+      audio_url: string;
+      size_bytes: number;
+    };
+  },
 };

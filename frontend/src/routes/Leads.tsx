@@ -16,6 +16,8 @@ import {
   StretchHorizontal,
   Flame,
   Snowflake,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { inboxApi } from '../api/inbox';
 import { composeApi } from '../api/compose';
@@ -25,6 +27,7 @@ import LeadContextPanel from '../components/LeadContextPanel';
 import ComposeToolbar from '../components/ComposeToolbar';
 import QuickReplyManager from '../components/QuickReplyManager';
 import AudioComposeModal from '../components/AudioComposeModal';
+import VoiceOnlyCompose from '../components/VoiceOnlyCompose';
 
 type ViewMode = 'chat' | 'table';
 type ScoreFilter = null | 'hot' | 'warm' | 'cold';
@@ -37,6 +40,7 @@ const SPIRITUAL_EMOJI: Record<string, string> = {
 };
 
 const DENSITY_KEY = 'acassia.inbox.density';
+const VOICE_ONLY_KEY = 'acassia.inbox.voice_only';
 
 function DeliveryStatus({ status }: { status: string | null | undefined }) {
   if (!status) return <Clock className="w-2.5 h-2.5" />;
@@ -108,6 +112,14 @@ export default function Leads() {
   });
   const [showQuickReplyManager, setShowQuickReplyManager] = useState(false);
   const [showAudioCompose, setShowAudioCompose] = useState(false);
+  const [voiceOnlyMode, setVoiceOnlyMode] = useState<boolean>(() => {
+    return localStorage.getItem(VOICE_ONLY_KEY) === '1';
+  });
+  const lastReadMsgIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(VOICE_ONLY_KEY, voiceOnlyMode ? '1' : '0');
+  }, [voiceOnlyMode]);
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -164,6 +176,30 @@ export default function Leads() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationData?.messages]);
+
+  // Voice-only mode: auto-play TTS de novas msgs do lead via SpeechSynthesis
+  useEffect(() => {
+    if (!voiceOnlyMode) return;
+    const messages = conversationData?.messages || [];
+    if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastReadMsgIdRef.current === lastMsg.id) return;
+    if (lastMsg.origem !== 'lead') {
+      lastReadMsgIdRef.current = lastMsg.id;
+      return;
+    }
+    if (!('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(lastMsg.texto || '');
+      utter.lang = 'pt-BR';
+      utter.rate = 0.95;
+      window.speechSynthesis.speak(utter);
+      lastReadMsgIdRef.current = lastMsg.id;
+    } catch {
+      // ignora
+    }
+  }, [voiceOnlyMode, conversationData?.messages]);
 
   const leads = useMemo(() =>
     (leadsData?.items || []).filter(l =>
@@ -624,6 +660,17 @@ export default function Leads() {
                         {selectedLead?.bot_pausado ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
                         {selectedLead?.bot_pausado ? 'Liberar Robô' : 'Assumir Controle'}
                       </button>
+                      <button
+                        onClick={() => setVoiceOnlyMode(v => !v)}
+                        title={voiceOnlyMode ? 'Sair do modo áudio' : 'Modo áudio (sem texto)'}
+                        className={`p-2.5 rounded-2xl border transition-all ${
+                          voiceOnlyMode
+                            ? 'bg-accent-amethyst text-white border-accent-amethyst shadow-lg shadow-accent-amethyst/30'
+                            : 'border-border bg-bg-surface hover:bg-bg-primary text-secondary'
+                        }`}
+                      >
+                        {voiceOnlyMode ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                      </button>
                       <button className="p-2.5 rounded-2xl border border-border bg-bg-surface hover:bg-bg-primary text-secondary transition-all">
                          <MoreVertical className="w-5 h-5" />
                       </button>
@@ -670,6 +717,15 @@ export default function Leads() {
                 </div>
 
                 {/* Input Unificado */}
+                {voiceOnlyMode ? (
+                  <VoiceOnlyCompose
+                    leadId={selectedLeadId}
+                    onSent={() => {
+                      queryClient.invalidateQueries({ queryKey: ['leads-conversation', selectedLeadId] });
+                      queryClient.invalidateQueries({ queryKey: ['leads-list'] });
+                    }}
+                  />
+                ) : (
                 <div className="bg-bg-surface/80 backdrop-blur-xl border-t border-border p-6 flex-shrink-0 z-10">
                    <div className="max-w-5xl mx-auto">
                      <div className="relative">
@@ -726,7 +782,7 @@ export default function Leads() {
                         ↻ Reprocessar Última
                       </button>
                       <div className="w-1 h-1 rounded-full bg-border" />
-                      <button 
+                      <button
                         onClick={() => inboxApi.resendCurrentBlock(selectedLeadId!).then(() => queryClient.invalidateQueries({ queryKey: ['leads-conversation', selectedLeadId] }))}
                         className="text-[9px] font-black uppercase tracking-widest hover:text-accent-amethyst transition-colors"
                       >
@@ -734,6 +790,7 @@ export default function Leads() {
                       </button>
                    </div>
                 </div>
+                )}
               </>
             )}
           </div>

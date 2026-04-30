@@ -551,6 +551,104 @@ def send_audio_to_lead():
         db.close()
 
 
+@voice_bp.route("/send-recorded-to-lead", methods=["POST"])
+@login_required
+@limiter.limit("60/hour")
+def send_recorded_to_lead():
+    """
+    Recebe gravacao de audio inline (multipart 'audio' + form 'lead_id') e
+    envia direto pro lead via WhatsApp (Frente 4.30 — voice-only mode).
+
+    NAO faz TTS — apenas reupload do que o atendente gravou. O usuario
+    fala diretamente, sem texto.
+    """
+    lead_id = request.form.get("lead_id")
+    audio_file = request.files.get("audio")
+
+    if not lead_id:
+        return jsonify({"error": "lead_id_required"}), 422
+    if not audio_file:
+        return jsonify({"error": "audio_required"}), 422
+
+    audio_bytes = audio_file.read()
+    if len(audio_bytes) < 5_000:
+        return jsonify({"error": "audio_too_short"}), 422
+    if len(audio_bytes) > 25_000_000:
+        return jsonify({"error": "audio_too_large"}), 422
+
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(
+            id=int(lead_id), tenant_id=current_user.tenant_id,
+        ).first()
+        if not lead:
+            return jsonify({"error": "lead_not_found"}), 404
+
+        # Persist audio file localmente
+        ext = (audio_file.filename or "").rsplit(".", 1)[-1].lower() or "webm"
+        if ext not in ("mp3", "ogg", "m4a", "webm", "wav"):
+            ext = "webm"
+        file_id = secrets.token_hex(8)
+        filename = f"{current_user.tenant_id}_rec_{file_id}.{ext}"
+        filepath = os.path.join(_AUDIO_DIR, filename)
+        with open(filepath, "wb") as f:
+            f.write(audio_bytes)
+
+        # URL absoluta — Meta requer HTTPS publica
+        public_base = (os.getenv("PUBLIC_URL") or "").rstrip("/")
+        if not public_base:
+            return jsonify({
+                "error": "public_url_not_configured",
+                "audio_url_local": f"/saas/voice/audio/{file_id}",
+            }), 503
+        absolute_url = f"{public_base}/saas/voice/audio/{file_id}"
+
+        # Envia via WhatsApp
+        try:
+            from api.whatsapp_api import whatsapp_client
+            ok = whatsapp_client.enviar_mensagem(
+                lead.telefone, absolute_url, formato="audio",
+            )
+        except Exception as exc:
+            logger.exception("[voice.send_recorded] envio falhou")
+            return jsonify({"error": "send_failed", "message": str(exc)[:200]}), 502
+        if not ok:
+            return jsonify({"error": "send_returned_false"}), 502
+
+        # Persist Mensagem + audit
+        try:
+            db.add(models.Mensagem(
+                lead_id=lead.id,
+                remetente="bot",
+                texto="[áudio gravado pelo atendente]",
+                tipo="audio",
+                media_url=absolute_url,
+            ))
+            db.add(models.AuditEvent(
+                tenant_id=current_user.tenant_id,
+                actor_user_id=current_user.id,
+                event_type="voice.recorded.sent",
+                target_type="lead",
+                target_id=str(lead.id),
+                payload={
+                    "file_id": file_id,
+                    "size_bytes": len(audio_bytes),
+                    "mime": audio_file.mimetype,
+                },
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        return jsonify({
+            "ok": True,
+            "audio_url": absolute_url,
+            "size_bytes": len(audio_bytes),
+        })
+    finally:
+        db.close()
+
+
 @voice_bp.route("/audio/<file_id>", methods=["GET"])
 @login_required
 def serve_audio(file_id: str):
