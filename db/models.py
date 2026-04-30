@@ -1267,6 +1267,25 @@ class WaInboundLog(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False, index=True)
 
 
+class SpiritualGlossaryTerm(Base):
+    """
+    Glossario espiritual injetado no system prompt do GPT (Frente 4.21).
+
+    Reduz alucinacao de termos: "egum" != "agua", "Pomba-gira" != generico.
+    Tabela suporta termos globais (tenant_id null) + custom por tenant.
+    """
+    __tablename__ = "spiritual_glossary"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=True, index=True)  # null = global
+    term = Column(String(100), nullable=False, index=True)
+    definition = Column(Text, nullable=False)
+    category = Column(String(40), nullable=True)  # afro|crista|astrologia|tarot|geral
+    usage_examples = Column(JSON, nullable=True)  # [{example, context}]
+    importance = Column(Integer, default=5, nullable=False)  # 1-10, ordena no prompt
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class SpiritualDate(Base):
     """
     Datas espirituais/ritos (Frente 4.22).

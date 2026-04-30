@@ -273,6 +273,7 @@ def _register_saas_blueprints():
     from api.saas.audio_library import audio_lib_bp as saas_audio_lib_bp
     from api.saas.daily_message import daily_msg_bp as saas_daily_msg_bp
     from api.saas.scheduled_tarot import sched_bp as saas_sched_tarot_bp
+    from api.saas.persona_api import persona_bp as saas_persona_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -314,6 +315,7 @@ def _register_saas_blueprints():
         saas_audio_lib_bp,
         saas_daily_msg_bp,
         saas_sched_tarot_bp,
+        saas_persona_bp,
     ):
         app.register_blueprint(bp)
 
