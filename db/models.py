@@ -1306,6 +1306,37 @@ class LeadAuraImage(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class DailyPersonalMessage(Base):
+    """
+    Mensagem do dia personalizada por lead (Frente 4.27).
+
+    Diferente de DailyHoroscope (per-signo, compartilhada), esta e unica
+    por lead e gera uma vez por dia via Gemini com contexto rico
+    (signo + lua + intencao + nome).
+
+    Idempotente: (tenant_id, lead_id, date) e unique.
+    """
+    __tablename__ = "daily_personal_messages"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "lead_id", "date",
+            name="uq_dpm_tenant_lead_date",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    text = Column(Text, nullable=False)
+    source = Column(String(40), nullable=False)  # gemini|fallback|manual
+    status = Column(String(20), default="generated", nullable=False)  # generated|sent|failed
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    error_message = Column(Text, nullable=True)
+    chars_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class HoroscopeDelivery(Base):
     """
     Log de envios diarios de horoscopo (idempotencia + analytics).

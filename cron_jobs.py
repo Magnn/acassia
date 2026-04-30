@@ -353,7 +353,21 @@ def run_hourly():
     hourly_apply_pending_downgrades()
     hourly_fire_lunar_triggers()
     hourly_dispatch_daily_horoscopes()
+    hourly_dispatch_daily_personal_messages()
     logger.info("[cron] hourly done")
+
+
+def hourly_dispatch_daily_personal_messages():
+    """Mensagem do dia personalizada por lead (Frente 4.27)."""
+    try:
+        import daily_personal_message as dpm
+        n = dpm.hourly_dispatch_due_tenants()
+        if n:
+            logger.info(
+                "[cron.hourly_dispatch_daily_personal_messages] tenants_processed=%d", n,
+            )
+    except Exception as exc:
+        logger.warning("[cron.daily_personal_message] falha: %s", exc)
 
 
 def hourly_dispatch_daily_horoscopes():
