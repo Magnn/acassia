@@ -96,6 +96,44 @@ def resolve_tenant_for_verify_token(verify_token: str | None) -> tuple[str, str]
     return None
 
 
+_PATH_TO_BINDING: dict[str, tuple[float, dict]] = {}
+
+
+def resolve_binding_by_webhook_path(webhook_path: str | None) -> dict | None:
+    """
+    Resolve binding pelo webhook_path (per-tenant URL). Cache 60s.
+
+    Retorna dict {tenant_id, phone_number_id, verify_token, app_secret}
+    ou None se nao encontrar.
+    """
+    if not webhook_path:
+        return None
+    path = str(webhook_path).strip()
+    cached = _PATH_TO_BINDING.get(path)
+    if cached and cached[0] > _now():
+        return cached[1]
+
+    db = SessionLocal()
+    try:
+        row = db.query(models.WaPhoneTenantBinding).filter_by(
+            webhook_path=path,
+        ).first()
+        if row:
+            payload = {
+                "tenant_id": row.tenant_id,
+                "phone_number_id": row.phone_number_id,
+                "verify_token": row.verify_token,
+                "app_secret": row.app_secret,
+            }
+            _PATH_TO_BINDING[path] = (_now() + _CACHE_TTL, payload)
+            return payload
+    except Exception as exc:
+        logger.warning("[wa_tenant_resolver] webhook_path lookup falhou: %s", exc)
+    finally:
+        db.close()
+    return None
+
+
 def get_app_secret_for_phone_id(phone_number_id: str | None) -> str | None:
     """Retorna app_secret do binding (ou None se nao houver — usar global)."""
     if not phone_number_id:
@@ -116,8 +154,16 @@ def invalidate_cache(phone_number_id: Optional[str] = None) -> None:
     if phone_number_id is None:
         _PHONE_TO_TENANT.clear()
         _VERIFY_TOKEN_TO_PHONE.clear()
+        _PATH_TO_BINDING.clear()
         return
     _PHONE_TO_TENANT.pop(str(phone_number_id).strip(), None)
+
+
+def invalidate_webhook_path_cache(webhook_path: str | None = None) -> None:
+    if webhook_path is None:
+        _PATH_TO_BINDING.clear()
+    else:
+        _PATH_TO_BINDING.pop(str(webhook_path).strip(), None)
 
 
 def _legacy_default() -> str:

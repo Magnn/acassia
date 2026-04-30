@@ -110,6 +110,23 @@ export default function WhatsAppConnect() {
     onError: handleApiError('Erro ao subscrever'),
   });
 
+  const rotatePathMut = useMutation({
+    mutationFn: () => integrationsApi.whatsapp.rotateWebhookPath(),
+    onSuccess: (res) => {
+      toast.success('URL rotacionada — atualize na Meta');
+      setLastSaved({
+        verify_token: binding?.verify_token ? '(token mantido)' : '',
+        webhook_url: res.webhook_url,
+        instructions: [
+          'A URL antiga foi invalidada — substitua pela nova no painel da Meta.',
+          'A URL global /webhook continua aceitando msgs até você atualizar.',
+        ],
+      });
+      qc.invalidateQueries({ queryKey: ['integrations-whatsapp'] });
+    },
+    onError: handleApiError('Erro ao rotacionar'),
+  });
+
   const copy = (text: string, label = 'Copiado') => {
     navigator.clipboard.writeText(text);
     toast.success(label);
@@ -157,12 +174,15 @@ export default function WhatsAppConnect() {
           <BindingView
             binding={binding}
             webhookUrl={data!.webhook_url}
+            webhookUrlGlobal={data!.webhook_url_global}
             onEdit={() => setEditing(true)}
             onCopy={copy}
             onRotate={() => rotateMut.mutate()}
             rotating={rotateMut.isPending}
             onSubscribe={() => subscribeMut.mutate()}
             subscribing={subscribeMut.isPending}
+            onRotatePath={() => rotatePathMut.mutate()}
+            rotatingPath={rotatePathMut.isPending}
           />
           <InboundTelemetry binding={binding} />
           <ObservabilityPanel />
@@ -229,17 +249,20 @@ function EmptyState({ onStart, webhookUrl }: { onStart: () => void; webhookUrl: 
 }
 
 function BindingView({
-  binding, webhookUrl, onEdit, onCopy, onRotate, rotating,
-  onSubscribe, subscribing,
+  binding, webhookUrl, webhookUrlGlobal, onEdit, onCopy, onRotate, rotating,
+  onSubscribe, subscribing, onRotatePath, rotatingPath,
 }: {
   binding: import('../api/integrations').WaBinding;
   webhookUrl: string;
+  webhookUrlGlobal?: string;
   onEdit: () => void;
   onCopy: (text: string, label?: string) => void;
   onRotate: () => void;
   rotating: boolean;
   onSubscribe: () => void;
   subscribing: boolean;
+  onRotatePath: () => void;
+  rotatingPath: boolean;
 }) {
   const statusColor = {
     active: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
@@ -269,7 +292,15 @@ function BindingView({
       {binding.waba_id && (
         <Row label="waba_id" value={binding.waba_id} onCopy={onCopy} mono />
       )}
-      <Row label="Webhook URL" value={webhookUrl} onCopy={onCopy} mono />
+      <Row
+        label={binding.webhook_path ? 'Webhook URL (per-tenant)' : 'Webhook URL'}
+        value={webhookUrl}
+        onCopy={onCopy}
+        mono
+      />
+      {binding.webhook_path && webhookUrlGlobal && webhookUrlGlobal !== webhookUrl && (
+        <Row label="Webhook URL global (fallback)" value={webhookUrlGlobal} onCopy={onCopy} mono />
+      )}
 
       <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
         <div className="text-secondary">
@@ -337,6 +368,17 @@ function BindingView({
           <RefreshCw className={`w-3 h-3 ${rotating ? 'animate-spin' : ''}`} />
           Rotacionar verify_token
         </button>
+        {binding.webhook_path && (
+          <button
+            onClick={onRotatePath}
+            disabled={rotatingPath}
+            className="px-3 py-1.5 bg-bg-surface border border-border hover:border-accent-amethyst/30 rounded-lg text-[11px] font-bold flex items-center gap-1.5"
+            title="Gera nova URL per-tenant (defesa em profundidade)"
+          >
+            <RefreshCw className={`w-3 h-3 ${rotatingPath ? 'animate-spin' : ''}`} />
+            Rotacionar URL
+          </button>
+        )}
       </div>
     </div>
   );

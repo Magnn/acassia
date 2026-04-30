@@ -25,6 +25,7 @@ export interface WaBinding {
   display_phone_number: string | null;
   has_verify_token: boolean;
   has_app_secret: boolean;
+  webhook_path: string | null;
   status: 'pending' | 'active' | 'failed';
   last_verified_at: string | null;
   last_error: string | null;
@@ -42,6 +43,7 @@ export interface WaIntegrationStatus {
   variables: Record<string, unknown>;
   secrets_set: string[];
   webhook_url: string;
+  webhook_url_global?: string;
   graph_api_version: string;
   global_verify_token_set: boolean;
 }
@@ -70,6 +72,8 @@ export interface WaSaveResult {
   binding: WaBinding;
   verify_token: string;
   webhook_url: string;
+  webhook_url_global?: string;
+  webhook_path?: string | null;
   instructions: string[];
 }
 
@@ -90,6 +94,12 @@ export const integrationsApi = {
     rotateVerifyToken: () =>
       api.post<{ ok: boolean; verify_token: string; webhook_url: string }>(
         '/saas/integrations/whatsapp/rotate-verify-token',
+        {},
+      ),
+
+    rotateWebhookPath: () =>
+      api.post<{ ok: boolean; webhook_path: string; webhook_url: string }>(
+        '/saas/integrations/whatsapp/rotate-webhook-path',
         {},
       ),
 

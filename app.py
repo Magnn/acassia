@@ -4103,6 +4103,85 @@ def integrations_summary():
 # WEBHOOKS (META WHATSAPP)
 # ─────────────────────────────────────────────────────────────────────
 
+@app.route("/webhook/<webhook_path>", methods=["GET", "POST"])
+def webhook_meta_per_tenant(webhook_path: str):
+    """
+    Per-tenant webhook URL — defesa em profundidade (Frente 1).
+
+    Path nao-adivinhavel + verify_token + app_secret = 3 camadas de
+    defesa. Mesma logica do /webhook global, mas resolve binding pelo
+    path antes do payload chegar.
+    """
+    try:
+        from wa_tenant_resolver import resolve_binding_by_webhook_path
+        binding = resolve_binding_by_webhook_path(webhook_path)
+    except Exception as exc:
+        logger.warning("⚠️ [WEBHOOK-PATH] resolver falhou: %s", exc)
+        return "Forbidden", 403
+
+    if binding is None:
+        # Path desconhecido — log defensivo e 403
+        try:
+            from db.database import SessionLocal as _SS
+            from db import models as _models
+            _db = _SS()
+            try:
+                _db.add(_models.WaInboundLog(
+                    tenant_id=None,
+                    phone_number_id=None,
+                    event_type="webhook_path_unknown",
+                    message=f"Path desconhecido: {webhook_path[:80]}",
+                ))
+                _db.commit()
+            finally:
+                _db.close()
+        except Exception:
+            pass
+        return "Forbidden", 403
+
+    # GET: verifica verify_token (ou global)
+    if request.method == "GET":
+        mode = request.args.get("hub.mode")
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
+        if mode == "subscribe":
+            expected_token = binding.get("verify_token") or VERIFY_TOKEN
+            if token == expected_token:
+                logger.info(
+                    "✅ [WEBHOOK-PATH] Token validado tenant=%s phone_id=%s",
+                    binding["tenant_id"], binding["phone_number_id"],
+                )
+                return challenge, 200
+        return "Forbidden", 403
+
+    # POST: HMAC com app_secret per-tenant ou global
+    corpo_raw = request.get_data()
+    secret_to_use = binding.get("app_secret") or APP_SECRET
+    if secret_to_use:
+        assinatura = request.headers.get("X-Hub-Signature-256", "")
+        mac = hmac.new(secret_to_use.encode(), corpo_raw, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(f"sha256={mac}", assinatura):
+            logger.warning("🚫 [WEBHOOK-PATH] HMAC invalido tenant=%s",
+                           binding["tenant_id"])
+            return "Invalid Signature", 403
+
+    data = request.get_json(silent=True)
+    if not data:
+        return "NO_DATA", 400
+
+    enqueued = False
+    try:
+        from reliability.redis_inbound import enqueue_inbound_webhook, redis_inbound_ready
+
+        if redis_inbound_ready():
+            enqueued = enqueue_inbound_webhook(data)
+    except Exception as e:
+        logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
+    if not enqueued:
+        threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()
+    return "EVENT_RECEIVED", 200
+
+
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook_meta():
     """Ponto de entrada oficial para mensagens do WhatsApp."""

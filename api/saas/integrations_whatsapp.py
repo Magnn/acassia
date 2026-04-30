@@ -139,6 +139,7 @@ def _serialize_binding(b: models.WaPhoneTenantBinding) -> dict:
         "display_phone_number": b.display_phone_number,
         "has_verify_token": bool(b.verify_token),
         "has_app_secret": bool(b.app_secret),
+        "webhook_path": b.webhook_path,
         "status": b.status,
         "last_verified_at": b.last_verified_at.isoformat() if b.last_verified_at else None,
         "last_error": b.last_error,
@@ -201,11 +202,20 @@ def get_status():
             ).all()
         ]
 
+        # URL per-tenant (preferencial) + URL global (fallback)
+        global_url = _public_webhook_url()
+        per_tenant_url = global_url
+        if binding and binding.webhook_path:
+            base = (global_url or "").rstrip("/webhook").rstrip("/")
+            if base:
+                per_tenant_url = f"{base}/webhook/{binding.webhook_path}"
+
         return jsonify({
             "binding": _serialize_binding(binding) if binding else None,
             "variables": wa_vars,
             "secrets_set": secret_keys,
-            "webhook_url": _public_webhook_url(),
+            "webhook_url": per_tenant_url,
+            "webhook_url_global": global_url,
             "graph_api_version": GRAPH_API_VERSION,
             "global_verify_token_set": bool(os.getenv("META_VERIFY_TOKEN")),
         })
@@ -306,6 +316,9 @@ def save_binding():
         binding.display_phone_number = info.get("display_phone_number") if isinstance(info, dict) else None
         binding.verify_token = verify_token
         binding.app_secret = app_secret
+        # Gera webhook_path unguessable na primeira vez (preserva entre updates)
+        if not binding.webhook_path:
+            binding.webhook_path = f"wh_{secrets.token_urlsafe(24)}"
         binding.status = "active" if not skip_validation else "pending"
         binding.last_verified_at = datetime.now(timezone.utc) if not skip_validation else None
         binding.last_error = None
@@ -349,14 +362,23 @@ def save_binding():
         except Exception:
             db.rollback()
 
+        # URL per-tenant (preferencial — defesa em profundidade) + URL global (fallback)
+        public_base = (_public_webhook_url() or "").rstrip("/webhook").rstrip("/")
+        per_tenant_url = (
+            f"{public_base}/webhook/{binding.webhook_path}"
+            if public_base and binding.webhook_path else _public_webhook_url()
+        )
+
         return jsonify({
             "ok": True,
             "binding": _serialize_binding(binding),
             "verify_token": verify_token,
-            "webhook_url": _public_webhook_url(),
+            "webhook_url": per_tenant_url,
+            "webhook_url_global": _public_webhook_url(),
+            "webhook_path": binding.webhook_path,
             "instructions": [
                 "1. Va em developers.facebook.com -> seu app -> WhatsApp -> Configuracao",
-                f"2. Cole '{_public_webhook_url()}' no Webhook callback URL",
+                f"2. Cole '{per_tenant_url}' no Webhook callback URL (URL exclusiva do seu tenant)",
                 f"3. Cole o verify_token gerado: {verify_token}",
                 "4. Em 'Webhook fields', assine ao menos: messages",
                 "5. Pronto — mande uma msg pro numero pra testar",
@@ -618,6 +640,53 @@ def inbound_logs():
                 }
                 for r in rows
             ],
+        })
+    finally:
+        db.close()
+
+
+@integrations_wa_bp.route("/rotate-webhook-path", methods=["POST"])
+@login_required
+def rotate_webhook_path():
+    """
+    Gera nova URL per-tenant. Tem que reconfigurar no painel da Meta
+    depois — ate la, /webhook (global) continua funcionando.
+    """
+    db = SessionLocal()
+    try:
+        binding = db.query(models.WaPhoneTenantBinding).filter_by(
+            tenant_id=current_user.tenant_id,
+        ).first()
+        if not binding:
+            return jsonify({"error": "no_binding"}), 404
+
+        old_path = binding.webhook_path
+        binding.webhook_path = f"wh_{secrets.token_urlsafe(24)}"
+        binding.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        # Invalida ambos caches
+        try:
+            from wa_tenant_resolver import (
+                invalidate_cache as _inv_main,
+                invalidate_webhook_path_cache as _inv_path,
+            )
+            _inv_main(binding.phone_number_id)
+            _inv_path(old_path)
+            _inv_path(binding.webhook_path)
+        except Exception:
+            pass
+
+        public_base = (_public_webhook_url() or "").rstrip("/webhook").rstrip("/")
+        new_url = (
+            f"{public_base}/webhook/{binding.webhook_path}"
+            if public_base else f"/webhook/{binding.webhook_path}"
+        )
+
+        return jsonify({
+            "ok": True,
+            "webhook_path": binding.webhook_path,
+            "webhook_url": new_url,
         })
     finally:
         db.close()
