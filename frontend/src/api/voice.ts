@@ -6,6 +6,7 @@ export interface VoiceClone {
   provider: string;
   provider_voice_id: string;
   status: 'pending' | 'active' | 'failed';
+  is_default: boolean;
   sample_audio_url: string | null;
   consented_at: string | null;
   created_at: string;
@@ -53,5 +54,13 @@ export const voiceApi = {
   testSample: (cloneId: number) =>
     api.post<{ ok: boolean; sample_audio_url: string }>(
       `/saas/voice/clones/${cloneId}/test`,
+    ),
+  setDefault: (cloneId: number) =>
+    api.post<{ ok: boolean; id: number; is_default: boolean }>(
+      `/saas/voice/clones/${cloneId}/set-default`,
+    ),
+  unsetDefault: (cloneId: number) =>
+    api.post<{ ok: boolean; is_default: boolean }>(
+      `/saas/voice/clones/${cloneId}/unset-default`,
     ),
 };

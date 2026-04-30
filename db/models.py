@@ -878,6 +878,9 @@ class VoiceClone(Base):
     enrollment_audio_url = Column(Text, nullable=True)
     sample_audio_url = Column(Text, nullable=True)  # áudio de teste gerado
     status = Column(String(20), default="pending", nullable=False)  # pending|active|failed
+    # Voice default do tenant (Frente 4.16) — bot usa essa pra audios outbound.
+    # Apenas 1 voice_clone por tenant pode estar marcada como default por vez.
+    is_default = Column(Boolean, default=False, nullable=False, index=True)
     consented_at = Column(DateTime(timezone=True), nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)

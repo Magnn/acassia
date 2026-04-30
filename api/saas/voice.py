@@ -60,6 +60,7 @@ def list_clones():
                     "provider": c.provider,
                     "provider_voice_id": c.provider_voice_id,
                     "status": c.status,
+                    "is_default": bool(c.is_default),
                     "sample_audio_url": c.sample_audio_url,
                     "consented_at": c.consented_at.isoformat() if c.consented_at else None,
                     "created_at": c.created_at.isoformat(),
@@ -160,6 +161,69 @@ def enroll_clone():
             "provider_voice_id": clone.provider_voice_id,
             "status": clone.status,
         }), 201
+    finally:
+        db.close()
+
+
+@voice_bp.route("/clones/<int:clone_id>/set-default", methods=["POST"])
+@login_required
+def set_default(clone_id: int):
+    """
+    Marca este clone como o default do tenant (Frente 4.16). Apenas 1 default
+    por tenant — desmarca os outros automaticamente.
+    """
+    db = SessionLocal()
+    try:
+        clone = db.query(models.VoiceClone).filter_by(
+            id=clone_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not clone or clone.deleted_at:
+            return jsonify({"error": "not_found"}), 404
+        if clone.status != "active":
+            return jsonify({"error": "clone_not_active", "status": clone.status}), 422
+
+        # Desmarca outros defaults do mesmo tenant
+        db.query(models.VoiceClone).filter(
+            models.VoiceClone.tenant_id == current_user.tenant_id,
+            models.VoiceClone.id != clone.id,
+            models.VoiceClone.is_default == True,  # noqa: E712
+        ).update({"is_default": False}, synchronize_session=False)
+
+        clone.is_default = True
+        db.commit()
+
+        try:
+            db.add(models.AuditEvent(
+                tenant_id=current_user.tenant_id,
+                actor_user_id=current_user.id,
+                event_type="voice.clone.default_set",
+                target_type="voice_clone",
+                target_id=str(clone.id),
+                payload={"name": clone.name},
+            ))
+            db.commit()
+        except Exception:
+            pass
+
+        return jsonify({"ok": True, "id": clone.id, "is_default": True})
+    finally:
+        db.close()
+
+
+@voice_bp.route("/clones/<int:clone_id>/unset-default", methods=["POST"])
+@login_required
+def unset_default(clone_id: int):
+    """Desmarca o default — bot volta a nao usar voz clonada."""
+    db = SessionLocal()
+    try:
+        clone = db.query(models.VoiceClone).filter_by(
+            id=clone_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not clone or clone.deleted_at:
+            return jsonify({"error": "not_found"}), 404
+        clone.is_default = False
+        db.commit()
+        return jsonify({"ok": True, "is_default": False})
     finally:
         db.close()
 

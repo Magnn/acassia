@@ -56,8 +56,9 @@ def _eleven_key(tenant_id: Optional[str] = None) -> Optional[str]:
                 row = db.query(models.TenantFlowSecret).filter_by(
                     tenant_id=tenant_id, key="elevenlabs.api_key",
                 ).first()
-                if row and row.value:
-                    return row.value
+                # Coluna correta e value_cipher (nao value).
+                if row and row.value_cipher:
+                    return row.value_cipher
             finally:
                 db.close()
         except Exception:
@@ -171,6 +172,66 @@ def synthesize_elevenlabs(
     if resp.status_code != 200:
         raise VoiceProviderError(f"ElevenLabs {resp.status_code}: {resp.text[:200]}")
     return resp.content
+
+
+def get_default_voice_for_tenant(tenant_id: str):
+    """
+    Retorna o VoiceClone marcado como default do tenant (ou None).
+
+    Usado pelo motor pra decidir se outbound de audio deve usar voz
+    clonada ou TTS generica (Frente 4.16).
+    """
+    if not tenant_id:
+        return None
+    try:
+        from db.database import SessionLocal
+        from db import models
+        db = SessionLocal()
+        try:
+            row = db.query(models.VoiceClone).filter_by(
+                tenant_id=tenant_id,
+                is_default=True,
+                deleted_at=None,
+                status="active",
+            ).first()
+            return row
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("[voice_provider.get_default] falha: %s", exc)
+        return None
+
+
+def synthesize_for_tenant(tenant_id: str, text: str) -> tuple[bytes | None, dict]:
+    """
+    Helper alto-nivel: pega voice default do tenant, sintetiza, retorna
+    (audio_bytes, info_dict). Se nao houver default ou provider nao
+    configurado, retorna (None, {error_reason}).
+
+    info_dict contem: voice_clone_id, provider_voice_id, chars_count,
+    error (se houve), error_reason.
+    """
+    info: dict = {"chars_count": len(text or "")}
+    if not is_configured(tenant_id):
+        info["error_reason"] = "provider_not_configured"
+        return None, info
+    clone = get_default_voice_for_tenant(tenant_id)
+    if clone is None:
+        info["error_reason"] = "no_default_voice"
+        return None, info
+    info["voice_clone_id"] = clone.id
+    info["provider_voice_id"] = clone.provider_voice_id
+    try:
+        audio = synthesize_elevenlabs(
+            tenant_id=tenant_id,
+            voice_id=clone.provider_voice_id,
+            text=text,
+        )
+        return audio, info
+    except VoiceProviderError as exc:
+        info["error_reason"] = "provider_error"
+        info["error"] = str(exc)
+        return None, info
 
 
 def delete_voice_elevenlabs(*, tenant_id: str, voice_id: str) -> bool:

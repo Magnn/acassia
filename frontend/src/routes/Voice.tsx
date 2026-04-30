@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Mic, MicOff, Play, Trash2, Sparkles, AlertCircle, CheckCircle2,
-  Volume2, Wand2, RefreshCw,
+  Volume2, Wand2, RefreshCw, Star, StarOff,
 } from 'lucide-react';
 import { voiceApi, type VoiceClone } from '../api/voice';
 import { handleApiError } from '../lib/handleApiError';
@@ -40,6 +40,24 @@ export default function Voice() {
       qc.invalidateQueries({ queryKey: ['voice-clones'] });
     },
     onError: handleApiError('Erro ao gerar amostra'),
+  });
+
+  const setDefaultMut = useMutation({
+    mutationFn: (id: number) => voiceApi.setDefault(id),
+    onSuccess: () => {
+      toast.success('Voz definida como padrão. Bot vai usar essa pra áudios.');
+      qc.invalidateQueries({ queryKey: ['voice-clones'] });
+    },
+    onError: handleApiError('Erro ao definir padrão'),
+  });
+
+  const unsetDefaultMut = useMutation({
+    mutationFn: (id: number) => voiceApi.unsetDefault(id),
+    onSuccess: () => {
+      toast.success('Voz padrão desmarcada.');
+      qc.invalidateQueries({ queryKey: ['voice-clones'] });
+    },
+    onError: handleApiError('Erro ao desmarcar padrão'),
   });
 
   const clones = data?.clones ?? [];
@@ -101,7 +119,10 @@ export default function Voice() {
                   deleteMut.mutate(c.id);
                 }
               }}
+              onSetDefault={() => setDefaultMut.mutate(c.id)}
+              onUnsetDefault={() => unsetDefaultMut.mutate(c.id)}
               testing={testMut.isPending}
+              defaulting={setDefaultMut.isPending || unsetDefaultMut.isPending}
             />
           ))}
         </div>
@@ -147,19 +168,36 @@ function EmptyState({ onStart }: { onStart: () => void }) {
 }
 
 function CloneCard({
-  clone, onSynth, onTest, onDelete, testing,
+  clone, onSynth, onTest, onDelete, onSetDefault, onUnsetDefault,
+  testing, defaulting,
 }: {
   clone: VoiceClone;
   onSynth: () => void;
   onTest: () => void;
   onDelete: () => void;
+  onSetDefault: () => void;
+  onUnsetDefault: () => void;
   testing: boolean;
+  defaulting: boolean;
 }) {
+  const isDefault = !!clone.is_default;
   return (
-    <div className="bg-bg-surface border border-border rounded-3xl p-6 space-y-4">
+    <div
+      className={`bg-bg-surface border rounded-3xl p-6 space-y-4 ${
+        isDefault ? 'border-accent-amethyst shadow-[0_0_30px_rgba(155,107,222,0.15)]' : 'border-border'
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-black text-lg">{clone.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-black text-lg">{clone.name}</h3>
+            {isDefault && (
+              <span className="text-[9px] uppercase tracking-widest font-black bg-accent-amethyst/10 text-accent-amethyst border border-accent-amethyst/30 rounded px-1.5 py-0.5 flex items-center gap-1">
+                <Star className="w-2.5 h-2.5 fill-current" />
+                Padrão
+              </span>
+            )}
+          </div>
           <div className="text-[10px] text-secondary mt-1">
             {clone.provider} · {clone.status}
             {clone.consented_at && (
@@ -176,7 +214,13 @@ function CloneCard({
         <audio src={clone.sample_audio_url} controls className="w-full h-10" />
       )}
 
-      <div className="flex gap-2">
+      {isDefault && (
+        <div className="text-[11px] text-accent-amethyst bg-accent-amethyst/5 border border-accent-amethyst/20 rounded-lg p-2">
+          Bot está usando esta voz para todos os áudios outbound.
+        </div>
+      )}
+
+      <div className="flex gap-2 flex-wrap">
         <button
           onClick={onSynth}
           className="flex-1 px-3 py-2 bg-accent-amethyst hover:bg-accent-amethyst/90 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
@@ -193,6 +237,28 @@ function CloneCard({
           {testing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
           Testar
         </button>
+        {clone.status === 'active' && !isDefault && (
+          <button
+            onClick={onSetDefault}
+            disabled={defaulting}
+            className="px-3 py-2 bg-bg-primary border border-border hover:border-accent-amethyst/30 disabled:opacity-30 rounded-xl text-xs font-bold flex items-center gap-1"
+            title="Bot vai usar esta voz pra todos os áudios"
+          >
+            <Star className="w-3.5 h-3.5" />
+            Padrão
+          </button>
+        )}
+        {isDefault && (
+          <button
+            onClick={onUnsetDefault}
+            disabled={defaulting}
+            className="px-3 py-2 bg-bg-primary border border-border hover:border-amber-500/30 disabled:opacity-30 rounded-xl text-xs font-bold flex items-center gap-1 text-secondary"
+            title="Voltar a usar TTS genérico"
+          >
+            <StarOff className="w-3.5 h-3.5" />
+            Desmarcar
+          </button>
+        )}
         <button
           onClick={onDelete}
           className="px-3 py-2 bg-bg-primary border border-border hover:border-red-500/30 rounded-xl text-xs hover:text-red-400"
