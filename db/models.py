@@ -1306,6 +1306,49 @@ class LeadAuraImage(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class ScheduledReading(Base):
+    """
+    Tiragem agendada (Frente 4.28).
+
+    Lead pede "quero tiragem na proxima lua cheia" → cria registro com
+    scheduled_for absoluto. Cron horario verifica vencidos:
+        - 1h antes: envia "preparando sua tiragem..."
+        - Hora certa: roda tiragem automatica + envia leitura
+
+    trigger_type:
+        lunar_full     — proxima lua cheia
+        lunar_new      — proxima lua nova
+        date_specific  — data/hora exata
+        sign_transit   — V2 (Sol entrando em signo)
+
+    status:
+        pending           — aguardando hora
+        warning_sent      — msg "preparando" ja enviou (1h antes)
+        completed         — tiragem rodou + entregue
+        cancelled         — lead pediu cancelar
+        failed            — erro processando
+    """
+    __tablename__ = "scheduled_readings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    scheduled_for = Column(DateTime(timezone=True), nullable=False, index=True)
+    trigger_type = Column(String(40), nullable=False)
+    spread_type = Column(String(40), default="3card", nullable=False)
+    deck_id = Column(String(40), default="marselha", nullable=False)
+    question = Column(Text, nullable=True)
+    status = Column(String(20), default="pending", nullable=False, index=True)
+    warning_sent_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    reading_id = Column(Integer, ForeignKey("tarot_readings.id"), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False,
+    )
+
+
 class DailyPersonalMessage(Base):
     """
     Mensagem do dia personalizada por lead (Frente 4.27).

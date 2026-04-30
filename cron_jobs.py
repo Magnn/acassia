@@ -354,7 +354,25 @@ def run_hourly():
     hourly_fire_lunar_triggers()
     hourly_dispatch_daily_horoscopes()
     hourly_dispatch_daily_personal_messages()
+    hourly_process_scheduled_readings()
     logger.info("[cron] hourly done")
+
+
+def hourly_process_scheduled_readings():
+    """Processa tiragens agendadas vencidas (Frente 4.28)."""
+    try:
+        import scheduled_readings as sr_mod
+        stats = sr_mod.process_due_readings()
+        if stats.get("warnings_sent") or stats.get("completed") or stats.get("failed"):
+            logger.info(
+                "[cron.hourly_process_scheduled_readings] warnings=%d completed=%d failed=%d errors=%d",
+                stats.get("warnings_sent", 0),
+                stats.get("completed", 0),
+                stats.get("failed", 0),
+                stats.get("errors", 0),
+            )
+    except Exception as exc:
+        logger.warning("[cron.scheduled_readings] falha: %s", exc)
 
 
 def hourly_dispatch_daily_personal_messages():
