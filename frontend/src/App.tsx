@@ -5,6 +5,8 @@ import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 import SettingsLayout from './components/SettingsLayout';
 import Toaster from './components/Toaster';
+import CommandPalette, { useCmdK } from './components/CommandPalette';
+import OnboardingTour from './components/OnboardingTour';
 import ImpersonateBanner from './components/ImpersonateBanner';
 import CookieBanner from './components/CookieBanner';
 import QuotaWarningBanner from './components/QuotaWarningBanner';
@@ -63,6 +65,16 @@ function PageFallback() {
   );
 }
 
+function AppShell() {
+  const { open: cmdkOpen, setOpen: setCmdkOpen } = useCmdK();
+  return (
+    <>
+      <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
+      <OnboardingTour />
+    </>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -70,6 +82,7 @@ export default function App() {
       <QuotaWarningBanner />
       <CookieBanner />
       <OnboardingChecklist />
+      <AppShell />
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/onboarding" element={<Onboarding />} />
