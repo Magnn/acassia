@@ -87,6 +87,14 @@ JANELA_SENSIVEL_NODE3_MIN = 12
 MAX_LEADS_POR_CICLO = int(CONFIG_CLIENTE.get("recovery_max_leads_por_ciclo", 120) or 120)
 
 
+class _NoopCtx:
+    """No-op context manager — usado quando tenant_override_ctx nao esta disponivel."""
+    def __enter__(self):
+        return None
+    def __exit__(self, *args):
+        return False
+
+
 class RecoveryEngine:
     def __init__(
         self,
@@ -124,25 +132,40 @@ class RecoveryEngine:
         agora = datetime.now(timezone.utc)
         db = SessionLocal()
         try:
-            # Filtra leads que estão em nós recuperáveis e não bloqueados
+            # Multi-tenant (Frente 1):
+            # - Se ENV ACASSIA_TENANT_ID estiver setada -> single-tenant (legacy).
+            # - Senao, processa todos os tenants com binding ativo + tenants
+            #   que tem leads ativos no DB.
             try:
-                from tenant_context import get_engine_tenant_id
-
-                _tid = get_engine_tenant_id()
+                from tenant_context import get_engine_tenant_id, tenant_override_ctx
             except Exception:
-                _tid = "default"
-            leads = (
-                db.query(Lead)
-                .filter(
-                    Lead.tenant_id == _tid,
-                    Lead.node_atual.notin_(NODES_EXCLUIDOS),
-                    Lead.recovery_bloqueado == False,
-                    Lead.convertido == False,
-                )
-                .order_by(Lead.atualizado_em.asc())
-                .limit(MAX_LEADS_POR_CICLO)
-                .all()
+                tenant_override_ctx = None
+                get_engine_tenant_id = lambda: "default"
+
+            import os as _os
+            single_tenant_legacy = bool(_os.getenv("ACASSIA_TENANT_ID"))
+
+            base_query = db.query(Lead).filter(
+                Lead.node_atual.notin_(NODES_EXCLUIDOS),
+                Lead.recovery_bloqueado == False,
+                Lead.convertido == False,
             )
+
+            if single_tenant_legacy:
+                _tid = get_engine_tenant_id()
+                leads = (
+                    base_query.filter(Lead.tenant_id == _tid)
+                    .order_by(Lead.atualizado_em.asc())
+                    .limit(MAX_LEADS_POR_CICLO)
+                    .all()
+                )
+            else:
+                # Multi-tenant: leads de qualquer tenant ate o limite
+                leads = (
+                    base_query.order_by(Lead.atualizado_em.asc())
+                    .limit(MAX_LEADS_POR_CICLO)
+                    .all()
+                )
 
             if not leads:
                 return
@@ -155,14 +178,22 @@ class RecoveryEngine:
                     lock = self._obter_lock(lead.id)
                     if lock.acquire(blocking=False):
                         try:
-                            acao = self._avaliar_lead(db, lead, agora, sinais.get(lead.id, {}))
-                            if getattr(lead, "_recovery_reset_pendente", False):
-                                resets_pendentes += 1
-                                setattr(lead, "_recovery_reset_pendente", False)
-                            if acao:
-                                self._disparar_recovery(db, lead, acao, agora)
-                                disparados += 1
-                                time.sleep(random.randint(*DELAY_ENTRE_LEADS))
+                            # Sempre opera no tenant do lead (multi-tenant safe)
+                            lead_tenant = lead.tenant_id or "default"
+                            ctx_mgr = (
+                                tenant_override_ctx(lead_tenant)
+                                if tenant_override_ctx is not None
+                                else _NoopCtx()
+                            )
+                            with ctx_mgr:
+                                acao = self._avaliar_lead(db, lead, agora, sinais.get(lead.id, {}))
+                                if getattr(lead, "_recovery_reset_pendente", False):
+                                    resets_pendentes += 1
+                                    setattr(lead, "_recovery_reset_pendente", False)
+                                if acao:
+                                    self._disparar_recovery(db, lead, acao, agora)
+                                    disparados += 1
+                                    time.sleep(random.randint(*DELAY_ENTRE_LEADS))
                         finally:
                             lock.release()
                     else:

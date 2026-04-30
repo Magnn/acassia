@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 import os
+import random
+import time
 from typing import Any
 
 import requests
@@ -24,6 +26,11 @@ logger = logging.getLogger(__name__)
 GRAPH_VERSION = "v21.0"
 TIMEOUT_CONNECT = 5
 TIMEOUT_READ = 15
+
+# Backoff config: 4xx nao retry, 5xx/timeout/connection-reset retry com jitter
+SEND_MAX_ATTEMPTS = int(os.getenv("META_SEND_MAX_ATTEMPTS", "3"))
+SEND_BASE_BACKOFF_S = float(os.getenv("META_SEND_BASE_BACKOFF_S", "1.0"))
+SEND_MAX_BACKOFF_S = float(os.getenv("META_SEND_MAX_BACKOFF_S", "8.0"))
 
 
 class MetaCloudProvider(WhatsAppProvider):
@@ -106,33 +113,105 @@ class MetaCloudProvider(WhatsAppProvider):
             logger.warning("[meta_cloud] formato desconhecido: %s", formato)
             return False
 
-        try:
-            response = requests.post(
-                self.base_url,
-                json=payload,
-                headers=self._headers(),
-                timeout=(TIMEOUT_CONNECT, TIMEOUT_READ),
-            )
-            if response.status_code == 200:
-                logger.info(
-                    "[meta_cloud] tenant=%s %s enviado para %s",
-                    self.tenant_id, formato.upper(), numero,
+        # Retry com backoff exponencial + jitter para 5xx, timeout e erros de rede.
+        # 4xx (auth/validacao) NAO retentamos — falha rapido pra alertar config errada.
+        for attempt in range(1, SEND_MAX_ATTEMPTS + 1):
+            try:
+                response = requests.post(
+                    self.base_url,
+                    json=payload,
+                    headers=self._headers(),
+                    timeout=(TIMEOUT_CONNECT, TIMEOUT_READ),
                 )
-                return True
-            logger.error(
-                "[meta_cloud] tenant=%s HTTP %s para %s — body: %s",
-                self.tenant_id, response.status_code, numero,
-                (response.text or "")[:300],
-            )
-            return False
-        except requests.exceptions.Timeout:
-            logger.error(
-                "[meta_cloud] tenant=%s timeout %s para %s", self.tenant_id, formato, numero,
-            )
-            return False
-        except requests.exceptions.RequestException as exc:
-            logger.error("[meta_cloud] tenant=%s erro %s: %s", self.tenant_id, numero, exc)
-            return False
+                status = response.status_code
+                if status == 200:
+                    if attempt > 1:
+                        logger.info(
+                            "[meta_cloud] tenant=%s %s enviado para %s (sucesso na tentativa %s/%s)",
+                            self.tenant_id, formato.upper(), numero,
+                            attempt, SEND_MAX_ATTEMPTS,
+                        )
+                    else:
+                        logger.info(
+                            "[meta_cloud] tenant=%s %s enviado para %s",
+                            self.tenant_id, formato.upper(), numero,
+                        )
+                    return True
+
+                # 4xx: nao retry (auth/permissao/numero invalido)
+                if 400 <= status < 500:
+                    logger.error(
+                        "[meta_cloud] tenant=%s HTTP %s para %s (4xx — sem retry) body: %s",
+                        self.tenant_id, status, numero,
+                        (response.text or "")[:300],
+                    )
+                    return False
+
+                # 5xx: retry se ainda houver tentativas
+                if attempt < SEND_MAX_ATTEMPTS:
+                    backoff = min(
+                        SEND_MAX_BACKOFF_S,
+                        SEND_BASE_BACKOFF_S * (2 ** (attempt - 1)),
+                    ) + random.uniform(0, 0.4)
+                    logger.warning(
+                        "[meta_cloud] tenant=%s HTTP %s tentativa=%s/%s aguardando %.1fs — body: %s",
+                        self.tenant_id, status, attempt, SEND_MAX_ATTEMPTS, backoff,
+                        (response.text or "")[:200],
+                    )
+                    time.sleep(backoff)
+                    continue
+
+                logger.error(
+                    "[meta_cloud] tenant=%s HTTP %s para %s exauridas %s tentativas — body: %s",
+                    self.tenant_id, status, numero, SEND_MAX_ATTEMPTS,
+                    (response.text or "")[:300],
+                )
+                return False
+
+            except requests.exceptions.Timeout:
+                if attempt < SEND_MAX_ATTEMPTS:
+                    backoff = min(
+                        SEND_MAX_BACKOFF_S,
+                        SEND_BASE_BACKOFF_S * (2 ** (attempt - 1)),
+                    ) + random.uniform(0, 0.4)
+                    logger.warning(
+                        "[meta_cloud] tenant=%s timeout tentativa=%s/%s aguardando %.1fs",
+                        self.tenant_id, attempt, SEND_MAX_ATTEMPTS, backoff,
+                    )
+                    time.sleep(backoff)
+                    continue
+                logger.error(
+                    "[meta_cloud] tenant=%s timeout exaurido para %s", self.tenant_id, numero,
+                )
+                return False
+
+            except requests.exceptions.ConnectionError as exc:
+                if attempt < SEND_MAX_ATTEMPTS:
+                    backoff = min(
+                        SEND_MAX_BACKOFF_S,
+                        SEND_BASE_BACKOFF_S * (2 ** (attempt - 1)),
+                    ) + random.uniform(0, 0.4)
+                    logger.warning(
+                        "[meta_cloud] tenant=%s connection error %s tentativa=%s/%s aguardando %.1fs",
+                        self.tenant_id, exc, attempt, SEND_MAX_ATTEMPTS, backoff,
+                    )
+                    time.sleep(backoff)
+                    continue
+                logger.error(
+                    "[meta_cloud] tenant=%s connection error exaurido para %s: %s",
+                    self.tenant_id, numero, exc,
+                )
+                return False
+
+            except requests.exceptions.RequestException as exc:
+                # Erros nao-retryable (ex.: SSL, invalid URL) — fail fast
+                logger.error(
+                    "[meta_cloud] tenant=%s erro nao-retryable %s: %s",
+                    self.tenant_id, numero, exc,
+                )
+                return False
+
+        return False
 
     def test_connection(self, target_number: str) -> SendResult:
         """Override pra capturar message_id retornado pela Graph API."""

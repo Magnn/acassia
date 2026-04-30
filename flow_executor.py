@@ -822,6 +822,38 @@ def steps_to_acoes(
     return acoes
 
 
+def tenant_has_published_content(tenant_id: Optional[str]) -> bool:
+    """
+    Retorna True se o tenant tem flow OU studio agent publicado.
+
+    Usado pelo engine pra decidir se pode rodar funil estatico legado
+    ou se deve mandar fallback "Ainda configurando" (multi-tenant safe).
+    """
+    if not tenant_id:
+        return False
+    try:
+        from db.database import SessionLocal
+        from db import models
+        tid = (tenant_id or "default").strip() or "default"
+        db = SessionLocal()
+        try:
+            flow_pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            if flow_pub and flow_pub.published_blueprint_id:
+                return True
+            try:
+                # StudioPublish é opcional — V1 pode não estar registrado
+                studio_pub = db.query(models.StudioPublish).filter_by(tenant_id=tid).first()
+                if studio_pub and getattr(studio_pub, "published_agent_id", None):
+                    return True
+            except Exception:
+                pass
+            return False
+        finally:
+            db.close()
+    except Exception:
+        return False
+
+
 def inject_published_flow_metadata(metadata: Optional[dict], tenant_id: Optional[str]) -> None:
     """Anexa snapshot do blueprint publicado ao metadata do contexto (somente leitura)."""
     if not isinstance(metadata, dict):

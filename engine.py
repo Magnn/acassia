@@ -275,6 +275,130 @@ class Engine:
         # Compat: codigos antigos que faziam motor.tenant_id = "x" continuam funcionando.
         self._tenant_id_static = str(value or "default")
 
+    def _should_use_fallback_reply(self, node_atual: str) -> bool:
+        """
+        Decide se este tenant deve receber auto-reply de fallback em vez
+        de cair no funil estatico legado.
+
+        Regras:
+            - Se ENV ACASSIA_TENANT_ID setada e bate com tenant atual -> usa
+              funil legado (single-tenant deploy).
+            - Senao, se tenant tem FlowPublish ou StudioPublish ativo ->
+              segue normal (engine consome blueprint publicado).
+            - Senao, se lead ja esta em node static_meumisterio -> deixa
+              continuar pra nao quebrar conversas em andamento.
+            - Senao, retorna True (fallback).
+        """
+        import os
+        legacy_tenant = (os.getenv("ACASSIA_TENANT_ID") or "").strip()
+        cur_tenant = self.tenant_id or "default"
+
+        if legacy_tenant and legacy_tenant == cur_tenant:
+            return False
+        if node_atual.startswith("static_meumisterio_"):
+            return False
+        try:
+            from flow_executor import tenant_has_published_content
+            if tenant_has_published_content(cur_tenant):
+                return False
+        except Exception:
+            pass
+        return True
+
+    def _enviar_fallback_reply(self, db, lead, telefone: str) -> dict:
+        """
+        Envia mensagem-padrao quando tenant nao tem flow publicado ainda.
+        Texto pode ser customizado via TenantFlowVariable
+        ``whatsapp.fallback_message`` (ate 1000 chars).
+
+        Idempotencia: marca flag em metadata_json pra nao spammar — re-envia
+        ate 1x por dia por lead.
+        """
+        from datetime import datetime, timezone, timedelta
+
+        cur_tenant = self.tenant_id or "default"
+
+        # 1) Resolve mensagem custom ou default
+        custom_msg = None
+        try:
+            from api.tenant_config import get_tenant_config
+            cfg = get_tenant_config(cur_tenant)
+            wa_cfg = cfg.get("whatsapp") if isinstance(cfg, dict) else None
+            if isinstance(wa_cfg, dict):
+                custom_msg = wa_cfg.get("fallback_message")
+        except Exception:
+            pass
+
+        msg = (custom_msg or
+               "Olá! Recebi sua mensagem. Em breve responderei pessoalmente — "
+               "estamos finalizando a configuração do atendimento. Obrigada pela "
+               "paciência. ✦")
+        msg = str(msg)[:1000]
+
+        # 2) Idempotencia: nao mandar mesma mensagem mais de 1x/dia pro lead
+        try:
+            meta = dict(getattr(lead, "metadata_json", None) or {})
+            last_sent_iso = meta.get("acassia_fallback_last_sent")
+            if last_sent_iso:
+                try:
+                    last_sent = datetime.fromisoformat(last_sent_iso)
+                    if last_sent.tzinfo is None:
+                        last_sent = last_sent.replace(tzinfo=timezone.utc)
+                    if datetime.now(timezone.utc) - last_sent < timedelta(hours=20):
+                        logger.info(
+                            "[engine.fallback] tenant=%s lead=%s ja recebeu fallback recente — skip",
+                            cur_tenant, lead.id,
+                        )
+                        with self._lock_proc:
+                            self._leads_em_processamento.pop(lead.id, None)
+                        return {"status": "fallback_skipped"}
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 3) Envio
+        try:
+            ok = self.whatsapp_client.enviar_mensagem(telefone, msg, formato="texto") \
+                if hasattr(self, "whatsapp_client") and self.whatsapp_client else False
+            if not ok:
+                # Fallback adicional: usar provider direto
+                try:
+                    from api.whatsapp_api import whatsapp_client as _wc
+                    ok = _wc.enviar_mensagem(telefone, msg, formato="texto")
+                except Exception:
+                    ok = False
+        except Exception as exc:
+            logger.warning("[engine.fallback] envio falhou tenant=%s lead=%s: %s",
+                           cur_tenant, lead.id, exc)
+            ok = False
+
+        # 4) Persist no historico de mensagens (mesmo se envio falhou — debug)
+        try:
+            self._salvar_mensagem(
+                db, lead.id, "bot", msg, "text", auto_commit=False,
+            )
+        except Exception:
+            pass
+
+        # 5) Marca metadata + audit
+        try:
+            meta = dict(getattr(lead, "metadata_json", None) or {})
+            meta["acassia_fallback_last_sent"] = datetime.now(timezone.utc).isoformat()
+            lead.metadata_json = meta
+            db.add(EventoAudit(
+                lead_id=lead.id,
+                evento="engine_fallback_no_flow_published",
+                dados={"tenant_id": cur_tenant, "sent_ok": ok},
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        with self._lock_proc:
+            self._leads_em_processamento.pop(lead.id, None)
+        return {"status": "fallback_sent", "ok": ok}
+
     def _iniciar_monitor_retomada_estatica(self) -> None:
         """
         Monitor de auto-retomada do funil estático:
@@ -545,8 +669,14 @@ class Engine:
                 if imagem_url: ctx.metadata["imagem_url"] = imagem_url
                 if caption: ctx.metadata["caption"] = caption
 
-                # ── HANDOFF: Verifica se o bot está pausado para atendimento humano ──
+                # ── MULTI-TENANT FALLBACK ──
+                # Tenant sem flow/studio publicado nao deve cair no funil estatico
+                # legado (que e do tenant default). Manda auto-reply gentil.
                 _node_atual_handoff = str(getattr(lead, "node_atual", "") or "")
+                if self._should_use_fallback_reply(_node_atual_handoff):
+                    return self._enviar_fallback_reply(db, lead, telefone)
+
+                # ── HANDOFF: Verifica se o bot está pausado para atendimento humano ──
                 _em_estatico_mm = _node_atual_handoff.startswith("static_meumisterio_")
                 # Guardrail: no funil estático ativo, não manter pause legado/indevido.
                 if _em_estatico_mm and bool(getattr(lead, "bot_pausado", False)) and not bool(getattr(lead, "convertido", False)):
