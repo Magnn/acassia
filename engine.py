@@ -1495,6 +1495,90 @@ class Engine:
                 elif acao.tipo == "audio":
                     payload_url = acao.url or acao.conteudo
                     _voice = bool((getattr(acao, "metadata", None) or {}).get("whatsapp_voice"))
+
+                    # Frente 4.16 ext — auto-TTS via default voice quando
+                    # conteudo nao parece ser URL e tenant tem voice padrao.
+                    payload_str = str(payload_url or "").strip()
+                    looks_like_url = payload_str.startswith(("http://", "https://", "/"))
+                    if payload_str and not looks_like_url:
+                        try:
+                            import voice_provider as _vp
+                            audio_bytes, info = _vp.synthesize_for_tenant(
+                                self.tenant_id, payload_str,
+                            )
+                            if audio_bytes:
+                                # Persist local + monta URL absoluta
+                                import secrets as _secrets
+                                import os as _os
+                                _audio_dir = _os.path.join(
+                                    _os.path.dirname(__file__), "media", "voice",
+                                )
+                                _os.makedirs(_audio_dir, exist_ok=True)
+                                _file_id = _secrets.token_hex(8)
+                                _filename = f"{self.tenant_id}_flow_{_file_id}.mp3"
+                                _filepath = _os.path.join(_audio_dir, _filename)
+                                with open(_filepath, "wb") as _f:
+                                    _f.write(audio_bytes)
+                                _public_base = (_os.getenv("PUBLIC_URL") or "").rstrip("/")
+                                if _public_base:
+                                    payload_url = f"{_public_base}/saas/voice/audio/{_file_id}"
+                                    # Registra AudioGeneration
+                                    try:
+                                        from db import models as _ag_models
+                                        db.add(_ag_models.AudioGeneration(
+                                            tenant_id=self.tenant_id,
+                                            voice_clone_id=info.get("voice_clone_id"),
+                                            text=payload_str[:2000],
+                                            chars_count=len(payload_str),
+                                            audio_url=f"/saas/voice/audio/{_file_id}",
+                                            provider="elevenlabs",
+                                            status="done",
+                                        ))
+                                    except Exception:
+                                        pass
+                                    logger.info(
+                                        "[engine.audio] auto-TTS tenant=%s voice=%s chars=%s",
+                                        self.tenant_id, info.get("voice_clone_id"),
+                                        info.get("chars_count"),
+                                    )
+                                else:
+                                    logger.warning(
+                                        "[engine.audio] PUBLIC_URL nao configurada — fallback texto",
+                                    )
+                                    # Fallback: envia como texto
+                                    if self._enviar_com_retry(ctx.telefone, "text", payload_str):
+                                        _registrar_source_entregue(acao)
+                                        self._salvar_mensagem(db, lead_id, "bot", payload_str, "text", auto_commit=False)
+                                        enviados += 1
+                                        pendentes_db += 1
+                                        if pendentes_db >= batch_commit:
+                                            db.commit()
+                                            pendentes_db = 0
+                                    else:
+                                        falhas += 1
+                                    continue
+                            else:
+                                # Sem default voice ou falhou — fallback pra texto
+                                reason = info.get("error_reason", "unknown")
+                                logger.info(
+                                    "[engine.audio] auto-TTS skip tenant=%s reason=%s — fallback texto",
+                                    self.tenant_id, reason,
+                                )
+                                if self._enviar_com_retry(ctx.telefone, "text", payload_str):
+                                    _registrar_source_entregue(acao)
+                                    self._salvar_mensagem(db, lead_id, "bot", payload_str, "text", auto_commit=False)
+                                    enviados += 1
+                                    pendentes_db += 1
+                                    if pendentes_db >= batch_commit:
+                                        db.commit()
+                                        pendentes_db = 0
+                                else:
+                                    falhas += 1
+                                continue
+                        except Exception as _tts_exc:
+                            logger.warning("[engine.audio] auto-TTS erro: %s", _tts_exc)
+                            # cai pro envio como URL (que pode ser invalida — mas mantém compat)
+
                     if payload_url and self._enviar_com_retry(
                         ctx.telefone, "audio", payload_url, audio_voice=_voice
                     ):
