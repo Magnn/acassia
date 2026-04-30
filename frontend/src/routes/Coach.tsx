@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   Wand2, Copy, RefreshCw, Sparkles, Brain,
-  CheckCircle2, BadgeCheck,
+  CheckCircle2, BadgeCheck, Activity, AlertCircle, TrendingUp,
 } from 'lucide-react';
-import { coachApi, type CopyVariation, type CopyRewrite, type GeneratedPersona } from '../api/coach';
+import { useQuery } from '@tanstack/react-query';
+import { coachApi, type CopyVariation, type CopyRewrite, type GeneratedPersona, type FunnelReview } from '../api/coach';
+import { blueprintsApi } from '../api/blueprints';
 import { handleApiError } from '../lib/handleApiError';
 import { toast } from '../lib/toast';
 
-type Tab = 'copy' | 'rewrite' | 'persona';
+type Tab = 'copy' | 'rewrite' | 'persona' | 'review';
 
 export default function Coach() {
   const [tab, setTab] = useState<Tab>('copy');
@@ -33,6 +35,7 @@ export default function Coach() {
           ['copy', 'Gerar Copy', Wand2],
           ['rewrite', 'Reescrever', RefreshCw],
           ['persona', 'Persona', BadgeCheck],
+          ['review', 'Review do Funil', Activity],
         ] as Array<[Tab, string, typeof Wand2]>).map(([k, label, Icon]) => (
           <button
             key={k}
@@ -52,6 +55,189 @@ export default function Coach() {
       {tab === 'copy' && <CopyGenTab />}
       {tab === 'rewrite' && <RewriteTab />}
       {tab === 'persona' && <PersonaGenTab />}
+      {tab === 'review' && <FunnelReviewTab />}
+    </div>
+  );
+}
+
+
+function FunnelReviewTab() {
+  const [selectedFlow, setSelectedFlow] = useState<{ id: number; slug: string; title: string } | null>(null);
+  const [periodDays, setPeriodDays] = useState(30);
+  const [review, setReview] = useState<FunnelReview | null>(null);
+  const [funnelSummary, setFunnelSummary] = useState<{
+    conversion_pct: number;
+    unique_leads: number;
+    high_drop_nodes: string[];
+  } | null>(null);
+  const [lowConfidence, setLowConfidence] = useState<string | null>(null);
+
+  const { data: flows } = useQuery({
+    queryKey: ['blueprints'],
+    queryFn: blueprintsApi.list,
+  });
+
+  const reviewMut = useMutation({
+    mutationFn: () => {
+      if (!selectedFlow) throw new Error('flow não selecionado');
+      return coachApi.funnelReview({
+        flow_id: selectedFlow.id,
+        period_days: periodDays,
+      });
+    },
+    onSuccess: (res) => {
+      if (res.low_confidence) {
+        setLowConfidence(res.message || 'Dados insuficientes pra review.');
+        setReview(null);
+        return;
+      }
+      setLowConfidence(null);
+      setReview(res.review || null);
+      setFunnelSummary(res.funnel_summary || null);
+      toast.success(`Review gerado — score ${res.review?.overall_score ?? '?'}/100`);
+    },
+    onError: handleApiError('Erro ao gerar review'),
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-bg-surface border border-border rounded-3xl p-6 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+          <div>
+            <label className="text-[10px] uppercase font-black tracking-widest text-secondary mb-1.5 block">
+              Fluxo a analisar
+            </label>
+            <select
+              value={selectedFlow?.id || ''}
+              onChange={(e) => {
+                const id = Number(e.target.value) || null;
+                const f = (flows ?? []).find((x) => x.id === id);
+                setSelectedFlow(f ? { id: f.id, slug: f.slug, title: f.title } : null);
+              }}
+              className="w-full bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-sm"
+            >
+              <option value="">Selecione…</option>
+              {(flows ?? []).map((f) => (
+                <option key={f.id} value={f.id}>{f.title}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] uppercase font-black tracking-widest text-secondary mb-1.5 block">
+              Período
+            </label>
+            <select
+              value={periodDays}
+              onChange={(e) => setPeriodDays(Number(e.target.value))}
+              className="bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-sm"
+            >
+              <option value={7}>7 dias</option>
+              <option value={14}>14 dias</option>
+              <option value={30}>30 dias</option>
+              <option value={60}>60 dias</option>
+              <option value={90}>90 dias</option>
+            </select>
+          </div>
+        </div>
+
+        <button
+          onClick={() => reviewMut.mutate()}
+          disabled={!selectedFlow || reviewMut.isPending}
+          className="w-full px-5 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-30 text-white rounded-xl text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2"
+        >
+          <Brain className="w-4 h-4" />
+          {reviewMut.isPending ? 'Analisando…' : 'Gerar review'}
+        </button>
+      </div>
+
+      {lowConfidence && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-start gap-2">
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <div className="font-black text-amber-300 mb-1">Confiança baixa</div>
+            <p className="text-amber-200/80 text-xs">{lowConfidence}</p>
+          </div>
+        </div>
+      )}
+
+      {review && (
+        <div className="space-y-4">
+          {/* Score header */}
+          <div className="bg-bg-surface border border-border rounded-3xl p-6 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] uppercase font-black tracking-widest text-secondary mb-1">
+                Score do funil
+              </div>
+              <div className="text-5xl font-black">
+                {review.overall_score}<span className="text-secondary text-2xl">/100</span>
+              </div>
+              {review.key_metric_callout && (
+                <p className="text-sm text-secondary mt-2 max-w-md">
+                  {review.key_metric_callout}
+                </p>
+              )}
+            </div>
+            {funnelSummary && (
+              <div className="text-right space-y-1">
+                <div className="text-[10px] uppercase tracking-widest text-secondary font-black">
+                  {funnelSummary.unique_leads} leads · {funnelSummary.conversion_pct}% conv
+                </div>
+                {funnelSummary.high_drop_nodes.length > 0 && (
+                  <div className="text-[10px] text-rose-400 font-bold">
+                    Nós críticos: {funnelSummary.high_drop_nodes.length}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Strengths */}
+          {review.strengths?.length > 0 && (
+            <div className="bg-emerald-500/5 border border-emerald-500/30 rounded-3xl p-5">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-3 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Pontos fortes
+              </h3>
+              <ul className="space-y-2">
+                {review.strengths.map((s, i) => (
+                  <li key={i} className="text-sm flex gap-2">
+                    <span className="text-emerald-400">✓</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Opportunities */}
+          {review.opportunities?.length > 0 && (
+            <div className="bg-bg-surface border border-border rounded-3xl p-5">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-secondary mb-3 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-accent-amethyst" />
+                Oportunidades de melhoria ({review.opportunities.length})
+              </h3>
+              <ol className="space-y-3">
+                {review.opportunities.map((op, i) => (
+                  <li key={i} className="bg-bg-primary border border-border rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] uppercase font-black tracking-widest text-accent-amethyst">
+                        {i + 1}
+                      </span>
+                      {op.node_id && (
+                        <span className="text-[10px] font-mono bg-bg-surface px-2 py-0.5 rounded">
+                          {op.node_id}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-rose-300 mb-1">{op.issue}</div>
+                    <div className="text-[12px] text-emerald-300">→ {op.suggestion}</div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

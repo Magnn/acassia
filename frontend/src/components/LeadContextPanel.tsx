@@ -13,6 +13,7 @@ import { toast } from '../lib/toast';
 import ScoreBadge from './ScoreBadge';
 import AudioSuggestPanel from './AudioSuggestPanel';
 import TarotTrendsCard from './TarotTrendsCard';
+import LeadSummaryCard from './LeadSummaryCard';
 
 interface Props {
   leadId: number | null;
@@ -156,6 +157,7 @@ export default function LeadContextPanel({ leadId }: Props) {
       <TarotTrendsCard leadId={leadId} />
 
       <SpiritualIntentCard leadId={leadId} spiritual={spiritual} />
+      <LeadSummaryCard leadId={leadId} />
       <AudioSuggestPanel leadId={leadId} />
       <NextActionCard leadId={leadId} />
       <NotesCard leadId={leadId} />
