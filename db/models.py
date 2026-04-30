@@ -1267,6 +1267,71 @@ class WaInboundLog(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False, index=True)
 
 
+class FlowNodeExperiment(Base):
+    """
+    A/B test em no de mensagem (Frente 3.28-3.29).
+
+    Cada experimento tem variantes A (original) e B (alternativa).
+    Assignment deterministico via hash(experiment_id + lead_id) % 100.
+
+    winning_event:
+        responded — lead respondeu apos receber a msg
+        clicked   — lead clicou em link/oferta
+        paid      — lead converteu (PaymentEventReceipt)
+        custom    — definido por callback
+
+    status:
+        running              — coletando dados
+        completed_winner_a   — A venceu por significancia
+        completed_winner_b   — B venceu por significancia
+        completed_no_diff    — sem diferenca apos N>=500
+        stopped_manual       — admin parou
+    """
+    __tablename__ = "flow_node_experiments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    flow_id = Column(Integer, nullable=True, index=True)
+    flow_slug = Column(String(120), nullable=True, index=True)
+    node_id = Column(String(120), nullable=False, index=True)
+    name = Column(String(200), nullable=True)
+    variant_a_text = Column(Text, nullable=False)
+    variant_b_text = Column(Text, nullable=False)
+    split_pct = Column(Integer, default=50, nullable=False)  # % do A
+    winning_event = Column(String(40), default="responded", nullable=False)
+    min_sample_size = Column(Integer, default=50, nullable=False)
+    confidence_threshold = Column(Float, default=0.95, nullable=False)
+    started_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    winner_picked_at = Column(DateTime(timezone=True), nullable=True)
+    winner = Column(String(1), nullable=True)  # 'A' or 'B'
+    p_value = Column(Float, nullable=True)
+    lift_pct = Column(Float, nullable=True)
+    status = Column(String(30), default="running", nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class FlowNodeExperimentAssignment(Base):
+    """
+    Lead foi assignado a uma variante (Frente 3.28).
+    Conversao detectada via WaPhoneTenantBinding ou Mensagem subsequente.
+    """
+    __tablename__ = "flow_node_experiment_assignments"
+    __table_args__ = (
+        UniqueConstraint("experiment_id", "lead_id", name="uq_exp_lead"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    experiment_id = Column(
+        Integer, ForeignKey("flow_node_experiments.id"), nullable=False, index=True,
+    )
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    variant = Column(String(1), nullable=False)
+    assigned_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    converted = Column(Boolean, default=False, nullable=False, index=True)
+    converted_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class SpiritualGlossaryTerm(Base):
     """
     Glossario espiritual injetado no system prompt do GPT (Frente 4.21).

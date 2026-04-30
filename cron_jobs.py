@@ -355,7 +355,19 @@ def run_hourly():
     hourly_dispatch_daily_horoscopes()
     hourly_dispatch_daily_personal_messages()
     hourly_process_scheduled_readings()
+    hourly_pick_ab_winners()
     logger.info("[cron] hourly done")
+
+
+def hourly_pick_ab_winners():
+    """Avalia experimentos A/B e promove vencedoras (Frente 3.29)."""
+    try:
+        import flow_experiments
+        n = flow_experiments.hourly_pick_winners()
+        if n:
+            logger.info("[cron.hourly_pick_ab_winners] experimentos_avaliados=%d", n)
+    except Exception as exc:
+        logger.warning("[cron.ab_test_winner] falha: %s", exc)
 
 
 def hourly_process_scheduled_readings():
