@@ -142,9 +142,36 @@ def _serialize_binding(b: models.WaPhoneTenantBinding) -> dict:
         "status": b.status,
         "last_verified_at": b.last_verified_at.isoformat() if b.last_verified_at else None,
         "last_error": b.last_error,
+        "subscribed_at": b.subscribed_at.isoformat() if b.subscribed_at else None,
+        "subscribe_error": b.subscribe_error,
+        "first_inbound_at": b.first_inbound_at.isoformat() if b.first_inbound_at else None,
+        "last_inbound_at": b.last_inbound_at.isoformat() if b.last_inbound_at else None,
+        "inbound_count": b.inbound_count or 0,
         "created_at": b.created_at.isoformat(),
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
     }
+
+
+def _try_subscribe(binding: models.WaPhoneTenantBinding, access_token: str) -> None:
+    """
+    Tenta subscribed_apps automatico no WABA. Se falhar, registra erro
+    em binding.subscribe_error mas nao bloqueia o save.
+    """
+    if not binding.waba_id:
+        binding.subscribe_error = "waba_id_missing"
+        return
+    try:
+        from meta_graph_admin import subscribe_apps_to_waba
+        ok, body = subscribe_apps_to_waba(binding.waba_id, access_token)
+        if ok and (body.get("success") is True or body.get("data") is not None):
+            binding.subscribed_at = datetime.now(timezone.utc)
+            binding.subscribe_error = None
+        else:
+            err = (body.get("error") or {}).get("message") or "unknown"
+            binding.subscribe_error = str(err)[:500]
+    except Exception as exc:
+        logger.warning("[integrations.whatsapp.subscribe] falha: %s", exc)
+        binding.subscribe_error = str(exc)[:500]
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────
@@ -284,6 +311,10 @@ def save_binding():
         binding.last_error = None
         binding.updated_at = datetime.now(timezone.utc)
 
+        # Auto-subscribe ao webhook field "messages" no WABA — best effort
+        if not skip_validation and waba_id:
+            _try_subscribe(binding, access_token)
+
         db.commit()
         db.refresh(binding)
 
@@ -381,6 +412,116 @@ def remove_binding():
             db.rollback()
 
         return jsonify({"ok": True})
+    finally:
+        db.close()
+
+
+@integrations_wa_bp.route("/subscribe", methods=["POST"])
+@login_required
+def force_subscribe():
+    """
+    Re-tenta subscribed_apps. Util quando o save inicial falhou
+    (ex: app sem permissao ainda) e o user corrigiu na Meta.
+    """
+    db = SessionLocal()
+    try:
+        binding = db.query(models.WaPhoneTenantBinding).filter_by(
+            tenant_id=current_user.tenant_id,
+        ).first()
+        if not binding:
+            return jsonify({"error": "no_binding"}), 404
+        if not binding.waba_id:
+            return jsonify({"error": "waba_id_missing", "hint": "Re-salve com waba_id"}), 422
+
+        # Pega access_token do TenantFlowSecret
+        sec = db.query(models.TenantFlowSecret).filter_by(
+            tenant_id=current_user.tenant_id, key="whatsapp.access_token",
+        ).first()
+        if not sec or not sec.value_cipher:
+            return jsonify({"error": "access_token_missing"}), 422
+
+        _try_subscribe(binding, sec.value_cipher)
+        binding.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(binding)
+
+        return jsonify({
+            "ok": binding.subscribed_at is not None,
+            "binding": _serialize_binding(binding),
+        })
+    finally:
+        db.close()
+
+
+@integrations_wa_bp.route("/test-send", methods=["POST"])
+@login_required
+def test_send():
+    """
+    Envia mensagem de texto real via Meta Cloud API pra validar end-to-end.
+    Body: {to: "5511..."} (E.164 sem +). Mensagem fixa de teste.
+    Body opcional: {body: "texto custom"}.
+    """
+    body = request.get_json(silent=True) or {}
+    to = (body.get("to") or "").strip().replace("+", "").replace(" ", "")
+    text = (body.get("body") or "").strip() or (
+        "✦ Acassia conectada com sucesso. Esse e um teste de envio."
+    )
+
+    if not to or len(to) < 8:
+        return jsonify({"error": "to_invalid"}), 422
+
+    db = SessionLocal()
+    try:
+        binding = db.query(models.WaPhoneTenantBinding).filter_by(
+            tenant_id=current_user.tenant_id,
+        ).first()
+        if not binding:
+            return jsonify({"error": "no_binding"}), 404
+
+        sec = db.query(models.TenantFlowSecret).filter_by(
+            tenant_id=current_user.tenant_id, key="whatsapp.access_token",
+        ).first()
+        if not sec or not sec.value_cipher:
+            return jsonify({"error": "access_token_missing"}), 422
+
+        try:
+            from meta_graph_admin import send_text
+            ok, resp = send_text(
+                binding.phone_number_id, sec.value_cipher,
+                to=to, body=text,
+            )
+        except Exception as exc:
+            logger.exception("[integrations.test_send] falha: %s", exc)
+            return jsonify({"error": "send_failed", "message": str(exc)[:200]}), 502
+
+        if not ok:
+            err = (resp.get("error") or {})
+            return jsonify({
+                "ok": False,
+                "error": "graph_error",
+                "graph_error": err,
+            }), 200
+
+        # Audit
+        try:
+            db.add(models.AuditEvent(
+                tenant_id=current_user.tenant_id,
+                actor_user_id=current_user.id,
+                event_type="integrations.whatsapp.test_send",
+                target_type="phone_number_id",
+                target_id=binding.phone_number_id,
+                payload={"to": to, "wamid": (resp.get("messages") or [{}])[0].get("id")},
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        return jsonify({
+            "ok": True,
+            "message_id": (resp.get("messages") or [{}])[0].get("id"),
+            "to": to,
+            "raw": resp,
+        })
     finally:
         db.close()
 

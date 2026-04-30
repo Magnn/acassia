@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2, XCircle, Webhook, Copy, RefreshCw, Trash2,
   Phone, KeyRound, Shield, AlertTriangle, ExternalLink, Eye, EyeOff,
+  Send, Activity, Inbox,
 } from 'lucide-react';
 import { integrationsApi } from '../api/integrations';
 import { handleApiError } from '../lib/handleApiError';
@@ -95,6 +96,20 @@ export default function WhatsAppConnect() {
     onError: handleApiError('Erro ao rotacionar'),
   });
 
+  const subscribeMut = useMutation({
+    mutationFn: () => integrationsApi.whatsapp.subscribe(),
+    onSuccess: (res) => {
+      if (res.ok) {
+        toast.success('App subscrita ao WABA');
+      } else {
+        const err = res.binding?.subscribe_error || 'Falhou — verifique permissões na Meta';
+        toast.error(err);
+      }
+      qc.invalidateQueries({ queryKey: ['integrations-whatsapp'] });
+    },
+    onError: handleApiError('Erro ao subscrever'),
+  });
+
   const copy = (text: string, label = 'Copiado') => {
     navigator.clipboard.writeText(text);
     toast.success(label);
@@ -138,14 +153,20 @@ export default function WhatsAppConnect() {
       </header>
 
       {!editing && binding ? (
-        <BindingView
-          binding={binding}
-          webhookUrl={data!.webhook_url}
-          onEdit={() => setEditing(true)}
-          onCopy={copy}
-          onRotate={() => rotateMut.mutate()}
-          rotating={rotateMut.isPending}
-        />
+        <>
+          <BindingView
+            binding={binding}
+            webhookUrl={data!.webhook_url}
+            onEdit={() => setEditing(true)}
+            onCopy={copy}
+            onRotate={() => rotateMut.mutate()}
+            rotating={rotateMut.isPending}
+            onSubscribe={() => subscribeMut.mutate()}
+            subscribing={subscribeMut.isPending}
+          />
+          <InboundTelemetry binding={binding} />
+          <TestSendForm />
+        </>
       ) : !editing && !binding ? (
         <EmptyState onStart={() => setEditing(true)} webhookUrl={data!.webhook_url} />
       ) : (
@@ -208,6 +229,7 @@ function EmptyState({ onStart, webhookUrl }: { onStart: () => void; webhookUrl: 
 
 function BindingView({
   binding, webhookUrl, onEdit, onCopy, onRotate, rotating,
+  onSubscribe, subscribing,
 }: {
   binding: import('../api/integrations').WaBinding;
   webhookUrl: string;
@@ -215,6 +237,8 @@ function BindingView({
   onCopy: (text: string, label?: string) => void;
   onRotate: () => void;
   rotating: boolean;
+  onSubscribe: () => void;
+  subscribing: boolean;
 }) {
   const statusColor = {
     active: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
@@ -266,6 +290,36 @@ function BindingView({
         </div>
       )}
 
+      <div className="bg-bg-surface border border-border rounded-lg p-2.5 text-[11px]">
+        <div className="flex items-center gap-2">
+          {binding.subscribed_at ? (
+            <>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-emerald-400 font-bold">Subscrita ao WABA</span>
+              <span className="text-secondary text-[10px] ml-auto">
+                {new Date(binding.subscribed_at).toLocaleString('pt-BR')}
+              </span>
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-amber-300 font-bold">App não subscrita ao WABA</span>
+              <button
+                onClick={onSubscribe}
+                disabled={subscribing}
+                className="ml-auto text-[10px] text-accent-amethyst hover:underline font-bold flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${subscribing ? 'animate-spin' : ''}`} />
+                {subscribing ? 'Subscrevendo…' : 'Tentar subscrever'}
+              </button>
+            </>
+          )}
+        </div>
+        {binding.subscribe_error && !binding.subscribed_at && (
+          <div className="text-[10px] text-rose-400 mt-1.5">{binding.subscribe_error}</div>
+        )}
+      </div>
+
       <div className="flex gap-2 pt-2 border-t border-border">
         <button
           onClick={onEdit}
@@ -283,6 +337,153 @@ function BindingView({
           Rotacionar verify_token
         </button>
       </div>
+    </div>
+  );
+}
+
+
+function InboundTelemetry({
+  binding,
+}: {
+  binding: import('../api/integrations').WaBinding;
+}) {
+  const hasInbound = (binding.inbound_count || 0) > 0;
+  return (
+    <div
+      className={`rounded-2xl p-4 border ${
+        hasInbound
+          ? 'bg-emerald-500/5 border-emerald-500/30'
+          : 'bg-amber-500/5 border-amber-500/30'
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        {hasInbound ? (
+          <Inbox className="w-4 h-4 text-emerald-400" />
+        ) : (
+          <Activity className="w-4 h-4 text-amber-300" />
+        )}
+        <span className={`text-[10px] font-black uppercase tracking-widest ${hasInbound ? 'text-emerald-400' : 'text-amber-300'}`}>
+          {hasInbound ? 'Recebendo mensagens' : 'Aguardando primeira mensagem'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 text-[11px]">
+        <div>
+          <div className="text-[9px] uppercase tracking-widest text-secondary">Total inbound</div>
+          <div className="text-xl font-black tabular-nums mt-0.5">{binding.inbound_count}</div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-widest text-secondary">1ª msg</div>
+          <div className="text-[11px] font-bold mt-0.5">
+            {binding.first_inbound_at
+              ? new Date(binding.first_inbound_at).toLocaleString('pt-BR')
+              : '—'}
+          </div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-widest text-secondary">Última msg</div>
+          <div className="text-[11px] font-bold mt-0.5">
+            {binding.last_inbound_at
+              ? new Date(binding.last_inbound_at).toLocaleString('pt-BR')
+              : '—'}
+          </div>
+        </div>
+      </div>
+
+      {!hasInbound && (
+        <p className="text-[11px] text-secondary mt-2">
+          Mande uma msg do seu celular para o número conectado pra confirmar
+          o webhook. Costuma chegar em 1-2 segundos.
+        </p>
+      )}
+    </div>
+  );
+}
+
+
+function TestSendForm() {
+  const [to, setTo] = useState('');
+  const [body, setBody] = useState('');
+  const [result, setResult] = useState<
+    { ok: true; message_id: string } | { ok: false; message: string } | null
+  >(null);
+
+  const sendMut = useMutation({
+    mutationFn: () =>
+      integrationsApi.whatsapp.testSend({
+        to: to.trim(),
+        body: body.trim() || undefined,
+      }),
+    onSuccess: (res) => {
+      if (res.ok && res.message_id) {
+        setResult({ ok: true, message_id: res.message_id });
+        toast.success('Mensagem enviada — confira o WhatsApp do destinatário');
+      } else {
+        const msg =
+          res.graph_error?.message ||
+          (typeof res.error === 'string' ? res.error : 'Erro desconhecido');
+        setResult({ ok: false, message: msg });
+      }
+    },
+    onError: handleApiError('Erro ao enviar'),
+  });
+
+  const valid = to.trim().replace(/[^0-9]/g, '').length >= 10;
+
+  return (
+    <div className="bg-bg-primary border border-border rounded-2xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Send className="w-4 h-4 text-accent-amethyst" />
+        <h4 className="text-[10px] font-black uppercase tracking-widest">
+          Enviar mensagem de teste
+        </h4>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_auto] gap-2">
+        <input
+          type="tel"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="55119xxxxxxxx"
+          className="bg-bg-surface border border-border rounded-xl px-3 py-2 text-xs font-mono"
+        />
+        <input
+          type="text"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Mensagem (deixe vazio pra usar default)"
+          className="bg-bg-surface border border-border rounded-xl px-3 py-2 text-xs"
+          maxLength={500}
+        />
+        <button
+          onClick={() => sendMut.mutate()}
+          disabled={!valid || sendMut.isPending}
+          className="px-4 py-2 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-30 text-white rounded-xl text-[11px] font-black uppercase tracking-widest"
+        >
+          {sendMut.isPending ? 'Enviando…' : 'Enviar'}
+        </button>
+      </div>
+      <div className="text-[10px] text-secondary">
+        Em E.164 sem +. Ex.: <code className="bg-bg-surface px-1 rounded">5511999999999</code>.
+        Custos da Meta aplicam-se normalmente.
+      </div>
+      {result && (
+        <div
+          className={`text-[11px] flex items-start gap-1 ${
+            result.ok ? 'text-emerald-400' : 'text-rose-400'
+          }`}
+        >
+          {result.ok ? (
+            <CheckCircle2 className="w-3 h-3 mt-0.5 flex-shrink-0" />
+          ) : (
+            <XCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+          )}
+          <span>
+            {result.ok
+              ? `wamid: ${result.message_id}`
+              : result.message}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

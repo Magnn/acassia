@@ -28,6 +28,11 @@ export interface WaBinding {
   status: 'pending' | 'active' | 'failed';
   last_verified_at: string | null;
   last_error: string | null;
+  subscribed_at: string | null;
+  subscribe_error: string | null;
+  first_inbound_at: string | null;
+  last_inbound_at: string | null;
+  inbound_count: number;
   created_at: string;
   updated_at: string | null;
 }
@@ -87,5 +92,19 @@ export const integrationsApi = {
         '/saas/integrations/whatsapp/rotate-verify-token',
         {},
       ),
+
+    subscribe: () =>
+      api.post<{ ok: boolean; binding: WaBinding }>(
+        '/saas/integrations/whatsapp/subscribe', {},
+      ),
+
+    testSend: (payload: { to: string; body?: string }) =>
+      api.post<{
+        ok: boolean;
+        message_id?: string;
+        to?: string;
+        error?: string;
+        graph_error?: { message?: string; code?: number };
+      }>('/saas/integrations/whatsapp/test-send', payload),
   },
 };

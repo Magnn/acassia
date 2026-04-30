@@ -1195,6 +1195,13 @@ class WaPhoneTenantBinding(Base):
     status = Column(String(20), default="pending", nullable=False)  # pending|active|failed
     last_verified_at = Column(DateTime(timezone=True), nullable=True)
     last_error = Column(Text, nullable=True)
+    # Subscribe automatico ao webhook field "messages" via Graph API
+    subscribed_at = Column(DateTime(timezone=True), nullable=True)
+    subscribe_error = Column(Text, nullable=True)
+    # Telemetria de inbound: 1ª msg + acumulado
+    first_inbound_at = Column(DateTime(timezone=True), nullable=True)
+    last_inbound_at = Column(DateTime(timezone=True), nullable=True)
+    inbound_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
     updated_at = Column(
         DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False,

@@ -4080,6 +4080,48 @@ def _triagem_meta(data):
             logger.warning("⚠️ [TRIAGEM] resolver tenant falhou: %s", _resolve_exc)
             resolved_tenant = None
 
+        # Telemetria inbound: first_inbound_at / last_inbound_at / inbound_count
+        # Best-effort — falha aqui nao deve interromper o pipeline de mensagem.
+        if phone_number_id:
+            try:
+                from db.database import SessionLocal as _SS
+                from db import models as _models
+                from datetime import datetime as _dt, timezone as _tz
+                _db_t = _SS()
+                try:
+                    _binding = _db_t.query(_models.WaPhoneTenantBinding).filter_by(
+                        phone_number_id=phone_number_id,
+                    ).first()
+                    if _binding is not None:
+                        _now_t = _dt.now(_tz.utc)
+                        _is_first = _binding.first_inbound_at is None
+                        if _is_first:
+                            _binding.first_inbound_at = _now_t
+                        _binding.last_inbound_at = _now_t
+                        _binding.inbound_count = (_binding.inbound_count or 0) + 1
+                        _db_t.commit()
+                        if _is_first:
+                            logger.info(
+                                "🎉 [WEBHOOK] Primeira mensagem inbound tenant=%s phone_id=%s",
+                                _binding.tenant_id, phone_number_id,
+                            )
+                            try:
+                                _db_t.add(_models.AuditEvent(
+                                    tenant_id=_binding.tenant_id,
+                                    actor_user_id=None,
+                                    event_type="integrations.whatsapp.first_inbound",
+                                    target_type="phone_number_id",
+                                    target_id=phone_number_id,
+                                    payload={"at": _now_t.isoformat()},
+                                ))
+                                _db_t.commit()
+                            except Exception:
+                                _db_t.rollback()
+                finally:
+                    _db_t.close()
+            except Exception as _telemetry_exc:
+                logger.warning("⚠️ [TRIAGEM] telemetria inbound falhou: %s", _telemetry_exc)
+
         msg = value["messages"][0]
         msg_id = msg.get("id")
 
