@@ -29,6 +29,9 @@ export interface LeadMessage {
   timestamp: string | null;
   media_url?: string;
   media_type?: string;
+  wamid?: string | null;
+  delivery_status?: 'sent' | 'delivered' | 'read' | 'failed' | null;
+  delivery_status_at?: string | null;
 }
 
 export interface LeadDetail {

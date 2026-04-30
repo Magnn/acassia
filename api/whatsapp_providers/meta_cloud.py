@@ -14,12 +14,26 @@ from __future__ import annotations
 import logging
 import os
 import random
+import threading
 import time
 from typing import Any
 
 import requests
 
 from .base import ProviderMode, SendResult, WhatsAppProvider
+
+
+# Thread-local pra propagar wamid do envio mais recente sem quebrar
+# a assinatura legada de enviar_mensagem. Engine chama pop_last_wamid()
+# logo apos um send pra associar ao Mensagem persistido.
+_LAST_WAMID = threading.local()
+
+
+def pop_last_wamid() -> str | None:
+    """Retorna e limpa o wamid do envio mais recente desta thread."""
+    val = getattr(_LAST_WAMID, "value", None)
+    _LAST_WAMID.value = None
+    return val
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +139,17 @@ class MetaCloudProvider(WhatsAppProvider):
                 )
                 status = response.status_code
                 if status == 200:
+                    # Captura wamid do response pra tracking de delivery
+                    try:
+                        body = response.json() or {}
+                        msgs = body.get("messages") or []
+                        if msgs and isinstance(msgs, list):
+                            wamid = msgs[0].get("id") if isinstance(msgs[0], dict) else None
+                            if wamid:
+                                _LAST_WAMID.value = wamid
+                    except Exception:
+                        pass
+
                     if attempt > 1:
                         logger.info(
                             "[meta_cloud] tenant=%s %s enviado para %s (sucesso na tentativa %s/%s)",

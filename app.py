@@ -4291,12 +4291,77 @@ def _log_wa_inbound(
         logger.warning("⚠️ [TRIAGEM] log_wa_inbound falhou: %s", exc)
 
 
+def _process_status_events(value: dict, phone_number_id: str | None) -> None:
+    """
+    Processa value.statuses (delivery receipts da Meta).
+    Cada status tem: {id (wamid), status (sent|delivered|read|failed),
+                      timestamp, recipient_id}.
+
+    Atualiza Mensagem.delivery_status pelo wamid.
+    """
+    statuses = value.get("statuses") or []
+    if not isinstance(statuses, list) or not statuses:
+        return
+
+    from db.database import SessionLocal as _SS
+    from db import models as _models
+    from datetime import datetime as _dt, timezone as _tz
+
+    # Status priority: failed > read > delivered > sent
+    rank = {"sent": 1, "delivered": 2, "read": 3, "failed": 4}
+    db = _SS()
+    updated = 0
+    try:
+        for s in statuses:
+            if not isinstance(s, dict):
+                continue
+            wamid = s.get("id")
+            new_status = (s.get("status") or "").strip().lower()
+            ts = s.get("timestamp")
+            if not wamid or new_status not in rank:
+                continue
+            try:
+                ts_dt = _dt.fromtimestamp(int(ts), tz=_tz.utc) if ts else _dt.now(_tz.utc)
+            except Exception:
+                ts_dt = _dt.now(_tz.utc)
+
+            msg = db.query(_models.Mensagem).filter_by(wamid=wamid).first()
+            if msg is None:
+                continue
+
+            cur = (msg.delivery_status or "").lower()
+            if cur and rank.get(cur, 0) >= rank[new_status]:
+                continue
+            msg.delivery_status = new_status
+            msg.delivery_status_at = ts_dt
+            updated += 1
+        if updated:
+            db.commit()
+            logger.info(
+                "📬 [DELIVERY] %d mensagens atualizadas (phone_id=%s)",
+                updated, phone_number_id or "unknown",
+            )
+    except Exception as exc:
+        logger.warning("⚠️ [DELIVERY] processamento falhou: %s", exc)
+    finally:
+        db.close()
+
+
 def _triagem_meta(data):
     """Extrai informações do JSON da Meta e gerencia Idempotência."""
     try:
         entry = data.get("entry", [{}])[0]
         changes = entry.get("changes", [{}])[0]
         value = changes.get("value", {})
+
+        # Delivery receipts (Frente 4 ext): processa antes de checar messages
+        if "statuses" in value:
+            meta_dict_d = value.get("metadata") or {}
+            phone_id_d = meta_dict_d.get("phone_number_id") or ""
+            try:
+                _process_status_events(value, phone_id_d)
+            except Exception as _ds_exc:
+                logger.warning("⚠️ [DELIVERY] falha: %s", _ds_exc)
 
         if "messages" not in value: return
 

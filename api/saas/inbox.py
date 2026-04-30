@@ -397,10 +397,16 @@ def conversation_data(lead_id: int):
             msgs_data.append({
                 "id": m.id,
                 "texto": m.texto,
-                "origem": m.origem,
+                "origem": getattr(m, "remetente", None),
                 "timestamp": m.timestamp.isoformat() if m.timestamp else None,
-                "media_url": m.media_url,
-                "media_type": m.media_type
+                "media_url": getattr(m, "media_url", None),
+                "media_type": getattr(m, "tipo", None),
+                "wamid": getattr(m, "wamid", None),
+                "delivery_status": getattr(m, "delivery_status", None),
+                "delivery_status_at": (
+                    m.delivery_status_at.isoformat()
+                    if getattr(m, "delivery_status_at", None) else None
+                ),
             })
             
         return jsonify({

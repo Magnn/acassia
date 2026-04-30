@@ -38,6 +38,22 @@ const SPIRITUAL_EMOJI: Record<string, string> = {
 
 const DENSITY_KEY = 'acassia.inbox.density';
 
+function DeliveryStatus({ status }: { status: string | null | undefined }) {
+  if (!status) return <Clock className="w-2.5 h-2.5" />;
+  if (status === 'failed') {
+    return <span title="Falhou">⚠</span>;
+  }
+  if (status === 'read') {
+    return <span title="Lida" className="text-sky-400">✓✓</span>;
+  }
+  if (status === 'delivered') {
+    return <span title="Entregue">✓✓</span>;
+  }
+  // sent
+  return <span title="Enviado">✓</span>;
+}
+
+
 function ScoreChip({
   label, Icon, color, active, onClick,
 }: {
@@ -643,7 +659,7 @@ export default function Leads() {
                             <div className="whitespace-pre-wrap break-words leading-relaxed font-medium">{m.texto || '(Mídia)'}</div>
                             <div className={`text-[9px] font-black mt-2 flex items-center justify-end gap-1.5 opacity-40`}>
                               {m.timestamp && new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              {!isUser && <Clock className="w-2.5 h-2.5" />}
+                              {!isUser && <DeliveryStatus status={m.delivery_status ?? null} />}
                             </div>
                           </div>
                         </div>

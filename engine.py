@@ -2654,12 +2654,27 @@ class Engine:
         auto_commit: bool = True,
     ):
         try:
+            # Captura wamid + status sent pra delivery tracking (Frente 4 ext)
+            wamid = None
+            delivery_status = None
+            if remetente == "bot":
+                try:
+                    from api.whatsapp_providers.meta_cloud import pop_last_wamid
+                    wamid = pop_last_wamid()
+                    if wamid:
+                        delivery_status = "sent"
+                except Exception:
+                    pass
+
             m = Mensagem(
                 lead_id=lead_id,
                 remetente=remetente,
                 texto=texto,
                 tipo=tipo,
                 media_url=media_url,
+                wamid=wamid,
+                delivery_status=delivery_status,
+                delivery_status_at=datetime.now(timezone.utc) if delivery_status else None,
                 timestamp=datetime.now(timezone.utc)
             )
             db.add(m)

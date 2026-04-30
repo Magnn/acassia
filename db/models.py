@@ -112,6 +112,10 @@ class Mensagem(Base):
     texto = Column(Text, nullable=False)
     tipo = Column(String(20), default="text")
     media_url = Column(Text, nullable=True)
+    # Frente 4 ext — tracking de entrega Meta (wamid + status)
+    wamid = Column(String(128), nullable=True, index=True)
+    delivery_status = Column(String(20), nullable=True)  # sent|delivered|read|failed
+    delivery_status_at = Column(DateTime(timezone=True), nullable=True)
 
     intencao = Column(String(50), nullable=True)
     sentimento = Column(String(50), nullable=True)
