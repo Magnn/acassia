@@ -86,4 +86,25 @@ export const spiritualApi = {
     api.post<{ ok: boolean; preview: string }>(
       `/saas/spiritual/leads/${leadId}/send-summary`, {},
     ),
+
+  extractBirthDate: (params: {
+    text: string;
+    lead_id?: number;
+    persist?: boolean;
+    prefer_gemini?: boolean;
+  }) =>
+    api.post<{
+      date: string | null;
+      year: number | null;
+      month: number | null;
+      day: number | null;
+      confidence: number;
+      source: string;
+      needs_clarification: boolean;
+      clarification_question: string | null;
+      parse_error: string | null;
+      confirmation_message: string;
+      persisted: boolean;
+      computed_sign?: string;
+    }>('/saas/spiritual/extract-birth-date', params),
 };

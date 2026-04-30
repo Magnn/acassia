@@ -788,6 +788,38 @@ class Engine:
                 if not texto_sniff and meta.get("caption"):
                     texto_sniff = str(meta.get("caption") or "").strip()
 
+                # ── BIRTH DATE SNIFFER (Frente 4.25) ──
+                # Detecta data de nascimento em mensagem natural quando lead nao
+                # tem birth_date ainda. So persiste em alta confianca + hint
+                # textual de data — zero false-positive em conversas normais.
+                if texto_sniff and not getattr(lead, "birth_date", None):
+                    try:
+                        import birthdate_extractor as _bde
+                        _bd_result = _bde.sniff_and_persist(texto_sniff, lead)
+                        if _bd_result is not None and _bd_result.date is not None:
+                            ctx.metadata["lead_birth_date_capturado"] = _bd_result.date.isoformat()
+                            ctx.metadata["lead_signo_capturado"] = getattr(lead, "signo", None)
+                            try:
+                                db.add(EventoAudit(
+                                    lead_id=lead.id,
+                                    evento="birth_date_auto_capturado",
+                                    dados={
+                                        "date": _bd_result.date.isoformat(),
+                                        "confidence": _bd_result.confidence,
+                                        "source": _bd_result.source,
+                                        "signo": getattr(lead, "signo", None),
+                                    },
+                                ))
+                            except Exception:
+                                pass
+                            logger.info(
+                                "🎂 [SNIFFER] Birth date auto-capturado lead=%s date=%s signo=%s",
+                                lead.id, _bd_result.date.isoformat(),
+                                getattr(lead, "signo", "?"),
+                            )
+                    except Exception as _bd_exc:
+                        logger.warning("[SNIFFER] birthdate falhou (fail-open): %s", _bd_exc)
+
                 _tinha_contato_decl = bool(meta.get("lead_contato_salvo_declarado"))
                 _ev_sniffer = sniffer_aplicar_fase1_flags(
                     meta,

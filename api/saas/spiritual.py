@@ -309,6 +309,78 @@ def interpret_numerology_route(lead_id: int):
 # ─── Send summary via WhatsApp ────────────────────────────────────────
 
 
+@spiritual_bp.route("/extract-birth-date", methods=["POST"])
+@login_required
+def extract_birth_date():
+    """
+    Extrai data de nascimento de mensagem livre (Frente 4.25).
+
+    Body: {text: "23 de maio de 1986", lead_id?: int, persist?: bool, prefer_gemini?: bool}
+
+    Se persist=True e lead_id fornecido e parse confiante (date+year+month+day),
+    grava lead.birth_date e calcula signo automaticamente.
+
+    Retorna sempre o resultado do parse (mesmo parcial), pra UI ou flow node
+    decidir qual mensagem de clarificacao mandar.
+    """
+    body = request.get_json(silent=True) or {}
+    text = (body.get("text") or "").strip()
+    lead_id = body.get("lead_id")
+    persist = bool(body.get("persist"))
+    prefer_gemini = bool(body.get("prefer_gemini"))
+
+    if not text:
+        return jsonify({"error": "text_required"}), 422
+
+    try:
+        import birthdate_extractor
+    except Exception as exc:
+        return jsonify({"error": "extractor_unavailable", "message": str(exc)}), 500
+
+    result = birthdate_extractor.extract_birth_date(text, prefer_gemini=prefer_gemini)
+    response = {
+        "date": result.date.isoformat() if result.date else None,
+        "year": result.year,
+        "month": result.month,
+        "day": result.day,
+        "confidence": round(result.confidence, 3),
+        "source": result.source,
+        "needs_clarification": result.needs_clarification,
+        "clarification_question": result.clarification_question,
+        "parse_error": result.parse_error,
+        "confirmation_message": birthdate_extractor.confirmation_message(result),
+    }
+
+    persisted = False
+    if persist and lead_id and result.date:
+        db = SessionLocal()
+        try:
+            lead = db.query(models.Lead).filter_by(
+                id=int(lead_id), tenant_id=current_user.tenant_id,
+            ).first()
+            if lead:
+                lead.birth_date = result.date
+                # Calcula signo automaticamente
+                try:
+                    import horoscope
+                    signo = horoscope.compute_sun_sign(result.date)
+                    if signo:
+                        lead.signo = signo
+                        response["computed_sign"] = signo
+                except Exception as exc:
+                    logger.warning("[spiritual.extract_birth_date] signo falhou: %s", exc)
+                db.commit()
+                persisted = True
+                response["persisted"] = True
+        finally:
+            db.close()
+
+    if not persisted:
+        response["persisted"] = False
+
+    return jsonify(response)
+
+
 @spiritual_bp.route("/leads/<int:lead_id>/send-summary", methods=["POST"])
 @login_required
 def send_summary(lead_id: int):
