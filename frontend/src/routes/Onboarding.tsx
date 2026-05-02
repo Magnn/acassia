@@ -43,10 +43,16 @@ const STEPS = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { data: status, isLoading: isLoadingStatus } = useQuery({
+  const { data: status, isLoading: isLoadingStatus, error: statusError } = useQuery({
     queryKey: ['onboarding-status'],
     queryFn: onboardingApi.getStatus,
   });
+
+  useEffect(() => {
+    if (statusError) {
+      window.location.href = '/saas/login?next=' + encodeURIComponent('/builder/onboarding');
+    }
+  }, [statusError]);
 
   const [currentStep, setCurrentStep] = useState<string | null>(null);
 

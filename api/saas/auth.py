@@ -344,8 +344,8 @@ def signup():
 @auth_bp.route("/signup/done")
 @login_required
 def signup_done():
-    """Placeholder — vira o passo 1 do wizard de onboarding numa próxima task."""
-    return render_template("auth/signup_done.html")
+    """Redireciona para o novo Wizard de Onboarding no React."""
+    return redirect("/builder/onboarding")
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])

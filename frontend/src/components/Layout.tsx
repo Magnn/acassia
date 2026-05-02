@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Visão geral', group: 'painel', roles: ['admin', 'user'] },
   { to: '/leads', icon: MessageSquare, label: 'Contatos & Conversas', group: 'CRM', roles: ['admin', 'user'] },
   { to: '/billing', icon: CreditCard, label: 'Assinatura', group: 'conta', roles: ['admin', 'user'] },
-  { to: '/blueprints', icon: FolderTree, label: 'Fluxos', group: 'oraculo', roles: ['admin'] },
+  { to: '/blueprints', icon: FolderTree, label: 'Fluxos', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/templates', icon: FolderTree, label: 'Templates', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/marketplace', icon: Store, label: 'Marketplace', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/tarot', icon: FolderTree, label: 'Tarot Virtual', group: 'oraculo', roles: ['admin', 'user'] },
@@ -52,11 +52,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/audio-library', icon: Library, label: 'Biblioteca de Áudios', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/affiliate', icon: CreditCard, label: 'Afiliados', group: 'conta', roles: ['admin', 'user'] },
   { to: '/agents', icon: Bot, label: 'Atendentes', group: 'oraculo', roles: ['admin', 'user'] },
-  { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo', roles: ['admin'] },
+  { to: '/runs', icon: Activity, label: 'Execuções', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/analytics/funnel', icon: Activity, label: 'Funnel', group: 'oraculo', roles: ['admin', 'user'] },
   { to: '/analytics/recovery', icon: Activity, label: 'Recuperação', group: 'oraculo', roles: ['admin', 'user'] },
-  { to: '/integrations', icon: Plug, label: 'Integrações', group: 'avancado', roles: ['admin'] },
-  { to: '/tenant-config', icon: KeyRound, label: 'Variáveis & Segredos', group: 'avancado', roles: ['admin'] },
+  { to: '/integrations', icon: Plug, label: 'Integrações', group: 'avancado', roles: ['admin', 'user'] },
+  { to: '/tenant-config', icon: KeyRound, label: 'Variáveis & Segredos', group: 'avancado', roles: ['admin', 'user'] },
   { to: '/admin/tenants', icon: ShieldCheck, label: 'Admin Console', group: 'platform', roles: ['admin'] },
 ];
 
@@ -101,8 +101,16 @@ export default function Layout() {
   // Sem sessão -> backend retorna 401 -> redireciona pro login.
   // Não bloqueia onboarding (tela própria fora do Layout).
   if (userError && !userLoading && !location.pathname.startsWith('/onboarding')) {
-    window.location.href = '/saas/login?next=' + encodeURIComponent(location.pathname);
+    window.location.href = '/saas/login?next=' + encodeURIComponent('/builder' + location.pathname);
     return null;
+  }
+
+  if (userLoading || !user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-bg-primary gap-4">
+        <div className="w-12 h-12 border-4 border-accent-amethyst/20 border-t-accent-amethyst rounded-full animate-spin" />
+      </div>
+    );
   }
 
   const pageTitle = pageTitleFor(location.pathname);

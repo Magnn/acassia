@@ -24,7 +24,7 @@ _PRAGMA_JA_LOGADO = False
 # ── CONFIGURAÇÃO DE CAMINHOS ──
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(_BASE_DIR, "cigana.db")
-DATABASE_URL = "sqlite:///" + DB_PATH.replace("\\", "/")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///" + DB_PATH.replace("\\", "/"))
 
 
 def _int_env(key: str, default: int) -> int:
@@ -57,6 +57,9 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     """
     Configurações de hardware e sistema para extrair o máximo do SQLite.
     """
+    if engine.name != "sqlite":
+        return
+
     cursor = dbapi_connection.cursor()
     # Ativa leitura e escrita simultânea (Crucial para o Recovery de 2min)
     cursor.execute("PRAGMA journal_mode=WAL")

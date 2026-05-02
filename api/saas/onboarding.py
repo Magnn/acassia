@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
 from flask_login import current_user, login_required
 
 from db import models

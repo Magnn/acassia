@@ -24,8 +24,9 @@ from db import models
 from db.database import SessionLocal
 from tenant_context import get_request_tenant_id
 
-# Atalho local — todas as rotas deste módulo são restritas a admin no MVP.
-_admin = require_role("admin")
+# Atalho local — permitimos "user" pois a filtragem é por tenant_id, 
+# e donos de tenant precisam gerenciar seus próprios fluxos.
+_admin = require_role("user")
 
 logger = logging.getLogger(__name__)
 
