@@ -55,7 +55,7 @@ function EnrollScreen({ onEnroll, pending }: { onEnroll: () => void; pending: bo
         </div>
         <h1 className="text-4xl font-black tracking-tight">Programa de Afiliados</h1>
         <p className="text-secondary text-base font-medium max-w-xl mx-auto">
-          Indique outras tarólogas pra Acássia e ganhe comissão recorrente todo mês.
+          Indique outras tarólogas pra Meu Mistério e ganhe comissão recorrente todo mês.
         </p>
       </div>
 
@@ -72,7 +72,7 @@ function EnrollScreen({ onEnroll, pending }: { onEnroll: () => void; pending: bo
           Como funciona
         </h3>
         <ul className="space-y-2 text-xs text-secondary">
-          <li>• Você ganha um link único: <code className="bg-bg-primary px-1 rounded">acassia.com.br/r/SEUCODE</code></li>
+          <li>• Você ganha um link único: <code className="bg-bg-primary px-1 rounded">meumisterio.com.br/r/SEUCODE</code></li>
           <li>• Indica pra tarólogos no Insta, WhatsApp, indicações</li>
           <li>• Quando alguém assina via seu link → ganha % da mensalidade</li>
           <li>• Pagamento mensal via Pix (você cadastra a chave)</li>

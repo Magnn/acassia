@@ -9,7 +9,7 @@ const KIND_LABELS: Record<string, string> = {
   gemini_tokens_month: 'tokens IA',
 };
 
-const STORAGE_KEY = 'acassia_quota_dismiss_v1';
+const STORAGE_KEY = 'meumisterio_quota_dismiss_v1';
 
 interface DismissState {
   [key: string]: number; // key = `${kind}-${threshold}`, value = timestamp

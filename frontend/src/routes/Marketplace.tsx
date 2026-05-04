@@ -443,7 +443,7 @@ function MyListings() {
       <div className="flex items-center justify-between">
         <p className="text-xs text-secondary">
           Publique seus fluxos prontos. Você recebe <strong className="text-primary">70%</strong>{' '}
-          de cada venda; Acássia retém 30%.
+          de cada venda; Meu Mistério retém 30%.
         </p>
         <button
           onClick={() => setCreating(true)}
@@ -636,7 +636,7 @@ function CreateListingModal({
               className="w-full bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-sm tabular-nums"
             />
             <div className="text-[10px] text-secondary mt-1">
-              Você recebe R$ {(Number(price) * 0.7).toFixed(2)} por venda · Acássia retém R$ {(Number(price) * 0.3).toFixed(2)}
+              Você recebe R$ {(Number(price) * 0.7).toFixed(2)} por venda · Meu Mistério retém R$ {(Number(price) * 0.3).toFixed(2)}
             </div>
           </Field>
 

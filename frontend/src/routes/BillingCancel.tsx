@@ -144,7 +144,7 @@ function ReasonStep({
         <h1 className="text-3xl font-black tracking-tight">Cancelar assinatura</h1>
         <p className="text-secondary text-sm font-medium mt-2">
           Sentimos muito. Antes de seguir, conta pra gente o motivo —
-          isso ajuda a melhorar a Acássia.
+          isso ajuda a melhorar a Meu Mistério.
         </p>
       </div>
 

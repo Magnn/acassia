@@ -1,7 +1,7 @@
 import { Field, NumberInput, Select, TextArea, TextInput } from './fields';
 import { patchConfig, readNum, readStr, type InspectorProps } from './helpers';
 import CardList from './conteudo/CardList';
-import { type Card } from './conteudo/types';
+import { type Card, cardId } from './conteudo/types';
 import RuleBuilder, { type Logic, type Rule } from './condicao/RuleBuilder';
 
 // ─── Header comum ─────────────────────────────────────────────────────
@@ -84,9 +84,10 @@ function readCards(cfg: Record<string, unknown>): Card[] {
   if (!Array.isArray(raw)) {
     // Compat: campos antigos do inspector simplificado da Fase 3 viram um TextCard.
     const legacyText = readStr(cfg, 'text') || readStr(cfg, 'body') || readStr(cfg, 'message');
-    return legacyText ? [{ type: 'text', value: legacyText }] : [];
+    return legacyText ? [{ _id: cardId(), type: 'text', value: legacyText }] : [];
   }
-  return raw.filter(isCard);
+  // Ensure every card has a stable _id for React keys
+  return raw.filter(isCard).map((c) => (c._id ? c : { ...c, _id: cardId() }));
 }
 
 function isCard(x: unknown): x is Card {
@@ -163,7 +164,7 @@ export function GptInspector({ node, onUpdate }: InspectorProps) {
           value={readStr(cfg, 'system_prompt')}
           onChange={(v) => onUpdate(patchConfig(node, { system_prompt: v }))}
           rows={6}
-          placeholder="Você é uma cigana experiente que…"
+          placeholder="Você é uma meumisterio experiente que…"
         />
       </Field>
       <div className="grid grid-cols-2 gap-2">
@@ -305,6 +306,39 @@ export function AnotacaoInspector({ node, onUpdate }: InspectorProps) {
           onChange={(v) => onUpdate(patchConfig(node, { note: v }))}
           rows={6}
           placeholder="Documente decisões, links, contexto…"
+        />
+      </Field>
+    </div>
+  );
+}
+
+
+
+
+export function AcaoInspector({ node, onUpdate }: InspectorProps) {
+  const cfg = node.data.config;
+  return (
+    <div className="space-y-4">
+      <Field label="Tipo de Ação">
+        <Select
+          value={readStr(cfg, 'action_type') || 'tag_add'}
+          onChange={(v) => onUpdate(patchConfig(node, { action_type: v }))}
+          options={[
+            { value: 'tag_add', label: 'Adicionar Tag' },
+            { value: 'tag_remove', label: 'Remover Tag' },
+            { value: 'assign_user', label: 'Atribuir Atendente' },
+            { value: 'set_custom_field', label: 'Atualizar Campo Personalizado' },
+            { value: 'webhook', label: 'Disparar Webhook' },
+            { value: 'close_chat', label: 'Finalizar Conversa' },
+          ]}
+        />
+      </Field>
+      <Field label="Valor / Payload" hint="O que essa ação deve aplicar?">
+        <TextArea
+          value={readStr(cfg, 'action_payload')}
+          onChange={(v) => onUpdate(patchConfig(node, { action_payload: v }))}
+          rows={3}
+          placeholder="Ex.: vip, email@exemplo.com..."
         />
       </Field>
     </div>

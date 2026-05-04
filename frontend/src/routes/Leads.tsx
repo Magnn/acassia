@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MessageSquare,
@@ -28,6 +28,12 @@ import ComposeToolbar from '../components/ComposeToolbar';
 import QuickReplyManager from '../components/QuickReplyManager';
 import AudioComposeModal from '../components/AudioComposeModal';
 import VoiceOnlyCompose from '../components/VoiceOnlyCompose';
+import { useInboxRealtime } from '../hooks/useInboxRealtime';
+import { useNotificationSound } from '../hooks/useNotificationSound';
+import TypingIndicator from '../components/inbox/TypingIndicator';
+import UnreadBadge from '../components/inbox/UnreadBadge';
+import ScrollToBottom from '../components/inbox/ScrollToBottom';
+import ConnectionStatus from '../components/inbox/ConnectionStatus';
 
 type ViewMode = 'chat' | 'table';
 type ScoreFilter = null | 'hot' | 'warm' | 'cold';
@@ -39,8 +45,8 @@ const SPIRITUAL_EMOJI: Record<string, string> = {
   familia: '🏠', espiritual: '🙏', decisao: '🔀', luto: '🕊️',
 };
 
-const DENSITY_KEY = 'acassia.inbox.density';
-const VOICE_ONLY_KEY = 'acassia.inbox.voice_only';
+const DENSITY_KEY = 'meumisterio.inbox.density';
+const VOICE_ONLY_KEY = 'meumisterio.inbox.voice_only';
 
 function DeliveryStatus({ status }: { status: string | null | undefined }) {
   if (!status) return <Clock className="w-2.5 h-2.5" />;
@@ -116,6 +122,8 @@ export default function Leads() {
     return localStorage.getItem(VOICE_ONLY_KEY) === '1';
   });
   const lastReadMsgIdRef = useRef<number | null>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     localStorage.setItem(VOICE_ONLY_KEY, voiceOnlyMode ? '1' : '0');
@@ -124,6 +132,31 @@ export default function Leads() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const composeRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Real-time SSE ──
+  const { play: playNotification } = useNotificationSound();
+  const { connected, typingLeadIds, unreadMap, totalUnread } = useInboxRealtime({
+    selectedLeadId: selectedLeadId,
+    onNewMessage: (evt) => {
+      // Tocar som apenas se mensagem é de lead (incoming)
+      if (evt.lead_id !== selectedLeadId) {
+        playNotification();
+      }
+    },
+  });
+
+  // ── Scroll detection (show/hide scroll-to-bottom button) ──
+  const handleChatScroll = useCallback(() => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setShowScrollBtn(!atBottom);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollBtn(false);
+  }, []);
 
   const { data: quickReplies } = useQuery({
     queryKey: ['quick-replies'],
@@ -293,7 +326,11 @@ export default function Leads() {
       <div className={`flex-shrink-0 border-r border-border bg-bg-sidebar transition-all duration-300 ${viewMode === 'table' ? 'w-0 opacity-0 overflow-hidden' : 'w-[380px]'}`}>
         <div className="p-6 border-b border-border bg-bg-sidebar/50">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-black tracking-tight">Conversas</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-black tracking-tight">Conversas</h2>
+              <ConnectionStatus connected={connected} />
+              {totalUnread > 0 && <UnreadBadge count={totalUnread} />}
+            </div>
             <button 
               onClick={() => setViewMode('table')}
               className="p-2 rounded-xl hover:bg-bg-primary text-secondary hover:text-accent-amethyst transition-all"
@@ -408,7 +445,7 @@ export default function Leads() {
                   onClick={() => setSelectedLeadId(l.id)}
                   className={`${isCompact ? 'p-2.5' : 'p-4'} rounded-2xl cursor-pointer transition-all border border-transparent relative group mb-1 ${
                     selectedLeadId === l.id ? 'bg-bg-surface border-border shadow-md' : 'hover:bg-bg-surface/40'
-                  }`}
+                  } ${(unreadMap.get(l.id) || 0) > 0 ? 'ring-1 ring-accent-amethyst/30' : ''}`}
                 >
                   {selectedLeadId === l.id && (
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-amethyst rounded-r-full shadow-[0_0_15px_rgba(var(--accent-amethyst-rgb),0.5)]" />
@@ -422,11 +459,16 @@ export default function Leads() {
                         {l.nome || l.telefone}
                       </div>
                     </div>
-                    {l.ultima_em && (
-                      <div className="text-[9px] text-secondary font-black tabular-nums flex-shrink-0">
-                        {formatRelativeTime(l.ultima_em)}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {(unreadMap.get(l.id) || 0) > 0 && (
+                        <UnreadBadge count={unreadMap.get(l.id)!} />
+                      )}
+                      {l.ultima_em && (
+                        <div className="text-[9px] text-secondary font-black tabular-nums">
+                          {formatRelativeTime(l.ultima_em)}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {!isCompact && (
                     <div className="text-[11px] text-secondary/80 font-medium line-clamp-1 mt-1.5">
@@ -678,7 +720,11 @@ export default function Leads() {
                 </div>
 
                 {/* Mensagens */}
-                <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide bg-gradient-to-b from-transparent to-bg-primary/30">
+                <div
+                  ref={chatContainerRef}
+                  onScroll={handleChatScroll}
+                  className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide bg-gradient-to-b from-transparent to-bg-primary/30 relative"
+                >
                   {messages.map((m) => {
                     const isUser = m.origem === 'lead';
                     const isSystem = m.origem === 'system';
@@ -713,7 +759,13 @@ export default function Leads() {
                       </div>
                     );
                   })}
+                  {/* Typing Indicator */}
+                  {selectedLeadId && typingLeadIds.has(selectedLeadId) && (
+                    <TypingIndicator name={selectedLead?.nome || undefined} />
+                  )}
                   <div ref={messagesEndRef} />
+                  {/* Scroll-to-Bottom */}
+                  <ScrollToBottom visible={showScrollBtn} onClick={scrollToBottom} />
                 </div>
 
                 {/* Input Unificado */}

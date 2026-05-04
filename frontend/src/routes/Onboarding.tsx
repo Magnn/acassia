@@ -35,10 +35,10 @@ import { toast } from '../lib/toast';
 import { track } from '../lib/analytics';
 
 const STEPS = [
-  { id: 'persona', label: 'Persona', icon: Sparkles, desc: 'Defina a alma da sua cigana' },
-  { id: 'oferta', label: 'Sua Oferta', icon: ShoppingBag, desc: 'O que você vai vender?' },
-  { id: 'template', label: 'Fluxo', icon: Layout, desc: 'Escolha a lógica do atendimento' },
-  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, desc: 'Conecte sua conta' },
+  { id: 'persona', label: 'Sua Alma', icon: Sparkles, desc: 'Dê vida à sua atendente que vende 24/7' },
+  { id: 'oferta', label: 'Seu Produto', icon: ShoppingBag, desc: 'Monte o que vai gerar o primeiro "sim"' },
+  { id: 'template', label: 'Seu Funil', icon: Layout, desc: 'Vendendo em 5 min, não em 5 dias' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, desc: 'Conecte e comece a faturar' },
 ];
 
 export default function Onboarding() {
@@ -135,7 +135,7 @@ export default function Onboarding() {
             <div className="w-10 h-10 bg-accent-amethyst rounded-2xl flex items-center justify-center shadow-lg shadow-accent-amethyst/20">
               <Zap className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight">Acássia <span className="text-accent-amethyst">Studio</span></h1>
+            <h1 className="text-2xl font-black tracking-tight">Meu Mistério <span className="text-accent-amethyst">Studio</span></h1>
           </div>
 
           <div className="space-y-8">
@@ -170,7 +170,7 @@ export default function Onboarding() {
 
         <div className="relative z-10 p-6 bg-bg-primary/50 border border-border rounded-3xl">
           <p className="text-[11px] font-bold text-secondary leading-relaxed">
-            "A tecnologia é a ferramenta, mas a alma da sua cigana é o que converte."
+            "Terapeutas que usam IA faturam 3x mais. A ferramenta é o multiplicador do seu dom."
           </p>
         </div>
       </aside>
@@ -196,18 +196,18 @@ function PersonaStep({ onSave, isPending }: { onSave: (d: PersonaDraft) => void,
   return (
     <div className="space-y-10">
       <div className="space-y-4">
-        <h2 className="text-5xl font-black tracking-tighter leading-tight">Quem será o rosto <br/>da sua <span className="text-accent-amethyst">operação?</span></h2>
-        <p className="text-lg text-secondary font-medium">Defina a personalidade e o tom de voz da sua atendente virtual.</p>
+        <h2 className="text-5xl font-black tracking-tighter leading-tight">Dê vida à sua <br/><span className="text-accent-amethyst">atendente digital</span></h2>
+        <p className="text-lg text-secondary font-medium">Ela vai atender seus clientes 24/7, gerar vendas enquanto você descansa e nunca perder um lead.</p>
       </div>
 
       <div className="space-y-8 bg-bg-surface p-10 rounded-[40px] border border-border shadow-premium">
         <div className="space-y-3">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">Nome da Cigana / Especialista</label>
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">Nome do Meu Mistério / Especialista</label>
           <input 
             type="text"
             value={formData.name}
             onChange={e => setFormData({ ...formData, name: e.target.value })}
-            placeholder="Ex: Cigana Esmeralda"
+            placeholder="Ex: Meu Mistério Esmeralda"
             className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-bold focus:border-accent-amethyst transition-all outline-none"
           />
         </div>
@@ -260,8 +260,8 @@ function OfertaStep({ onSave, isPending }: { onSave: (d: OfertaDraft) => void, i
   return (
     <div className="space-y-10">
       <div className="space-y-4">
-        <h2 className="text-5xl font-black tracking-tighter leading-tight">O que seus clientes <br/><span className="text-accent-amethyst">receberão?</span></h2>
-        <p className="text-lg text-secondary font-medium">Configure os detalhes do seu produto ou consulta.</p>
+        <h2 className="text-5xl font-black tracking-tighter leading-tight">Monte o produto que vai<br/><span className="text-accent-amethyst">gerar o primeiro "sim"</span></h2>
+        <p className="text-lg text-secondary font-medium">Defina o que você entrega, quanto custa, e como recebe. Simples assim.</p>
       </div>
 
       <div className="space-y-8 bg-bg-surface p-10 rounded-[40px] border border-border shadow-premium">
@@ -617,7 +617,7 @@ function WhatsAppStep({ onSave, isPending }: { onSave: (d: WhatsAppDraft) => voi
       });
       // Também marca o step do onboarding como done
       handleSave();
-      track('onboarding_whatsapp_bound', {
+      track('onboarding_whatsapp_bound' as any, {
         subscribed: res.binding.subscribed_at !== null,
       });
     },
@@ -701,7 +701,7 @@ function WhatsAppStep({ onSave, isPending }: { onSave: (d: WhatsAppDraft) => voi
               onChange={e => setFormData({ ...formData, access_token: e.target.value })}
               placeholder="EAAB..."
               className={`w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-mono break-all focus:border-accent-amethyst transition-all outline-none resize-none pr-12 ${showToken ? '' : 'text-transparent caret-primary'}`}
-              style={!showToken ? { WebkitTextSecurity: 'disc' as never, textSecurity: 'disc' as never } : undefined}
+              style={!showToken ? { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as React.CSSProperties : undefined}
             />
             <button
               type="button"

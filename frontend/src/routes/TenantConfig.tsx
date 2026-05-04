@@ -220,7 +220,7 @@ function SecretsPanel() {
   });
 
   const errMsg = (error as Error | undefined)?.message;
-  const isMissingKey = errMsg?.includes('ACASSIA_FLOW_SECRETS_KEY');
+  const isMissingKey = errMsg?.includes('MEU_MISTERIO_FLOW_SECRETS_KEY');
 
   return (
     <div className="space-y-6">
@@ -228,7 +228,7 @@ function SecretsPanel() {
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-700 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>
-            <strong>Configuração Necessária:</strong> A chave de criptografia <strong>ACASSIA_FLOW_SECRETS_KEY</strong> não foi encontrada no ambiente. Segredos não podem ser salvos até que ela seja definida no arquivo .env do servidor.
+            <strong>Configuração Necessária:</strong> A chave de criptografia <strong>MEU_MISTERIO_FLOW_SECRETS_KEY</strong> não foi encontrada no ambiente. Segredos não podem ser salvos até que ela seja definida no arquivo .env do servidor.
           </span>
         </div>
       )}

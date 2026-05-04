@@ -6,14 +6,13 @@ interface Props {
 }
 
 /**
- * Acássia — marca visual.
+ * Meu Mistério — marca visual.
  *
  * Composição: lua crescente partida por um eixo vertical (axis mundi)
  * + ponto astral no canto superior direito. Single-color (currentColor)
  * pra herdar de qualquer contexto.
  *
- * Tokens internos da paleta usam prefix `sibila-*` (legado, igual aos
- * `cigana-*` antes) — só nomenclatura interna, não aparece pra usuário.
+ * Tokens internos da paleta usam prefix `sibila-*` — nomenclatura interna.
  */
 export default function Logo({
   size = 24,
@@ -30,7 +29,7 @@ export default function Logo({
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
-      aria-label="Acássia"
+      aria-label="Meu Mistério"
     >
       {/* Lua crescente — design mais refinado */}
       <path
@@ -50,7 +49,7 @@ export default function Logo({
 }
 
 /**
- * Wordmark "Acássia" — Marca principal do sistema.
+ * Wordmark "Meu Mistério" — Marca principal do sistema.
  */
 export function Wordmark({
   className = '',
@@ -62,7 +61,7 @@ export function Wordmark({
       className={`font-black tracking-tight ${className}`}
       style={{ letterSpacing: '-0.02em' }}
     >
-      Acássia
+      Meu Mistério
     </span>
   );
 }

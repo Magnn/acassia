@@ -17,7 +17,7 @@ interface TourStep {
 const FIRST_LOGIN_TOUR: TourStep[] = [
   {
     id: 'welcome',
-    title: 'Bem-vinda ao Acássia ✨',
+    title: 'Bem-vinda ao Meu Mistério ✨',
     body: 'Esse é seu painel — vou te guiar em 5 passos rápidos. Pode pular a qualquer momento.',
     position: 'center',
   },
@@ -49,7 +49,7 @@ const FIRST_LOGIN_TOUR: TourStep[] = [
   },
 ];
 
-const TOURS_DONE_KEY = 'acassia.tours.done';
+const TOURS_DONE_KEY = 'meumisterio.tours.done';
 
 function tourCompleted(tourId: string): boolean {
   try {

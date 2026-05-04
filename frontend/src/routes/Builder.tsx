@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  Bot,
+  BrainCircuit,
   CheckCircle2,
   Download,
   HelpCircle,
@@ -10,8 +12,11 @@ import {
   Play,
   Redo2,
   Rocket,
+  Settings,
   Square,
   Undo2,
+  XCircle,
+  Zap,
 } from 'lucide-react';
 import { blueprintsApi, type BlueprintDetail } from '../api/blueprints';
 import Canvas from '../builder/Canvas';
@@ -27,7 +32,7 @@ import ShortcutsModal from '../components/ShortcutsModal';
 import { reactFlowToDocument } from '../lib/serialize';
 import { exportBlueprint } from '../lib/exportImport';
 import { toast } from '../lib/toast';
-import type { AcassiaDocument } from '../lib/types';
+import type { MeuMisterioDocument } from '../lib/types';
 import type { FlowNodeData } from '../lib/adapt';
 
 export default function Builder() {
@@ -66,7 +71,7 @@ export default function Builder() {
 type RightPanel = 'inspector' | 'simulator' | 'versions' | null;
 
 function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
-  const initialDoc = (blueprint.body ?? {}) as AcassiaDocument;
+  const initialDoc = (blueprint.body ?? {}) as MeuMisterioDocument;
   const fs = useFlowState({ blueprintId: blueprint.id, initialDoc });
   const qc = useQueryClient();
 
@@ -78,6 +83,14 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   const [focusRequest, setFocusRequest] = useState<{ id: string; ts: number } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
+  // Separate editing state from selection — clicking a node selects it (for drag),
+  // but only the Edit button opens the inspector.
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+
+  // Track inspector dirty state to block close when unsaved
+  const inspectorDirtyRef = useRef(false);
+  const inspectorRequestCloseRef = useRef<(() => void) | null>(null);
+
   const decoratedNodes = useMemo(
     () =>
       fs.nodes.map((n) => ({
@@ -86,26 +99,49 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           ...n.data,
           lintLevel: issueLevels.get(n.id),
           simActive: simCurrent === n.id || undefined,
+          onEdit: () => setEditingNodeId(n.id),
+          onDuplicate: () => fs.duplicateNode(n.id),
         },
       })),
-    [fs.nodes, issueLevels, simCurrent],
+    [fs.nodes, issueLevels, simCurrent, fs.duplicateNode],
   );
 
   const requestFocus = useCallback((nodeId: string) => {
     setFocusRequest({ id: nodeId, ts: Date.now() });
   }, []);
 
-  const handleUpdateSelected = useCallback(
+  const handleUpdateEditing = useCallback(
     (patch: Partial<FlowNodeData>) => {
-      if (fs.selectedNodeId) fs.updateNode(fs.selectedNodeId, patch);
+      if (editingNodeId) fs.updateNode(editingNodeId, patch);
     },
-    [fs],
+    [fs, editingNodeId],
   );
 
   const handleCloseInspector = useCallback(() => {
-    if (!fs.selectedNodeId) return;
-    fs.onNodesChange([{ type: 'select', id: fs.selectedNodeId, selected: false }]);
-  }, [fs]);
+    setEditingNodeId(null);
+  }, []);
+
+  // Wrap onNodesChange to intercept deselection when inspector is dirty
+  const guardedOnNodesChange = useCallback(
+    (changes: any[]) => {
+      // If inspector is dirty and the editing node is being deselected, block it
+      if (inspectorDirtyRef.current && editingNodeId) {
+        const isDeselecting = changes.some(
+          (c: any) => c.type === 'select' && c.id === editingNodeId && !c.selected
+        );
+        if (isDeselecting) {
+          inspectorRequestCloseRef.current?.();
+          const filtered = changes.filter(
+            (c: any) => !(c.type === 'select' && c.id === editingNodeId && !c.selected)
+          );
+          if (filtered.length > 0) fs.onNodesChange(filtered);
+          return;
+        }
+      }
+      fs.onNodesChange(changes);
+    },
+    [fs, editingNodeId],
+  );
 
   // Validate (server-side)
   const validateMutation = useMutation({
@@ -187,15 +223,19 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           setRightPanel(null);
           return;
         }
-        if (fs.selectedNodeId) {
-          handleCloseInspector();
+        if (editingNodeId) {
+          if (inspectorDirtyRef.current) {
+            inspectorRequestCloseRef.current?.();
+          } else {
+            handleCloseInspector();
+          }
           return;
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [fs, handleCloseInspector, shortcutsOpen, rightPanel]);
+  }, [fs, handleCloseInspector, shortcutsOpen, rightPanel, editingNodeId]);
 
   // Quando uma versão é restaurada, recarrega o blueprint e reseta painel
   const handleVersionRestored = useCallback(() => {
@@ -225,14 +265,19 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
         }}
       />
     );
-  } else if (fs.selectedNode) {
-    sidePanel = (
-      <Inspector
-        node={fs.selectedNode}
-        onUpdate={handleUpdateSelected}
-        onClose={handleCloseInspector}
-      />
-    );
+  } else if (editingNodeId) {
+    const editingNode = fs.nodes.find((n) => n.id === editingNodeId) ?? null;
+    if (editingNode) {
+      sidePanel = (
+        <Inspector
+          node={editingNode}
+          onUpdate={handleUpdateEditing}
+          onClose={handleCloseInspector}
+          onDirtyChange={(dirty) => { inspectorDirtyRef.current = dirty; }}
+          onRequestCloseRef={inspectorRequestCloseRef}
+        />
+      );
+    }
   }
 
   const editable = rightPanel !== 'simulator';
@@ -240,156 +285,97 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   return (
     <div className="h-full flex flex-col bg-bg-primary">
       {/* Barra de ferramentas */}
-      <div className="h-[60px] border-b border-border bg-bg-header backdrop-blur-sm px-4 flex items-center justify-between flex-shrink-0 z-20">
-        <div className="flex items-center gap-4">
+      {/* Barra de ferramentas LAILLA Style */}
+      <div className="h-[64px] bg-white border-b border-slate-200 px-4 flex items-center justify-between flex-shrink-0 z-20">
+        
+        {/* Left Actions */}
+        <div className="flex items-center gap-2">
           <Link
             to="/flows"
-            className="p-2 rounded-md text-secondary hover:text-primary hover:bg-bg-surface transition-colors"
-            title="Voltar para lista"
+            className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
+            title="Voltar"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <div>
-            <h2 className="font-display text-base text-primary leading-tight flex items-center gap-2">
-              {blueprint.title}
-              <span className="text-[10px] bg-bg-surface px-1.5 py-0.5 rounded border border-border text-secondary font-mono font-normal uppercase tracking-wider">
-                {blueprint.slug}
-              </span>
-            </h2>
-            <div className="text-[11px] text-secondary">
-              última alteração: {blueprint.updated_at ? new Date(blueprint.updated_at).toLocaleString() : '—'}
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3 text-xs text-secondary">
-          <span>
-            {fs.nodes.length} nodes · {fs.edges.length} arestas
-          </span>
-
-          <div className="flex items-center gap-1 border-l border-border pl-3">
-            <button
-              onClick={fs.undo}
-              disabled={!fs.canUndo}
-              className="p-1.5 rounded text-secondary hover:text-primary hover:bg-bg-surface disabled:opacity-30"
-              title="Desfazer (Ctrl+Z)"
-            >
-              <Undo2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={fs.redo}
-              disabled={!fs.canRedo}
-              className="p-1.5 rounded text-secondary hover:text-primary hover:bg-bg-surface disabled:opacity-30"
-              title="Refazer (Ctrl+Y)"
-            >
-              <Redo2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setShortcutsOpen(true)}
-              className="p-1.5 rounded text-secondary hover:text-primary hover:bg-bg-surface"
-              title="Atalhos"
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <SaveIndicator status={fs.status} error={fs.error} />
-
-          {/* Ações de fluxo */}
-          <div className="flex items-center gap-1 border-l border-border pl-3">
-            <button
-              type="button"
-              onClick={() => validateMutation.mutate()}
-              disabled={validateMutation.isPending}
-              title="Validar no servidor"
-              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-border hover:border-accent-amethyst text-primary bg-bg-surface disabled:opacity-50"
-            >
-              <CheckCircle2 className="w-3 h-3" />
-              {validateMutation.isPending ? 'Validando…' : 'Validar'}
-            </button>
-            <button
-              type="button"
-              onClick={() => exportBlueprint(blueprint.id, blueprint.slug)}
-              title="Exportar JSON"
-              className="px-2 py-1 rounded text-xs flex items-center gap-1 border border-border hover:border-accent-amethyst text-primary bg-bg-surface"
-            >
-              <Download className="w-3 h-3" />
-              Export
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setRightPanel((p) => (p === 'versions' ? null : 'versions'))
-              }
-              title="Histórico de versões"
-              className={[
-                'px-2 py-1 rounded text-xs flex items-center gap-1 transition-all',
-                rightPanel === 'versions'
-                  ? 'bg-accent-amethyst text-white shadow-glow-amethyst'
-                  : 'border border-border bg-bg-surface hover:border-accent-amethyst text-primary',
-              ].join(' ')}
-            >
-              <HistoryIcon className="w-3 h-3" />
-              Versões
-            </button>
           <button
-            type="button"
-            onClick={() => {
-              if (
-                confirm(
-                  isPublished
-                    ? `"${blueprint.title}" já está publicado. Republicar?`
-                    : `Publicar "${blueprint.title}"? Será o fluxo ativo no motor.`,
-                )
-              )
-                publishMutation.mutate();
-            }}
-            disabled={publishMutation.isPending}
-            title={isPublished ? 'Republicar' : 'Publicar fluxo'}
-            className={[
-              'px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm',
-              isPublished
-                ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20'
-                : 'bg-emerald-600 text-white hover:bg-emerald-500 hover:shadow-glow-emerald',
-              'disabled:opacity-50',
-            ].join(' ')}
+            onClick={() => {}}
+            className="w-[38px] h-[38px] rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white flex items-center justify-center transition-colors shadow-sm"
+            title="Cancelar"
           >
-            <Rocket className="w-3.5 h-3.5" />
-            {publishMutation.isPending
-              ? 'Publicando…'
-              : isPublished
-              ? 'Republicar'
-              : 'Publicar'}
+            <XCircle className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => {
+               if (confirm(isPublished ? `Desativar fluxo?` : `Ativar fluxo?`)) {
+                  publishMutation.mutate();
+               }
+            }}
+            className={`w-[38px] h-[38px] rounded-lg flex items-center justify-center transition-colors shadow-sm ${isPublished ? 'bg-[#10b981] hover:bg-[#059669] text-white' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}
+            title={isPublished ? "Fluxo Ativo (Clique para desativar)" : "Ativar Fluxo"}
+          >
+            <Zap className="w-5 h-5" />
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            setRightPanel((p) => (p === 'simulator' ? null : 'simulator'))
-          }
-          className={[
-            'px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all',
-            rightPanel === 'simulator'
-              ? 'bg-accent-amethyst text-white shadow-glow-amethyst ring-2 ring-accent-amethyst/20'
-              : 'bg-bg-surface border border-border hover:border-accent-amethyst text-primary shadow-sm hover:shadow-md',
-          ].join(' ')}
-        >
-            {rightPanel === 'simulator' ? (
-              <>
-                <Square className="w-3 h-3" fill="currentColor" />
-                Fechar simulador
-              </>
-            ) : (
-              <>
-                <Play className="w-3 h-3" fill="currentColor" />
-                Simular
-              </>
-            )}
+        {/* Center Tabs */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
+           <div className="flex items-center gap-2 text-[13px] font-bold text-slate-800">
+              <Bot className="w-4 h-4 text-blue-600" />
+              {blueprint.title}
+              <span className="bg-[#10b981] text-white text-[9px] px-1.5 py-0.5 rounded tracking-widest uppercase">
+                 {fs.status === 'saving' ? 'Salvando...' : fs.error ? 'Erro' : 'Salvo'}
+              </span>
+           </div>
+           
+           <div className="flex items-center bg-slate-100 p-1 rounded-full text-[11px] font-bold text-slate-500">
+              <button className="px-4 py-1.5 rounded-full hover:text-slate-700 transition-colors">Logs</button>
+              <button className="px-4 py-1.5 rounded-full bg-[#9333ea] text-white shadow-sm transition-colors">Automação</button>
+              <button className="px-4 py-1.5 rounded-full hover:text-slate-700 transition-colors">Relatórios</button>
+           </div>
+        </div>
+
+        {/* Right Actions */}
+        <div className="flex items-center gap-2">
+          <button
+             onClick={() => setRightPanel((p) => (p === 'simulator' ? null : 'simulator'))}
+             className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
+             title="Simulador"
+          >
+             <Play className="w-5 h-5" />
+          </button>
+          
+          <button
+            onClick={() => setRightPanel((p) => (p === 'versions' ? null : 'versions'))}
+            className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
+            title="Versões"
+          >
+            <HistoryIcon className="w-5 h-5" />
+          </button>
+
+          <button
+            className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
+            title="Inteligência Artificial"
+          >
+            <BrainCircuit className="w-5 h-5" />
+          </button>
+          
+          <button
+            className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
+            title="Configurações"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={() => validateMutation.mutate()}
+            className="w-[38px] h-[38px] rounded-lg bg-[#84cc16] hover:bg-[#65a30d] text-white flex items-center justify-center transition-colors shadow-sm"
+            title="Salvar e Validar"
+          >
+            <CheckCircle2 className="w-5 h-5" />
           </button>
         </div>
       </div>
-      <div className="flex-1 min-h-0 flex">
+      <div className="flex-1 min-h-0 flex relative">
         <Palette />
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1 min-h-0">
@@ -398,7 +384,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
               edges={fs.edges}
               editable={editable}
               focusRequest={focusRequest}
-              onNodesChange={fs.onNodesChange}
+              onNodesChange={guardedOnNodesChange}
               onEdgesChange={fs.onEdgesChange}
               onConnect={fs.onConnect}
               onAddNode={fs.addNode}

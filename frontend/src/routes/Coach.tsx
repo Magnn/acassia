@@ -22,7 +22,7 @@ export default function Coach() {
           <div className="w-10 h-10 rounded-2xl bg-accent-amethyst/10 flex items-center justify-center">
             <Brain className="w-5 h-5 text-accent-amethyst" />
           </div>
-          <h1 className="text-3xl font-black tracking-tight">Cigana Coach</h1>
+          <h1 className="text-3xl font-black tracking-tight">Meu Mistério Coach</h1>
         </div>
         <p className="text-secondary text-sm font-medium">
           IA assistente — gera copy, reescreve mensagens, cria persona.

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { CheckCircle2, Circle, ChevronRight, X, Sparkles } from 'lucide-react';
 import { useOnboarding } from '../hooks/useOnboarding';
 
-const STORAGE_KEY = 'acassia_onboarding_dismissed_v1';
+const STORAGE_KEY = 'meumisterio_onboarding_dismissed_v1';
 
 export default function OnboardingChecklist() {
   const { data: progress } = useOnboarding();

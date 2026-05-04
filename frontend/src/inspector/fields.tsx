@@ -1,8 +1,9 @@
 import { type ReactNode } from 'react';
 
 const baseInput =
-  'w-full rounded border border-sibila-mist bg-sibila-onyx px-2 py-1.5 text-sm text-sibila-moonlight ' +
-  'placeholder:text-sibila-smoke focus:outline-none focus:border-sibila-amethyst';
+  'w-full rounded-[10px] border border-[#e2e8f0] bg-[#f1f5f9] px-[9px] py-[7px] text-[13px] text-slate-800 ' +
+  'placeholder:text-slate-400 focus:outline-none focus:border-[#6366f1] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.14)] focus:bg-white transition-colors ' +
+  'font-[Inter,ui-sans-serif,system-ui,sans-serif]';
 
 export function Field({
   label,
@@ -16,10 +17,10 @@ export function Field({
   return (
     <label className="block">
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-[11px] uppercase tracking-wide text-sibila-fog">
+        <span className="text-[12px] font-semibold text-[#475569] tracking-tight block mb-1.5" style={{ letterSpacing: '-0.01em' }}>
           {label}
         </span>
-        {hint && <span className="text-[10px] text-sibila-smoke">{hint}</span>}
+        {hint && <span className="text-[10px] text-slate-400">{hint}</span>}
       </div>
       {children}
     </label>

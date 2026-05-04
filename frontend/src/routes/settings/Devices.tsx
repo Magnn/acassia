@@ -1,949 +1,215 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle,
-  ArrowLeft,
-  Building2,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  ExternalLink,
-  Pencil,
-  Phone,
-  Plus,
-  PowerOff,
-  QrCode,
-  Save,
-  Send,
-  Server,
-  ShieldCheck,
-  X,
+  AlertTriangle, CheckCircle2, ExternalLink, Phone, Plus, QrCode,
+  RefreshCw, Save, ShieldCheck, Star, Trash2, Unplug, X,
 } from 'lucide-react';
-import {
-  type ProviderMode,
-  type WhatsAppConfig,
-  whatsappApi,
-} from '../../api/whatsapp';
+import { api } from '../../api/client';
 import { toast } from '../../lib/toast';
+import { WizardModal } from './WizardModal';
 
-const EMPTY_CONFIG: WhatsAppConfig = {
-  provider: 'meta_cloud',
-  meta_cloud: { phone_number_id: '', waba_id: '', has_access_token: false },
-  coex: { api_url: '', instance: '', has_api_key: false },
-  evolution: { server_url: '', instance: '', has_api_key: false },
-};
+/* ── WhatsApp SVG Logo ─────────────────────── */
+const WaLogo = ({ className = 'w-8 h-8' }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+);
 
-interface ProviderMeta {
-  id: ProviderMode;
-  Icon: typeof ShieldCheck;
-  title: string;
-  badge: string;
-  badgeTone: string;
-  description: string;
+const MetaLogo = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <svg viewBox="0 0 512 512" className={className} fill="currentColor">
+    <path d="M412.7 163.2c-28.3 0-51.7 25.9-82.7 75.2l-13.6 21.5-12.2-20.4c-36.1-60.3-60-76.3-91.8-76.3-35.3 0-65.7 28.4-89.4 82C98.7 300 83.6 377.1 83.6 420c0 31.5 11.1 51.7 33.6 51.7 14.9 0 26.6-8.2 44.9-37.7l41-66.3 8.9-14.6 4.8-8 8.6-14.4c17.4-29.4 27.2-42.2 42.3-42.2 12.2 0 20.6 9.9 33 33.9l6 11.8 4.1 8.3 4.1 8.4 8.4 17.3c18.3 37.3 30.3 52 51.2 52 22.5 0 33.6-20.2 33.6-51.7 0-43-14.7-120-53.4-175.1-23.7-33.8-51.6-57.9-77.7-57.9"/>
+  </svg>
+);
+
+interface Device {
+  id: number; nickname: string; provider: string;
+  phone_display: string | null; connected: boolean;
+  connection_state: string | null; is_primary: boolean;
+  groups_count: number;
 }
-
-const PROVIDERS: ProviderMeta[] = [
-  {
-    id: 'meta_cloud',
-    Icon: ShieldCheck,
-    title: 'Meta Cloud (nativo)',
-    badge: 'oficial',
-    badgeTone: 'bg-sibila-amethyst/20 text-sibila-amethyst border-sibila-amethyst/40',
-    description: 'API oficial Meta. Você fornece phone_number_id, waba_id e access_token.',
-  },
-  {
-    id: 'coex',
-    Icon: Building2,
-    title: 'Coex (BSP parceiro)',
-    badge: 'oficial · BSP',
-    badgeTone: 'bg-sibila-ember/20 text-sibila-ember border-sibila-ember/40',
-    description: 'Integração via BSP — Coex repassa pra Cloud API. Pague taxa, evite App Review.',
-  },
-  {
-    id: 'evolution',
-    Icon: Server,
-    title: 'Evolution (não oficial)',
-    badge: 'risco · não oficial',
-    badgeTone: 'bg-sibila-crimson/20 text-sibila-crimson border-sibila-crimson/40',
-    description: 'WhatsApp Web por baixo, conexão por QR. Mais barato; pode ser banido.',
-  },
-];
 
 export default function Devices() {
   const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const emptyForm = { nickname: '', provider: 'meta_cloud', phone_display: '', meta_phone_number_id: '', meta_waba_id: '', meta_access_token: '', evolution_server_url: '', evolution_instance: '', evolution_api_key: '' };
+  const [form, setForm] = useState(emptyForm);
 
-  const { data: config, isLoading, error: configError } = useQuery({
-    queryKey: ['whatsapp-config'],
-    queryFn: whatsappApi.getConfig,
-    retry: false,
+  const { data } = useQuery({ queryKey: ['devices'], queryFn: () => api.get<any>('/saas/devices/') });
+  const devices: Device[] = data?.devices || [];
+
+  const createMut = useMutation({
+    mutationFn: (d: any) => api.post('/saas/devices/', d),
+    onSuccess: () => { toast.success('Dispositivo criado!'); qc.invalidateQueries({ queryKey: ['devices'] }); setShowAdd(false); setForm(emptyForm); },
+    onError: (e: any) => toast.error(e?.message || 'Erro ao criar'),
   });
-
-  const { data: status, refetch: refetchStatus } = useQuery({
-    queryKey: ['whatsapp-status'],
-    queryFn: whatsappApi.status,
-    refetchInterval: 30000,
-    retry: false,
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => api.del(`/saas/devices/${id}`),
+    onSuccess: () => { toast.success('Removido'); qc.invalidateQueries({ queryKey: ['devices'] }); },
   });
-
-  const [form, setForm] = useState<WhatsAppConfig | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [editingNickname, setEditingNickname] = useState(false);
-  const [nickname, setNickname] = useState('');
-
-  useEffect(() => {
-    if (config) {
-      setForm(config);
-    } else if (!isLoading && !form) {
-      setForm(EMPTY_CONFIG);
-    }
-  }, [config, isLoading, form]);
-
-  // Carrega nickname salvo do localStorage por tenant (UX simples).
-  useEffect(() => {
-    const saved = localStorage.getItem('sibila.device.nickname') || '';
-    setNickname(saved);
-  }, []);
-
-  const saveMutation = useMutation({
-    mutationFn: whatsappApi.saveConfig,
-    onSuccess: () => {
-      toast.success('Configuração salva.');
-      setShowAddModal(false);
-      qc.invalidateQueries({ queryKey: ['whatsapp-config'] });
-      refetchStatus();
-    },
-    onError: (e) => toast.error(`Falha: ${(e as Error).message}`),
+  const primaryMut = useMutation({
+    mutationFn: (id: number) => api.post(`/saas/devices/${id}/set-primary`, {}),
+    onSuccess: () => { toast.success('Principal definido'); qc.invalidateQueries({ queryKey: ['devices'] }); },
   });
-
-  const isConfigured = !!(
-    config &&
-    ((config.provider === 'meta_cloud' && config.meta_cloud.phone_number_id) ||
-      (config.provider === 'coex' && config.coex.api_url) ||
-      (config.provider === 'evolution' && config.evolution.server_url))
-  );
-
-  const activeProviderMeta = PROVIDERS.find((p) => p.id === (config?.provider ?? 'meta_cloud'))!;
-
-  const handleSaveNickname = () => {
-    localStorage.setItem('sibila.device.nickname', nickname.trim());
-    setEditingNickname(false);
-    toast.success('Apelido salvo.');
-  };
-
-  const handleDisconnect = () => {
-    if (!confirm('Desconectar este dispositivo? As credenciais salvas permanecem; apenas o provider volta ao padrão.')) return;
-    whatsappApi
-      .saveConfig({
-        meta_cloud: { phone_number_id: '', waba_id: '', access_token: '' },
-        coex: { api_url: '', instance: '', api_key: '' },
-        evolution: { server_url: '', instance: '', api_key: '' },
-      })
-      .then(() => {
-        toast.success('Dispositivo desconectado.');
-        qc.invalidateQueries({ queryKey: ['whatsapp-config'] });
-        refetchStatus();
-      })
-      .catch((e) => toast.error((e as Error).message));
-  };
 
   return (
     <div className="px-8 py-8 max-w-6xl mx-auto">
-      <div className="flex items-baseline justify-between mb-2">
-        <h2 className="font-display text-2xl text-sibila-moonlight">
-          Meus dispositivos {isConfigured ? '(1/1)' : '(0/1)'}
-        </h2>
-      </div>
-      <p className="flex items-center gap-1.5 text-sm text-sibila-smoke mb-6">
-        <Phone className="w-3.5 h-3.5" />
-        Minhas conexões com dispositivos WhatsApp.
-      </p>
-
-      {/* Erro de carregamento */}
-      {configError && (
-        <ErrorBanner error={configError as Error} />
-      )}
-
-      {/* Plano atingido (futuro: viria do backend) */}
-      {isConfigured && (
-        <div className="mb-6 rounded-lg bg-sibila-rose/15 border border-sibila-rose/30 px-4 py-2.5 text-sm text-sibila-moonlight text-center">
-          ⓘ Você atingiu o número máximo de dispositivos no plano atual.{' '}
-          <a href="/saas/billing" className="underline hover:text-sibila-ember">
-            Atualize seu plano
-          </a>
-          .
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#25D366] to-[#128C7E] flex items-center justify-center shadow-lg shadow-[#25D366]/20">
+            <WaLogo className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h2 className="font-display text-3xl text-primary tracking-tight">Meus Dispositivos</h2>
+            <p className="text-xs text-secondary mt-0.5">{devices.length} número{devices.length !== 1 ? 's' : ''} conectado{devices.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
-      )}
-
-      {/* Tabs Sessões */}
-      <div className="flex items-center justify-end gap-6 border-b border-sibila-mist mb-5">
-        <button className="text-sm text-sibila-amethyst border-b-2 border-sibila-amethyst pb-2 -mb-px font-medium">
-          Sessões Ativas
-        </button>
-        <button className="text-sm text-sibila-smoke pb-2 -mb-px hover:text-sibila-fog">
-          Sessões Inativas
+        <button onClick={() => setShowAdd(true)}
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-[#25D366]/20 transition-all">
+          <Plus className="w-4 h-4" /> Novo Dispositivo
         </button>
       </div>
 
-      {/* Grade de cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Card "Conectar novo" — só aparece se NÃO configurado (1/1 limite) */}
-        {!isConfigured && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="rounded-xl border-2 border-dashed border-sibila-mist bg-sibila-obsidian/40 p-8 flex flex-col items-center justify-center gap-3 text-sibila-smoke hover:border-sibila-amethyst hover:text-sibila-moonlight transition-all min-h-[220px]"
-          >
-            <span className="w-14 h-14 rounded-full bg-sibila-veil flex items-center justify-center">
-              <Phone className="w-6 h-6 text-sibila-amethyst" strokeWidth={1.5} />
-            </span>
-            <div className="text-center">
-              <div className="text-sm font-medium text-sibila-moonlight">
-                Conectar um novo dispositivo
-              </div>
-              <div className="text-[11px] mt-1">Clique para adicionar um novo whatsapp</div>
-            </div>
+      {/* Empty state */}
+      {devices.length === 0 && (
+        <div className="text-center py-20 bg-bg-surface border border-border rounded-2xl">
+          <Phone className="w-12 h-12 text-secondary mx-auto mb-4 opacity-30" />
+          <h3 className="text-lg font-bold text-primary mb-2">Nenhum dispositivo conectado</h3>
+          <p className="text-xs text-secondary mb-6">Adicione seu primeiro número WhatsApp para começar.</p>
+          <button onClick={() => setShowAdd(true)}
+            className="px-6 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-sm font-bold inline-flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Adicionar Dispositivo
           </button>
-        )}
-
-        {/* Card de dispositivo conectado/aguardando */}
-        {isConfigured && config && status && (
-          <div
-            className={[
-              'rounded-xl bg-sibila-obsidian overflow-hidden shadow-inset-veil',
-              status.ok
-                ? 'border border-sibila-mist'
-                : 'border-2 border-sibila-crimson/60',
-            ].join(' ')}
-          >
-            {/* Header com logo do provider + pill status + nickname */}
-            <div className="px-4 py-4 flex items-start gap-3">
-              <ProviderLogo provider={config.provider} state={status.ok ? 'connected' : 'pending'} />
-              <div className="flex-1 min-w-0">
-                {status.ok ? (
-                  <>
-                    <div className="text-[10px] uppercase tracking-wider-2 text-sibila-smoke mb-0.5">
-                      {activeProviderMeta.badge}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {phoneFromConfig(config) && (
-                        <span className="inline-block px-2 py-0.5 rounded bg-sibila-amethyst/15 text-sibila-amethyst text-[11px] font-mono">
-                          +{phoneFromConfig(config)}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <span className="inline-block px-2 py-0.5 rounded bg-sibila-rose/15 text-sibila-rose text-[11px] font-medium">
-                    Aguardando Conexão
-                  </span>
-                )}
-                <div className="mt-2 flex items-center gap-2 group">
-                  {editingNickname ? (
-                    <input
-                      autoFocus
-                      value={nickname}
-                      onChange={(e) => setNickname(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveNickname()}
-                      onBlur={handleSaveNickname}
-                      placeholder="Apelido (ex.: Esmeralda Cigana)"
-                      className="bg-sibila-veil border border-sibila-mist rounded px-2 py-0.5 text-sm text-sibila-moonlight focus:outline-none focus:border-sibila-amethyst flex-1"
-                    />
-                  ) : (
-                    <>
-                      <span className="text-sm text-sibila-moonlight">
-                        {nickname || (status.ok ? 'Dispositivo principal' : 'Novo Dispositivo')}
-                      </span>
-                      <button
-                        onClick={() => setEditingNickname(true)}
-                        className="opacity-0 group-hover:opacity-100 text-sibila-smoke hover:text-sibila-amethyst transition-opacity"
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Status banner / Tentativas */}
-            {status.ok ? (
-              <div className="px-4 py-2 text-center text-sm font-medium bg-sibila-amethyst text-white">
-                <CheckCircle2 className="w-3.5 h-3.5 inline mr-1.5" />
-                Conexão realizada com sucesso!
-              </div>
-            ) : (
-              <div className="px-4 py-2 text-center text-sm font-medium border-y border-sibila-mist text-sibila-fog">
-                Tentativas de conexão <strong className="text-sibila-moonlight">3</strong> de <strong className="text-sibila-moonlight">3</strong> .
-              </div>
-            )}
-
-            {/* Mostrar Detalhes */}
-            <button
-              onClick={() => setShowDetails((v) => !v)}
-              className="w-full px-4 py-2.5 text-sm text-sibila-fog hover:bg-sibila-veil/40 border-t border-sibila-mist flex items-center justify-center gap-1.5"
-            >
-              {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              Mostrar Detalhes
-            </button>
-            {showDetails && (
-              <div className="px-4 py-3 bg-sibila-veil/30 border-t border-sibila-mist text-xs space-y-1.5">
-                <DetailRow label="Provider" value={activeProviderMeta.title} />
-                {config.provider === 'meta_cloud' && (
-                  <>
-                    <DetailRow label="phone_number_id" value={config.meta_cloud.phone_number_id || '—'} mono />
-                    <DetailRow label="waba_id" value={config.meta_cloud.waba_id || '—'} mono />
-                    <DetailRow label="access_token" value={config.meta_cloud.has_access_token ? '••••••••' : 'não configurado'} />
-                  </>
-                )}
-                {config.provider === 'coex' && (
-                  <>
-                    <DetailRow label="api_url" value={config.coex.api_url || '—'} mono />
-                    <DetailRow label="instance" value={config.coex.instance || '—'} mono />
-                    <DetailRow label="api_key" value={config.coex.has_api_key ? '••••••••' : 'não configurado'} />
-                  </>
-                )}
-                {config.provider === 'evolution' && (
-                  <>
-                    <DetailRow label="server_url" value={config.evolution.server_url || '—'} mono />
-                    <DetailRow label="instance" value={config.evolution.instance || '—'} mono />
-                    <DetailRow label="api_key" value={config.evolution.has_api_key ? '••••••••' : 'não configurado'} />
-                    {status?.connection_state && (
-                      <DetailRow label="connection_state" value={status.connection_state} />
-                    )}
-                  </>
-                )}
-                <div className="pt-2 mt-2 border-t border-sibila-mist/60">
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="text-xs text-sibila-amethyst hover:underline"
-                  >
-                    Editar credenciais
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Gerar QR Code (só Evolution não conectado) */}
-            {!status.ok && config.provider === 'evolution' && (
-              <button
-                onClick={() => setShowQrModal(true)}
-                className="w-full px-4 py-2.5 text-sm text-sibila-amethyst hover:bg-sibila-amethyst/10 border-t border-sibila-mist flex items-center justify-center gap-1.5 transition-colors font-medium"
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                Gerar QR Code
-              </button>
-            )}
-
-            {/* Desconectar */}
-            <button
-              onClick={handleDisconnect}
-              className="w-full px-4 py-2.5 text-sm text-sibila-crimson hover:bg-sibila-crimson/10 border-t border-sibila-mist flex items-center justify-center gap-1.5 transition-colors"
-            >
-              <PowerOff className="w-3.5 h-3.5" />
-              Desconectar
-            </button>
-          </div>
-        )}
-
-        {/* Placeholder vazio quando NÃO configurado para preencher a grid de 2 colunas */}
-        {!isConfigured && (
-          <div className="hidden md:block rounded-xl border border-sibila-mist/50 bg-sibila-obsidian/20 min-h-[220px]" />
-        )}
-      </div>
-
-      {/* Modal de configuração */}
-      {showAddModal && form && (
-        <ConfigModal
-          form={form}
-          setForm={setForm}
-          onClose={() => setShowAddModal(false)}
-          onSave={(patch) => saveMutation.mutate(patch)}
-          saving={saveMutation.isPending}
-        />
+        </div>
       )}
 
-      {/* Modal QR — só pra Evolution não conectado */}
-      {showQrModal && (
-        <QrModal onClose={() => setShowQrModal(false)} onPaired={() => {
-          setShowQrModal(false);
-          refetchStatus();
-        }} />
+      {/* Device cards grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {devices.map(d => (
+          <DeviceCard key={d.id} device={d}
+            onDelete={() => deleteMut.mutate(d.id)}
+            onSetPrimary={() => primaryMut.mutate(d.id)} />
+        ))}
+      </div>
+
+      {/* Add Device Modal */}
+      {showAdd && <WizardModal onClose={() => setShowAdd(false)} />}
+    </div>
+  );
+}
+
+/* ── Reusable Field ──────────────────────────── */
+function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <div>
+      <label className="text-xs font-bold text-secondary block mb-1">{label}</label>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary" />
+    </div>
+  );
+}
+
+/* ── Provider Button ─────────────────────────── */
+function ProviderBtn({ label, sub, active, onClick, color }: { id: string; label: string; sub: string; active: boolean; onClick: () => void; color: string }) {
+  const cls = active
+    ? color === 'green'
+      ? 'bg-gradient-to-br from-[#0a1a12] to-[#0f2318] border-[#25D366]/30 ring-1 ring-[#25D366]/20'
+      : 'bg-gradient-to-br from-purple-900/30 to-purple-950/30 border-purple-500/30 ring-1 ring-purple-500/20'
+    : 'bg-bg-primary border-border hover:border-border';
+  return (
+    <button type="button" onClick={onClick} className={`text-left p-4 rounded-xl border transition-all ${cls}`}>
+      <div className="text-sm font-bold text-primary">{label}</div>
+      <div className="text-[10px] text-secondary">{sub}</div>
+    </button>
+  );
+}
+
+function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onDelete: () => void; onSetPrimary: () => void }) {
+  const { data: liveStatus, refetch } = useQuery({
+    queryKey: ['device-status', d.id],
+    queryFn: () => api.get<any>(`/saas/devices/${d.id}/status`),
+    refetchInterval: 20000,
+  });
+  const isConnected = liveStatus?.connected ?? d.connected;
+  const isMeta = d.provider === 'meta_cloud' || d.provider === 'coex';
+
+  return (
+    <div className="relative rounded-[24px] bg-[#F2F4F7] p-8 shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all group overflow-hidden max-w-[600px]">
+      
+      {d.is_primary && (
+        <div className="absolute top-5 right-5 flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Principal</span>
+        </div>
+      )}
+
+      {/* Top: WA Logo + Phone Number */}
+      <div className="flex items-center gap-5 mb-8">
+        <div className="relative">
+          <div className="w-[56px] h-[56px] bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.08)] flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="w-[42px] h-[42px] text-[#25D366] fill-current">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.662-2.06-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51h-.57c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+          </div>
+        </div>
+        <div className="text-[34px] font-bold text-[#1D2B36] tracking-tight font-sans">
+          {d.phone_display || d.nickname || 'Sem número'}
+        </div>
+      </div>
+
+      {/* Middle: Status + Disconnect */}
+      <div className="flex items-center justify-between mb-10">
+        <div className="flex items-center gap-3">
+          {isConnected ? (
+            <>
+              <div className="w-[16px] h-[16px] rounded-full bg-[#25D366] shadow-[0_0_16px_5px_rgba(37,211,102,0.5)] animate-pulse" />
+              <span className="text-[22px] font-medium text-[#25D366]">Conectado</span>
+            </>
+          ) : (
+            <>
+              <div className="w-[16px] h-[16px] rounded-full bg-amber-400 shadow-[0_0_16px_5px_rgba(251,191,36,0.5)]" />
+              <span className="text-[22px] font-medium text-amber-500">Desconectado</span>
+            </>
+          )}
+        </div>
+        
+        <button onClick={() => { if (confirm(`Desconectar "${d.nickname}"?`)) onDelete(); }}
+          className="flex items-center gap-2.5 px-6 py-3 bg-white border border-gray-200 rounded-[12px] text-[16px] font-medium text-[#1D2B36] hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
+          <Unplug className="w-5 h-5 text-gray-800" strokeWidth={2} /> Desconectar
+        </button>
+      </div>
+
+      {/* Bottom Right: Meta / Evolution Logo */}
+      <div className="flex justify-end mt-4">
+        <div className="flex flex-col items-end">
+          {isMeta ? (
+            <>
+              <div className="flex items-center gap-2 mb-1">
+                <svg viewBox="0 0 36 36" className="w-[32px] h-[32px] text-[#0866FF] fill-current">
+                  <path d="M19.78,24.11a2.83,2.83,0,0,1-2.22-1.07l-3.24-4L11,15a4.34,4.34,0,0,0-6.17,0A4.47,4.47,0,0,0,3.58,18a4.47,4.47,0,0,0,1.25,3A4.34,4.34,0,0,0,11,21l3.35,4.06a6.83,6.83,0,0,0,10.6,0A6.83,6.83,0,0,0,25,15h0a6.83,6.83,0,0,0-10.6,0L13.11,16.63l1.83,2.23L16.22,17.3a4.34,4.34,0,0,1,6.17,0,4.47,4.47,0,0,1,0,6A4.34,4.34,0,0,1,19.78,24.11Z" />
+                </svg>
+                <span className="text-[28px] font-bold text-[#1D2B36] tracking-tight">Meta</span>
+              </div>
+              <span className="text-[14px] font-medium text-[#0866FF]">Official Meta API Connection</span>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-1">
+                <QrCode className="w-[32px] h-[32px] text-purple-600" />
+                <span className="text-[28px] font-bold text-[#1D2B36] tracking-tight">Evolution</span>
+              </div>
+              <span className="text-[14px] font-medium text-purple-600">QR Code Connection</span>
+            </>
+          )}
+        </div>
+      </div>
+      
+      {/* Set Primary Button (Hidden unless hovered) */}
+      {!d.is_primary && (
+        <button onClick={onSetPrimary} className="absolute bottom-6 left-8 text-[12px] font-bold text-gray-400 hover:text-gray-700 underline opacity-0 group-hover:opacity-100 transition-opacity">
+          Definir principal
+        </button>
       )}
     </div>
   );
 }
-
-// ── Subcomponents ──────────────────────────────────────────────────────
-
-function ProviderLogo({
-  provider,
-  state = 'connected',
-}: {
-  provider: ProviderMode;
-  state?: 'connected' | 'pending';
-}) {
-  const meta = PROVIDERS.find((p) => p.id === provider)!;
-  // Estado pendente: usa cor de Evolution (esmeralda) com Plus circle pra indicar "novo"
-  const cls =
-    state === 'pending'
-      ? 'bg-emerald-500/10 border-emerald-500/30'
-      : 'bg-sibila-veil border-sibila-mist';
-  const iconColor = state === 'pending' ? 'text-emerald-500' : 'text-sibila-amethyst';
-  return (
-    <span className={`relative w-12 h-12 rounded-lg border flex items-center justify-center flex-shrink-0 ${cls}`}>
-      <meta.Icon className={`w-5 h-5 ${iconColor}`} strokeWidth={1.6} />
-      {state === 'pending' && (
-        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-sibila-obsidian flex items-center justify-center">
-          <Plus className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-        </span>
-      )}
-    </span>
-  );
-}
-
-function phoneFromConfig(c: WhatsAppConfig): string {
-  // Meta Cloud não tem o número direto (só phone_number_id), então mostra o ID
-  if (c.provider === 'meta_cloud') return c.meta_cloud.phone_number_id;
-  if (c.provider === 'coex') return c.coex.instance;
-  if (c.provider === 'evolution') return c.evolution.instance;
-  return '';
-}
-
-function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="grid grid-cols-[120px,1fr] gap-2">
-      <span className="text-sibila-smoke">{label}</span>
-      <span
-        className={`text-sibila-fog break-all ${mono ? 'font-mono text-[11px]' : ''}`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function ErrorBanner({ error }: { error: Error }) {
-  return (
-    <div className="mb-6 rounded-lg px-4 py-3 border bg-sibila-crimson/10 border-sibila-crimson/30 flex items-start gap-3">
-      <AlertTriangle className="w-4 h-4 text-sibila-crimson mt-0.5 flex-shrink-0" />
-      <div className="flex-1 text-sm">
-        <div className="font-medium text-sibila-moonlight">
-          Não consegui ler a config do servidor
-        </div>
-        <div className="text-xs text-sibila-fog mt-1">{error.message}</div>
-        <ul className="text-[11px] text-sibila-smoke mt-2 list-disc list-inside space-y-0.5">
-          <li><strong>401</strong>: faça login em <a className="text-sibila-amethyst hover:underline" href="/saas/login">/saas/login</a></li>
-          <li><strong>404</strong>: reinicie o Flask (blueprint <code>saas_whatsapp</code> novo)</li>
-          <li><strong>500</strong>: cheque o log do Flask</li>
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-// ── Modal de configuração ──────────────────────────────────────────────
-
-function ConfigModal({
-  form,
-  setForm,
-  onClose,
-  onSave,
-  saving,
-}: {
-  form: WhatsAppConfig;
-  setForm: (f: WhatsAppConfig) => void;
-  onClose: () => void;
-  onSave: (patch: Parameters<typeof whatsappApi.saveConfig>[0]) => void;
-  saving: boolean;
-}) {
-  // Step 1: type picker (compacto, estilo Lailla)
-  // Step 2: form contextual do provider escolhido
-  const [step, setStep] = useState<'type' | 'form'>(form.provider && (form.meta_cloud.phone_number_id || form.coex.api_url || form.evolution.server_url) ? 'form' : 'type');
-  const [mode, setMode] = useState<ProviderMode>(form.provider);
-  const [secrets, setSecrets] = useState({
-    access_token: '',
-    coex_api_key: '',
-    evolution_api_key: '',
-  });
-  const [testNumber, setTestNumber] = useState('');
-
-  const testMutation = useMutation({
-    mutationFn: () => whatsappApi.test(testNumber),
-    onSuccess: (r) => {
-      if (r.ok) toast.success(`Mensagem teste enviada${r.message_id ? ` (id: ${r.message_id})` : ''}.`);
-      else toast.error(`Falha no teste: ${r.error || 'desconhecido'}`);
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
-
-  const handleSave = () => {
-    const patch: Parameters<typeof whatsappApi.saveConfig>[0] = {
-      provider: mode,
-      meta_cloud: {
-        phone_number_id: form.meta_cloud.phone_number_id,
-        waba_id: form.meta_cloud.waba_id,
-      },
-      coex: { api_url: form.coex.api_url, instance: form.coex.instance },
-      evolution: { server_url: form.evolution.server_url, instance: form.evolution.instance },
-    };
-    if (secrets.access_token) patch.meta_cloud!.access_token = secrets.access_token;
-    if (secrets.coex_api_key) patch.coex!.api_key = secrets.coex_api_key;
-    if (secrets.evolution_api_key) patch.evolution!.api_key = secrets.evolution_api_key;
-    onSave(patch);
-  };
-
-  // ── Step 1: type picker ─────────────────────────────────────────────
-  if (step === 'type') {
-    return (
-      <div
-        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-        onClick={onClose}
-      >
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="bg-white text-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
-        >
-          <header className="flex items-center justify-between px-5 py-3 bg-sibila-amethyst text-white">
-            <h3 className="font-display text-base">Escolha o tipo de conexão</h3>
-            <button
-              onClick={onClose}
-              className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-slate-700 flex items-center justify-center transition-colors"
-              title="Fechar"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </header>
-          <ul className="p-4 space-y-3">
-            {PROVIDERS.map((p) => (
-              <li key={p.id}>
-                <button
-                  onClick={() => {
-                    setMode(p.id);
-                    setStep('form');
-                  }}
-                  className={[
-                    'w-full text-left rounded-xl border-2 px-4 py-3.5 flex items-center gap-3 transition-all',
-                    mode === p.id
-                      ? 'border-sibila-amethyst shadow-md'
-                      : 'border-slate-200 hover:border-sibila-amethyst/50 hover:shadow-sm',
-                  ].join(' ')}
-                >
-                  <span
-                    className={[
-                      'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
-                      p.id === 'meta_cloud' ? 'bg-blue-50 text-blue-600' :
-                      p.id === 'coex' ? 'bg-amber-50 text-amber-600' :
-                      'bg-emerald-50 text-emerald-600',
-                    ].join(' ')}
-                  >
-                    <p.Icon className="w-5 h-5" strokeWidth={1.8} />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800">
-                      {modalTitleFor(p.id)}
-                    </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      {modalSubtitleFor(p.id)}
-                    </div>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Step 2: form ────────────────────────────────────────────────────
-  return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-sibila-obsidian border border-sibila-mist rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-      >
-        <header className="flex items-center justify-between px-6 py-4 border-b border-sibila-mist flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setStep('type')}
-              className="text-sibila-fog hover:text-sibila-moonlight p-1 rounded hover:bg-sibila-veil"
-              title="Voltar"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <div>
-              <h3 className="font-display text-lg text-sibila-moonlight">
-                {modalTitleFor(mode)}
-              </h3>
-              <p className="text-[11px] text-sibila-smoke mt-0.5">
-                {modalSubtitleFor(mode)}
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-sibila-fog hover:text-sibila-moonlight p-1">
-            <X className="w-4 h-4" />
-          </button>
-        </header>
-
-        <div className="overflow-y-auto px-6 py-5 space-y-5">
-          {/* Form contextual */}
-          {mode === 'meta_cloud' && (
-            <div className="space-y-3">
-              <Field
-                label="phone_number_id"
-                hint="numérico, da Meta Business"
-                value={form.meta_cloud.phone_number_id}
-                onChange={(v) => setForm({ ...form, meta_cloud: { ...form.meta_cloud, phone_number_id: v } })}
-                placeholder="106540152569312"
-                mono
-              />
-              <Field
-                label="waba_id"
-                hint="WhatsApp Business Account ID"
-                value={form.meta_cloud.waba_id}
-                onChange={(v) => setForm({ ...form, meta_cloud: { ...form.meta_cloud, waba_id: v } })}
-                placeholder="103845942681542"
-                mono
-              />
-              <Secret
-                label="access_token"
-                hint={form.meta_cloud.has_access_token ? 'Salvo · digite só pra trocar' : 'System User token (permanente)'}
-                value={secrets.access_token}
-                onChange={(v) => setSecrets({ ...secrets, access_token: v })}
-                placeholder={form.meta_cloud.has_access_token ? '••••••••••••' : 'EAAxxx...'}
-              />
-              <a
-                href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
-                target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-sibila-amethyst hover:underline"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Doc Meta Cloud API
-              </a>
-            </div>
-          )}
-
-          {mode === 'coex' && (
-            <div className="space-y-3">
-              <div className="rounded border border-sibila-ember/30 bg-sibila-ember/5 px-3 py-2 text-[11px] text-sibila-fog">
-                Coex é stub estrutural. Forneça as 3 chaves abaixo; o envio real
-                fica pendente até você passar a doc oficial Coex.
-              </div>
-              <Field
-                label="api_url"
-                value={form.coex.api_url}
-                onChange={(v) => setForm({ ...form, coex: { ...form.coex, api_url: v } })}
-                placeholder="https://api.coex.cx/v1/messages"
-                mono
-              />
-              <Field
-                label="instance"
-                value={form.coex.instance}
-                onChange={(v) => setForm({ ...form, coex: { ...form.coex, instance: v } })}
-                placeholder="prod-default"
-                mono
-              />
-              <Secret
-                label="api_key"
-                hint={form.coex.has_api_key ? 'Salva · digite só pra trocar' : ''}
-                value={secrets.coex_api_key}
-                onChange={(v) => setSecrets({ ...secrets, coex_api_key: v })}
-                placeholder={form.coex.has_api_key ? '••••••••••••' : 'cx_xxx...'}
-              />
-            </div>
-          )}
-
-          {mode === 'evolution' && (
-            <div className="space-y-3">
-              <div className="rounded border border-sibila-crimson/30 bg-sibila-crimson/5 px-3 py-2 text-[11px] text-sibila-fog">
-                <strong className="text-sibila-crimson">Atenção:</strong> Evolution viola TOS do WhatsApp — números podem ser banidos. Use só em testes.
-              </div>
-              <Field
-                label="server_url"
-                value={form.evolution.server_url}
-                onChange={(v) => setForm({ ...form, evolution: { ...form.evolution, server_url: v } })}
-                placeholder="https://evo.example.com"
-                mono
-              />
-              <Field
-                label="instance"
-                value={form.evolution.instance}
-                onChange={(v) => setForm({ ...form, evolution: { ...form.evolution, instance: v } })}
-                placeholder="cigana-prod"
-                mono
-              />
-              <Secret
-                label="api_key"
-                hint={form.evolution.has_api_key ? 'Salva · digite só pra trocar' : ''}
-                value={secrets.evolution_api_key}
-                onChange={(v) => setSecrets({ ...secrets, evolution_api_key: v })}
-                placeholder={form.evolution.has_api_key ? '••••••••••••' : 'B6xxxx...'}
-              />
-            </div>
-          )}
-
-          {/* Test send */}
-          <div className="border-t border-sibila-mist pt-4">
-            <div className="text-[11px] uppercase tracking-wider-2 text-sibila-fog mb-2">
-              Testar envio
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={testNumber}
-                onChange={(e) => setTestNumber(e.target.value)}
-                placeholder="5511999999999"
-                className="flex-1 rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm font-mono text-sibila-moonlight focus:outline-none focus:border-sibila-amethyst"
-              />
-              <button
-                onClick={() => {
-                  if (!testNumber.trim()) return toast.warning('Informe um número.');
-                  testMutation.mutate();
-                }}
-                disabled={testMutation.isPending}
-                className="px-3 py-1.5 rounded bg-sibila-sage/30 border border-sibila-sage/50 text-sibila-sage text-sm hover:bg-sibila-sage/40 disabled:opacity-50 flex items-center gap-1.5"
-              >
-                <Send className="w-3.5 h-3.5" />
-                {testMutation.isPending ? '…' : 'Testar'}
-              </button>
-            </div>
-            <p className="text-[10px] text-sibila-smoke mt-1">
-              Usa o provider <strong>já salvo</strong> — salve antes de testar credenciais novas.
-            </p>
-          </div>
-        </div>
-
-        <footer className="border-t border-sibila-mist px-6 py-3 flex items-center justify-between flex-shrink-0">
-          <button onClick={onClose} className="text-sm text-sibila-fog hover:text-sibila-moonlight px-3 py-1.5">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-1.5 rounded bg-sibila-amethyst text-white text-sm hover:brightness-110 disabled:opacity-50"
-          >
-            {saving ? '…' : <><Save className="w-3.5 h-3.5" /> Salvar</>}
-          </button>
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  value,
-  onChange,
-  placeholder,
-  mono,
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  mono?: boolean;
-}) {
-  return (
-    <label className="block">
-      <div className="flex items-baseline justify-between mb-1">
-        <span className="text-[11px] uppercase tracking-wider-2 text-sibila-fog">{label}</span>
-        {hint && <span className="text-[10px] text-sibila-smoke">{hint}</span>}
-      </div>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={`w-full rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm text-sibila-moonlight placeholder:text-sibila-smoke focus:outline-none focus:border-sibila-amethyst ${mono ? 'font-mono' : ''}`}
-      />
-    </label>
-  );
-}
-
-function Secret({
-  label,
-  hint,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <label className="block">
-      <div className="flex items-baseline justify-between mb-1">
-        <span className="text-[11px] uppercase tracking-wider-2 text-sibila-fog">{label}</span>
-        {hint && <span className="text-[10px] text-sibila-smoke">{hint}</span>}
-      </div>
-      <input
-        type="password"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        autoComplete="new-password"
-        className="w-full rounded border border-sibila-mist bg-sibila-onyx px-3 py-1.5 text-sm font-mono text-sibila-moonlight placeholder:text-sibila-smoke focus:outline-none focus:border-sibila-amethyst"
-      />
-    </label>
-  );
-}
-
-// ── QR Modal — pareamento Evolution (estilo Lailla) ────────────────────
-
-function QrModal({
-  onClose,
-  onPaired,
-}: {
-  onClose: () => void;
-  onPaired: () => void;
-}) {
-  const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['whatsapp-qr'],
-    queryFn: whatsappApi.qr,
-    retry: false,
-    refetchInterval: 3000, // re-busca cada 3s — Evolution rotaciona o QR
-  });
-
-  // Detecta estado paired via status; se virar 'open', avisa parent
-  const { data: status } = useQuery({
-    queryKey: ['whatsapp-status'],
-    queryFn: whatsappApi.status,
-    retry: false,
-    refetchInterval: 2500,
-  });
-
-  useEffect(() => {
-    if (status?.connection_state === 'open') {
-      onPaired();
-    }
-  }, [status, onPaired]);
-
-  // Extrai QR do payload Evolution v2: { base64?, code?, pairingCode? }
-  const qrPayload = (data?.data ?? {}) as Record<string, unknown>;
-  const qrBase64 = typeof qrPayload.base64 === 'string' ? qrPayload.base64 : null;
-  const qrCode = typeof qrPayload.code === 'string' ? qrPayload.code : null;
-  const pairingCode = typeof qrPayload.pairingCode === 'string' ? qrPayload.pairingCode : null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white text-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden"
-      >
-        <header className="flex items-center justify-between px-5 py-3 bg-sibila-amethyst text-white">
-          <h3 className="font-display text-base">Conectar com número de telefone</h3>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-slate-700 flex items-center justify-center transition-colors"
-            title="Fechar"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </header>
-
-        <div className="p-6 grid grid-cols-1 md:grid-cols-[1fr,auto] gap-6 items-start">
-          {/* Instruções */}
-          <div className="space-y-3">
-            <h4 className="font-display text-lg text-slate-800">Leitura de QR Code</h4>
-            <ol className="space-y-2 text-sm text-slate-600">
-              <li>Abra o WhatsApp no seu celular.</li>
-              <li>
-                Toque em <strong>Mais opções</strong> ou <strong>Configurações</strong> e
-                selecione <strong>Aparelhos conectados</strong>.
-              </li>
-              <li>Toque em <strong>Conectar um aparelho</strong>.</li>
-              <li>
-                Aponte seu celular para esta tela para capturar o QR code e aguarde a
-                conexão ser concluída.
-              </li>
-            </ol>
-
-            {pairingCode && (
-              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 mt-3">
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
-                  Código de pareamento alternativo
-                </div>
-                <code className="font-mono text-lg font-semibold text-slate-800 tracking-wider">
-                  {pairingCode}
-                </code>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Use no WhatsApp em "Conectar com número de telefone".
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-                <strong>Não consegui buscar o QR.</strong>{' '}
-                {(error as Error).message}
-                <button
-                  onClick={() => refetch()}
-                  className="block mt-1 text-xs underline hover:text-red-900"
-                >
-                  Tentar novamente
-                </button>
-              </div>
-            )}
-
-            {!error && status && status.connection_state !== 'open' && (
-              <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                Aguardando pareamento… (atualiza a cada 3s)
-              </div>
-            )}
-          </div>
-
-          {/* QR */}
-          <div className="flex items-center justify-center">
-            {isLoading || isFetching ? (
-              <div className="w-[260px] h-[260px] rounded-lg bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-sm">
-                Gerando QR…
-              </div>
-            ) : qrBase64 ? (
-              <img
-                src={qrBase64.startsWith('data:') ? qrBase64 : `data:image/png;base64,${qrBase64}`}
-                alt="QR code"
-                className="w-[260px] h-[260px] rounded-lg border border-slate-200"
-              />
-            ) : qrCode ? (
-              <div className="w-[260px] h-[260px] rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center p-3 text-[10px] font-mono text-slate-400 break-all overflow-hidden">
-                {qrCode.slice(0, 200)}…
-              </div>
-            ) : (
-              <div className="w-[260px] h-[260px] rounded-lg bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
-                <QrCode className="w-10 h-10" strokeWidth={1.2} />
-                <span className="text-xs">QR não disponível</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function modalTitleFor(p: ProviderMode): string {
-  if (p === 'meta_cloud') return 'API Oficial (Meta Cloud)';
-  if (p === 'coex') return 'API Oficial · Coex (BSP)';
-  return 'WhatsApp Business (não oficial)';
-}
-
-function modalSubtitleFor(p: ProviderMode): string {
-  if (p === 'meta_cloud') return 'Conecte direto na Graph API da Meta';
-  if (p === 'coex') return 'Provedor BSP brasileiro parceiro Meta';
-  return 'Conexão por QR (Evolution API) — pode ser banido';
-}
-
-// Marca usado pra evitar warning do TS noUnusedLocals
-void Plus;
