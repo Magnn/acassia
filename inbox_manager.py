@@ -12,6 +12,7 @@ from config_cliente import CONFIG_CLIENTE
 from db import models
 from db.database import SessionLocal
 from tenant_context import get_engine_tenant_id, tenant_override_ctx
+from reliability.distributed_lock import DistributedSemaphore
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +54,12 @@ class LeadInboxManager:
             0.0, min(float(CONFIG_CLIENTE.get("inbox_after_text_grace_seconds", 20) or 20), 60.0)
         )
         self.after_text_grace_min_chars = int(CONFIG_CLIENTE.get("inbox_after_text_grace_min_chars", 40) or 40)
-        self._sem_processamento = threading.BoundedSemaphore(
-            value=max(4, int(CONFIG_CLIENTE.get("inbox_max_concorrencia_processamento", 24) or 24))
+        # Semáforo distribuído (Redis se disponível, fallback local).
+        # Limita concurrência GLOBAL (cross-worker) de processamento.
+        _max_conc = max(4, int(CONFIG_CLIENTE.get("inbox_max_concorrencia_processamento", 24) or 24))
+        self._sem_processamento = DistributedSemaphore(
+            "inbox:processing",
+            max_concurrent=_max_conc,
         )
         self._re_confirmacao_curta = re.compile(
             r"\b(ok|sim|pronto|salvo|beleza|blz|show|feito|entendi|combinado)\b",

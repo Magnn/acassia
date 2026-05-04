@@ -394,81 +394,57 @@ def _register_saas_blueprints():
     from api.saas.wa_devices import devices_bp as saas_wa_devices_bp
     from api.b2c_marketplace import b2c_bp
 
+
     login_manager.init_app(app)
-    for bp in (
-        auth_bp,
-        onboarding_bp,
-        inbox_bp,
-        metrics_bp,
-        settings_bp,
-        connect_bp,
-        billing_bp,
-        whatsapp_bp,
-        telemetry_bp,
-        twofa_bp,
-        admin_tenants_bp,
-        impersonate_bp,
-        lifecycle_bp,
-        commercial_bp,
-        admin_metrics_bp,
-        security_bp,
-        privacy_bp,
-        saas_analytics_bp,
-        saas_templates_bp,
-        saas_tarot_bp,
-        saas_pix_bp,
-        saas_voice_bp,
-        saas_coach_bp,
-        saas_affiliate_bp,
-        saas_referral_bp,
-        saas_lunar_bp,
-        saas_marketplace_bp,
-        saas_admin_marketplace_bp,
-        saas_horoscope_bp,
-        saas_spiritual_bp,
-        saas_aura_bp,
-        saas_compose_bp,
-        saas_lead_context_bp,
-        saas_calendar_bp,
-        saas_integrations_wa_bp,
-        saas_audio_lib_bp,
-        saas_daily_msg_bp,
-        saas_sched_tarot_bp,
-        saas_persona_bp,
-        saas_exp_bp,
-        saas_realtime_bp,
-        saas_api_keys_bp,
-        saas_ritual_bp,
-        public_astro_bp,
-        saas_broadcast_bp,
-        saas_events_bp,
-        saas_content_bp,
-        saas_coupons_bp,
-        saas_scheduling_bp,
-        saas_subscriptions_bp,
-        saas_profile_bp,
-        saas_journal_bp,
-        saas_trails_bp,
-        saas_dreams_bp,
-        saas_visionboard_bp,
-        saas_community_bp,
-        saas_reading_bp,
-        saas_social_bp,
-        saas_progress_bp,
-        saas_health_bp,
-        saas_launch_bp,
-        saas_pipeline_bp,
-        saas_ac_bp,
-        saas_checkout_bp,
-        saas_multi_bp,
-        saas_groups_bp,
-        saas_extras_bp,
-        saas_smart_bp,
-        saas_wa_conn_bp,
-        saas_wa_devices_bp,
-        b2c_bp,
-    ):
+
+    # Blueprints críticos — se falharem, app DEVE crashar (webhook, auth, billing)
+    _critical = (
+        auth_bp, onboarding_bp, inbox_bp, billing_bp, whatsapp_bp,
+        connect_bp, settings_bp, security_bp, twofa_bp,
+    )
+    for bp in _critical:
         app.register_blueprint(bp)
+
+    # Blueprints não-críticos — falha isolada não mata a app
+    _optional = (
+        metrics_bp, telemetry_bp,
+        admin_tenants_bp, impersonate_bp, lifecycle_bp, commercial_bp,
+        admin_metrics_bp, privacy_bp,
+        saas_analytics_bp, saas_templates_bp, saas_tarot_bp,
+        saas_pix_bp, saas_voice_bp, saas_coach_bp,
+        saas_affiliate_bp, saas_referral_bp,
+        saas_lunar_bp, saas_marketplace_bp, saas_admin_marketplace_bp,
+        saas_horoscope_bp, saas_spiritual_bp, saas_aura_bp,
+        saas_compose_bp, saas_lead_context_bp,
+        saas_calendar_bp, saas_integrations_wa_bp,
+        saas_audio_lib_bp, saas_daily_msg_bp, saas_sched_tarot_bp,
+        saas_persona_bp, saas_exp_bp, saas_realtime_bp,
+        saas_api_keys_bp, saas_ritual_bp, public_astro_bp,
+        saas_broadcast_bp, saas_events_bp,
+        saas_content_bp, saas_coupons_bp,
+        saas_scheduling_bp, saas_subscriptions_bp,
+        saas_profile_bp, saas_journal_bp, saas_trails_bp,
+        saas_dreams_bp, saas_visionboard_bp,
+        saas_community_bp, saas_reading_bp, saas_social_bp,
+        saas_progress_bp, saas_health_bp, saas_launch_bp,
+        saas_pipeline_bp, saas_ac_bp, saas_checkout_bp,
+        saas_multi_bp, saas_groups_bp, saas_extras_bp,
+        saas_smart_bp, saas_wa_conn_bp, saas_wa_devices_bp,
+        b2c_bp,
+    )
+    _failed_bps = []
+    for bp in _optional:
+        try:
+            app.register_blueprint(bp)
+        except Exception as exc:
+            bp_name = getattr(bp, 'name', str(bp))
+            _failed_bps.append(bp_name)
+            logger.error("[SAAS] Blueprint '%s' falhou ao registrar: %s", bp_name, exc)
+    if _failed_bps:
+        logger.warning(
+            "⚠️ [SAAS] %d blueprint(s) falharam (app operando em modo degradado): %s",
+            len(_failed_bps), ", ".join(_failed_bps),
+        )
 
 
 try:

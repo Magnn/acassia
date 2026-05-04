@@ -426,6 +426,8 @@ class Engine:
         Monitor de auto-retomada do funil estático:
         quando um lead respondeu e ficou sem resposta do bot após queda/restart,
         reenfileira o último turno do usuário automaticamente.
+
+        Guard: usa DistributedLock para evitar múltiplos monitors em multi-worker.
         """
         try:
             enabled = bool(CONFIG_CLIENTE.get("funil_estatico_auto_retoma_ativo", True))
@@ -435,6 +437,19 @@ class Engine:
             return
         if self._monitor_retomada_estatica_ativo:
             return
+
+        # Lock distribuído: apenas 1 worker roda o monitor
+        try:
+            _static_lock = DistributedLock(
+                "engine:static_retomada_monitor",
+                ttl_ms=120_000,  # 2 min TTL — monitor roda a cada 45s
+            )
+            if not _static_lock.acquire(timeout=0.5):
+                logger.info("[ENGINE] Monitor retomada estática já ativo em outro worker — skip")
+                return
+        except Exception as exc:
+            logger.debug("[ENGINE] Fallback: iniciando monitor retomada local: %s", exc)
+
         self._monitor_retomada_estatica_ativo = True
         th = threading.Thread(
             target=self._loop_monitor_retomada_estatica,
