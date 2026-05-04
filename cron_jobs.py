@@ -5,10 +5,10 @@ Cada job é idempotente (pode rodar múltiplas vezes sem efeito colateral).
 Recomendado rodar a cada hora via systemd timer ou cron host:
 
     # Hourly
-    0 * * * * cd /opt/acassia && python -m cron_jobs hourly
+    0 * * * * cd /opt/meumisterio && python -m cron_jobs hourly
 
     # Daily 2am UTC (off-peak)
-    0 2 * * * cd /opt/acassia && python -m cron_jobs daily
+    0 2 * * * cd /opt/meumisterio && python -m cron_jobs daily
 
 Jobs:
     hourly_trial_warnings  — D-12, D-7, D-3, D-1 emails (Frente 2.19)
@@ -356,6 +356,7 @@ def run_hourly():
     hourly_dispatch_daily_personal_messages()
     hourly_process_scheduled_readings()
     hourly_pick_ab_winners()
+    hourly_check_launch_phases()
     logger.info("[cron] hourly done")
 
 
@@ -581,6 +582,25 @@ if __name__ == "__main__":
         run_hourly()
     elif cmd == "daily":
         run_daily()
+    elif cmd == "minutely":
+        run_minutely()
     else:
-        print(f"Unknown command: {cmd}. Use 'hourly' or 'daily'.")
+        print(f"Unknown command: {cmd}. Use 'hourly', 'daily', or 'minutely'.")
         sys.exit(1)
+
+
+def hourly_check_launch_phases():
+    """Executa fases de lançamento cujo scheduled_at já passou."""
+    try:
+        from api.saas.launch_manager import check_and_execute_due_phases
+        check_and_execute_due_phases()
+    except Exception as exc:
+        logger.warning("[cron.launch_phases] falha: %s", exc)
+
+
+def run_minutely():
+    """Para lançamentos: checa fases a cada minuto (precisão de timing)."""
+    logger.info("[cron] starting minutely jobs")
+    hourly_check_launch_phases()
+    logger.info("[cron] minutely done")
+

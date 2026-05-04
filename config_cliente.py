@@ -170,8 +170,8 @@ def carregar() -> dict:
 
     # Perfil de negócio (base para multi-tenant / wizard — preencher via .env)
     perfil_negocio = {
-        "slug": _obter_limpo("NEGOCIO_SLUG", "CLIENTE_SLUG", "cigana_piloto"),
-        "nome_exibicao": _obter_limpo("NEGOCIO_NOME", "CLIENTE_NOME_EXIBICAO", "Cigana Esmeralda"),
+        "slug": _obter_limpo("NEGOCIO_SLUG", "CLIENTE_SLUG", "meumisterio_piloto"),
+        "nome_exibicao": _obter_limpo("NEGOCIO_NOME", "CLIENTE_NOME_EXIBICAO", "Meu Mistério Esmeralda"),
         "vertical": _obter_limpo("NEGOCIO_VERTICAL", None, "consultoria_mistica"),
         "oferta_resumo": _obter_limpo("NEGOCIO_OFERTA_RESUMO", None, "Leitura guiada + ritual personalizado no WhatsApp"),
         "publico_hint": _obter_limpo("NEGOCIO_PUBLICO", None, "Pessoas em crise afetiva buscando clareza"),
@@ -286,7 +286,7 @@ def carregar() -> dict:
         "whatsapp_typing_enabled": (
             _obter_limpo("WHATSAPP_TYPING_ENABLED", None, "0").lower() in ("1", "true", "yes", "sim")
         ),
-        # Novo lead: "1_apresentacao" (padrão Cigana) ou "static_meumisterio_b1" (funil estático Meu Mistério)
+        # Novo lead: "1_apresentacao" (padrão Meu Mistério) ou "static_meumisterio_b1" (funil estático Meu Mistério)
         "funil_entrada_inicial": (_obter_limpo("FUNIL_ENTRADA_INICIAL", None, "") or "").strip(),
 
         # Identidade

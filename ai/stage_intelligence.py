@@ -383,7 +383,7 @@ def _secao_biblioteca_pontes(
     if not linhas:
         return ""
     return (
-        "BIBLIOTECA DE PONTES (adaptar ao tom da Cigana; não copiar em bloco se soar robótico):\n"
+        "BIBLIOTECA DE PONTES (adaptar ao tom do Meu Mistério; não copiar em bloco se soar robótico):\n"
         + "\n".join(linhas)
     )
 

@@ -30,7 +30,7 @@ SENTIMENTOS_VALIDOS = {
 
 # Prompt mestre focado em vendas e nicho espiritual
 SYSTEM_PROMPT = """Analise o sentimento e as objeções na mensagem do WhatsApp.
-Você é a inteligência emocional da Cigana Esmeralda.
+Você é a inteligência emocional do Meu Mistério Esmeralda.
 
 Retorne um JSON estrito:
 {

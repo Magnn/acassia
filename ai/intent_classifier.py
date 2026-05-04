@@ -48,13 +48,13 @@ INTENCOES = {
 EXAMPLES = [
     {"texto": "Quanto custa?", "intencao": "preco"},
     {"texto": "Bom dia, me chamo João", "intencao": "saudacao"},
-    {"texto": "Boa tarde cigana esmeralda, me chamo Ju", "intencao": "saudacao"},
-    {"texto": "Oi Cigana, tudo bem?", "intencao": "saudacao"},
+    {"texto": "Boa tarde meumisterio esmeralda, me chamo Ju", "intencao": "saudacao"},
+    {"texto": "Oi Meu Mistério, tudo bem?", "intencao": "saudacao"},
     {"texto": "Quero comprar", "intencao": "compra"},
     {"texto": "Não quero mais mensagens", "intencao": "opt_out"},
 ]
 
-SYSTEM_PROMPT = """Você é o classificador de intenções da Cigana Esmeralda. 
+SYSTEM_PROMPT = """Você é o classificador de intenções do Meu Mistério Esmeralda. 
 Sua missão é analisar a mensagem do usuário com base no histórico e no estágio atual do funil.
 
 Categorias:
@@ -68,8 +68,8 @@ REGRAS DE OURO:
 2. NUNCA use o símbolo '—' em qualquer parte da resposta.
 3. Se o nome do usuário for Magno, a análise interna deve considerar adjetivos masculinos.
 4. Se o usuário confirmar o xeque-mate da leitura, use 'engajado' ou 'confirmacao'.
-5. Se o nó atual for de apresentação (1_apresentacao) e a mensagem for só saudação, nome ou cumprimento SEM pedido de valor, use 'saudacao' — não use 'preco' só porque citou "Cigana" ou o nome do bot.
-6. "Me chamo", "meu nome é", "boa tarde cigana" com apresentação = sempre 'saudacao', salvo se perguntar quanto custa, valor, preço ou pix na mesma frase.
+5. Se o nó atual for de apresentação (1_apresentacao) e a mensagem for só saudação, nome ou cumprimento SEM pedido de valor, use 'saudacao' — não use 'preco' só porque citou "Meu Mistério" ou o nome do bot.
+6. "Me chamo", "meu nome é", "boa tarde meumisterio" com apresentação = sempre 'saudacao', salvo se perguntar quanto custa, valor, preço ou pix na mesma frase.
 
 Formato de saída:
 {{"intencao": "nome_da_categoria", "confianca": 0.0, "justificativa": "1 frase curta sem travessões"}}
@@ -156,7 +156,7 @@ class IntentClassifier:
             "oi ",
             "oi,",
             "tudo bem",
-            "cigana",
+            "meumisterio",
         )
         if any(s in t for s in sinais):
             logger.info(
@@ -186,20 +186,20 @@ class IntentClassifier:
             return None
         tl = texto.lower()
         if re.search(r"me\s+chamo|chamo[- ]?me|meu\s+nome", tl) and any(
-            x in tl for x in ("cigana", "bom dia", "boa tarde", "boa noite", "olá", "ola", "oi")
+            x in tl for x in ("meumisterio", "bom dia", "boa tarde", "boa noite", "olá", "ola", "oi")
         ):
             return "saudacao"
         if re.match(
             r"^\s*(bom dia|boa tarde|boa noite|oi|olá|ola)\b",
             tl,
-        ) and "cigana" in tl:
+        ) and "meumisterio" in tl:
             return "saudacao"
         return None
 
     @staticmethod
     def _heuristica_apresentacao_curta_sem_preco(texto: str) -> Optional[str]:
         """
-        Saudação + 'me chamo' + menção à cigana/cumprimento, sem pedido de valor.
+        Saudação + 'me chamo' + menção à meumisterio/cumprimento, sem pedido de valor.
         Não depende do nó (lead pode estar em 2_/3_ após sniffers ou estado salvo).
         """
         if not (texto or "").strip():
@@ -215,7 +215,7 @@ class IntentClassifier:
         tem_saudacao = any(
             x in tl
             for x in (
-                "cigana",
+                "meumisterio",
                 "bom dia",
                 "boa tarde",
                 "boa noite",

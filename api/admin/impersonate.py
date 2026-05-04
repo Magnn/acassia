@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 impersonate_bp = Blueprint("admin_impersonate", __name__, url_prefix="/api/admin")
 
 
-_IMP_COOKIE = "acassia_imp_session"
+_IMP_COOKIE = "meumisterio_imp_session"
 _IMP_SALT = "impersonate-cookie-v1"
 _REASON_MIN_LEN = 10
 _DURATION_MIN_DEFAULT = 60

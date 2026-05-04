@@ -76,7 +76,7 @@ def _gemini_for_lead(lead) -> Optional[str]:
         ctx_str = ", ".join(ctx_bits) or "(sem contexto extra)"
 
         prompt = (
-            "Voce e cigana mistica, falando direto e curto no WhatsApp. "
+            "Voce e meumisterio mistica, falando direto e curto no WhatsApp. "
             "Crie a 'mensagem do dia' personalizada para esta pessoa. "
             "Maximo 220 caracteres. Tom acolhedor, poetico, em pt-BR. "
             "Use o primeiro nome dela. Nao seja generico — referencie o "

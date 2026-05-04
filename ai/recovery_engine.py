@@ -133,7 +133,7 @@ class RecoveryEngine:
         db = SessionLocal()
         try:
             # Multi-tenant (Frente 1):
-            # - Se ENV ACASSIA_TENANT_ID estiver setada -> single-tenant (legacy).
+            # - Se ENV MEU_MISTERIO_TENANT_ID estiver setada -> single-tenant (legacy).
             # - Senao, processa todos os tenants com binding ativo + tenants
             #   que tem leads ativos no DB.
             try:
@@ -143,7 +143,7 @@ class RecoveryEngine:
                 get_engine_tenant_id = lambda: "default"
 
             import os as _os
-            single_tenant_legacy = bool(_os.getenv("ACASSIA_TENANT_ID"))
+            single_tenant_legacy = bool(_os.getenv("MEU_MISTERIO_TENANT_ID"))
 
             base_query = db.query(Lead).filter(
                 Lead.node_atual.notin_(NODES_EXCLUIDOS),

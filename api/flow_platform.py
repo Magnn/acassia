@@ -39,10 +39,10 @@ _SAFE_WEBHOOK_TEST_HOSTS = {
 
 
 def _secret_master_bytes() -> bytes:
-    k = (os.getenv("ACASSIA_FLOW_SECRETS_KEY") or "").strip()
+    k = (os.getenv("MEU_MISTERIO_FLOW_SECRETS_KEY") or "").strip()
     if not k:
         # Fail-safe para evitar segredo previsível em produção.
-        raise RuntimeError("ACASSIA_FLOW_SECRETS_KEY ausente")
+        raise RuntimeError("MEU_MISTERIO_FLOW_SECRETS_KEY ausente")
     raw = k.encode("utf-8")
     return hashlib.sha256(raw).digest()
 
@@ -187,6 +187,153 @@ def record_execute_flow_run(tenant_id: str, blueprint_id: int, lead_id: int) -> 
 
 def register_flow_platform_routes(app: Flask) -> None:
     """Registra rotas /api/flows/* da plataforma."""
+
+    @app.route("/api/flows/blueprints", methods=["GET"])
+    @login_required
+    @_admin
+    def api_flow_bp_list():
+        tid = get_request_tenant_id()
+        db = SessionLocal()
+        try:
+            rows = db.query(models.FlowBlueprint).filter_by(tenant_id=tid).order_by(models.FlowBlueprint.criado_em.desc()).all()
+            return jsonify({
+                "ok": True,
+                "blueprints": [
+                    {
+                        "id": r.id,
+                        "slug": r.slug,
+                        "title": r.title,
+                        "updated_at": r.atualizado_em.isoformat() if r.atualizado_em else (r.criado_em.isoformat() if r.criado_em else ""),
+                        "created_at": r.criado_em.isoformat() if r.criado_em else ""
+                    } for r in rows
+                ]
+            }), 200
+        except Exception as e:
+            logger.error("[API] bp list: %s", e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            db.close()
+
+    @app.route("/api/flows/blueprints/<int:bid>", methods=["GET", "PATCH", "DELETE"])
+    @login_required
+    @_admin
+    def api_flow_bp_detail(bid: int):
+        tid = get_request_tenant_id()
+        db = SessionLocal()
+        try:
+            bp = _bp_row(db, tid, bid)
+            if not bp:
+                return jsonify({"ok": False, "error": "fluxo não encontrado"}), 404
+            
+            if request.method == "GET":
+                return jsonify({
+                    "ok": True,
+                    "blueprint": {
+                        "id": bp.id,
+                        "slug": bp.slug,
+                        "title": bp.title,
+                        "body": bp.body_json if isinstance(bp.body_json, dict) else {},
+                        "updated_at": bp.atualizado_em.isoformat() if bp.atualizado_em else (bp.criado_em.isoformat() if bp.criado_em else ""),
+                        "created_at": bp.criado_em.isoformat() if bp.criado_em else ""
+                    }
+                }), 200
+                
+            if request.method == "DELETE":
+                db.delete(bp)
+                db.commit()
+                return jsonify({"ok": True}), 200
+                
+            body = request.get_json(silent=True) or {}
+            if "title" in body:
+                bp.title = str(body["title"])[:300]
+            if "slug" in body:
+                bp.slug = str(body["slug"]).strip()[:128]
+            if "body" in body and isinstance(body["body"], dict):
+                bp.body_json = body["body"]
+                
+            db.commit()
+            return jsonify({
+                "ok": True,
+                "blueprint": {
+                    "id": bp.id,
+                    "slug": bp.slug,
+                    "title": bp.title,
+                    "updated_at": bp.atualizado_em.isoformat() if bp.atualizado_em else "",
+                    "created_at": bp.criado_em.isoformat() if bp.criado_em else ""
+                }
+            }), 200
+            
+        except Exception as e:
+            logger.error("[API] bp detail %s: %s", bid, e)
+            db.rollback()
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            db.close()
+
+    @app.route("/api/flows/publish", methods=["POST"])
+    @login_required
+    @_admin
+    def api_flow_publish():
+        tid = get_request_tenant_id()
+        body = request.get_json(silent=True) or {}
+        bid = body.get("blueprint_id")
+        if bid is None:
+            return jsonify({"ok": False, "error": "blueprint_id obrigatório"}), 400
+            
+        db = SessionLocal()
+        try:
+            bid = int(bid)
+            bp = _bp_row(db, tid, bid)
+            if not bp:
+                return jsonify({"ok": False, "error": "fluxo não encontrado"}), 404
+                
+            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            if not pub:
+                pub = models.FlowPublish(tenant_id=tid, published_blueprint_id=bid)
+                db.add(pub)
+            else:
+                pub.published_blueprint_id = bid
+                
+            db.commit()
+            return jsonify({
+                "ok": True,
+                "published_blueprint_id": bid
+            }), 200
+        except Exception as e:
+            logger.error("[API] publish %s: %s", bid, e)
+            db.rollback()
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            db.close()
+
+    @app.route("/api/flows/publish/status", methods=["GET"])
+    @login_required
+    @_admin
+    def api_flow_publish_status():
+        tid = get_request_tenant_id()
+        db = SessionLocal()
+        try:
+            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            if not pub or not pub.published_blueprint_id:
+                return jsonify({"ok": True, "published": None}), 200
+                
+            bp = _bp_row(db, tid, pub.published_blueprint_id)
+            if not bp:
+                return jsonify({"ok": True, "published": None}), 200
+                
+            return jsonify({
+                "ok": True,
+                "published": {
+                    "blueprint_id": bp.id,
+                    "slug": bp.slug,
+                    "title": bp.title
+                }
+            }), 200
+        except Exception as e:
+            logger.error("[API] publish status: %s", e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/versions", methods=["GET", "POST"])
     @login_required
@@ -774,8 +921,8 @@ def register_flow_platform_routes(app: Flask) -> None:
         tid = get_request_tenant_id()
         db = SessionLocal()
         try:
-            if not (os.getenv("ACASSIA_FLOW_SECRETS_KEY") or "").strip():
-                return jsonify({"ok": False, "error": "configure ACASSIA_FLOW_SECRETS_KEY"}), 503
+            if not (os.getenv("MEU_MISTERIO_FLOW_SECRETS_KEY") or "").strip():
+                return jsonify({"ok": False, "error": "configure MEU_MISTERIO_FLOW_SECRETS_KEY"}), 503
             if request.method == "GET":
                 rows = db.query(models.TenantFlowSecret).filter_by(tenant_id=tid).all()
                 items = []

@@ -109,7 +109,7 @@ def create_pix_mercadopago(
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
-        "X-Idempotency-Key": f"acassia-{tenant_id}-{int(datetime.now(timezone.utc).timestamp() * 1000)}",
+        "X-Idempotency-Key": f"meumisterio-{tenant_id}-{int(datetime.now(timezone.utc).timestamp() * 1000)}",
     }
 
     try:

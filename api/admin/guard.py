@@ -31,7 +31,7 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 logger = logging.getLogger(__name__)
 
 
-_ADMIN_2FA_COOKIE = "acassia_admin_2fa"
+_ADMIN_2FA_COOKIE = "meumisterio_admin_2fa"
 _ADMIN_2FA_TTL_S = 15 * 60  # 15 minutos
 _ADMIN_2FA_SALT = "admin-2fa-cookie-v1"
 

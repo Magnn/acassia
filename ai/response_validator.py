@@ -5,7 +5,7 @@ Validador de segurança e qualidade otimizado para evitar cortes de texto.
 
 🔥 UPGRADES DE ELITE (v2.4):
   1. EXPANSÃO DE LIMITE (Fix image_da1d7f): Aumento do limite de 350 para 
-     500 caracteres, permitindo que a Cigana seja mais eloquente sem ser podada.
+     500 caracteres, permitindo que o Meu Mistério seja mais eloquente sem ser podada.
   2. SENTENCE INTEGRITY: Instrução reforçada para NUNCA cortar palavras ou 
      deixar frases pendentes durante a correção de tom ou tamanho.
   3. BALAO LOGIC: Preferência por quebrar em blocos [BALAO] em vez de resumir 
@@ -26,7 +26,7 @@ from schema import Acao
 logger = logging.getLogger(__name__)
 
 # Persona fixa e Leis de Validação
-SYSTEM_PROMPT = """Você é o Guardião da Qualidade da Cigana Esmeralda.
+SYSTEM_PROMPT = """Você é o Guardião da Qualidade do Meu Mistério Esmeralda.
 Sua missão é garantir que a resposta seja mística, segura e perfeitamente formatada para o WhatsApp.
 
 REGRAS DE OURO PARA CORREÇÃO:

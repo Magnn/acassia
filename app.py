@@ -1,5 +1,5 @@
 """
-app.py — Versão SUPREME v8.7 (IMPÉRIO DA CIGANA - FULL INTEGRATION)
+app.py — Versão SUPREME v8.7 (IMPÉRIO DA MEU_MISTERIO - FULL INTEGRATION)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 O CENTRO DE COMANDO DEFINITIVO — VERSÃO INTEGRAL E SEM RESUMOS
 
@@ -199,7 +199,7 @@ app.config["SECRET_KEY"] = _secret
 
 # ── CORS ─────────────────────────────────────────────────────────────
 # Em prod, FRONTEND_ORIGINS deve listar origens permitidas (vírgula-separadas).
-# Ex.: FRONTEND_ORIGINS=https://app.acassia.com.br,https://acassia.com.br
+# Ex.: FRONTEND_ORIGINS=https://app.meumisterio.com.br,https://meumisterio.com.br
 # Em dev, fallback liberal pra localhost:5173 (Vite) e 5000 (Flask same-origin).
 _cors_env = (os.getenv("FRONTEND_ORIGINS") or "").strip()
 if _cors_env:
@@ -274,6 +274,7 @@ def _register_saas_blueprints():
     from api.saas.aura import aura_bp as saas_aura_bp
     from api.saas.compose import compose_bp as saas_compose_bp
     from api.saas.lead_context import lead_context_bp as saas_lead_context_bp
+    from api.saas.realtime import realtime_bp as saas_realtime_bp
     from api.saas.calendar_spiritual import calendar_bp as saas_calendar_bp
     from api.saas.integrations_whatsapp import integrations_wa_bp as saas_integrations_wa_bp
     from api.saas.audio_library import audio_lib_bp as saas_audio_lib_bp
@@ -281,6 +282,36 @@ def _register_saas_blueprints():
     from api.saas.scheduled_tarot import sched_bp as saas_sched_tarot_bp
     from api.saas.persona_api import persona_bp as saas_persona_bp
     from api.saas.experiments import exp_bp as saas_exp_bp
+    from api.saas.api_keys import api_keys_bp as saas_api_keys_bp
+    from api.saas.ritual import ritual_bp as saas_ritual_bp
+    from api.public.v1.astrology import public_astro_bp
+    from api.saas.broadcast import broadcast_bp as saas_broadcast_bp
+    from api.saas.events import events_bp as saas_events_bp
+    from api.saas.content import content_bp as saas_content_bp
+    from api.saas.content import coupons_bp as saas_coupons_bp
+    from api.saas.scheduling import scheduling_bp as saas_scheduling_bp
+    from api.saas.subscriptions import subscriptions_bp as saas_subscriptions_bp
+    from api.saas.profile import profile_bp as saas_profile_bp
+    from api.saas.journal import journal_bp as saas_journal_bp
+    from api.saas.trails import trails_bp as saas_trails_bp
+    from api.saas.dreams import dreams_bp as saas_dreams_bp
+    from api.saas.visionboard import visionboard_bp as saas_visionboard_bp
+    from api.saas.community import community_bp as saas_community_bp
+    from api.saas.unified_reading import reading_bp as saas_reading_bp
+    from api.saas.social_content import social_bp as saas_social_bp
+    from api.saas.client_progress import progress_bp as saas_progress_bp
+    from api.saas.platform_health import health_bp as saas_health_bp
+    from api.saas.launch_manager import launch_bp as saas_launch_bp
+    from api.saas.pipeline import pipeline_bp as saas_pipeline_bp
+    from api.saas.ac_engine import ac_bp as saas_ac_bp
+    from api.saas.checkout_webhooks import checkout_bp as saas_checkout_bp
+    from api.saas.multi_atendimento import multi_bp as saas_multi_bp
+    from api.saas.wa_groups import groups_bp as saas_groups_bp
+    from api.saas.devzapp_extras import extras_bp as saas_extras_bp
+    from api.saas.smart_links import smart_bp as saas_smart_bp
+    from api.saas.wa_connection import wa_conn_bp as saas_wa_conn_bp
+    from api.saas.wa_devices import devices_bp as saas_wa_devices_bp
+    from api.b2c_marketplace import b2c_bp
 
     login_manager.init_app(app)
     for bp in (
@@ -324,6 +355,37 @@ def _register_saas_blueprints():
         saas_sched_tarot_bp,
         saas_persona_bp,
         saas_exp_bp,
+        saas_realtime_bp,
+        saas_api_keys_bp,
+        saas_ritual_bp,
+        public_astro_bp,
+        saas_broadcast_bp,
+        saas_events_bp,
+        saas_content_bp,
+        saas_coupons_bp,
+        saas_scheduling_bp,
+        saas_subscriptions_bp,
+        saas_profile_bp,
+        saas_journal_bp,
+        saas_trails_bp,
+        saas_dreams_bp,
+        saas_visionboard_bp,
+        saas_community_bp,
+        saas_reading_bp,
+        saas_social_bp,
+        saas_progress_bp,
+        saas_health_bp,
+        saas_launch_bp,
+        saas_pipeline_bp,
+        saas_ac_bp,
+        saas_checkout_bp,
+        saas_multi_bp,
+        saas_groups_bp,
+        saas_extras_bp,
+        saas_smart_bp,
+        saas_wa_conn_bp,
+        saas_wa_devices_bp,
+        b2c_bp,
     ):
         app.register_blueprint(bp)
 
@@ -336,6 +398,13 @@ except Exception as _e:
 
 from db.sync import sync_database
 sync_database()
+
+# Auto-seed default community groups (zodiac + thematic)
+try:
+    from community_seed import seed_community_groups
+    seed_community_groups()
+except Exception as _seed_err:
+    logger.warning("[community] Seed falhou (OK se tabela não existe ainda): %s", _seed_err)
 
 from api.flow_platform import register_flow_platform_routes
 
@@ -854,7 +923,7 @@ def api_health():
     """Liveness para monitoramento e debug rápido."""
     return jsonify({
         "ok": True,
-        "service": "cigana",
+        "service": "meumisterio",
         "uptime_s": int(time.time() - _APP_STARTED_AT),
     }), 200
 
@@ -1024,7 +1093,7 @@ def api_health_deep():
 
     return jsonify({
         "ok": overall_ok,
-        "service": "cigana",
+        "service": "meumisterio",
         "uptime_s": int(time.time() - _APP_STARTED_AT),
         "elapsed_ms": elapsed_ms,
         "checks": checks,
@@ -1109,7 +1178,7 @@ def api_flows_summary():
 
     return jsonify({
         "ok": True,
-        "engine": "AcassIA / Cigana",
+        "engine": "AcassIA / Meu Mistério",
         "total_nodes": int(total_nodes),
         "phases": phases,
         "motor_nodes": motor_nodes,
@@ -1200,7 +1269,7 @@ def api_flows_catalog():
 @login_required
 @require_admin
 def api_flows_validate():
-    """Validação de documento do construtor visual (acassia-flow v1)."""
+    """Validação de documento do construtor visual (meumisterio-flow v1)."""
     try:
         from flow_builder_runtime import validate_flow_document
 
@@ -1410,7 +1479,7 @@ def api_flows_blueprint_one(bid: int):
 @login_required
 @require_admin
 def api_flows_blueprint_by_slug(slug: str):
-    """Carrega documento acassia-flow por slug estável (uma ida ao servidor)."""
+    """Carrega documento meumisterio-flow por slug estável (uma ida ao servidor)."""
     tid = get_request_tenant_id()
     ns = (slug or "").strip().lower()[:128]
     if not ns:
@@ -1519,7 +1588,7 @@ def api_flows_blueprint_execute(bid: int):
             {
                 "ok": False,
                 "error": "motor_tenant_mismatch",
-                "hint": "ACASSIA_TENANT_ID do processo deve coincidir com X-Acassia-Tenant.",
+                "hint": "MEU_MISTERIO_TENANT_ID do processo deve coincidir com X-Meu Mistério-Tenant.",
             }
         ), 503
 
@@ -3485,7 +3554,7 @@ def advance_lead_node(lead_id: int):
 def send_manual(lead_id):
     """Envia mensagem manual do atendente via Meta API."""
     data = request.get_json()
-    texto = data.get("texto", "").strip()
+    texto = (data.get("texto") or data.get("text") or "").strip()
     if not texto: return jsonify({"error": "Mensagem vazia"}), 400
 
     db = SessionLocal()
@@ -3516,6 +3585,14 @@ def send_manual(lead_id):
             # Ao intervir manualmente, pausamos o bot por segurança
             lead.bot_pausado = True 
             db.commit()
+            # Notificar browsers via SSE
+            try:
+                from api.saas.realtime_hooks import notify_message_created, notify_lead_updated
+                tid = str(getattr(lead, "tenant_id", "default") or "default")
+                notify_message_created(tid, lead.id, m.id, texto, "bot")
+                notify_lead_updated(tid, lead.id, {"bot_pausado": True})
+            except Exception:
+                pass
             return jsonify({"status": "ok", "whatsapp_meta": _json_safe_for_api(wa_before)}), 200
         return jsonify({"error": "Falha no envio via Meta"}), 500
     except Exception as e:
@@ -4123,6 +4200,29 @@ def _triagem_meta(data):
         }
         inbox_manager.enqueue(telefone, payload)
 
+        # ── SSE: notificar browsers em real-time ──
+        try:
+            from api.saas.realtime_hooks import notify_message_created
+            _sse_tid = resolved_tenant or "default"
+            # Resolver lead_id pelo telefone para o evento SSE
+            from db.database import SessionLocal as _SL
+            from db import models as _mdl
+            _dbs = _SL()
+            try:
+                _lead = _dbs.query(_mdl.Lead).filter_by(
+                    tenant_id=_sse_tid, telefone=telefone
+                ).first()
+                if _lead:
+                    notify_message_created(
+                        _sse_tid, _lead.id, None,
+                        texto_recebido[:120] if texto_recebido else "(mídia)",
+                        "lead",
+                    )
+            finally:
+                _dbs.close()
+        except Exception:
+            pass  # SSE é best-effort, nunca bloqueia o fluxo
+
     except Exception as e:
         logger.error(f"🚨 [TRIAGEM] Erro crítico na extração: {e}", exc_info=True)
         try:
@@ -4384,9 +4484,23 @@ if __name__ == "__main__":
     threading.Thread(target=_limpeza_automatica, daemon=True, name="CleanupThread").start()
 
     logger.info(
-        "🚀 [SYSTEM] AcassIA v8.7 — plataforma de funil (ex.: fluxo Cigana Esmeralda no motor de nós)."
+        "🚀 [SYSTEM] Meu Mistério v8.7 — plataforma de funil (ex.: fluxo Meu Mistério Esmeralda no motor de nós)."
     )
-    logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
-    
-    # Execução com suporte a multithreading nativo do Flask para melhor performance
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+
+    use_waitress = os.environ.get("USE_WAITRESS", "1").strip() in ("1", "true", "yes")
+
+    if use_waitress:
+        try:
+            from waitress import serve
+            _threads = int(os.environ.get("WAITRESS_THREADS", "8"))
+            logger.info("🏭 [SERVER] Waitress production server — %d threads — port 5000", _threads)
+            logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
+            serve(app, host="0.0.0.0", port=5000, threads=_threads,
+                  channel_timeout=120, recv_bytes=65536,
+                  url_scheme="https" if os.getenv("FORCE_HTTPS") else "http")
+        except ImportError:
+            logger.warning("⚠️ Waitress não instalado, caindo pro Flask dev server")
+            app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+    else:
+        logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
+        app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

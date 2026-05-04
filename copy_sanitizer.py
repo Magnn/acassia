@@ -1,5 +1,5 @@
 """
-copy_sanitizer.py — Sanitização global de copy WhatsApp (Cigana Esmeralda)
+copy_sanitizer.py — Sanitização global de copy WhatsApp (Meu Mistério Esmeralda)
 Aplicar antes de persistir/enviar texto ao lead.
 
 API central para dados do lead nos nodes:
@@ -202,7 +202,7 @@ def genero_hint_para_prompt(metadata: Optional[Dict[str, Any]] = None) -> str:
     return "indefinido: prefira 'você' e 'suas linhas', sem marcar gênero à força"
 
 
-def vocativo_cigana(
+def vocativo_meumisterio(
     nome_raw: str,
     genero_hint: str = "",
     metadata: Optional[Dict[str, Any]] = None,
@@ -247,7 +247,7 @@ def _strip_colagem_whatsapp_em_dor(s: str) -> str:
     if not t:
         return ""
     t = _RE_TOKENS_ABERTURA_NAO_DOR.sub("", t)
-    t = re.sub(r"(?is)\bcigana\s+esmeralda\s*[,.]?\s*", "", t)
+    t = re.sub(r"(?is)\bmeumisterio\s+esmeralda\s*[,.]?\s*", "", t)
     t = re.sub(r"(?is)me\s+chamo\s+[A-Za-zÀ-ú']{2,24}\s*[,.]?\s*", "", t)
     # Operacional típico no meio da colagem (Node 6 fallback / eco de dado_concreto)
     t = re.sub(r"(?is)\b(essa\s+)?consulta\s+(é\s+)?paga\??\b", "", t)
@@ -283,10 +283,10 @@ def resumo_dor_para_copy(dor: str, *, max_len: int = 120) -> str:
 
 # Modelo cola a 1ª mensagem do WhatsApp no meio do balão (Nodes 6–8) — remove o bloco inteiro.
 _RE_COLAGEM_ABERTURA_NO_MEIO = re.compile(
-    r"(?is)\b(boa\s+(?:tarde|noite|dia)\s+cigana\s+esmeralda,\s*me\s+chamo\s+[A-Za-zÀ-ú']+,.*?quanto\s+custa\s+[^.?!…]+[.?!…]?)"
+    r"(?is)\b(boa\s+(?:tarde|noite|dia)\s+meumisterio\s+esmeralda,\s*me\s+chamo\s+[A-Za-zÀ-ú']+,.*?quanto\s+custa\s+[^.?!…]+[.?!…]?)"
 )
 _RE_COLAGEM_ABERTURA_NO_MEIO_ALT = re.compile(
-    r"(?is)\b(boa\s+(?:tarde|noite|dia)\s*,?\s*cigana\s+esmeralda.*?quanto\s+custa[^.?!…]*[.?!…]?)"
+    r"(?is)\b(boa\s+(?:tarde|noite|dia)\s*,?\s*meumisterio\s+esmeralda.*?quanto\s+custa[^.?!…]*[.?!…]?)"
 )
 
 
@@ -500,7 +500,7 @@ def motivo_redundancia_texto(texto_balao: str, evidencias: Mapping[str, bool]) -
 
 _RE_ECO_OPERACIONAL_RESIDUAL = re.compile(
     r"(?is)\b(consulta\s+(é\s+)?paga|essa\s+consulta|quanto\s+custa|me\s+chamo|"
-    r"cigana\s+esmeralda|pix|comprovante)\b"
+    r"meumisterio\s+esmeralda|pix|comprovante)\b"
 )
 # Meta-perguntas do funil que não são dor real e não devem aparecer no eco
 _RE_ECO_META_PERGUNTA = re.compile(

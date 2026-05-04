@@ -1,5 +1,5 @@
 """
-CIGANA ESMERALDA — Constituição de copy (lógica de persuasão + universos).
+MEU_MISTERIO ESMERALDA — Constituição de copy (lógica de persuasão + universos).
 Injetada nos nodes 6–8. Prazos do playbook NÃO vão ao prompt como promessa (compliance).
 """
 

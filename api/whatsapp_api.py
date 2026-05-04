@@ -4,7 +4,7 @@ WhatsApp client legado — agora um shim por cima do sistema multi-provider.
 Mantém a API ``whatsapp_client.enviar_mensagem(...)`` que o motor já usa,
 mas internamente delega pro provider configurado do tenant em curso. Em
 runtime, o tenant é resolvido via ``tenant_context.get_request_tenant_id``
-quando há request Flask, ou via env ``ACASSIA_TENANT_ID`` (default)
+quando há request Flask, ou via env ``MEU_MISTERIO_TENANT_ID`` (default)
 em workers / threads.
 
 Para uso explícito multi-tenant, use:
@@ -38,7 +38,7 @@ def _current_tenant_id() -> str:
             return get_request_tenant_id()
     except Exception:
         pass
-    return os.getenv("ACASSIA_TENANT_ID", "default")
+    return os.getenv("MEU_MISTERIO_TENANT_ID", "default")
 
 
 # Cache em memória de tenants que já tiveram primeira msg enviada na vida

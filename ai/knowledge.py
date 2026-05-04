@@ -1,7 +1,7 @@
 """
 ai/knowledge.py — SCRIPT MESTRE SOFISTICADO (Ground Truth 2025)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Este é o cérebro estratégico integral da Cigana Esmeralda.
+Este é o cérebro estratégico integral do Meu Mistério Esmeralda.
 
 APRIMORAMENTOS (VERSÃO OMNISCIENTE):
 ✓ Redirecionamento Empático: Habilidade de validar perguntas fora de hora (ex: preços) e puxar de volta ao funil.

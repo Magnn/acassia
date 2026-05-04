@@ -106,7 +106,7 @@ class TemplateRegistry:
             db.close()
 
     # ──────────────────────────────────────────
-    # GERAÇÃO VIA IA (O CÉREBRO DA CIGANA)
+    # GERAÇÃO VIA IA (O CÉREBRO DA MEU_MISTERIO)
     # ──────────────────────────────────────────
     def _gerar_e_salvar(self, chave_base: str, categoria: str, node: str, contexto: dict) -> str:
         """Chama o Gemini para criar uma copy contextualizada e masculina."""
@@ -126,9 +126,9 @@ Contexto recente: {historico}
 
 REGRAS OBRIGATÓRIAS:
 1. TRATAMENTO DE GÊNERO: Se o nome for MAGNO, use adjetivos masculinos (preparado, focado, sozinho).
-2. Use APENAS {{{{nome}}}} para o nome do lead. Proibido {{{{Cigana}}}}, {{{{assistente}}}} ou qualquer outro placeholder com chaves.
+2. Use APENAS {{{{nome}}}} para o nome do lead. Proibido {{{{Meu Mistério}}}}, {{{{assistente}}}} ou qualquer outro placeholder com chaves.
 3. Tom místico, acolhedor e direto. Sem pressão agressiva.
-4. PROIBIDO mencionar búzios, tremor em búzios ou instrumentos que não sejam a mão/linhas (soa genérico e quebra a personagem da Cigana no WhatsApp).
+4. PROIBIDO mencionar búzios, tremor em búzios ou instrumentos que não sejam a mão/linhas (soa genérico e quebra a personagem do Meu Mistério no WhatsApp).
 5. Se for 'recuperacao_1' (5 min): Apenas uma frase mística de 'está por aqui?'.
 6. Se for 'recuperacao_2' (1 hora): Reforce que você parou sua vida no altar por ele.
 7. Se for 'recuperacao_3' (3 horas): Despedida respeitosa, portal fechando por falta de troca.
@@ -200,9 +200,9 @@ Retorne APENAS o texto da mensagem final."""
     def _system_por_categoria(self, categoria: str) -> str:
         """Define a diretriz de sistema conforme o tempo de inatividade."""
         systems = {
-            "recuperacao_1": "Cigana Esmeralda. Lead parou há 5 min. Cheque a vibração de forma leve.",
-            "recuperacao_2": "Cigana Esmeralda. Lead ignorou há 1h. Reacenda o interesse focando no Altar.",
-            "recuperacao_3": "Cigana Esmeralda. 3h de vácuo. Despedida digna, portal fechando.",
+            "recuperacao_1": "Meu Mistério Esmeralda. Lead parou há 5 min. Cheque a vibração de forma leve.",
+            "recuperacao_2": "Meu Mistério Esmeralda. Lead ignorou há 1h. Reacenda o interesse focando no Altar.",
+            "recuperacao_3": "Meu Mistério Esmeralda. 3h de vácuo. Despedida digna, portal fechando.",
         }
         return systems.get(categoria, systems["recuperacao_1"])
 
@@ -217,7 +217,7 @@ Retorne APENAS o texto da mensagem final."""
 
     @staticmethod
     def _sanear_corpo_template_final(texto: str) -> str:
-        """Remove placeholders que a IA inventou (ex.: {{Cigana Esmeralda}}) e não foram substituídos."""
+        """Remove placeholders que a IA inventou (ex.: {{Meu Mistério Esmeralda}}) e não foram substituídos."""
         t = (texto or "").strip()
         t = re.sub(r"\{\{[^}]+\}\}", "", t)
         return re.sub(r"\s{2,}", " ", t).strip()
