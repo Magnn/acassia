@@ -281,7 +281,7 @@ class Engine:
         de cair no funil estatico legado.
 
         Regras:
-            - Se ENV ACASSIA_TENANT_ID setada e bate com tenant atual -> usa
+            - Se ENV MEU_MISTERIO_TENANT_ID setada e bate com tenant atual -> usa
               funil legado (single-tenant deploy).
             - Senao, se tenant tem FlowPublish ou StudioPublish ativo ->
               segue normal (engine consome blueprint publicado).
@@ -290,7 +290,7 @@ class Engine:
             - Senao, retorna True (fallback).
         """
         import os
-        legacy_tenant = (os.getenv("ACASSIA_TENANT_ID") or "").strip()
+        legacy_tenant = (os.getenv("MEU_MISTERIO_TENANT_ID") or "").strip()
         cur_tenant = self.tenant_id or "default"
 
         if legacy_tenant and legacy_tenant == cur_tenant:
@@ -338,7 +338,7 @@ class Engine:
         # 2) Idempotencia: nao mandar mesma mensagem mais de 1x/dia pro lead
         try:
             meta = dict(getattr(lead, "metadata_json", None) or {})
-            last_sent_iso = meta.get("acassia_fallback_last_sent")
+            last_sent_iso = meta.get("meumisterio_fallback_last_sent")
             if last_sent_iso:
                 try:
                     last_sent = datetime.fromisoformat(last_sent_iso)
@@ -384,7 +384,7 @@ class Engine:
         # 5) Marca metadata + audit
         try:
             meta = dict(getattr(lead, "metadata_json", None) or {})
-            meta["acassia_fallback_last_sent"] = datetime.now(timezone.utc).isoformat()
+            meta["meumisterio_fallback_last_sent"] = datetime.now(timezone.utc).isoformat()
             lead.metadata_json = meta
             db.add(EventoAudit(
                 lead_id=lead.id,
@@ -598,7 +598,7 @@ class Engine:
             if nome_perfil and nome_eh_placeholder(str(getattr(lead, "nome", "") or "")):
                 toks = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ]{2,24}", nome_perfil)
                 lixo = {
-                    "oi", "ola", "olá", "sim", "ok", "pronto", "cigana", "esmeralda",
+                    "oi", "ola", "olá", "sim", "ok", "pronto", "meumisterio", "esmeralda",
                     "meu", "bem", "anjo", "contato", "whatsapp",
                 }
                 if toks:
@@ -2006,7 +2006,7 @@ class Engine:
     _META_KEYS_EXCLUIR_PERSISTENCIA = frozenset(
         {
             "__config__",
-            "__acassia_studio__",
+            "__meumisterio_studio__",
             "node_atual_exec",
             "node5_ignorar_ruido_um_turno",
             "node6_fallback_acionado_turno",
@@ -2421,7 +2421,7 @@ class Engine:
                     num_e164  = f"+{num_limpo}" if num_limpo and not conteudo.startswith("+") else conteudo.strip()
 
                     contato = {
-                        "name": {"first_name": "Esmeralda", "formatted_name": "Cigana Esmeralda"},
+                        "name": {"first_name": "Esmeralda", "formatted_name": "Meu Mistério Esmeralda"},
                         "phones": [{"phone": num_e164, "wa_id": num_limpo, "type": "WORK"}] if num_limpo else []
                     }
                     payload.update({"type": "contacts", "contacts": [contato]})
@@ -2526,7 +2526,7 @@ class Engine:
                     lead_meta = json.loads(meta_json)
                 ctx.estado_coleta = lead_meta.pop("estado_coleta", ctx.estado_coleta or "inicial")
                 for k, v in lead_meta.items():
-                    if k not in ctx.metadata and k not in ("__config__", "__acassia_studio__"):
+                    if k not in ctx.metadata and k not in ("__config__", "__meumisterio_studio__"):
                         ctx.metadata[k] = v
             except (json.JSONDecodeError, TypeError):
                 ctx.estado_coleta = getattr(lead, "estado_coleta", None) or "inicial"

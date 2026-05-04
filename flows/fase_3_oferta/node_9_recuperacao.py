@@ -24,7 +24,7 @@ from copy_sanitizer import (
     nome_lead_para_exibicao,
     resumo_dor_para_copy,
     resolver_gatilho_emocional,
-    vocativo_cigana,
+    vocativo_meumisterio,
     normalizar_link_para_envio,
     preparar_texto_envio,
 )
@@ -190,7 +190,7 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
 
     elif tentativa == 3:
         # --- TENTATIVA 3: fechamento sem desconto nem desespero ---
-        voc = vocativo_cigana(nome, metadata=metadata)
+        voc = vocativo_meumisterio(nome, metadata=metadata)
         txt_f1 = f"{voc}, eu vou recolher seu nome do altar por agora para abrir espaço aos próximos atendimentos."
         txt_f2 = f"Sinto que, {dor_ctx}, isso ainda pesa aí dentro."
 

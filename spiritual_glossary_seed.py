@@ -125,10 +125,10 @@ GLOSSARY: list[dict] = [
      "definition": "Campo energetico ao redor do corpo. Cores variam segundo estado emocional/espiritual."},
 
     # ─── Ciganos ──────────────────────────────────────────────────────
-    {"term": "Romani", "category": "cigana", "importance": 6,
+    {"term": "Romani", "category": "meumisterio", "importance": 6,
      "definition": "Povo cigano (auto-denominacao). Cultura nomade com tradicoes de vidência."},
-    {"term": "Sara Kali", "category": "cigana", "importance": 6,
-     "definition": "Santa cigana, padroeira. Devocao popular entre povo Romani."},
+    {"term": "Sara Kali", "category": "meumisterio", "importance": 6,
+     "definition": "Santa meumisterio, padroeira. Devocao popular entre povo Romani."},
 
     # ─── Numerologia ──────────────────────────────────────────────────
     {"term": "Numero da Vida", "category": "numerologia", "importance": 8,

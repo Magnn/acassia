@@ -34,7 +34,7 @@ from copy_sanitizer import (
     sufixo_ancoras_node3_para_prompt,
     unificar_vocativos_por_genero,
 )
-from analytics.copy_constituicao_cigana import camada_constituicao_node7
+from analytics.copy_constituicao_meumisterio import camada_constituicao_node7
 from conversation_policy import lead_reportou_problema_entrega
 from analytics.copy_personalization import (
     contexto_desejo_resultado_para_prompt,
@@ -119,7 +119,7 @@ def _reacao_curta_ao_input(msg_lead: str, nome_fmt: str) -> str:
     return f"Recebi o que você me falou agora, {nome_fmt}, e vou ser direta com você."
 
 # ── PROMPT (mesma voz dos nodes 5 e 6; quiromancia + compromisso com o caminho) ──
-_SYSTEM_AGITACAO_SUPREMA = """Você é Esmeralda Ácassia (Cigana Esmeralda), mesma presença da leitura anterior: firme, acolhedora, sem tom de telemarketing.
+_SYSTEM_AGITACAO_SUPREMA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), mesma presença da leitura anterior: firme, acolhedora, sem tom de telemarketing.
 
 ESTÁGIO: AGITACAO_E_MECANISMO_UNICO (interesse e desejo depois da leitura fria)
 

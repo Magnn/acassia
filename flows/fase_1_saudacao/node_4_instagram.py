@@ -51,7 +51,7 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|card|cart[aã]o\s+de\s+contato)"
 )
-_IG_CANONICO_CIGANA = "https://www.instagram.com/meumisterio_oficial/"
+_IG_CANONICO_MEU_MISTERIO = "https://www.instagram.com/meumisterio_oficial/"
 
 
 def _handle_instagram_para_fallback(link_ig: str) -> str:
@@ -68,7 +68,7 @@ def _handle_instagram_para_fallback(link_ig: str) -> str:
     return f"@{seg}"
 
 # ── PROMPT (mesma linha editorial do Node 1: leitura, calma, sem telemarketing) ──
-_SYSTEM_ANTECAMARA = """Você é Esmeralda Ácassia (Cigana Esmeralda), a mesma voz dos passos anteriores: quiromancia com presença, como no templo.
+_SYSTEM_ANTECAMARA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), a mesma voz dos passos anteriores: quiromancia com presença, como no templo.
 
 ESTÁGIO: ANTECAMARA_PROVA_SOCIAL (acolher o relato, preparar a leitura; o link do perfil vem na mensagem SEGUINTE, automática — não cite URL, @ nem "Instagram")
 
@@ -105,7 +105,7 @@ def _normalizar_link_ig(link_raw: str) -> str:
     link = normalizar_link_para_envio(link_raw, instagram_mode=True)
     link = preparar_texto_envio(link, "node4_link_ig").strip()
     if not link:
-        return _IG_CANONICO_CIGANA
+        return _IG_CANONICO_MEU_MISTERIO
     if _RE_LINK_VALIDO.match(link):
         # Preferir perfil (não reel/página interna) para manter URL estável.
         if _RE_LINK_INSTAGRAM_ESTRITO.match(link):
@@ -120,8 +120,8 @@ def _normalizar_link_ig(link_raw: str) -> str:
     m_handle = re.search(r"@([A-Za-z0-9._]+)", link_raw or "")
     if m_handle:
         return f"https://www.instagram.com/{m_handle.group(1)}/"
-    logger.warning("[NODE 4] link_prova_social inválido no .env. Usando canônico da Cigana.")
-    return _IG_CANONICO_CIGANA
+    logger.warning("[NODE 4] link_prova_social inválido no .env. Usando canônico do Meu Mistério.")
+    return _IG_CANONICO_MEU_MISTERIO
 
 
 def _encurtar_balao_node4(texto: str, limite: int = 170) -> str:
@@ -237,7 +237,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     f"ou busca no Instagram pelo perfil {handle}, é o mesmo lugar."
                 )
             else:
-                exib = ((config.get("perfil_negocio") or {}).get("nome_exibicao") or "Cigana Esmeralda")
+                exib = ((config.get("perfil_negocio") or {}).get("nome_exibicao") or "Meu Mistério Esmeralda")
                 linha = (
                     f"{voc}, às vezes o WhatsApp corta o link. Busca pelo nome {exib} no Instagram "
                     "ou me diz aqui que te ajudo a achar."

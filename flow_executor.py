@@ -199,7 +199,7 @@ def _coerce_section(value: Any, *, nested_keys: Tuple[str, ...] = ()) -> str:
 def _build_system_instruction_from_studio(snap: Any) -> Optional[str]:
     """
     Constrói o ``systemInstruction`` para o Gemini a partir do snapshot do
-    agente Studio publicado (injetado em ``ctx.metadata['__acassia_studio__']``
+    agente Studio publicado (injetado em ``ctx.metadata['__meumisterio_studio__']``
     pelo ``studio_runtime.inject_published_studio_into_metadata``).
 
     Tolera ambos os shapes do Studio (plano novo e aninhado legado), juntando
@@ -675,7 +675,7 @@ def steps_to_acoes(
                     lmeta[key] = str(v).strip()[:64]
 
             # Agente Studio publicado: vira systemInstruction (personalidade + base + FAQ).
-            studio_snap = fv.get("__acassia_studio__")
+            studio_snap = fv.get("__meumisterio_studio__")
             system_instruction = _build_system_instruction_from_studio(studio_snap)
             if system_instruction:
                 lmeta["studio_agent"] = (
@@ -867,13 +867,13 @@ def inject_published_flow_metadata(metadata: Optional[dict], tenant_id: Optional
         try:
             pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
             if not pub or not pub.published_blueprint_id:
-                metadata.pop("__acassia_flow_blueprint__", None)
+                metadata.pop("__meumisterio_flow_blueprint__", None)
                 return
             bp = db.query(models.FlowBlueprint).filter_by(id=pub.published_blueprint_id, tenant_id=tid).first()
             if not bp:
                 return
             body = bp.body_json if isinstance(bp.body_json, dict) else {}
-            metadata["__acassia_flow_blueprint__"] = {
+            metadata["__meumisterio_flow_blueprint__"] = {
                 "blueprint_id": bp.id,
                 "slug": bp.slug,
                 "title": bp.title,

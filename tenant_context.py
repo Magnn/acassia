@@ -2,8 +2,8 @@
 Isolamento por conta (multi-tenant): cada assinatura = um tenant_id estável.
 
 Uso típico:
-  - Uma instância / um número WhatsApp: variável de ambiente ACASSIA_TENANT_ID (default: default).
-  - API / dashboard: cabeçalho X-Acassia-Tenant (ou query ?tenant=) quando o mesmo servidor atende várias contas.
+  - Uma instância / um número WhatsApp: variável de ambiente MEU_MISTERIO_TENANT_ID (default: default).
+  - API / dashboard: cabeçalho X-Meu Mistério-Tenant (ou query ?tenant=) quando o mesmo servidor atende várias contas.
   - Webhook multi-tenant: ``tenant_override_ctx(tenant_id)`` define o tenant pra
     duração de uma chamada do engine via contextvar (thread-safe).
 
@@ -33,7 +33,7 @@ def normalize_tenant_id(raw: Optional[str]) -> str:
 
 
 _ENGINE_TENANT_OVERRIDE: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
-    "acassia_engine_tenant_override", default=None,
+    "meumisterio_engine_tenant_override", default=None,
 )
 
 
@@ -43,13 +43,13 @@ def get_engine_tenant_id() -> str:
 
     Resolução em ordem:
       1. Override per-call via ``tenant_override_ctx(...)`` (multi-tenant webhook).
-      2. ENV ``ACASSIA_TENANT_ID`` (legado single-tenant).
+      2. ENV ``MEU_MISTERIO_TENANT_ID`` (legado single-tenant).
       3. ``"default"`` como fallback.
     """
     override = _ENGINE_TENANT_OVERRIDE.get()
     if override:
         return normalize_tenant_id(override)
-    return normalize_tenant_id(os.getenv("ACASSIA_TENANT_ID", "default"))
+    return normalize_tenant_id(os.getenv("MEU_MISTERIO_TENANT_ID", "default"))
 
 
 @contextlib.contextmanager
@@ -80,7 +80,7 @@ def get_request_tenant_id() -> str:
         from flask import has_request_context, request
 
         if has_request_context():
-            h = (request.headers.get("X-Acassia-Tenant") or "").strip()
+            h = (request.headers.get("X-Meu Mistério-Tenant") or "").strip()
             if h:
                 return normalize_tenant_id(h)
             q = (request.args.get("tenant") or "").strip()
@@ -88,4 +88,4 @@ def get_request_tenant_id() -> str:
                 return normalize_tenant_id(q)
     except Exception:
         pass
-    return normalize_tenant_id(os.getenv("ACASSIA_TENANT_ID", "default"))
+    return normalize_tenant_id(os.getenv("MEU_MISTERIO_TENANT_ID", "default"))

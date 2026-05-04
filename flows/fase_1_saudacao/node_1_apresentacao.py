@@ -30,7 +30,7 @@ from analytics.dare_copy_engine import (
 logger = logging.getLogger(__name__)
 
 # ── CONFIGURAÇÕES E REGEX DE SEGURANÇA ──
-# Não use "ana" isolado: casa dentro de "cigana" e força IA em toda saudação ao bot.
+# Não use "ana" isolado: casa dentro de "meumisterio" e força IA em toda saudação ao bot.
 _GATILHOS_DINAMICOS = ["valor", "preço", "preco", "custa", "pago", "ajuda", "desesperad", "dor"]
 _RUIDO_INICIAL = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"]
 
@@ -50,11 +50,11 @@ _RE_DOR_OU_SOFRIMENTO = re.compile(
 )
 
 # ── PROMPT NODE 1: JSON hierárquico + briefing comportamental ──
-_SYSTEM_NODE1_JSON = """Você é Esmeralda Ácassia (Cigana Esmeralda), atendimento por WhatsApp no nosso instituto de luz chamado Meu Mistério.
+_SYSTEM_NODE1_JSON = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), atendimento por WhatsApp no nosso instituto de luz chamado Meu Mistério.
 
 TOM DE OURO (imitar este ritmo, sem copiar palavra por palavra se o briefing pedir outra coisa):
 - A_saudacao: saudação do período + prazer em receber no instituto de luz chamado Meu Mistério + bem-vindo + ✨
-- B_apresentacao: "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, respeito e presença de verdade." (variação leve permitida; sem travessão —; sem tom de telemarketing)
+- B_apresentacao: "Me chamo Esmeralda Ácassia, sou meumisterio e te atendo por aqui nesse templo com calma, respeito e presença de verdade." (variação leve permitida; sem travessão —; sem tom de telemarketing)
 - Se vaga ativa: um balão acolhedor sobre última vaga da consulta inicial e linhas, calma (como conversa, não como anúncio)
 - C_nome (se sem nome): "Me diz como você se chama, meu bem? Assim eu te falo direito."
 - D: transição humana; se C já pediu o nome, D pode ser curto ou integrar o convite sem repetir vaga
@@ -74,7 +74,7 @@ ANTI-REPETIÇÃO (obrigatório):
 - A_saudacao: obrigatório. Saudação calorosa + UMA vez a boas-vindas ao espaço (ex.: prazer em te receber no nosso instituto de luz chamado Meu Mistério), neste balão só.
   * Duas frases curtas OU um parágrafo fluido (até ~45 palavras). Use o nome se souber.
 
-- B_apresentacao: obrigatório. Quem você é: Esmeralda Ácassia, cigana, tom e como acompanha o lead — SEM repetir o instituto nem o nome Meu Mistério (já ditos em A ou extra).
+- B_apresentacao: obrigatório. Quem você é: Esmeralda Ácassia, meumisterio, tom e como acompanha o lead — SEM repetir o instituto nem o nome Meu Mistério (já ditos em A ou extra).
   * Uma ou duas frases completas (até ~45 palavras). Frase inteira, sem cortar.
 
 - C_nome: null se o primeiro nome já veio; senão pergunta humana pelo nome (ex.: "Me diz como você se chama, meu bem? Assim eu te falo direito.").
@@ -340,7 +340,7 @@ def _blob_user_para_extrair_nome(ctx, msg_raw: str) -> str:
 
 
 _BLOCO_APRESENTACAO_PADRAO = (
-    "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, "
+    "Me chamo Esmeralda Ácassia, sou meumisterio e te atendo por aqui nesse templo com calma, "
     "respeito e presença de verdade."
 )
 
@@ -669,7 +669,7 @@ def _deduplicar_baloes_node1(baloes: List[str]) -> List[str]:
     viu_vaga = False
 
     re_saudacao = re.compile(r"\b(bom dia|boa tarde|boa noite|prazer te receber|instituto)\b", re.I)
-    re_apresentacao = re.compile(r"\b(me chamo esmeralda|sou cigana|templo)\b", re.I)
+    re_apresentacao = re.compile(r"\b(me chamo esmeralda|sou meumisterio|templo)\b", re.I)
     re_vaga = re.compile(r"\b(última vaga|vaga gratuita|consulta inicial)\b", re.I)
 
     for b in baloes:
@@ -724,7 +724,7 @@ def _gerar_fallback(
         Acao(
             tipo="text",
             conteudo=(
-                "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, "
+                "Me chamo Esmeralda Ácassia, sou meumisterio e te atendo por aqui nesse templo com calma, "
                 "respeito e presença de verdade."
             ),
         ),
@@ -778,7 +778,7 @@ def _montar_baloes_contrato_node1(
             "Seja muito bem-vindo. ✨"
         ),
         (
-            "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, "
+            "Me chamo Esmeralda Ácassia, sou meumisterio e te atendo por aqui nesse templo com calma, "
             "respeito e presença de verdade."
         ),
     ]

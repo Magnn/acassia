@@ -8608,7 +8608,7 @@
         </div>
         <div class="p-6">
             <label class="block text-[11px] font-bold text-[var(--c-text)] mb-1.5">Nome da pasta <span class="text-rose-500">*</span></label>
-            <input type="text" id="new-flux-folder-name" placeholder="Ex.: Pasta da Cigana" maxlength="80" class="input-field w-full p-2.5" autocomplete="off" />
+            <input type="text" id="new-flux-folder-name" placeholder="Ex.: Pasta do Meu Mistério" maxlength="80" class="input-field w-full p-2.5" autocomplete="off" />
             <p class="text-[9px] text-[var(--c-muted)] mt-2 leading-relaxed">Os fluxos que criar ou importar dentro desta pasta ficam organizados aqui.</p>
             <button type="button" onclick="confirmCreateFluxFolder()" class="btn btn-emerald w-full justify-center py-3 text-sm rounded-lg mt-5">
                 <i class="fas fa-check"></i> Criar pasta
@@ -9433,7 +9433,7 @@
                     <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-start">
                         <div>
                             <div style="font-weight:700;font-size:13px;color:var(--c-text)">Tenant (API)</div>
-                            <div style="font-size:11px;color:var(--c-muted);margin-top:2px">Valor enviado em todas as requisições <code style="font-size:10px">X-Acassia-Tenant</code> (multi-tenant / isolamento no backend).</div>
+                            <div style="font-size:11px;color:var(--c-muted);margin-top:2px">Valor enviado em todas as requisições <code style="font-size:10px">X-Meu Mistério-Tenant</code> (multi-tenant / isolamento no backend).</div>
                         </div>
                         <button type="button" class="btn btn-primary" style="font-size:11px;flex-shrink:0" onclick="saveTenantSetting()"><i class="fas fa-save"></i> Guardar</button>
                     </div>
@@ -10293,7 +10293,7 @@
             </div>
             <div style="font-size:11px;color:var(--c-muted);line-height:1.75">
                 <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Estado do servidor</strong> — O indicador verde no cabeçalho confirma <code style="font-size:10px">GET /api/health</code>. Vermelho: servidor parado, rede ou URL errada.</p>
-                <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Tenant</strong> — Em <strong>Configurações</strong> (ícone de roda) defina o tenant. Todas as chamadas <code style="font-size:10px">/api/*</code> enviam o cabeçalho <code style="font-size:10px">X-Acassia-Tenant</code>.</p>
+                <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Tenant</strong> — Em <strong>Configurações</strong> (ícone de roda) defina o tenant. Todas as chamadas <code style="font-size:10px">/api/*</code> enviam o cabeçalho <code style="font-size:10px">X-Meu Mistério-Tenant</code>.</p>
                 <p style="margin-bottom:12px"><strong style="color:var(--c-text)">Flow Builder</strong> — roda para zoom; pan no fundo / espaço / botão direito; <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Shift+Z</kbd> histórico; <kbd>?</kbd> atalhos; <kbd>Esc</kbd> fecha painéis.</p>
                 <p style="margin:0"><strong style="color:var(--c-text)">Pedidos API</strong> — Timeout automático (~30s) em chamadas à API local para evitar ecrãs presos.</p>
             </div>
@@ -10622,8 +10622,8 @@ const API = window.location.origin;
             if (u.startsWith(API) && u.indexOf('/api/') !== -1) {
                 init = init ? { ...init } : {};
                 const h = new Headers(init.headers || {});
-                if (!h.has('X-Acassia-Tenant')) {
-                    h.set('X-Acassia-Tenant', (localStorage.getItem('acassia_tenant') || 'default').trim() || 'default');
+                if (!h.has('X-Meu Mistério-Tenant')) {
+                    h.set('X-Meu Mistério-Tenant', (localStorage.getItem('meumisterio_tenant') || 'default').trim() || 'default');
                 }
                 init.headers = h;
                 if (!init.signal) {
@@ -10726,7 +10726,7 @@ async function pollApiHealth() {
         const j = await r.json().catch(() => ({}));
         if (r.ok && j && j.ok) {
             const u = typeof j.uptime_s === 'number' ? ` uptime ${j.uptime_s}s` : '';
-            setHeaderConnectionStatus(true, (j.service || 'cigana') + u);
+            setHeaderConnectionStatus(true, (j.service || 'meumisterio') + u);
         } else {
             setHeaderConnectionStatus(false);
         }
@@ -10772,7 +10772,7 @@ function syncTenantFieldFromStorage() {
     const el = document.getElementById('cfg-tenant-input');
     if (!el) return;
     try {
-        el.value = localStorage.getItem('acassia_tenant') || 'default';
+        el.value = localStorage.getItem('meumisterio_tenant') || 'default';
     } catch (_) {
         el.value = 'default';
     }
@@ -10782,7 +10782,7 @@ function saveTenantSetting() {
     const el = document.getElementById('cfg-tenant-input');
     const v = (el && el.value.trim()) || 'default';
     try {
-        localStorage.setItem('acassia_tenant', v);
+        localStorage.setItem('meumisterio_tenant', v);
     } catch (_) {
         toast('Não foi possível guardar no browser.', 'rose');
         return;
@@ -11052,7 +11052,7 @@ function go(name, contextTitle = null) {
 
     _lastNavName = name;
     try {
-        sessionStorage.setItem('acassia_last_view', name);
+        sessionStorage.setItem('meumisterio_last_view', name);
     } catch (_) {}
     if (name === 'configuracoes') {
         syncTenantFieldFromStorage();
@@ -11064,9 +11064,9 @@ function go(name, contextTitle = null) {
         exitFluxFolder();
         void loadFluxosSummary().then(() => {
             try {
-                const pending = sessionStorage.getItem('acassia_fluxos_open_folder');
+                const pending = sessionStorage.getItem('meumisterio_fluxos_open_folder');
                 if (pending) {
-                    sessionStorage.removeItem('acassia_fluxos_open_folder');
+                    sessionStorage.removeItem('meumisterio_fluxos_open_folder');
                     openFluxFolder(pending);
                 }
             } catch (_) {}
@@ -11090,7 +11090,7 @@ function go(name, contextTitle = null) {
             flowBuilderSyncRelHeaderTitle();
         } catch (_) {}
         try {
-            const sid = localStorage.getItem('acassia_flow_blueprint_id');
+            const sid = localStorage.getItem('meumisterio_flow_blueprint_id');
             const parsed = sid ? parseInt(sid, 10) : NaN;
             _currentFlowBlueprintId = !isNaN(parsed) && parsed > 0 ? parsed : null;
         } catch (_) {
@@ -11105,7 +11105,7 @@ function go(name, contextTitle = null) {
 let _fluxFolder = 'root';
 let _fluxosSummaryCache = null;
 
-const _FLUX_FOLDERS_KEY = 'acassia_flux_folders_v1';
+const _FLUX_FOLDERS_KEY = 'meumisterio_flux_folders_v1';
 
 function readFluxFoldersState() {
     try {
@@ -11313,7 +11313,7 @@ async function loadFluxCatalogFromApi() {
 
 function getFluxCatalog() {
     const store = readFlowStore();
-    const drafts = Object.values(store).filter((d) => d && d.format === 'acassia-flow');
+    const drafts = Object.values(store).filter((d) => d && d.format === 'meumisterio-flow');
     const draftBySlug = {};
     drafts.forEach((d) => {
         const slug = _flowSlug(d.title || '');
@@ -11582,7 +11582,7 @@ async function loadFluxosSummary() {
     updateFluxosHeaderActions();
 }
 
-const _FLOW_STORE_KEY = 'acassia_flow_drafts_v1';
+const _FLOW_STORE_KEY = 'meumisterio_flow_drafts_v1';
 
 function _flowSlug(title) {
     const t = String(title || '').replace(/<[^>]*>/g, '').trim() || 'fluxo';
@@ -13919,7 +13919,7 @@ let _flowHistPointer = -1;
 let _flowHistoryRestoring = false;
 let _flowClipboard = null;
 /** Grelha 8px + snap: preferência em localStorage (Missão 2.3) */
-const FLOW_GRID_ENABLED_STORAGE_KEY = 'acassia_flow_grid_enabled';
+const FLOW_GRID_ENABLED_STORAGE_KEY = 'meumisterio_flow_grid_enabled';
 
 function flowReadGridEnabledFromStorage() {
     try {
@@ -20085,7 +20085,7 @@ function serializeFlowCanvas() {
     const svg = document.getElementById('svg-connections');
     const nodes = document.getElementById('nodes-container');
     return {
-        format: 'acassia-flow',
+        format: 'meumisterio-flow',
         version: 1,
         title,
         updatedAt: new Date().toISOString(),
@@ -20096,7 +20096,7 @@ function serializeFlowCanvas() {
 }
 
 function deserializeFlowCanvas(doc) {
-    if (!doc || doc.format !== 'acassia-flow') return false;
+    if (!doc || doc.format !== 'meumisterio-flow') return false;
     const tEl = document.getElementById('flow-doc-title');
     if (tEl && doc.title != null && String(doc.title).trim() !== '') {
         tEl.textContent = String(doc.title).replace(/<[^>]*>/g, '').trim();
@@ -20315,7 +20315,7 @@ async function tryLoadFlowDocumentFromServer(slug) {
         if (bySlug.ok && js.ok && js.blueprint && js.blueprint.body && typeof js.blueprint.body === 'object') {
             if (js.blueprint.id) {
                 _currentFlowBlueprintId = js.blueprint.id;
-                try { localStorage.setItem('acassia_flow_blueprint_id', String(js.blueprint.id)); } catch (_) {}
+                try { localStorage.setItem('meumisterio_flow_blueprint_id', String(js.blueprint.id)); } catch (_) {}
             }
             return js.blueprint.body;
         }
@@ -20328,7 +20328,7 @@ async function tryLoadFlowDocumentFromServer(slug) {
                     return j.blueprint.body;
                 }
                 _currentFlowBlueprintId = null;
-                try { localStorage.removeItem('acassia_flow_blueprint_id'); } catch (_) {}
+                try { localStorage.removeItem('meumisterio_flow_blueprint_id'); } catch (_) {}
             }
         }
         const listRes = await fetch(`${API}/api/flows/blueprints`);
@@ -20337,7 +20337,7 @@ async function tryLoadFlowDocumentFromServer(slug) {
         const hit = listJ.blueprints.find((b) => String(b.slug || '').toLowerCase() === s);
         if (!hit || !hit.id) return null;
         _currentFlowBlueprintId = hit.id;
-        try { localStorage.setItem('acassia_flow_blueprint_id', String(hit.id)); } catch (_) {}
+        try { localStorage.setItem('meumisterio_flow_blueprint_id', String(hit.id)); } catch (_) {}
         const r2 = await fetch(`${API}/api/flows/blueprints/${hit.id}`);
         const d = await r2.json();
         if (r2.ok && d.ok && d.blueprint && d.blueprint.body && typeof d.blueprint.body === 'object') {
@@ -20348,7 +20348,7 @@ async function tryLoadFlowDocumentFromServer(slug) {
 }
 
 async function tryCreateBlueprintOnServerAfterNewFlow(slug, title, doc) {
-    if (!doc || doc.format !== 'acassia-flow') return;
+    if (!doc || doc.format !== 'meumisterio-flow') return;
     try {
         const res = await fetch(`${API}/api/flows/blueprints`, {
             method: 'POST',
@@ -20358,7 +20358,7 @@ async function tryCreateBlueprintOnServerAfterNewFlow(slug, title, doc) {
         const out = await res.json();
         if (res.ok && out.ok && out.blueprint && out.blueprint.id) {
             _currentFlowBlueprintId = out.blueprint.id;
-            try { localStorage.setItem('acassia_flow_blueprint_id', String(_currentFlowBlueprintId)); } catch (_) {}
+            try { localStorage.setItem('meumisterio_flow_blueprint_id', String(_currentFlowBlueprintId)); } catch (_) {}
             refreshFlowPublishStatus();
             await loadFluxBlueprintsFromServer();
             hydrateDraftCardsFromStorage();
@@ -20372,7 +20372,7 @@ async function tryCreateBlueprintOnServerAfterNewFlow(slug, title, doc) {
             const hit = listJ.blueprints && listJ.blueprints.find((b) => String(b.slug || '').toLowerCase() === String(slug).toLowerCase());
             if (hit && hit.id) {
                 _currentFlowBlueprintId = hit.id;
-                try { localStorage.setItem('acassia_flow_blueprint_id', String(hit.id)); } catch (_) {}
+                try { localStorage.setItem('meumisterio_flow_blueprint_id', String(hit.id)); } catch (_) {}
                 const patch = await fetch(`${API}/api/flows/blueprints/${hit.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -22410,7 +22410,7 @@ async function saveFlowBlueprintServer(opts) {
         if (!res.ok || !out.ok) throw new Error(out.error || 'save_failed');
         if (out.blueprint && out.blueprint.id) {
             _currentFlowBlueprintId = out.blueprint.id;
-            try { localStorage.setItem('acassia_flow_blueprint_id', String(_currentFlowBlueprintId)); } catch (_) {}
+            try { localStorage.setItem('meumisterio_flow_blueprint_id', String(_currentFlowBlueprintId)); } catch (_) {}
         }
         const fpAfter = flowFingerprintFlowDoc(serializeFlowCanvas());
         if (fpAfter) {
@@ -22599,7 +22599,7 @@ async function flowLoadBlueprintById(bid) {
         }
         const body = d.blueprint.body;
         _currentFlowBlueprintId = bid;
-        try { localStorage.setItem('acassia_flow_blueprint_id', String(bid)); } catch (_) {}
+        try { localStorage.setItem('meumisterio_flow_blueprint_id', String(bid)); } catch (_) {}
         if (body.title) {
             const dt = document.getElementById('flow-doc-title');
             if (dt) dt.textContent = String(body.title).replace(/</g, '');
@@ -22650,7 +22650,7 @@ function exportFlowCanvasToFile() {
     const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `acassia-fluxo-${slug}.json`;
+    a.download = `meumisterio-fluxo-${slug}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     toast('JSON exportado.', 'purple');
@@ -22693,7 +22693,7 @@ async function importBundledMeumisterioTemplate() {
 }
 
 function applyImportedFlowDocument(doc) {
-    if (!doc || doc.format !== 'acassia-flow' || doc.version !== 1) {
+    if (!doc || doc.format !== 'meumisterio-flow' || doc.version !== 1) {
         toast('Formato inválido. Use JSON v1 exportado pelo construtor AcassIA.', 'rose');
         return;
     }
@@ -22707,7 +22707,7 @@ function applyImportedFlowDocument(doc) {
     setFlowFolderMapping(slug, targetFolder);
     ensureDraftCardForSlug(slug, title);
     try {
-        sessionStorage.setItem('acassia_fluxos_open_folder', targetFolder);
+        sessionStorage.setItem('meumisterio_fluxos_open_folder', targetFolder);
     } catch (_) {}
     go('fluxos');
     toast('Fluxo importado — aparece na pasta.', 'emerald');
@@ -22767,7 +22767,7 @@ function hydrateDraftCardsFromStorage() {
     const store = readFlowStore();
     Object.keys(store).forEach((slug) => {
         const doc = store[slug];
-        if (!doc || doc.format !== 'acassia-flow' || doc.version !== 1) return;
+        if (!doc || doc.format !== 'meumisterio-flow' || doc.version !== 1) return;
         let has = false;
         grid.querySelectorAll('[data-flow-slug]').forEach((c) => {
             if (c.getAttribute('data-flow-slug') === slug) has = true;
@@ -23617,7 +23617,7 @@ function _defaultAgentData() {
 
 async function migrateLocalAgentsIfNeeded() {
     let raw;
-    try { raw = localStorage.getItem('acassia_agents'); } catch (_) { return; }
+    try { raw = localStorage.getItem('meumisterio_agents'); } catch (_) { return; }
     if (!raw) return;
     let list;
     try { list = JSON.parse(raw); } catch (_) { return; }
@@ -23640,7 +23640,7 @@ async function migrateLocalAgentsIfNeeded() {
             body: JSON.stringify({ draft: a.data || _defaultAgentData() }),
         });
     }
-    try { localStorage.removeItem('acassia_agents'); } catch (_) {}
+    try { localStorage.removeItem('meumisterio_agents'); } catch (_) {}
 }
 
 async function refreshStudioPublishStatus() {
@@ -25306,7 +25306,7 @@ async function saveNewFlow() {
     const nodesInnerHTML = flowTriggerNodeHtmlString(trigId, 80, 56, cfg, iconClass, `Gatilho: ${integName}`);
     const st = readFlowStore();
     st[slug] = {
-        format: 'acassia-flow',
+        format: 'meumisterio-flow',
         version: 1,
         title,
         updatedAt: new Date().toISOString(),
@@ -25538,7 +25538,7 @@ function flowPaletteDragStart(e) {
     if (!t) return;
     _flowPaletteDragType = t;
     try {
-        e.dataTransfer.setData('application/x-acassia-flow-node', t);
+        e.dataTransfer.setData('application/x-meumisterio-flow-node', t);
         e.dataTransfer.setData('text/plain', t);
     } catch (_) {}
     e.dataTransfer.effectAllowed = 'copy';
@@ -25548,7 +25548,7 @@ function flowDataTransferHasPaletteNode(dt) {
     if (!dt || !dt.types) return false;
     try {
         const arr = Array.from(dt.types);
-        return arr.indexOf('application/x-acassia-flow-node') >= 0 || arr.indexOf('text/plain') >= 0;
+        return arr.indexOf('application/x-meumisterio-flow-node') >= 0 || arr.indexOf('text/plain') >= 0;
     } catch (_) {
         return false;
     }
@@ -25573,7 +25573,7 @@ function initFlowPaletteDnD() {
         vp.classList.remove('flow-canvas--palette-drag-over');
         let type = '';
         try {
-            type = e.dataTransfer.getData('application/x-acassia-flow-node') || e.dataTransfer.getData('text/plain');
+            type = e.dataTransfer.getData('application/x-meumisterio-flow-node') || e.dataTransfer.getData('text/plain');
         } catch (_) {}
         type = String(type || '').trim();
         if (!type) return;

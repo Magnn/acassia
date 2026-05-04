@@ -1,33 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Métricas — Cigana SaaS{% endblock %}
+{% block title %}Métricas — Meu Mistério SaaS{% endblock %}
 {% block main_class %}max-w-5xl mx-auto py-8 px-6{% endblock %}
 {% block content %}
 
 <h1 class="text-2xl font-bold mb-6">Métricas</h1>
 
 <div class="grid md:grid-cols-4 gap-4 mb-6">
-  <div class="bg-cigana-surface border border-cigana-border rounded-lg p-4">
+  <div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-4">
     <div class="text-xs text-slate-400 mb-1">Total de leads</div>
     <div class="text-2xl font-bold">{{ kpis.total_leads }}</div>
   </div>
-  <div class="bg-cigana-surface border border-cigana-border rounded-lg p-4">
+  <div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-4">
     <div class="text-xs text-slate-400 mb-1">Leads (últimos 7d)</div>
     <div class="text-2xl font-bold">{{ kpis.leads_7d }}</div>
     <div class="text-xs text-slate-500">{{ kpis.leads_30d }} em 30d</div>
   </div>
-  <div class="bg-cigana-surface border border-cigana-border rounded-lg p-4">
+  <div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-4">
     <div class="text-xs text-slate-400 mb-1">Convertidos</div>
     <div class="text-2xl font-bold text-emerald-400">{{ kpis.convertidos }}</div>
     <div class="text-xs text-slate-500">{{ kpis.conversion_rate }}% taxa</div>
   </div>
-  <div class="bg-cigana-surface border border-cigana-border rounded-lg p-4">
+  <div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-4">
     <div class="text-xs text-slate-400 mb-1">Ativas agora</div>
     <div class="text-2xl font-bold">{{ kpis.ativas }}</div>
     <div class="text-xs text-slate-500">{{ kpis.pausadas }} pausadas / {{ kpis.opt_out }} opt-out</div>
   </div>
 </div>
 
-<div class="bg-cigana-surface border border-cigana-border rounded-lg p-5">
+<div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-5">
   <h2 class="font-bold mb-3">Distribuição por etapa do funil (top 5)</h2>
   {% if kpis.node_distribution %}
     <div class="space-y-2">
@@ -38,8 +38,8 @@
             <span class="font-mono">{{ nd.node }}</span>
             <span>{{ nd.count }}</span>
           </div>
-          <div class="w-full h-2 bg-cigana-bg rounded">
-            <div class="h-2 bg-cigana-purple rounded" style="width: {{ width }}%"></div>
+          <div class="w-full h-2 bg-meumisterio-bg rounded">
+            <div class="h-2 bg-meumisterio-purple rounded" style="width: {{ width }}%"></div>
           </div>
         </div>
       {% endfor %}

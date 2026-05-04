@@ -11,7 +11,7 @@ PROPÓSITO:
 import logging
 import random
 from schema import Acao
-from copy_sanitizer import genero_efetivo_para_copy, nome_lead_para_exibicao, vocativo_cigana
+from copy_sanitizer import genero_efetivo_para_copy, nome_lead_para_exibicao, vocativo_meumisterio
 from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def executar_v2(ctx) -> tuple:
     meta = getattr(ctx, "metadata", {}) or {}
     msg_lead = str(getattr(ctx, "texto_recebido", "") or "").strip()
     meta["genero_lead"] = genero_efetivo_para_copy(nome, meta, texto_discurso=msg_lead or None)
-    voc = vocativo_cigana(nome, metadata=meta)
+    voc = vocativo_meumisterio(nome, metadata=meta)
     config = meta.get("__config__", {})
     # Aqui você deve configurar um link de checkout de R$30 no seu .env se desejar automação total
     link_downsell = config.get("link_downsell", config.get("link_pagamento", "[LINK]"))

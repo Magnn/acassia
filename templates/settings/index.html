@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Configurações — Cigana SaaS{% endblock %}
+{% block title %}Configurações — Meu Mistério SaaS{% endblock %}
 {% block main_class %}max-w-3xl mx-auto py-8 px-6{% endblock %}
 {% block content %}
 
 <h1 class="text-2xl font-bold mb-6">Configurações</h1>
 
 {# Recovery #}
-<section class="bg-cigana-surface border border-cigana-border rounded-lg p-5 mb-4">
+<section class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-5 mb-4">
   <h2 class="font-bold mb-1">Cadência de recovery</h2>
   <p class="text-xs text-slate-400 mb-3">
     Tempo (em minutos) entre tentativas de reabordar lead que sumiu. Ex: <code>5, 60, 180</code> = 5min, 1h, 3h. Mínimo 5min, máximo 7 toques.
@@ -14,15 +14,15 @@
   <form method="POST" action="{{ url_for('saas_settings.recovery') }}" class="flex gap-2">
     <input type="text" name="cadence_minutes" value="{{ cadence_str }}"
            pattern="[\d, ]+" required
-           class="flex-1 px-3 py-2 rounded-lg bg-cigana-bg border border-cigana-border focus:border-cigana-purple focus:outline-none font-mono">
-    <button type="submit" class="bg-cigana-purple hover:bg-purple-600 transition px-4 py-2 rounded-lg text-sm font-bold">
+           class="flex-1 px-3 py-2 rounded-lg bg-meumisterio-bg border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none font-mono">
+    <button type="submit" class="bg-meumisterio-purple hover:bg-purple-600 transition px-4 py-2 rounded-lg text-sm font-bold">
       Salvar
     </button>
   </form>
 </section>
 
 {# WhatsApp #}
-<section class="bg-cigana-surface border border-cigana-border rounded-lg p-5 mb-4">
+<section class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-5 mb-4">
   <h2 class="font-bold mb-3">WhatsApp Cloud API</h2>
   {% if whatsapp_configured %}
     <div class="text-sm space-y-1">
@@ -37,7 +37,7 @@
 </section>
 
 {# Stripe / Billing #}
-<section class="bg-cigana-surface border border-cigana-border rounded-lg p-5 mb-4">
+<section class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-5 mb-4">
   <h2 class="font-bold mb-3">Assinatura e Conta Stripe</h2>
   <div class="text-sm space-y-2">
     <div>
@@ -49,7 +49,7 @@
       {% else %}
         <span class="text-slate-500">sem assinatura</span>
       {% endif %}
-      <a href="{{ url_for('saas_billing.plans') }}" class="ml-2 text-cigana-purple hover:underline text-xs">gerenciar →</a>
+      <a href="{{ url_for('saas_billing.plans') }}" class="ml-2 text-meumisterio-purple hover:underline text-xs">gerenciar →</a>
     </div>
     <div>
       Connect (split end-user):
@@ -58,7 +58,7 @@
       {% else %}
         <span class="text-slate-500">não configurado</span>
       {% endif %}
-      <a href="{{ url_for('saas_connect.status') }}" class="ml-2 text-cigana-purple hover:underline text-xs">gerenciar →</a>
+      <a href="{{ url_for('saas_connect.status') }}" class="ml-2 text-meumisterio-purple hover:underline text-xs">gerenciar →</a>
     </div>
   </div>
 </section>

@@ -33,7 +33,7 @@ def resolve_tenant_for_phone_id(phone_number_id: str | None) -> str:
     Mapeia phone_number_id -> tenant_id consultando WaPhoneTenantBinding.
     Cache 60s.
 
-    Fallback: se ENV ACASSIA_TENANT_ID estiver setado, usa ele.
+    Fallback: se ENV MEU_MISTERIO_TENANT_ID estiver setado, usa ele.
               Senao, retorna 'default' (modo single-tenant legado).
     """
     if not phone_number_id:
@@ -167,7 +167,7 @@ def invalidate_webhook_path_cache(webhook_path: str | None = None) -> None:
 
 
 def _legacy_default() -> str:
-    raw = (os.getenv("ACASSIA_TENANT_ID") or "default").strip()
+    raw = (os.getenv("MEU_MISTERIO_TENANT_ID") or "default").strip()
     return raw or "default"
 
 

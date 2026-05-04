@@ -176,8 +176,8 @@ class Personalizer:
             return ""
         limpo = texto.strip()
         marcadores = [
-            "RESPOSTA DA CIGANA:", "RESPOSTA DA CIGANA",
-            "CIGANA:", "RESPOSTA:", "###", "SISTEMA:",
+            "RESPOSTA DA MEU_MISTERIO:", "RESPOSTA DA MEU_MISTERIO",
+            "MEU_MISTERIO:", "RESPOSTA:", "###", "SISTEMA:",
         ]
         for marcador in marcadores:
             limpo = limpo.replace(marcador, "")
@@ -199,11 +199,11 @@ class Personalizer:
         )
 
     @staticmethod
-    def _bloco_acassia_studio(metadata: Optional[dict]) -> str:
-        """Perfil publicado do Studio AcassIA (engine injeta __acassia_studio__)."""
+    def _bloco_meumisterio_studio(metadata: Optional[dict]) -> str:
+        """Perfil publicado do Studio AcassIA (engine injeta __meumisterio_studio__)."""
         if not isinstance(metadata, dict):
             return ""
-        snap = metadata.get("__acassia_studio__")
+        snap = metadata.get("__meumisterio_studio__")
         if not isinstance(snap, dict):
             return ""
         data = snap.get("data")
@@ -212,7 +212,7 @@ class Personalizer:
         nome = str(snap.get("agent_name") or "").strip()
         vn = snap.get("version_number")
         head = (
-            f"PERFIL AGENTE ACASSIA PUBLICADO (v{vn}"
+            f"PERFIL AGENTE MEU_MISTERIO PUBLICADO (v{vn}"
             + (f" — {nome}" if nome else "")
             + "):\n"
         )
@@ -360,7 +360,7 @@ class Personalizer:
             rem = getattr(m, "remetente", None) or (m.get("remetente") if isinstance(m, dict) else "")
             txt = getattr(m, "texto", None) or (m.get("texto") if isinstance(m, dict) else str(m))
             if txt and not txt.startswith("[") and not txt.startswith("SISTEMA_"):
-                quem = "Cliente" if rem == "user" else "Cigana"
+                quem = "Cliente" if rem == "user" else "Meu Mistério"
                 linhas.append(f"{quem}: {txt}")
         # Evita duplicar a última mensagem: o engine já a gravou no histórico e repete em ÚLTIMA MENSAGEM.
         dup = (mensagem_lead or "").strip()
@@ -449,7 +449,7 @@ class Personalizer:
         fatos_cliente = self._montar_fatos_contexto(metadata)
         prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
         guard = self._bloco_copy_guardrails(metadata)
-        studio = self._bloco_acassia_studio(metadata)
+        studio = self._bloco_meumisterio_studio(metadata)
         si = (metadata or {}).get("stage_intel") or {}
         longo = bool(si.get("varias_perguntas_detectadas"))
 
@@ -459,7 +459,7 @@ class Personalizer:
             f"FATOS CONHECIDOS SOBRE O CLIENTE (Não esqueça disto):\n{fatos_cliente}\n\n"
             f"HISTÓRICO RECENTE DA CONVERSA:\n{contexto_dialogo}\n\n"
             f"ÚLTIMA MENSAGEM DO CLIENTE: {mensagem_lead}\n\n"
-            "RESPOSTA DA CIGANA (Mística, acolhedora e direta):"
+            "RESPOSTA DA MEU_MISTERIO (Mística, acolhedora e direta):"
         )
         prompt_final = self._append_instrucao_etapa(metadata, prompt_final)
 
@@ -523,7 +523,7 @@ class Personalizer:
             fatos_cliente = self._montar_fatos_contexto(metadata)
             prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
             guard = self._bloco_copy_guardrails(metadata)
-            studio = self._bloco_acassia_studio(metadata)
+            studio = self._bloco_meumisterio_studio(metadata)
             prompt_final = (
                 f"{prioridade}{guard}{studio}"
                 f"{system_prompt}\n\n"
@@ -581,7 +581,7 @@ class Personalizer:
             fatos_cliente = self._montar_fatos_contexto(metadata)
             prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
             guard = self._bloco_copy_guardrails(metadata)
-            studio = self._bloco_acassia_studio(metadata)
+            studio = self._bloco_meumisterio_studio(metadata)
             si = (metadata or {}).get("stage_intel") or {}
             longo = bool(si.get("varias_perguntas_detectadas"))
 

@@ -29,7 +29,7 @@ class Carta:
 
 
 # 22 Arcanos Maiores (ids 0-21) — ordem canônica de Marselha.
-# Nomes seguem a tradução adotada na cigana_tarot original.
+# Nomes seguem a tradução adotada na meumisterio_tarot original.
 _ARCANOS_MAIORES: list[Carta] = [
     Carta(0,  "O Louco",          "o_louco",           "maior"),
     Carta(1,  "O Mago",           "o_mago",            "maior"),

@@ -114,7 +114,7 @@ class AudioEngine:
         
         # Prompt de Sistema Refinado para Entonação
         instrucao_voz = (
-            "Diga este texto como uma Cigana Quiromante experiente. "
+            "Diga este texto como umo Meu Mistério Quiromante experiente. "
             "Use um tom de voz calmo, acolhedor, místico e com pausas naturais. "
             "O texto é: "
         )

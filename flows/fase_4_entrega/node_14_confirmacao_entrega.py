@@ -3,7 +3,7 @@ flows/fase_4_entrega/node_14_confirmacao_entrega.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PÓS-VENDA E BOAS VINDAS — MASTER SUPREMA v2.0
 
-Este node é o "tapete vermelho" da Cigana. É disparado 
+Este node é o "tapete vermelho" do Meu Mistério. É disparado 
 automaticamente pelo engine.py quando o webhook do Cakto 
 confirma que o pagamento foi concluído.
 
@@ -16,7 +16,7 @@ MELHORIAS APLICADAS:
 import logging
 import random
 from schema import Acao  # 🚨 FIX CIRCULAR: Importação centralizada para estabilidade
-from copy_sanitizer import genero_efetivo_para_copy, vocativo_cigana
+from copy_sanitizer import genero_efetivo_para_copy, vocativo_meumisterio
 from flows.funnel_gates import VOCATIVO_SEM_NOME
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def _pergunta_dados_altar(voc: str) -> str:
 def executar_v2(ctx) -> tuple:
     nome = (ctx.nome_lead or "").strip() or VOCATIVO_SEM_NOME
     meta = getattr(ctx, "metadata", {}) or {}
-    voc = vocativo_cigana(nome, metadata=meta)
+    voc = vocativo_meumisterio(nome, metadata=meta)
     genero = genero_efetivo_para_copy(nome, meta)
     meta["genero_lead"] = genero
     ctx.metadata = meta

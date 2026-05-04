@@ -1,30 +1,49 @@
 """
-db/database.py — SUPREME v4.2 (HIGH-SPEED ENGINE & ALCHEMY 2.0)
+db/database.py — v5.0 (DUAL-ENGINE: SQLite + PostgreSQL)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Conexão SQLAlchemy otimizada para o tráfego pesado do Magno.
+Suporta SQLite (dev/single-tenant) e PostgreSQL (prod/multi-tenant).
+Detecção automática via DATABASE_URL:
+    - Não definida / sqlite:///... → SQLite com pragmas WAL+MMAP
+    - postgresql://... ou postgres://... → PostgreSQL com pool otimizado
 
-🔥 UPGRADES DESTA VERSÃO (v4.2):
-  1. MMAP PERFORMANCE: Ativa o Memory-Mapped I/O para leitura ultra-rápida.
-  2. SQLALCHEMY 2.0 READY: Atualização da 'Base' para evitar LegacyWarnings.
-  3. SESSION PERSISTENCE: expire_on_commit=False para manter dados vivos no Dashboard.
-  4. PAGE_SIZE OPTIMIZATION: Ajuste de 4KB para melhor performance em SSDs modernos.
+🔥 UPGRADES v5.0:
+  1. DUAL ENGINE: SQLite (dev) ou PostgreSQL (prod) via DATABASE_URL
+  2. POOL TUNING: Parâmetros distintos por driver
+  3. HEALTH CHECK: Função `check_db_health()` para probes
+  4. ASYNC-READY: Estrutura preparada para migração futura asyncpg
 """
 
 import os
 import logging
 from contextlib import contextmanager
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 logger = logging.getLogger(__name__)
 
-# Evita repetir a mesma linha a cada nova conexão SQLite (worker / threads)
+# Evita repetir log de pragmas a cada nova conexão SQLite
 _PRAGMA_JA_LOGADO = False
 
 # ── CONFIGURAÇÃO DE CAMINHOS ──
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(_BASE_DIR, "cigana.db")
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///" + DB_PATH.replace("\\", "/"))
+# Prefer meumisterio.db, fallback to meumisterio.db for backwards compatibility
+_NEW_DB = os.path.join(_BASE_DIR, "meumisterio.db")
+_LEGACY_DB = os.path.join(_BASE_DIR, "meumisterio.db")
+DB_PATH = _NEW_DB if os.path.exists(_NEW_DB) else (_LEGACY_DB if os.path.exists(_LEGACY_DB) else _NEW_DB)
+
+# Detecta driver a partir de DATABASE_URL
+_raw_url = os.getenv("DATABASE_URL", "").strip()
+
+# Heroku/Railway usam "postgres://" que SQLAlchemy 2.x não aceita — corrigir
+if _raw_url.startswith("postgres://"):
+    _raw_url = _raw_url.replace("postgres://", "postgresql://", 1)
+
+if _raw_url and _raw_url.startswith("postgresql"):
+    DATABASE_URL = _raw_url
+    DB_DRIVER = "postgresql"
+else:
+    DATABASE_URL = _raw_url if _raw_url else ("sqlite:///" + DB_PATH.replace("\\", "/"))
+    DB_DRIVER = "sqlite"
 
 
 def _int_env(key: str, default: int) -> int:
@@ -34,28 +53,49 @@ def _int_env(key: str, default: int) -> int:
         return default
 
 
-DB_POOL_SIZE = max(5, _int_env("DB_POOL_SIZE", 24))
-DB_MAX_OVERFLOW = max(0, _int_env("DB_MAX_OVERFLOW", 48))
-DB_POOL_TIMEOUT = max(3, _int_env("DB_POOL_TIMEOUT", 20))
-DB_POOL_RECYCLE = max(60, _int_env("DB_POOL_RECYCLE", 1800))
+# ── POOL SETTINGS (ajustados por driver) ──
+if DB_DRIVER == "postgresql":
+    DB_POOL_SIZE = max(5, _int_env("DB_POOL_SIZE", 20))
+    DB_MAX_OVERFLOW = max(0, _int_env("DB_MAX_OVERFLOW", 40))
+    DB_POOL_TIMEOUT = max(3, _int_env("DB_POOL_TIMEOUT", 30))
+    DB_POOL_RECYCLE = max(60, _int_env("DB_POOL_RECYCLE", 1800))
 
-# ── MOTOR DE EXECUÇÃO ──
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    pool_pre_ping=True,  # Verifica saúde da conexão antes de cada query
-    pool_size=DB_POOL_SIZE,
-    max_overflow=DB_MAX_OVERFLOW,
-    pool_timeout=DB_POOL_TIMEOUT,
-    pool_recycle=DB_POOL_RECYCLE,
-    pool_use_lifo=True,
-)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=DB_POOL_SIZE,
+        max_overflow=DB_MAX_OVERFLOW,
+        pool_timeout=DB_POOL_TIMEOUT,
+        pool_recycle=DB_POOL_RECYCLE,
+        pool_use_lifo=True,
+        # PostgreSQL: statement timeout 30s (evita queries lentas travarem pool)
+        connect_args={"options": "-c statement_timeout=30000"},
+    )
+else:
+    # SQLite
+    DB_POOL_SIZE = max(5, _int_env("DB_POOL_SIZE", 32))
+    DB_MAX_OVERFLOW = max(0, _int_env("DB_MAX_OVERFLOW", 64))
+    DB_POOL_TIMEOUT = max(3, _int_env("DB_POOL_TIMEOUT", 30))
+    DB_POOL_RECYCLE = max(60, _int_env("DB_POOL_RECYCLE", 1800))
 
-# ── PRAGMAS DE ALTA PERFORMANCE (O SEGREDO DA VELOCIDADE) ──
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        pool_pre_ping=True,
+        pool_size=DB_POOL_SIZE,
+        max_overflow=DB_MAX_OVERFLOW,
+        pool_timeout=DB_POOL_TIMEOUT,
+        pool_recycle=DB_POOL_RECYCLE,
+        pool_use_lifo=True,
+    )
+
+
+# ── PRAGMAS SQLite DE ALTA PERFORMANCE ──
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     """
     Configurações de hardware e sistema para extrair o máximo do SQLite.
+    Ignora silenciosamente se o driver for PostgreSQL.
     """
     if engine.name != "sqlite":
         return
@@ -71,14 +111,20 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.execute("PRAGMA mmap_size=268435456")
     # Buffer de cache em memória
     cursor.execute("PRAGMA cache_size=-64000")
-    # Timeout de segurança para evitar 'Database is locked'
-    cursor.execute("PRAGMA busy_timeout=10000")
-    
-    # Validação mística do estado
+    # Timeout de segurança para evitar 'Database is locked' (30s para 50+ users)
+    cursor.execute("PRAGMA busy_timeout=30000")
+    # Wal auto-checkpoint a cada 1000 pages (evita WAL crescer demais)
+    cursor.execute("PRAGMA wal_autocheckpoint=1000")
+    # Leitura suja permitida em WAL (melhora leitura concorrente)
+    cursor.execute("PRAGMA read_uncommitted=ON")
+    # Temp store em memória
+    cursor.execute("PRAGMA temp_store=MEMORY")
+
+    # Validação do estado
     cursor.execute("PRAGMA journal_mode")
     mode = cursor.fetchone()[0]
     cursor.close()
-    
+
     global _PRAGMA_JA_LOGADO
     if mode.lower() == "wal":
         if not _PRAGMA_JA_LOGADO:
@@ -86,6 +132,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
             _PRAGMA_JA_LOGADO = True
     else:
         logger.warning(f"⚠️ [DATABASE] SQLite operando em modo degradado: {mode}")
+
 
 # ── GESTÃO DE SESSÕES ──
 SessionLocal = sessionmaker(
@@ -99,7 +146,7 @@ SessionLocal = sessionmaker(
 class Base(DeclarativeBase):
     pass
 
-# ── GERENCIADORES DE CONTEXTO IMPERIAIS ──
+# ── GERENCIADORES DE CONTEXTO ──
 
 @contextmanager
 def session_scope():
@@ -128,10 +175,32 @@ def get_db():
     finally:
         db.close()
 
-# Log de inicialização com path absoluto para segurança operacional
-logger.info(f"🔮 [DATABASE] Oráculo conectado em: {os.path.abspath(DB_PATH)}")
+
+# ── HEALTH CHECK ──
+def check_db_health() -> dict:
+    """Verifica saúde do banco para probes de readiness."""
+    try:
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+            return {"status": "ok", "driver": DB_DRIVER}
+        finally:
+            db.close()
+    except Exception as exc:
+        return {"status": "error", "driver": DB_DRIVER, "error": str(exc)[:200]}
+
+
+# Log de inicialização
+if DB_DRIVER == "postgresql":
+    # Oculta credenciais no log
+    _safe_url = DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else "localhost"
+    logger.info(f"🐘 [DATABASE] PostgreSQL conectado em: ...@{_safe_url}")
+else:
+    logger.info(f"🔮 [DATABASE] SQLite conectado em: {os.path.abspath(DB_PATH)}")
+
 logger.info(
-    "🧵 [DATABASE] Pool configurado: size=%s overflow=%s timeout=%ss recycle=%ss",
+    "🧵 [DATABASE] Pool configurado: driver=%s size=%s overflow=%s timeout=%ss recycle=%ss",
+    DB_DRIVER,
     DB_POOL_SIZE,
     DB_MAX_OVERFLOW,
     DB_POOL_TIMEOUT,

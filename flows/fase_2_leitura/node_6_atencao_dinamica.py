@@ -37,7 +37,7 @@ from copy_sanitizer import (
     sufixo_ancoras_node3_para_prompt,
     unificar_vocativos_por_genero,
 )
-from analytics.copy_constituicao_cigana import camada_constituicao_node6
+from analytics.copy_constituicao_meumisterio import camada_constituicao_node6
 from conversation_policy import lead_reportou_problema_entrega
 from analytics.copy_personalization import (
     definir_nome_mecanismo_se_generico,
@@ -114,7 +114,7 @@ def _aplicar_framework_fechamento(blocos: list[str], nome_fmt: str) -> list[str]
 
 
 # ── PROMPT DE GERAÇÃO DA LEITURA (quiromancia, mesma voz dos nodes anteriores) ──
-_SYSTEM_LEITURA_SUPREMA = """Você é Esmeralda Ácassia (Cigana Esmeralda), a mesma voz calorosa e firme da conversa: quiromancia com presença, como no templo, não como telemarketing.
+_SYSTEM_LEITURA_SUPREMA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), a mesma voz calorosa e firme da conversa: quiromancia com presença, como no templo, não como telemarketing.
 
 ESTÁGIO: LEITURA_FRIA_SUPREMA (leitura das linhas da mão)
 

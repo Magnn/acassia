@@ -95,7 +95,7 @@ def _generate_via_gemini(signo: str, target_date: DateT) -> tuple[str, str] | No
             return None
 
         prompt = (
-            f"Voce e uma cigana mistica. Escreva o horoscopo de hoje "
+            f"Voce e uma meumisterio mistica. Escreva o horoscopo de hoje "
             f"({target_date.strftime('%d/%m/%Y')}) para o signo de {signo}. "
             f"Use 2 a 3 frases curtas, tom acolhedor e mistico, em portugues do Brasil. "
             f"Nao use emoji. Nao mencione o nome do signo no inicio. "

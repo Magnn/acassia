@@ -19,7 +19,7 @@ from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-QUEUE_KEY = os.getenv("REDIS_INBOUND_QUEUE_KEY", "cigana:wa:inbound").strip() or "cigana:wa:inbound"
+QUEUE_KEY = os.getenv("REDIS_INBOUND_QUEUE_KEY", "meumisterio:wa:inbound").strip() or "meumisterio:wa:inbound"
 
 _redis_client: Any = None
 _redis_unavailable: bool = False

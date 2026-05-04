@@ -41,7 +41,7 @@ _GATILHOS_DINAMICOS = [
 ]
 
 # ── PROMPT (mesma linha editorial do Node 1: leitura, templo, calma) ──
-_SYSTEM_VCARD_DINAMICO = """Você é Esmeralda Ácassia (Cigana Esmeralda), a mesma voz calorosa do primeiro passo da conversa.
+_SYSTEM_VCARD_DINAMICO = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), a mesma voz calorosa do primeiro passo da conversa.
 ESTÁGIO: PACTO_DE_RESSONÂNCIA (salvar contato antes de seguir a leitura)
 
 IMPORTANTE: Não escreva tags técnicas, [ESTÁGIO], nem texto entre colchetes na resposta.
@@ -116,7 +116,7 @@ def _limpar_nome(texto: str) -> str:
 
     palavras_lixo = {
         "oi", "olá", "ola", "bom", "dia", "boa", "tarde", "noite", "tudo", "bem",
-        "esmeralda", "cigana", "amém", "me", "chamo", "nome", "é", "e", "sou",
+        "esmeralda", "meumisterio", "amém", "me", "chamo", "nome", "é", "e", "sou",
         "estou", "sim", "quero", "vou", "salvar", "salvei", "pronto", "ok", "ta", "tá",
         "ja", "já", "ah", "aham", "uhum", "nem", "tipo",
         "mandei", "enviei", "mando", "manda", "segue", "foto", "fotos", "imagem", "video", "vídeo",

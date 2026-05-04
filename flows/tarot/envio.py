@@ -1,7 +1,7 @@
 """
 Envio de mídia do tarô via WhatsApp Cloud API.
 
-Sequência ritual herdada da `cigana_tarot/03_zara_sorteio_cartas.json`:
+Sequência ritual herdada da `meumisterio_tarot/03_zara_sorteio_cartas.json`:
 baralho fechado → pausa → 3 cartas com pausa entre cada (2s default).
 """
 

@@ -5,23 +5,23 @@ Sem dependencia de prometheus_client. Output formato Prometheus exposition
 construido manualmente — leve e zero dep extra.
 
 Metrics expostas em /metrics:
-    acassia_uptime_seconds                                   gauge
-    acassia_active_tenants                                   gauge
-    acassia_active_bindings                                  gauge
-    acassia_subscribed_bindings                              gauge
-    acassia_inbound_total{tenant_id,phone_number_id}         gauge (cumulativo)
-    acassia_published_flows                                  gauge
-    acassia_wa_inbound_events_24h{event_type}                gauge
-    acassia_leads_total{tenant_id}                           gauge
-    acassia_messages_total{tenant_id,direction}              gauge (24h)
-    acassia_rate_limiter_remaining{phone_number_id}          gauge
+    meumisterio_uptime_seconds                                   gauge
+    meumisterio_active_tenants                                   gauge
+    meumisterio_active_bindings                                  gauge
+    meumisterio_subscribed_bindings                              gauge
+    meumisterio_inbound_total{tenant_id,phone_number_id}         gauge (cumulativo)
+    meumisterio_published_flows                                  gauge
+    meumisterio_wa_inbound_events_24h{event_type}                gauge
+    meumisterio_leads_total{tenant_id}                           gauge
+    meumisterio_messages_total{tenant_id,direction}              gauge (24h)
+    meumisterio_rate_limiter_remaining{phone_number_id}          gauge
 
 Uso (Prometheus):
     scrape_config:
-      - job_name: 'acassia'
+      - job_name: 'meumisterio'
         bearer_token: 'xxx'  # METRICS_TOKEN
         static_configs:
-          - targets: ['acassia.example.com']
+          - targets: ['meumisterio.example.com']
         metrics_path: /metrics
 """
 
@@ -60,9 +60,9 @@ def render_metrics(*, app_started_at: float) -> str:
     lines: list[str] = []
 
     # ── Uptime ────────────────────────────────────────────────────────
-    lines.append("# HELP acassia_uptime_seconds Uptime do processo em segundos")
-    lines.append("# TYPE acassia_uptime_seconds gauge")
-    lines.append(_fmt_metric("acassia_uptime_seconds", int(time.time() - app_started_at)))
+    lines.append("# HELP meumisterio_uptime_seconds Uptime do processo em segundos")
+    lines.append("# TYPE meumisterio_uptime_seconds gauge")
+    lines.append(_fmt_metric("meumisterio_uptime_seconds", int(time.time() - app_started_at)))
 
     # ── Tenant + binding stats ────────────────────────────────────────
     try:
@@ -77,28 +77,28 @@ def render_metrics(*, app_started_at: float) -> str:
                 models.User.is_active == True,  # noqa: E712
                 models.User.deleted_at.is_(None),
             ).scalar() or 0
-            lines.append("# HELP acassia_active_tenants Tenants ativos (users.is_active)")
-            lines.append("# TYPE acassia_active_tenants gauge")
-            lines.append(_fmt_metric("acassia_active_tenants", int(active_tenants)))
+            lines.append("# HELP meumisterio_active_tenants Tenants ativos (users.is_active)")
+            lines.append("# TYPE meumisterio_active_tenants gauge")
+            lines.append(_fmt_metric("meumisterio_active_tenants", int(active_tenants)))
 
             # Bindings totais e subscribed
             bindings_total = db.query(func.count(models.WaPhoneTenantBinding.phone_number_id)).scalar() or 0
             bindings_subs = db.query(func.count(models.WaPhoneTenantBinding.phone_number_id)).filter(
                 models.WaPhoneTenantBinding.subscribed_at.isnot(None),
             ).scalar() or 0
-            lines.append("# HELP acassia_active_bindings Total de WaPhoneTenantBinding")
-            lines.append("# TYPE acassia_active_bindings gauge")
-            lines.append(_fmt_metric("acassia_active_bindings", int(bindings_total)))
-            lines.append("# HELP acassia_subscribed_bindings Bindings subscribed ao WABA")
-            lines.append("# TYPE acassia_subscribed_bindings gauge")
-            lines.append(_fmt_metric("acassia_subscribed_bindings", int(bindings_subs)))
+            lines.append("# HELP meumisterio_active_bindings Total de WaPhoneTenantBinding")
+            lines.append("# TYPE meumisterio_active_bindings gauge")
+            lines.append(_fmt_metric("meumisterio_active_bindings", int(bindings_total)))
+            lines.append("# HELP meumisterio_subscribed_bindings Bindings subscribed ao WABA")
+            lines.append("# TYPE meumisterio_subscribed_bindings gauge")
+            lines.append(_fmt_metric("meumisterio_subscribed_bindings", int(bindings_subs)))
 
             # Por binding: inbound total
-            lines.append("# HELP acassia_inbound_total Total inbound desde a conexao por binding")
-            lines.append("# TYPE acassia_inbound_total gauge")
+            lines.append("# HELP meumisterio_inbound_total Total inbound desde a conexao por binding")
+            lines.append("# TYPE meumisterio_inbound_total gauge")
             for b in db.query(models.WaPhoneTenantBinding).all():
                 lines.append(_fmt_metric(
-                    "acassia_inbound_total",
+                    "meumisterio_inbound_total",
                     int(b.inbound_count or 0),
                     {"tenant_id": b.tenant_id, "phone_number_id": b.phone_number_id},
                 ))
@@ -107,9 +107,9 @@ def render_metrics(*, app_started_at: float) -> str:
             published = db.query(func.count(models.FlowPublish.tenant_id)).filter(
                 models.FlowPublish.published_blueprint_id.isnot(None),
             ).scalar() or 0
-            lines.append("# HELP acassia_published_flows Tenants com flow publicado")
-            lines.append("# TYPE acassia_published_flows gauge")
-            lines.append(_fmt_metric("acassia_published_flows", int(published)))
+            lines.append("# HELP meumisterio_published_flows Tenants com flow publicado")
+            lines.append("# TYPE meumisterio_published_flows gauge")
+            lines.append(_fmt_metric("meumisterio_published_flows", int(published)))
 
             # Inbound events ultimas 24h por tipo
             cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -119,11 +119,11 @@ def render_metrics(*, app_started_at: float) -> str:
             ).filter(
                 models.WaInboundLog.created_at >= cutoff,
             ).group_by(models.WaInboundLog.event_type).all()
-            lines.append("# HELP acassia_wa_inbound_events_24h Eventos WaInboundLog ultimas 24h")
-            lines.append("# TYPE acassia_wa_inbound_events_24h gauge")
+            lines.append("# HELP meumisterio_wa_inbound_events_24h Eventos WaInboundLog ultimas 24h")
+            lines.append("# TYPE meumisterio_wa_inbound_events_24h gauge")
             for evt_type, cnt in evt_rows:
                 lines.append(_fmt_metric(
-                    "acassia_wa_inbound_events_24h", int(cnt),
+                    "meumisterio_wa_inbound_events_24h", int(cnt),
                     {"event_type": evt_type or "unknown"},
                 ))
 
@@ -134,11 +134,11 @@ def render_metrics(*, app_started_at: float) -> str:
             ).filter(
                 models.Lead.opt_out == False,  # noqa: E712
             ).group_by(models.Lead.tenant_id).all()
-            lines.append("# HELP acassia_leads_total Leads ativos (opt_out=false) por tenant")
-            lines.append("# TYPE acassia_leads_total gauge")
+            lines.append("# HELP meumisterio_leads_total Leads ativos (opt_out=false) por tenant")
+            lines.append("# TYPE meumisterio_leads_total gauge")
             for tenant_id, cnt in lead_rows:
                 lines.append(_fmt_metric(
-                    "acassia_leads_total", int(cnt),
+                    "meumisterio_leads_total", int(cnt),
                     {"tenant_id": tenant_id or "default"},
                 ))
 
@@ -153,11 +153,11 @@ def render_metrics(*, app_started_at: float) -> str:
             ).filter(
                 models.Mensagem.timestamp >= msg_cutoff,
             ).group_by(models.Lead.tenant_id, models.Mensagem.remetente).all()
-            lines.append("# HELP acassia_messages_total Mensagens ultimas 24h por tenant e direcao")
-            lines.append("# TYPE acassia_messages_total gauge")
+            lines.append("# HELP meumisterio_messages_total Mensagens ultimas 24h por tenant e direcao")
+            lines.append("# TYPE meumisterio_messages_total gauge")
             for tenant_id, direction, cnt in msg_rows:
                 lines.append(_fmt_metric(
-                    "acassia_messages_total", int(cnt),
+                    "meumisterio_messages_total", int(cnt),
                     {
                         "tenant_id": tenant_id or "default",
                         "direction": (direction or "unknown"),
@@ -172,11 +172,11 @@ def render_metrics(*, app_started_at: float) -> str:
     try:
         from wa_rate_limiter import stats as rate_stats
         snap = rate_stats() or {}
-        lines.append("# HELP acassia_rate_limiter_remaining Tokens restantes no bucket por phone_number_id")
-        lines.append("# TYPE acassia_rate_limiter_remaining gauge")
+        lines.append("# HELP meumisterio_rate_limiter_remaining Tokens restantes no bucket por phone_number_id")
+        lines.append("# TYPE meumisterio_rate_limiter_remaining gauge")
         for phone_id, info in snap.items():
             lines.append(_fmt_metric(
-                "acassia_rate_limiter_remaining",
+                "meumisterio_rate_limiter_remaining",
                 int(info.get("tokens_remaining", 0)),
                 {"phone_number_id": phone_id},
             ))

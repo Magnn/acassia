@@ -563,8 +563,8 @@ def validate_flow_document(doc: Mapping[str, Any]) -> Dict[str, Any]:
     if not title:
         issues.append(ValidationIssue("error", "missing_title", "Título do fluxo é obrigatório."))
 
-    if doc.get("format") != "acassia-flow":
-        issues.append(ValidationIssue("error", "invalid_format", "Formato inválido; esperado 'acassia-flow'."))
+    if doc.get("format") != "meumisterio-flow":
+        issues.append(ValidationIssue("error", "invalid_format", "Formato inválido; esperado 'meumisterio-flow'."))
     try:
         ver = int(doc.get("version") or 0)
     except (TypeError, ValueError):
@@ -664,7 +664,7 @@ def validate_flow_document(doc: Mapping[str, Any]) -> Dict[str, Any]:
         )
 
     normalized = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": title,
         "graph": {"nodes": norm_nodes, "edges": [e for e in edges_raw if e.get("from") and e.get("to")]},

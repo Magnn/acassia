@@ -31,7 +31,7 @@ from google.genai import types
 
 from schema import Acao, slice_historico_para_ia
 from copy_sanitizer import (
-    vocativo_cigana,
+    vocativo_meumisterio,
     delay_dramatico,
     genero_efetivo_para_copy,
     genero_hint_para_prompt,
@@ -557,7 +557,7 @@ def _validar_foto_mao_com_gemini(ctx) -> bool:
         return bool(media_bytes)
 
 
-_SYSTEM_COLETA_DINAMICA = """Você é Esmeralda Ácassia (Cigana Esmeralda): mesma voz dos passos anteriores — quiromancia com presença, como conversa no terreiro ou à beira da mesa, nunca como script de call center nem questionário.
+_SYSTEM_COLETA_DINAMICA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda): mesma voz dos passos anteriores — quiromancia com presença, como conversa no terreiro ou à beira da mesa, nunca como script de call center nem questionário.
 
 ESTÁGIO: COLETA_DADOS_DIAGNOSTICO (nesta etapa só existem duas peças: foto da mão + desabafo com corpo; peça SOMENTE o que ainda faltar).
 
@@ -582,7 +582,7 @@ WHATSAPP:
 PROIBIDO nesta etapa: "o que você quer saber sobre sua vida", "mapa da vida", segunda grande pergunta existencial, ou qualquer coisa que pule a fila antes de foto+desabafo estarem completos.
 """
 
-_SYSTEM_GRACEFUL_EXIT = """Você é Esmeralda Ácassia (Cigana Esmeralda). O lead demonstrou hesitação ou medo.
+_SYSTEM_GRACEFUL_EXIT = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda). O lead demonstrou hesitação ou medo.
 Acolha com respeito e leveza. Mantenha a porta aberta sem pressão. NÃO sugira encerrar nem mencione a palavra ENCERRAR.
 Responda com 1 a 2 balões curtos. Tom: templo, suave, sem culpa, sem travessão.
 """
@@ -946,7 +946,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 # Se já houve foto antes (ex.: node 1), não apagar a prova do sniffer — pede outra imagem sem "esquecer" a primeira.
                 if _historico_conta_midia_usuario(ctx) <= 1:
                     meta["foto_recebida"] = False
-                voc = vocativo_cigana(nome_db, genero, meta)
+                voc = vocativo_meumisterio(nome_db, genero, meta)
                 ctx.metadata = meta
                 return [
                     Acao(tipo="delay", segundos=6),

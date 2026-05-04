@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Inbox — Cigana SaaS{% endblock %}
+{% block title %}Inbox — Meu Mistério SaaS{% endblock %}
 {% block main_class %}max-w-5xl mx-auto py-8 px-6{% endblock %}
 {% block content %}
 
@@ -16,20 +16,20 @@
   {% for f in filtros_disponiveis %}
     <a href="?filtro={{ f }}"
        class="px-3 py-1 rounded-full transition
-              {% if filtro == f %}bg-cigana-purple text-white{% else %}bg-cigana-surface border border-cigana-border hover:border-cigana-purple{% endif %}">
+              {% if filtro == f %}bg-meumisterio-purple text-white{% else %}bg-meumisterio-surface border border-meumisterio-border hover:border-meumisterio-purple{% endif %}">
       {{ f }}
     </a>
   {% endfor %}
 </div>
 
 {# Lista #}
-<div class="bg-cigana-surface border border-cigana-border rounded-lg overflow-hidden">
+<div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg overflow-hidden">
   {% if not items %}
     <div class="p-8 text-center text-slate-500 text-sm">Nenhuma conversa nesse filtro.</div>
   {% else %}
     {% for item in items %}
       <a href="{{ url_for('saas_inbox.conversation', lead_id=item.id) }}"
-         class="block p-4 border-b border-cigana-border last:border-0 hover:bg-cigana-bg transition">
+         class="block p-4 border-b border-meumisterio-border last:border-0 hover:bg-meumisterio-bg transition">
         <div class="flex items-start gap-3">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">

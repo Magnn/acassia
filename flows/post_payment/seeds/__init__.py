@@ -16,7 +16,7 @@ def load_seed(template: str) -> dict:
         template: ``'express'`` (Tarot R$19-49) ou ``'premium'`` (Quiromancia R$197+).
 
     Returns:
-        Dict acassia-flow v1 pronto pra clonar via FlowBlueprint.
+        Dict meumisterio-flow v1 pronto pra clonar via FlowBlueprint.
 
     Raises:
         ValueError: se ``template`` não está em AVAILABLE_SEEDS.

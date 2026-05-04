@@ -1,5 +1,5 @@
 """
-Schema canônico de planos da Acássia (Frente 2.1).
+Schema canônico de planos da Meu Mistério (Frente 2.1).
 
 Source-of-truth dos limites e features de cada plano. Define base estática
 em código + permite override por campo via `plan_global_overrides` no DB

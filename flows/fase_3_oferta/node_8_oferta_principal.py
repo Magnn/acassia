@@ -34,7 +34,7 @@ from copy_sanitizer import (
     sufixo_ancoras_node3_para_prompt,
     unificar_vocativos_por_genero,
 )
-from analytics.copy_constituicao_cigana import camada_constituicao_node8
+from analytics.copy_constituicao_meumisterio import camada_constituicao_node8
 from conversation_policy import lead_reportou_problema_entrega
 from analytics.copy_personalization import (
     contexto_desejo_resultado_para_prompt,
@@ -306,7 +306,7 @@ def _resolver_link_ticket(meta: dict, config: dict, link_fallback: str, ticket: 
     return link_fallback
 
 
-_SYSTEM_OFERTA_SUPREMA = """Você é Esmeralda Ácassia (Cigana Esmeralda), mesma voz da leitura: firme, acolhedora, transparente no que custa e no que vem depois.
+_SYSTEM_OFERTA_SUPREMA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), mesma voz da leitura: firme, acolhedora, transparente no que custa e no que vem depois.
 
 IMPORTANTE: Não escreva tags de estágio, [COLCHETES] técnicos nem metadados na resposta. Não inclua URL nem link na resposta.
 CONTEXTO INTERNO (CRÍTICO): use histórico apenas como base interna. PROIBIDO reproduzir texto bruto do histórico, PROIBIDO citar mensagens literais entre aspas, e PROIBIDO imprimir separadores técnicos (ex.: "|", "||", "->").

@@ -1,34 +1,34 @@
 {% extends "base.html" %}
-{% block title %}Criar conta — Cigana SaaS{% endblock %}
+{% block title %}Criar conta — Meu Mistério SaaS{% endblock %}
 {% block content %}
 <div class="text-center mb-8">
-  <h1 class="text-3xl font-bold mb-2">🔮 Cigana</h1>
+  <h1 class="text-3xl font-bold mb-2">🔮 Meu Mistério</h1>
   <p class="text-slate-400 text-sm">Criar conta de tarólogo</p>
 </div>
 <form method="POST" action="{{ url_for('saas_auth.signup') }}" class="space-y-4">
   <div>
     <label for="name" class="block mb-1 text-sm text-slate-300">Nome</label>
     <input type="text" id="name" name="name" maxlength="200" autocomplete="name"
-           class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none">
+           class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
   </div>
   <div>
     <label for="email" class="block mb-1 text-sm text-slate-300">Email</label>
     <input type="email" id="email" name="email" required autocomplete="email"
-           class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none">
+           class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
   </div>
   <div>
     <label for="password" class="block mb-1 text-sm text-slate-300">Senha</label>
     <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password"
-           class="w-full px-3 py-2 rounded-lg bg-cigana-surface border border-cigana-border focus:border-cigana-purple focus:outline-none">
+           class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
     <p class="mt-1 text-xs text-slate-500">Mínimo 8 caracteres</p>
   </div>
   <button type="submit"
-          class="w-full bg-cigana-purple hover:bg-purple-600 transition py-2 rounded-lg font-bold">
+          class="w-full bg-meumisterio-purple hover:bg-purple-600 transition py-2 rounded-lg font-bold">
     Criar conta
   </button>
 </form>
 <p class="mt-6 text-center text-sm text-slate-400">
   Já tem conta?
-  <a href="{{ url_for('saas_auth.login') }}" class="text-cigana-purple hover:underline">Entrar</a>
+  <a href="{{ url_for('saas_auth.login') }}" class="text-meumisterio-purple hover:underline">Entrar</a>
 </p>
 {% endblock %}

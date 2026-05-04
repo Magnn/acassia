@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Cigana SaaS{% endblock %}</title>
+  <title>{% block title %}Meu Mistério SaaS{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script>
@@ -11,17 +11,17 @@
       theme: {
         extend: {
           colors: {
-            'cigana-purple': '#7c3aed',
-            'cigana-bg': '#0f172a',
-            'cigana-surface': '#1e293b',
-            'cigana-border': '#334155',
+            'meumisterio-purple': '#7c3aed',
+            'meumisterio-bg': '#0f172a',
+            'meumisterio-surface': '#1e293b',
+            'meumisterio-border': '#334155',
           }
         }
       }
     }
   </script>
 </head>
-<body class="bg-cigana-bg text-slate-100 min-h-screen">
+<body class="bg-meumisterio-bg text-slate-100 min-h-screen">
   <main class="{% block main_class %}max-w-md mx-auto py-12 px-6{% endblock %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
