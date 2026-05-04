@@ -1,32 +1,32 @@
-import type { Edge, Node } from '@xyflow/react';
+﻿import type { Edge, Node } from '@xyflow/react';
 import type { FlowNodeData } from './adapt';
-import type { AcassiaDocument, AcassiaEdge, AcassiaNode } from './types';
+import type { MeuMisterioDocument, MeuMisterioEdge, MeuMisterioNode } from './types';
 
 /**
- * Converte estado React Flow de volta para o documento acassia-flow persistido.
+ * Converte estado React Flow de volta para o documento meumisterio-flow persistido.
  * Mantém o título e versão do documento original.
  */
 export function reactFlowToDocument(
-  base: AcassiaDocument,
+  base: MeuMisterioDocument,
   nodes: Node<FlowNodeData>[],
   edges: Edge[],
-): AcassiaDocument {
+): MeuMisterioDocument {
   return {
-    format: 'acassia-flow',
+    format: 'meumisterio-flow',
     version: base.version ?? 1,
     title: base.title,
     updatedAt: new Date().toISOString(),
     graph: {
-      nodes: nodes.map(reactFlowNodeToAcassia),
-      edges: edges.map(reactFlowEdgeToAcassia),
+      nodes: nodes.map(reactFlowNodeToMeuMisterio),
+      edges: edges.map(reactFlowEdgeToMeuMisterio),
     },
   };
 }
 
-function reactFlowNodeToAcassia(n: Node<FlowNodeData>): AcassiaNode {
+function reactFlowNodeToMeuMisterio(n: Node<FlowNodeData>): MeuMisterioNode {
   return {
     id: n.id,
-    type: n.data.acassiaType,
+    type: n.data.meumisterioType,
     label: n.data.label,
     x: Math.round(n.position.x),
     y: Math.round(n.position.y),
@@ -34,8 +34,8 @@ function reactFlowNodeToAcassia(n: Node<FlowNodeData>): AcassiaNode {
   };
 }
 
-function reactFlowEdgeToAcassia(e: Edge): AcassiaEdge {
-  const out: AcassiaEdge = { id: e.id, from: e.source, to: e.target };
+function reactFlowEdgeToMeuMisterio(e: Edge): MeuMisterioEdge {
+  const out: MeuMisterioEdge = { id: e.id, from: e.source, to: e.target };
   if (typeof e.label === 'string' && e.label.trim()) out.label = e.label;
   return out;
 }

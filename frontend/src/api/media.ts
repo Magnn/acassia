@@ -22,9 +22,10 @@ export async function uploadMedia(file: File): Promise<string> {
   return data.url;
 }
 
+// Formatos aceitos pela API Meta / WhatsApp Business
 export const ACCEPT_BY_KIND: Record<string, string> = {
-  image: 'image/*',
-  video: 'video/*',
-  audio: 'audio/*',
-  document: '.pdf,.doc,.docx,.txt',
+  image: 'image/jpeg,image/png',
+  video: 'video/mp4,video/3gpp',
+  audio: 'audio/aac,audio/mp3,audio/mpeg,audio/amr,audio/ogg,audio/opus',
+  document: '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt',
 };

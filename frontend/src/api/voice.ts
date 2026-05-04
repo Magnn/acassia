@@ -43,14 +43,22 @@ export const voiceApi = {
   },
   delete: (id: number) =>
     api.del<{ ok: boolean }>(`/saas/voice/clones/${id}`),
-  synthesize: (cloneId: number, text: string, lead_id?: number) =>
+  synthesize: (cloneId: number, text: string, lead_id?: number, stability?: number, similarity?: number) =>
     api.post<{
       ok: boolean;
       generation_id: number;
       audio_url: string;
       chars_count: number;
       size_bytes: number;
-    }>(`/saas/voice/clones/${cloneId}/synthesize`, { text, lead_id }),
+    }>(`/saas/voice/clones/${cloneId}/synthesize`, { text, lead_id, stability, similarity }),
+  synthesizePreset: (providerVoiceId: string, text: string, lead_id?: number, stability?: number, similarity?: number) =>
+    api.post<{
+      ok: boolean;
+      generation_id: number;
+      audio_url: string;
+      chars_count: number;
+      size_bytes: number;
+    }>(`/saas/voice/presets/${providerVoiceId}/synthesize`, { text, lead_id, stability, similarity }),
   testSample: (cloneId: number) =>
     api.post<{ ok: boolean; sample_audio_url: string }>(
       `/saas/voice/clones/${cloneId}/test`,

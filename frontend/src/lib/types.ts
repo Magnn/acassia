@@ -1,9 +1,11 @@
-// Tipos espelhando o formato "acassia-flow" persistido em FlowBlueprint.body_json.
+// Tipos espelhando o formato "meumisterio-flow" persistido em FlowBlueprint.body_json.
 // Ver dashboard.html → extractFlowGraphFromDom / flowEdgeToPersist.
 
-export type AcassiaNodeType =
+export type MeuMisterioNodeType =
   | 'trigger'
   | 'conteudo'
+  | 'pergunta'
+  | 'acao'
   | 'delay'
   | 'condicao'
   | 'gpt'
@@ -11,12 +13,15 @@ export type AcassiaNodeType =
   | 'ab_split'
   | 'motor_ref'
   | 'anotacao'
+  | 'menu'
+  | 'expediente'
+  | 'notificar_atendente'
   | 'end'
   | (string & {}); // permite tipos novos sem quebrar build
 
-export interface AcassiaNode {
+export interface MeuMisterioNode {
   id: string;
-  type: AcassiaNodeType;
+  type: MeuMisterioNodeType;
   label: string;
   x: number;
   y: number;
@@ -24,7 +29,7 @@ export interface AcassiaNode {
   config: Record<string, unknown>;
 }
 
-export interface AcassiaEdge {
+export interface MeuMisterioEdge {
   id: string;
   from: string;
   to: string;
@@ -36,16 +41,16 @@ export interface AcassiaEdge {
   dc2y?: number;
 }
 
-export interface AcassiaGraph {
-  nodes: AcassiaNode[];
-  edges: AcassiaEdge[];
+export interface MeuMisterioGraph {
+  nodes: MeuMisterioNode[];
+  edges: MeuMisterioEdge[];
 }
 
-export interface AcassiaDocument {
-  format?: 'acassia-flow';
+export interface MeuMisterioDocument {
+  format?: 'meumisterio-flow';
   version?: number;
   title?: string;
   updatedAt?: string;
-  graph?: AcassiaGraph;
+  graph?: MeuMisterioGraph;
   // campos legados/extra do dashboard.html (svgInner, nodesInnerHTML) são ignorados
 }

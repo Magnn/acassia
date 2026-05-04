@@ -39,7 +39,7 @@ export function lintGraph(
   }
 
   // Triggers: zero ou múltiplos.
-  const triggers = nodes.filter((n) => n.data.acassiaType === 'trigger');
+  const triggers = nodes.filter((n) => n.data.meumisterioType === 'trigger');
   if (triggers.length === 0) {
     issues.push({
       code: 'no_trigger',
@@ -92,7 +92,7 @@ export function lintGraph(
   for (const n of nodes) {
     const inc = incoming.get(n.id) ?? [];
     const out = outgoing.get(n.id) ?? [];
-    const t = n.data.acassiaType;
+    const t = n.data.meumisterioType;
 
     if (inc.length === 0 && out.length === 0) {
       issues.push({

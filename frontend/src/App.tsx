@@ -15,6 +15,8 @@ import BlueprintsList from './routes/BlueprintsList';
 
 // Telas SaaS — lazy.
 const Dashboard = lazy(() => import('./routes/Dashboard'));
+const Workspaces = lazy(() => import('./routes/Workspaces'));
+const Catalog = lazy(() => import('./routes/Catalog'));
 const Leads = lazy(() => import('./routes/Leads'));
 const Builder = lazy(() => import('./routes/Builder'));
 const Runs = lazy(() => import('./routes/Runs'));
@@ -40,6 +42,44 @@ const Billing = lazy(() => import('./routes/Billing'));
 const BillingUsage = lazy(() => import('./routes/BillingUsage'));
 const BillingCancel = lazy(() => import('./routes/BillingCancel'));
 
+// Novas telas — Sprint Completo
+const Scheduling = lazy(() => import('./routes/Scheduling'));
+const ProfilePage = lazy(() => import('./routes/Profile'));
+const Events = lazy(() => import('./routes/Events'));
+const ContentPage = lazy(() => import('./routes/Content'));
+const Broadcast = lazy(() => import('./routes/Broadcast'));
+const SubscriptionsPage = lazy(() => import('./routes/Subscriptions'));
+const JournalPage = lazy(() => import('./routes/Journal'));
+const TrailsPage = lazy(() => import('./routes/Trails'));
+const RitualsPage = lazy(() => import('./routes/Rituals'));
+const DreamsPage = lazy(() => import('./routes/Dreams'));
+const VisionBoardPage = lazy(() => import('./routes/VisionBoard'));
+const CommunityPage = lazy(() => import('./routes/Community'));
+const UnifiedReadingPage = lazy(() => import('./routes/UnifiedReading'));
+const SocialContentPage = lazy(() => import('./routes/SocialContent'));
+const PricingPage = lazy(() => import('./routes/Pricing'));
+const ClientProgressPage = lazy(() => import('./routes/ClientProgress'));
+const LandingPageRoute = lazy(() => import('./routes/LandingPage'));
+const LaunchManagerPage = lazy(() => import('./routes/LaunchManager'));
+const PipelinePage = lazy(() => import('./routes/Pipeline'));
+const CheckoutWebhooksPage = lazy(() => import('./routes/CheckoutWebhooks'));
+const WAGroupsPage = lazy(() => import('./routes/WAGroups'));
+const WAConnectionPage = lazy(() => import('./routes/WAConnection'));
+const DepartmentsPage = lazy(() => import('./routes/Departments'));
+const ServiceRatingsPage = lazy(() => import('./routes/ServiceRatings'));
+const SmartLinksPage = lazy(() => import('./routes/SmartLinks'));
+
+// Portal do Consumidor (B2C)
+const PortalLayout = lazy(() => import('./routes/portal/PortalLayout'));
+const PortalExplore = lazy(() => import('./routes/portal/PortalExplore'));
+const PortalVault = lazy(() => import('./routes/portal/PortalVault'));
+const PortalSchedule = lazy(() => import('./routes/portal/PortalSchedule'));
+const PortalRituals = lazy(() => import('./routes/portal/PortalRituals'));
+const PortalDreams = lazy(() => import('./routes/portal/PortalDreams'));
+const PortalCommunity = lazy(() => import('./routes/portal/PortalCommunity'));
+const PortalJournal = lazy(() => import('./routes/portal/PortalJournal'));
+const PortalOnboarding = lazy(() => import('./routes/portal/PortalOnboarding'));
+
 // Settings sub-rotas
 const SettingsDevices = lazy(() => import('./routes/settings/Devices'));
 const SettingsRecovery = lazy(() => import('./routes/settings/Recovery'));
@@ -59,7 +99,7 @@ function PageFallback() {
     <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
       <div className="w-12 h-12 border-4 border-accent-amethyst/20 border-t-accent-amethyst rounded-full animate-spin" />
       <div className="text-secondary text-[11px] font-black uppercase tracking-[0.2em] animate-pulse">
-        Carregando Acássia Studio…
+        Carregando Meu Mistério Studio…
       </div>
     </div>
   );
@@ -86,8 +126,10 @@ export default function App() {
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/workspaces" element={<Workspaces />} />
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/catalog" element={<Catalog />} />
             <Route path="/leads" element={<Leads />} />
             <Route path="/inbox" element={<Navigate to="/leads" replace />} />
             <Route path="/contacts" element={<Navigate to="/leads" replace />} />
@@ -113,6 +155,31 @@ export default function App() {
             <Route path="/audio-library" element={<AudioLibraryRoute />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/tenant-config" element={<TenantConfig />} />
+
+            {/* Novas telas — Sprint Completo */}
+            <Route path="/scheduling" element={<Scheduling />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/events" element={<Events />} />
+            <Route path="/content" element={<ContentPage />} />
+            <Route path="/broadcast" element={<Broadcast />} />
+            <Route path="/subscriptions" element={<SubscriptionsPage />} />
+            <Route path="/journal" element={<JournalPage />} />
+            <Route path="/trails" element={<TrailsPage />} />
+            <Route path="/rituals" element={<RitualsPage />} />
+            <Route path="/dreams" element={<DreamsPage />} />
+            <Route path="/vision-board" element={<VisionBoardPage />} />
+            <Route path="/community" element={<CommunityPage />} />
+            <Route path="/reading" element={<UnifiedReadingPage />} />
+            <Route path="/social-content" element={<SocialContentPage />} />
+            <Route path="/client-progress/:leadId" element={<ClientProgressPage />} />
+            <Route path="/launches" element={<LaunchManagerPage />} />
+            <Route path="/pipeline" element={<PipelinePage />} />
+            <Route path="/checkout-webhooks" element={<CheckoutWebhooksPage />} />
+            <Route path="/wa-groups" element={<WAGroupsPage />} />
+            <Route path="/wa-connection" element={<WAConnectionPage />} />
+            <Route path="/departments" element={<DepartmentsPage />} />
+            <Route path="/service-ratings" element={<ServiceRatingsPage />} />
+            <Route path="/smart-links" element={<SmartLinksPage />} />
 
             {/* Configurações com submenu lateral próprio */}
             <Route path="/settings" element={<SettingsLayout />}>
@@ -198,7 +265,23 @@ export default function App() {
             <Route path="metrics" element={<AdminMetrics />} />
           </Route>
 
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* Portal B2C (Consumidor Final) */}
+          <Route path="/portal/welcome" element={<PortalOnboarding />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/home" element={<LandingPageRoute />} />
+          <Route path="/portal" element={<PortalLayout />}>
+            <Route index element={<Navigate to="/portal/explore" replace />} />
+            <Route path="explore" element={<PortalExplore />} />
+            <Route path="vault" element={<PortalVault />} />
+            <Route path="schedule" element={<PortalSchedule />} />
+            <Route path="rituals" element={<PortalRituals />} />
+            <Route path="dreams" element={<PortalDreams />} />
+            <Route path="community" element={<PortalCommunity />} />
+            <Route path="journal" element={<PortalJournal />} />
+          </Route>
+
+          {/* Fallback 404 redireciona pro dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
       <Toaster />

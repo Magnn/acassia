@@ -27,7 +27,7 @@ interface WalkContext {
 
 export async function* walk(ctx: WalkContext): AsyncGenerator<SimStep> {
   const byId = new Map(ctx.nodes.map((n) => [n.id, n]));
-  const trigger = ctx.nodes.find((n) => n.data.acassiaType === 'trigger');
+  const trigger = ctx.nodes.find((n) => n.data.meumisterioType === 'trigger');
   if (!trigger) {
     yield { kind: 'halt', reason: 'sem nó "trigger"' };
     return;
@@ -53,10 +53,10 @@ export async function* walk(ctx: WalkContext): AsyncGenerator<SimStep> {
       kind: 'enter',
       nodeId: node.id,
       label: node.data.label,
-      type: node.data.acassiaType,
+      type: node.data.meumisterioType,
     };
 
-    const t = node.data.acassiaType;
+    const t = node.data.meumisterioType;
 
     if (t === 'end') {
       yield { kind: 'end', nodeId: node.id, label: node.data.label };
@@ -102,7 +102,7 @@ async function* emitForNode(
   node: Node<FlowNodeData>,
   ctx: WalkContext,
 ): AsyncGenerator<SimStep> {
-  const t = node.data.acassiaType;
+  const t = node.data.meumisterioType;
   const cfg = node.data.config;
 
   if (t === 'trigger' || t === 'anotacao') return;

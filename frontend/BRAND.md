@@ -1,10 +1,10 @@
-# Acássia — Brand Guidelines
+# Meu Mistério — Brand Guidelines
 
-> **Nome canônico do produto:** Acássia.
-> **Sufixo do app interno:** "Studio" (ex.: "Acássia Studio").
+> **Nome canônico do produto:** Meu Mistério.
+> **Sufixo do app interno:** "Studio" (ex.: "Meu Mistério Studio").
 > **Nome da paleta de cor (interno, não aparece pro usuário):** `sibila-*`.
 
-A separação é proposital: usuário lê "Acássia" em todo lugar visível;
+A separação é proposital: usuário lê "Meu Mistério" em todo lugar visível;
 desenvolvedores usam tokens `sibila-*` no Tailwind por consistência com
 o histórico do código (mesmo princípio dos aliases legados `cigana-*`).
 
@@ -37,7 +37,7 @@ Implementação: `frontend/src/components/Logo.tsx`. SVG single-color (currentCo
 
 ## Wordmark
 
-**Acássia** — sans serif, peso black/bold, tracking apertado (`-0.02em`).
+**Meu Mistério** — sans serif, peso black/bold, tracking apertado (`-0.02em`).
 
 ## Tipografia
 
@@ -118,8 +118,8 @@ Manter raridade — não exagerar nos termos místicos. **Um por tela** é mais 
 ## Implementação
 
 - `tailwind.config.ts` — tokens (CSS variables + `sibila-*` aliases)
-- `frontend/src/components/Logo.tsx` — marca SVG + Wordmark "Acássia"
+- `frontend/src/components/Logo.tsx` — marca SVG + Wordmark "Meu Mistério"
 - `frontend/src/components/Layout.tsx` — sidebar + header globais aplicando a paleta
-- `frontend/index.html` — carrega Fraunces + Inter via Google Fonts; title "Acássia"
+- `frontend/index.html` — carrega Fraunces + Inter via Google Fonts; title "Meu Mistério"
 
 Ver também: pt-br nas labels da nav, agrupamento por seção (Painel / Oráculo / Configuração).

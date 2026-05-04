@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addEdge,
   applyEdgeChanges,
@@ -14,7 +14,7 @@ import { blueprintsApi } from '../api/blueprints';
 import { documentToReactFlow, type FlowNodeData } from '../lib/adapt';
 import { newId, reactFlowToDocument } from '../lib/serialize';
 import { toast } from '../lib/toast';
-import type { AcassiaDocument, AcassiaNodeType } from '../lib/types';
+import type { MeuMisterioDocument, MeuMisterioNodeType } from '../lib/types';
 
 export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -29,7 +29,7 @@ interface Snapshot {
 
 interface UseFlowStateOpts {
   blueprintId: number;
-  initialDoc: AcassiaDocument;
+  initialDoc: MeuMisterioDocument;
 }
 
 export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
@@ -54,7 +54,7 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: (next: AcassiaDocument) =>
+    mutationFn: (next: MeuMisterioDocument) =>
       blueprintsApi.update(blueprintId, { body: next as Record<string, unknown> }),
     onSuccess: () => {
       setStatus('saved');
@@ -170,16 +170,37 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
   );
 
   const addNode = useCallback(
-    (type: AcassiaNodeType, position: { x: number; y: number }, label?: string) => {
+    (type: MeuMisterioNodeType, position: { x: number; y: number }, label?: string) => {
       const node: Node<FlowNodeData> = {
         id: newId('n'),
-        type: 'acassia',
+        type: 'meumisterio',
         position,
-        data: { label: label ?? defaultLabel(type), acassiaType: type, config: {} },
+        data: { label: label ?? defaultLabel(type), meumisterioType: type, config: {} },
       };
       setNodes((curr) => [...curr, node]);
       markDirty();
       return node.id;
+    },
+    [markDirty],
+  );
+
+  const duplicateNode = useCallback(
+    (id: string) => {
+      setNodes((curr) => {
+        const source = curr.find((n) => n.id === id);
+        if (!source) return curr;
+        const clone: Node<FlowNodeData> = {
+          id: newId('n'),
+          type: 'meumisterio',
+          position: { x: source.position.x + 40, y: source.position.y + 60 },
+          data: {
+            ...structuredClone(source.data),
+            label: `${source.data.label || defaultLabel(source.data.meumisterioType as MeuMisterioNodeType)} (cópia)`,
+          },
+        };
+        return [...curr, clone];
+      });
+      markDirty();
     },
     [markDirty],
   );
@@ -210,6 +231,7 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     onEdgesChange,
     onConnect,
     addNode,
+    duplicateNode,
     updateNode,
     undo,
     redo,
@@ -218,7 +240,7 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
   };
 }
 
-function defaultLabel(type: AcassiaNodeType): string {
+function defaultLabel(type: MeuMisterioNodeType): string {
   const map: Record<string, string> = {
     trigger: 'Gatilho',
     conteudo: 'Conteúdo',

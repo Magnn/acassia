@@ -3,7 +3,7 @@ import type { Config } from 'tailwindcss';
 /**
  * Sibila brand tokens — "Noite Considerada".
  *
- * Os tokens cigana-* são preservados como aliases para os mesmos valores
+ * Os tokens meumisterio-* são preservados como aliases para os mesmos valores
  * (compat retroativo enquanto o codebase migra). Use sibila-* em código novo.
  */
 export default {
@@ -40,11 +40,11 @@ export default {
           fog: '#a8a3b3',
           smoke: '#6b6677',
         },
-        // ── Cigana (aliases legados) ────────────────────────────────
-        'cigana-bg': '#0b0817',
-        'cigana-surface': '#14101e',
-        'cigana-border': '#2a2538',
-        'cigana-purple': '#7c6a99',
+        // ── Meu Mistério (aliases legados) ────────────────────────────────
+        'meumisterio-bg': '#0b0817',
+        'meumisterio-surface': '#14101e',
+        'meumisterio-border': '#2a2538',
+        'meumisterio-purple': '#7c6a99',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],

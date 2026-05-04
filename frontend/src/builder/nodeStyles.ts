@@ -1,18 +1,24 @@
 import {
   Bot,
+  CalendarClock,
   Clock,
   GitBranch,
   GitFork,
+  HelpCircle,
+  List,
   MessageSquare,
+  PlayCircle,
   Plug,
   Square,
   StickyNote,
   Terminal,
+  UserPlus,
+  XCircle,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
 
-interface NodeVisual {
+export interface NodeVisual {
   Icon: LucideIcon;
   border: string;
   bg: string;
@@ -21,22 +27,45 @@ interface NodeVisual {
   /** cor de acento (Tailwind text-*) — para o ícone */
   accent: string;
   glow?: string;
+  desc?: string;
+  badge?: { text: string; color: string };
 }
 
 const VISUALS: Record<string, NodeVisual> = {
   trigger: {
     Icon: Zap,
-    border: 'border-l-violet-500',
+    border: 'border-l-green-500',
     bg: 'bg-bg-surface/80',
-    accent: 'text-violet-500',
+    accent: 'text-green-500',
     label: 'Trigger',
+    desc: 'Início do fluxo',
   },
   conteudo: {
     Icon: MessageSquare,
-    border: 'border-l-sky-500',
+    border: 'border-l-purple-600',
     bg: 'bg-bg-surface/80',
-    accent: 'text-sky-500',
+    accent: 'text-purple-600',
     label: 'Conteúdo',
+    desc: 'Enviar mensagem de texto, imagem...',
+    badge: { text: 'Popular', color: 'bg-slate-100 text-slate-500' },
+  },
+  pergunta: {
+    Icon: HelpCircle,
+    border: 'border-l-[#ff5722]',
+    bg: 'bg-bg-surface/80',
+    accent: 'text-[#ff5722]',
+    label: 'Pergunta',
+    desc: 'Enviar pergunta',
+    badge: { text: 'Popular', color: 'bg-slate-100 text-slate-500' },
+  },
+  acao: {
+    Icon: PlayCircle,
+    border: 'border-l-[#2d336b]',
+    bg: 'bg-bg-surface/80',
+    accent: 'text-[#2d336b]',
+    label: 'Ação',
+    desc: 'Executar uma ação',
+    badge: { text: 'Popular', color: 'bg-slate-100 text-slate-500' },
   },
   delay: {
     Icon: Clock,
@@ -44,13 +73,16 @@ const VISUALS: Record<string, NodeVisual> = {
     bg: 'bg-bg-surface/80',
     accent: 'text-amber-500',
     label: 'Delay',
+    desc: 'Aguardar um período',
   },
   condicao: {
     Icon: GitBranch,
-    border: 'border-l-indigo-500',
+    border: 'border-l-red-500',
     bg: 'bg-bg-surface/80',
-    accent: 'text-indigo-500',
+    accent: 'text-red-500',
     label: 'Condição',
+    desc: 'Validar uma condição',
+    badge: { text: 'Popular', color: 'bg-slate-100 text-slate-500' },
   },
   gpt: {
     Icon: Bot,
@@ -58,20 +90,24 @@ const VISUALS: Record<string, NodeVisual> = {
     bg: 'bg-bg-surface/80',
     accent: 'text-emerald-500',
     label: 'GPT / IA',
+    desc: 'Processamento com IA',
+    badge: { text: 'Novidade', color: 'bg-blue-500 text-white' },
   },
   api: {
     Icon: Plug,
     border: 'border-l-cyan-500',
     bg: 'bg-bg-surface/80',
     accent: 'text-cyan-500',
-    label: 'API',
+    label: 'API Externa',
+    desc: 'Chamada HTTP genérica',
   },
   ab_split: {
     Icon: GitFork,
     border: 'border-l-fuchsia-500',
     bg: 'bg-bg-surface/80',
     accent: 'text-fuchsia-500',
-    label: 'A/B',
+    label: 'Divisão',
+    desc: 'Distribuição de contatos',
   },
   motor_ref: {
     Icon: Terminal,
@@ -79,6 +115,7 @@ const VISUALS: Record<string, NodeVisual> = {
     bg: 'bg-bg-surface/80',
     accent: 'text-rose-500',
     label: 'Motor Python',
+    desc: 'Módulo backend',
   },
   anotacao: {
     Icon: StickyNote,
@@ -86,13 +123,40 @@ const VISUALS: Record<string, NodeVisual> = {
     bg: 'bg-yellow-500/5',
     accent: 'text-yellow-600',
     label: 'Anotação',
+    desc: 'Apenas organização',
+  },
+  menu: {
+    Icon: List,
+    border: 'border-l-slate-600',
+    bg: 'bg-bg-surface/80',
+    accent: 'text-slate-600',
+    label: 'Menu',
+    desc: 'Menu de opções',
+  },
+  expediente: {
+    Icon: CalendarClock,
+    border: 'border-l-teal-500',
+    bg: 'bg-bg-surface/80',
+    accent: 'text-teal-500',
+    label: 'Expediente',
+    desc: 'Adicionar horário de funcionamento',
+    badge: { text: 'Novidade', color: 'bg-blue-500 text-white' },
+  },
+  notificar_atendente: {
+    Icon: UserPlus,
+    border: 'border-l-indigo-500',
+    bg: 'bg-bg-surface/80',
+    accent: 'text-indigo-500',
+    label: 'Notificar Atendente',
+    desc: 'Enviar mensagem para atendente.',
   },
   end: {
-    Icon: Square,
+    Icon: XCircle,
     border: 'border-l-slate-400',
     bg: 'bg-bg-surface/80',
     accent: 'text-slate-500',
     label: 'Fim',
+    desc: 'Encerrar automação',
   },
 };
 

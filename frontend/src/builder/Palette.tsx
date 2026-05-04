@@ -1,60 +1,77 @@
-import { Layers } from 'lucide-react';
-import { visualForType } from './nodeStyles';
-import type { AcassiaNodeType } from '../lib/types';
+﻿import { X } from 'lucide-react';
+import { visualForType, type NodeVisual } from './nodeStyles';
+import type { MeuMisterioNodeType } from '../lib/types';
 
-export const DRAG_MIME = 'application/x-acassia-node';
+export const DRAG_MIME = 'application/x-meumisterio-node';
 
-const ITEMS: AcassiaNodeType[] = [
-  'trigger',
+const ITEMS: MeuMisterioNodeType[] = [
+  'menu',
   'conteudo',
+  'pergunta',
+  'acao',
   'delay',
+  'expediente',
   'condicao',
+  'notificar_atendente',
+  'ab_split',
   'gpt',
   'api',
-  'ab_split',
   'motor_ref',
   'anotacao',
-  'end',
 ];
 
 export default function Palette() {
   return (
-    <aside className="w-56 flex-shrink-0 border-r border-border bg-bg-sidebar overflow-y-auto">
-      <div className="px-3 py-3 flex items-center gap-2 text-[11px] uppercase tracking-wide text-secondary border-b border-border">
-        <Layers className="w-3.5 h-3.5" />
-        <span>Paleta</span>
+    <aside className="absolute left-0 top-0 w-[280px] bg-white border-r border-slate-200 overflow-hidden shadow-[4px_0_24px_rgba(0,0,0,0.06)] flex flex-col h-full z-20">
+      <div className="px-4 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
+        <span className="font-bold text-slate-800 text-[15px]">Menu de opções</span>
+        <button className="text-slate-400 hover:text-slate-600 transition-colors">
+           <X className="w-4 h-4" />
+        </button>
       </div>
-      <ul className="p-2 space-y-1">
-        {ITEMS.map((t) => (
-          <PaletteItem key={t} type={t} />
-        ))}
-      </ul>
-      <div className="p-3 text-[11px] text-secondary border-t border-border">
-        Arraste para o canvas
+
+      <div className="p-3 flex-1 overflow-y-auto custom-scrollbar">
+         <div className="flex flex-col gap-2">
+           {ITEMS.map((t) => (
+             <PaletteItem key={t} type={t} />
+           ))}
+         </div>
       </div>
     </aside>
   );
 }
 
-function PaletteItem({ type }: { type: AcassiaNodeType }) {
+function PaletteItem({ type }: { type: MeuMisterioNodeType }) {
   const v = visualForType(type);
   return (
-    <li
+    <div
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_MIME, type);
         e.dataTransfer.effectAllowed = 'copy';
       }}
-      className={[
-        'rounded border px-2 py-2 cursor-grab active:cursor-grabbing select-none',
-        'flex items-center gap-2 text-sm',
-        v.border,
-        v.bg,
-        'hover:brightness-125 transition',
-      ].join(' ')}
+      className="group flex items-center gap-3 px-3 py-2.5 rounded-lg border border-slate-100 bg-white hover:border-violet-400 hover:shadow-md cursor-grab active:cursor-grabbing select-none transition-all duration-200"
     >
-      <v.Icon className={`w-4 h-4 ${v.accent}`} strokeWidth={2.25} />
-      <span className="text-primary">{v.label}</span>
-    </li>
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-50 border border-slate-100 group-hover:bg-violet-50 transition-colors">
+         <v.Icon className={`w-[18px] h-[18px] ${v.accent}`} strokeWidth={2} />
+      </div>
+      
+      <div className="flex flex-col flex-1 min-w-0 justify-center">
+         <span className="text-[13px] font-semibold text-slate-800 leading-tight">
+            {v.label}
+         </span>
+         {v.desc && (
+            <span className="text-[10.5px] text-slate-400 truncate mt-0.5 font-medium leading-tight">
+               {v.desc}
+            </span>
+         )}
+      </div>
+
+      {v.badge && (
+         <div className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wide ${v.badge.color}`}>
+            {v.badge.text}
+         </div>
+      )}
+    </div>
   );
 }

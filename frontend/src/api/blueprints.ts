@@ -76,7 +76,7 @@ export const blueprintsApi = {
 
   // ── Validação / compilação no servidor ──────────────────────────────
   validate: (doc: Record<string, unknown>) =>
-    api.post<ValidationReport>('/api/flows/validate', doc),
+    api.post<ValidationReport>('/api/flows/lint', doc),
 
   // ── Publicação ──────────────────────────────────────────────────────
   publish: (blueprintId: number) =>
@@ -117,7 +117,7 @@ export const blueprintsApi = {
   create: async (title: string): Promise<BlueprintDetail> => {
     const data = await api.post<{ ok: boolean; blueprint: BlueprintDetail }>(
       '/api/flows/blueprints/import',
-      { title, body: { format: 'acassia-flow', version: 1, graph: { nodes: [], edges: [] } } },
+      { title, body: { format: 'meumisterio-flow', version: 1, graph: { nodes: [], edges: [] } } },
     );
     return data.blueprint;
   },

@@ -28,7 +28,7 @@ interface BubbleEntry {
   step: SimStep;
 }
 
-const STORAGE_KEY = 'cigana.builder.persona';
+const STORAGE_KEY = 'meumisterio.builder.persona';
 
 export default function Simulator({
   nodes,

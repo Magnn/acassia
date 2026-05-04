@@ -31,7 +31,7 @@ export async function importBlueprintFromFile(file: File): Promise<number | null
     // Suporta formatos:
     //   { exportVersion, blueprint: { title, slug, body } } — produzido pelo /export
     //   { title, slug, body } — manual
-    //   acassia-flow doc direto: usa .title como title, sem slug
+    //   meumisterio-flow doc direto: usa .title como title, sem slug
     let title = '';
     let slug: string | undefined;
     let body: Record<string, unknown> = {};

@@ -1,7 +1,7 @@
 // Pastas para organizar blueprints — só localStorage, sem backend.
-// Compatível com a chave do dashboard.html original (acassia_flux_folders_v1).
+// Compatível com a chave do dashboard.html original (meumisterio_flux_folders_v1).
 
-const KEY = 'acassia_flux_folders_v1';
+const KEY = 'meumisterio_flux_folders_v1';
 
 export interface Folder {
   id: string;

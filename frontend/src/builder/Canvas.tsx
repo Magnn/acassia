@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+﻿import { useCallback, useEffect } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -14,10 +14,10 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import AcassiaNode from './AcassiaNode';
+import MeuMisterioNode from './MeuMisterioNode';
 import { DRAG_MIME } from './Palette';
 import type { FlowNodeData } from '../lib/adapt';
-import type { AcassiaNodeType } from '../lib/types';
+import type { MeuMisterioNodeType } from '../lib/types';
 
 interface CanvasProps {
   nodes: Node<FlowNodeData>[];
@@ -29,12 +29,12 @@ interface CanvasProps {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (conn: Connection) => void;
   onAddNode: (
-    type: AcassiaNodeType,
+    type: MeuMisterioNodeType,
     position: { x: number; y: number },
   ) => void;
 }
 
-const nodeTypes = { acassia: AcassiaNode } as const;
+const nodeTypes = { meumisterio: MeuMisterioNode } as const;
 
 export default function Canvas(props: CanvasProps) {
   return (
@@ -75,7 +75,7 @@ function CanvasInner({
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
-      const type = e.dataTransfer.getData(DRAG_MIME) as AcassiaNodeType;
+      const type = e.dataTransfer.getData(DRAG_MIME) as MeuMisterioNodeType;
       if (!type) return;
       e.preventDefault();
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
@@ -86,7 +86,8 @@ function CanvasInner({
 
   return (
     <div
-      className="h-full w-full bg-bg-primary transition-colors duration-500"
+      className="h-full w-full transition-colors duration-500"
+      style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #eef2f7 100%)' }}
       onDragOver={editable ? handleDragOver : undefined}
       onDrop={editable ? handleDrop : undefined}
     >
@@ -106,9 +107,9 @@ function CanvasInner({
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={24}
+          gap={22}
           size={1}
-          color="var(--border-primary)"
+          color="rgba(15, 23, 42, 0.06)"
         />
         <MiniMap
           pannable
