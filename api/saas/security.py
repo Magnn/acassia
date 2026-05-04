@@ -11,7 +11,7 @@ Endpoints:
 Lockout:
 - 5 falhas em 15min na mesma conta → lockout 15min
 - 10 falhas em 1h do mesmo IP → block IP 1h
-- Storage: Redis se disponível (chave acassia:auth:fail:{user_id|ip})
+- Storage: Redis se disponível (chave meumisterio:auth:fail:{user_id|ip})
 - Fallback: in-memory dict (single-process, dev only)
 """
 
@@ -65,7 +65,7 @@ def _record_failure(key: str, window_s: int = 900) -> int:
     r = _redis()
     if r:
         try:
-            full_key = f"acassia:auth:fail:{key}"
+            full_key = f"meumisterio:auth:fail:{key}"
             r.zadd(full_key, {str(now): now})
             r.zremrangebyscore(full_key, 0, cutoff)
             r.expire(full_key, window_s + 60)
@@ -86,7 +86,7 @@ def _clear_failures(key: str) -> None:
     r = _redis()
     if r:
         try:
-            r.delete(f"acassia:auth:fail:{key}")
+            r.delete(f"meumisterio:auth:fail:{key}")
             return
         except Exception:
             pass
@@ -102,7 +102,7 @@ def is_locked_out(user_id: int) -> tuple[bool, int]:
     key = str(user_id)
     if r:
         try:
-            full_key = f"acassia:auth:fail:user:{key}"
+            full_key = f"meumisterio:auth:fail:user:{key}"
             now = time.time()
             r.zremrangebyscore(full_key, 0, now - 900)
             count = int(r.zcard(full_key) or 0)

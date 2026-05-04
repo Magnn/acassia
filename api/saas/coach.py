@@ -338,7 +338,7 @@ def funnel_review():
         for s in funnel["steps"]
     ])
 
-    prompt = f"""Você é Cigana Coach, conselheira de tarólogas SaaS. Analise esse funnel
+    prompt = f"""Você é Meu Mistério Coach, conselheira de tarólogas SaaS. Analise esse funnel
 e gere review acionável em pt-BR.
 
 Funnel: {flow_slug or f'flow {flow_id}'}

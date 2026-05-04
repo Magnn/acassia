@@ -29,7 +29,7 @@ persona_bp = Blueprint("saas_persona", __name__, url_prefix="/saas")
 
 
 VALID_GLOSSARY_CATEGORIES = {
-    "afro", "tarot", "astrologia", "espirita", "cigana",
+    "afro", "tarot", "astrologia", "espirita", "meumisterio",
     "holistica", "numerologia", "geral",
 }
 

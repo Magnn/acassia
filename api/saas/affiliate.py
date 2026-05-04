@@ -271,7 +271,7 @@ def referral_landing(ref_code):
     target = "/saas/signup"
     resp = make_response(redirect(target))
     resp.set_cookie(
-        "acassia_ref",
+        "meumisterio_ref",
         code,
         max_age=30 * 24 * 3600,
         httponly=False,  # Frontend pode ler pra UI
@@ -289,9 +289,9 @@ def referral_landing(ref_code):
 def attach_referral_to_signup(referred_user_id: int, referred_email: str) -> None:
     """
     Chamado em api/saas/auth.signup_user após criar User.
-    Lê cookie acassia_ref, cria Referral entry se válido.
+    Lê cookie meumisterio_ref, cria Referral entry se válido.
     """
-    ref_code = (request.cookies.get("acassia_ref") or "").strip().upper() if request else None
+    ref_code = (request.cookies.get("meumisterio_ref") or "").strip().upper() if request else None
     if not ref_code:
         return
 

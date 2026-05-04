@@ -434,6 +434,12 @@ def takeover_data(lead_id: int):
             return jsonify({"error": "Not found"}), 404
         lead.bot_pausado = not lead.bot_pausado
         db.commit()
+        # Notificar browsers conectados via SSE
+        try:
+            from api.saas.realtime_hooks import notify_lead_updated
+            notify_lead_updated(tenant_id, lead_id, {"bot_pausado": lead.bot_pausado})
+        except Exception:
+            pass
         return jsonify({"status": "ok", "bot_pausado": lead.bot_pausado})
     finally:
         db.close()

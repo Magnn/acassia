@@ -486,7 +486,7 @@ def test_send():
     body = request.get_json(silent=True) or {}
     to = (body.get("to") or "").strip().replace("+", "").replace(" ", "")
     text = (body.get("body") or "").strip() or (
-        "✦ Acassia conectada com sucesso. Esse e um teste de envio."
+        "✦ Meu Mistério conectada com sucesso. Esse e um teste de envio."
     )
 
     if not to or len(to) < 8:

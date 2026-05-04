@@ -313,7 +313,7 @@ def _generate_suggestions(lead: models.Lead, msgs: list[models.Mensagem]) -> lis
         ctx_line = "; ".join(contexto) or "(sem contexto)"
 
         prompt = (
-            "Voce e atendente humana de uma cigana/taroteira no WhatsApp. "
+            "Voce e atendente humana de uma meumisterio/taroteira no WhatsApp. "
             "Sua tarefa: sugerir 3 respostas curtas (max 200 chars cada) que continuem "
             "naturalmente a conversa. Use tom acolhedor, mistico, em portugues do Brasil. "
             "Cada sugestao deve ter um angulo diferente (uma pratica, uma emocional, uma com cta sutil).\n\n"

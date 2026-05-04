@@ -44,7 +44,7 @@ def create_pix():
     if amount_brl < 1 or amount_brl > 50_000:
         return jsonify({"error": "amount_brl_out_of_range", "min": 1, "max": 50000}), 422
 
-    description = (body.get("description") or "Pagamento Acássia").strip()[:200]
+    description = (body.get("description") or "Pagamento Meu Mistério").strip()[:200]
     lead_id = body.get("lead_id")
     expires_min = int(body.get("expires_min") or 30)
     if expires_min < 5 or expires_min > 1440:

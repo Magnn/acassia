@@ -66,7 +66,7 @@ def set_consent():
     cleaned["essential"] = True  # sempre true
 
     user_id = current_user.id if current_user.is_authenticated else None
-    visitor_id = body.get("visitor_id") or request.cookies.get("acassia_visitor_id")
+    visitor_id = body.get("visitor_id") or request.cookies.get("meumisterio_visitor_id")
     if not visitor_id and not user_id:
         # Gera visitor_id pra anônimo
         visitor_id = secrets.token_hex(16)
@@ -91,7 +91,7 @@ def set_consent():
         })
         if visitor_id and not user_id:
             resp.set_cookie(
-                "acassia_visitor_id", visitor_id,
+                "meumisterio_visitor_id", visitor_id,
                 max_age=365 * 24 * 3600,
                 httponly=True,
                 samesite="Lax",
@@ -106,7 +106,7 @@ def set_consent():
 def get_consent():
     """Retorna consents atuais (último registro). Funciona logado ou anônimo."""
     user_id = current_user.id if current_user.is_authenticated else None
-    visitor_id = request.cookies.get("acassia_visitor_id")
+    visitor_id = request.cookies.get("meumisterio_visitor_id")
 
     if not user_id and not visitor_id:
         return jsonify({
@@ -218,7 +218,7 @@ def _build_user_data_export(user_id: int) -> dict:
             "_metadata": {
                 "lgpd_disclaimer": (
                     "Este export contém todos os dados pessoais associados "
-                    "ao seu cadastro Acássia. Para deleção total, use "
+                    "ao seu cadastro Meu Mistério. Para deleção total, use "
                     "/saas/data-deletion."
                 ),
                 "policy_version": _CURRENT_POLICY_VERSION,
@@ -265,7 +265,7 @@ def data_export():
         BytesIO(json_bytes),
         mimetype="application/json",
         as_attachment=True,
-        download_name=f"acassia-export-{current_user.id}-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json",
+        download_name=f"meumisterio-export-{current_user.id}-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json",
     )
 
 

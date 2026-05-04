@@ -336,7 +336,7 @@ def _generate_message_for_date(d: models.SpiritualDate) -> dict:
         if client is None or not hasattr(client, "client"):
             raise RuntimeError("personalizer_unavailable")
         prompt = (
-            f"Voce e cigana mistica respondendo no WhatsApp. "
+            f"Voce e meumisterio mistica respondendo no WhatsApp. "
             f"Hoje e dia de {d.name} ({d.tradition}). "
             f"Contexto: {d.description or '(sem descricao adicional)'}\n\n"
             "Gere 3 sugestoes de mensagem curtas (max 250 chars cada), em pt-BR, "

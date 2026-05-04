@@ -39,7 +39,7 @@ marketplace_bp = Blueprint("saas_marketplace", __name__, url_prefix="/saas/marke
 admin_marketplace_bp = Blueprint("admin_marketplace", __name__, url_prefix="/api/admin/marketplace")
 
 
-ACASSIA_FEE_PCT = 30  # 30% do preço fica com a Acássia
+MEU_MISTERIO_FEE_PCT = 30  # 30% do preço fica com a Meu Mistério
 
 
 # ─── Buyer flows ──────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ def buy_listing(listing_id: int):
             })
 
         amount_cents = listing.price_brl_cents
-        fee_cents = int(amount_cents * ACASSIA_FEE_PCT / 100)
+        fee_cents = int(amount_cents * MEU_MISTERIO_FEE_PCT / 100)
         seller_cents = amount_cents - fee_cents
 
         # Cria Purchase em pending
@@ -186,7 +186,7 @@ def buy_listing(listing_id: int):
             buyer_user_id=current_user.id,
             listing_id=listing_id,
             amount_brl_cents=amount_cents,
-            acassia_fee_cents=fee_cents,
+            meumisterio_fee_cents=fee_cents,
             seller_payout_cents=seller_cents,
             payment_provider=provider,
             status="pending",
@@ -199,7 +199,7 @@ def buy_listing(listing_id: int):
         if provider == "pix":
             try:
                 from api.payments.pix_provider import create_pix_mercadopago
-                # Plataforma recebe → Acássia, depois faz payout pro seller via affiliate-style
+                # Plataforma recebe → Meu Mistério, depois faz payout pro seller via affiliate-style
                 result = create_pix_mercadopago(
                     tenant_id=current_user.tenant_id,
                     amount_brl=amount_cents / 100,
@@ -463,7 +463,7 @@ def create_listing():
 
         return jsonify({
             "ok": True, "id": listing.id, "status": listing.status,
-            "message": "Listing criado e enviado pra review da equipe Acássia.",
+            "message": "Listing criado e enviado pra review da equipe Meu Mistério.",
         }), 201
     finally:
         db.close()
@@ -495,7 +495,7 @@ def my_sales():
                     "id": s.id,
                     "listing_id": s.listing_id,
                     "amount_brl": s.amount_brl_cents / 100,
-                    "fee_brl": s.acassia_fee_cents / 100,
+                    "fee_brl": s.meumisterio_fee_cents / 100,
                     "payout_brl": s.seller_payout_cents / 100,
                     "purchased_at": s.purchased_at.isoformat(),
                 } for s in sales

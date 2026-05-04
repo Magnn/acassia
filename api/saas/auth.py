@@ -179,7 +179,7 @@ def _load_user(user_id_str: str) -> Optional[AuthenticatedUser]:
                         role=target.role,
                         impersonator_id=admin_user.id,
                         impersonation_session_id=sess.id,
-                        admin_subrole=admin_user.admin_subrole,
+                        admin_subrole=getattr(admin_user, 'admin_subrole', None),
                     )
 
         return AuthenticatedUser(
@@ -187,7 +187,7 @@ def _load_user(user_id_str: str) -> Optional[AuthenticatedUser]:
             email=admin_user.email,
             tenant_id=admin_user.tenant_id,
             role=admin_user.role,
-            admin_subrole=admin_user.admin_subrole,
+            admin_subrole=getattr(admin_user, 'admin_subrole', None),
         )
     finally:
         db.close()
@@ -269,7 +269,7 @@ def signup_user(email: str, password: str, name: Optional[str] = None) -> models
             email, tenant_id, user.trial_ends_at.isoformat() if user.trial_ends_at else None,
         )
 
-        # Attach referral se cookie acassia_ref está presente (Frente 7.15)
+        # Attach referral se cookie meumisterio_ref está presente (Frente 7.15)
         try:
             from api.saas.affiliate import attach_referral_to_signup
             attach_referral_to_signup(user.id, email)
@@ -344,8 +344,8 @@ def signup():
 @auth_bp.route("/signup/done")
 @login_required
 def signup_done():
-    """Redireciona para o novo Wizard de Onboarding no React."""
-    return redirect("/builder/onboarding")
+    """Redireciona direto pro dashboard após signup (conforme regra de negócio)."""
+    return redirect("/builder/dashboard")
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -413,7 +413,7 @@ def login():
         except Exception:
             pass
 
-        next_url = request.args.get("next") or url_for("saas_auth.signup_done")
+        next_url = request.args.get("next") or "/builder/workspaces"
         return redirect(next_url)
 
     return render_template("auth/login.html")
@@ -525,3 +525,88 @@ def me_complete_milestone(milestone_key):
     import onboarding_progress
     is_new = onboarding_progress.mark_milestone(current_user.id, milestone_key)
     return jsonify({"ok": True, "is_new": is_new})
+
+# ─── WORKSPACES MANAGEMENT (FRENTE 11.0) ───────────────────────────────────
+
+from db.models import Workspace, WorkspaceMember
+
+@auth_bp.route("/workspaces", methods=["GET"])
+@login_required
+def list_workspaces():
+    """Lista todos os workspaces a que o usuário pertence."""
+    db = SessionLocal()
+    try:
+        memberships = db.query(WorkspaceMember).filter_by(user_id=current_user.id).all()
+        workspace_ids = [m.workspace_id for m in memberships]
+        workspaces = db.query(Workspace).filter(Workspace.id.in_(workspace_ids)).all()
+
+        result = []
+        for w in workspaces:
+            role = next((m.role for m in memberships if m.workspace_id == w.id), "user")
+            result.append({
+                "id": w.id,
+                "name": w.name,
+                "role": role,
+                "is_current": w.id == current_user.tenant_id
+            })
+
+        return jsonify({"workspaces": result})
+    finally:
+        db.close()
+
+@auth_bp.route("/workspaces/switch", methods=["POST"])
+@login_required
+def switch_workspace():
+    """Altera o tenant_id atual do usuário para trocar de contexto."""
+    data = request.json or {}
+    target_id = data.get("workspace_id", "").strip()
+
+    db = SessionLocal()
+    try:
+        # Verifica se ele é membro do workspace alvo
+        membership = db.query(WorkspaceMember).filter_by(user_id=current_user.id, workspace_id=target_id).first()
+        if not membership:
+            return jsonify({"error": "Sem permissão ou workspace não encontrado"}), 403
+
+        u = db.query(models.User).filter_by(id=current_user.id).first()
+        u.tenant_id = target_id
+        db.commit()
+
+        # Update session
+        login_user(AuthenticatedUser(u.id, u.email, target_id, u.role))
+        return jsonify({"message": "Contexto alterado com sucesso", "current_workspace": target_id})
+    finally:
+        db.close()
+
+@auth_bp.route("/workspaces", methods=["POST"])
+@login_required
+def create_workspace():
+    """Cria um novo workspace e vincula o criador como admin."""
+    import uuid
+    data = request.json or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Nome obrigatório"}), 400
+
+    new_tenant_id = "wk_" + uuid.uuid4().hex[:12]
+    db = SessionLocal()
+    try:
+        new_ws = Workspace(
+            id=new_tenant_id,
+            name=name,
+            owner_id=current_user.id
+        )
+        db.add(new_ws)
+        db.flush()
+
+        new_member = WorkspaceMember(
+            workspace_id=new_tenant_id,
+            user_id=current_user.id,
+            role="admin"
+        )
+        db.add(new_member)
+        db.commit()
+
+        return jsonify({"message": "Workspace criado", "id": new_tenant_id})
+    finally:
+        db.close()

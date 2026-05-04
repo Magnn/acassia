@@ -289,7 +289,7 @@ def _generate_next_action(lead: models.Lead, msgs: list[models.Mensagem]) -> dic
         if lead.tempo_sofrimento: ctx_bits.append(f"tempo dor: {lead.tempo_sofrimento}")
 
         prompt = (
-            "Voce e supervisor de atendimento de cigana/taroteira. "
+            "Voce e supervisor de atendimento de meumisterio/taroteira. "
             "Analise o lead e sugira a PROXIMA ACAO concreta. "
             "Contexto:\n"
             f"{'; '.join(ctx_bits) if ctx_bits else '(pouco contexto)'}\n\n"

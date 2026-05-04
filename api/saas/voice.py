@@ -292,6 +292,9 @@ def synthesize(clone_id: int):
         if not clone or clone.deleted_at:
             return jsonify({"error": "clone_not_found"}), 404
 
+        stability = float(body.get("stability") or 0.5)
+        similarity = float(body.get("similarity") or 0.75)
+
         # Quota Gemini-style: cap chars por mês baseado em plano
         # Aqui usamos quota-spec custom — por enquanto, simples cap por tenant
         chars_count = len(text)
@@ -310,6 +313,8 @@ def synthesize(clone_id: int):
                 tenant_id=current_user.tenant_id,
                 voice_id=clone.provider_voice_id,
                 text=text,
+                stability=stability,
+                similarity_boost=similarity,
             )
         except vp.VoiceProviderError as exc:
             return jsonify({"error": "provider_error", "message": str(exc)}), 502
@@ -324,6 +329,78 @@ def synthesize(clone_id: int):
         gen = models.AudioGeneration(
             tenant_id=current_user.tenant_id,
             voice_clone_id=clone.id,
+            text=text[:2000],
+            chars_count=chars_count,
+            audio_url=f"/saas/voice/audio/{file_id}",
+            provider="elevenlabs",
+            status="done",
+        )
+        db.add(gen)
+        db.commit()
+        db.refresh(gen)
+
+        return jsonify({
+            "ok": True,
+            "generation_id": gen.id,
+            "audio_url": gen.audio_url,
+            "chars_count": chars_count,
+            "size_bytes": len(audio_bytes),
+        })
+    finally:
+        db.close()
+
+@voice_bp.route("/presets/<provider_voice_id>/synthesize", methods=["POST"])
+@login_required
+@limiter.limit("30/minute")
+def synthesize_preset(provider_voice_id: str):
+    """
+    Gera TTS para vozes pré-aprovadas (ElevenLabs defaults).
+    """
+    body = request.get_json(silent=True) or {}
+    text = (body.get("text") or "").strip()
+
+    if not text:
+        return jsonify({"error": "text_required"}), 422
+    if len(text) > 5000:
+        return jsonify({"error": "text_too_long", "max": 5000}), 422
+
+    stability = float(body.get("stability") or 0.5)
+    similarity = float(body.get("similarity") or 0.75)
+
+    chars_count = len(text)
+    try:
+        import quota
+        allowed, _, _ = quota.consume_quota(
+            current_user.tenant_id, "gemini_tokens_month", chars_count,
+        )
+        if not allowed:
+            return jsonify({"error": "quota_exceeded", "kind": "voice_chars"}), 402
+    except Exception:
+        pass
+
+    try:
+        audio_bytes = vp.synthesize_elevenlabs(
+            tenant_id=current_user.tenant_id,
+            voice_id=provider_voice_id,
+            text=text,
+            stability=stability,
+            similarity_boost=similarity,
+        )
+    except vp.VoiceProviderError as exc:
+        return jsonify({"error": "provider_error", "message": str(exc)}), 502
+
+    # Salva localmente
+    file_id = secrets.token_hex(8)
+    filename = f"{current_user.tenant_id}_{file_id}.mp3"
+    filepath = os.path.join(_AUDIO_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(audio_bytes)
+
+    db = SessionLocal()
+    try:
+        gen = models.AudioGeneration(
+            tenant_id=current_user.tenant_id,
+            voice_clone_id=None,  # Not a clone
             text=text[:2000],
             chars_count=chars_count,
             audio_url=f"/saas/voice/audio/{file_id}",

@@ -100,7 +100,7 @@ def save_persona(
     backstory = (backstory or "").strip()
 
     if not name:
-        raise ValueError("nome da cigana é obrigatório")
+        raise ValueError("nome da meumisterio é obrigatório")
     if tone not in ALLOWED_TONES:
         raise ValueError(f"tom inválido; aceitos: {ALLOWED_TONES}")
     if len(backstory) < 20:
@@ -192,7 +192,7 @@ def save_template(tenant_id: str, template: str) -> Optional[int]:
     # 1. em_branco
     if template == "em_branco":
         body = {
-            "format": "acassia-flow",
+            "format": "meumisterio-flow",
             "version": 1,
             "title": "Pós-pagamento (em branco)",
             "graph": {"nodes": [], "edges": []},
@@ -224,13 +224,13 @@ def save_template(tenant_id: str, template: str) -> Optional[int]:
             ft.usage_count = (ft.usage_count or 0) + 1
             ft_db.commit()
             body_in = ft.blueprint_json or {}
-            # Normaliza pra formato acassia-flow se o seed estiver no formato antigo
+            # Normaliza pra formato meumisterio-flow se o seed estiver no formato antigo
             if "graph" in body_in:
                 body = body_in
             else:
-                # Converte nodes simples em formato acassia-flow
+                # Converte nodes simples em formato meumisterio-flow
                 body = {
-                    "format": "acassia-flow",
+                    "format": "meumisterio-flow",
                     "version": 1,
                     "title": ft.name,
                     "graph": {
@@ -563,5 +563,5 @@ def whatsapp():
                 "5. Mande uma msg pro numero pra confirmar — vai aparecer aqui em segundos",
             ],
         })
-    flash("Onboarding concluído! Tua cigana está pronta pra ser ativada.", "success")
+    flash("Onboarding concluído! Tua meumisterio está pronta pra ser ativada.", "success")
     return redirect(url_for("saas_auth.signup_done"))
