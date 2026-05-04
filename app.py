@@ -34,12 +34,20 @@ from flask import Flask, request, jsonify, redirect, send_from_directory
 from flask_login import login_required
 from api.saas.auth import require_role
 
-# Atalho: rotas administrativas (criar/editar fluxos, agentes, segredos) usam:
-#   @login_required
-#   @require_admin
-# Tarólogos comuns (role='user') ficam restritos às rotas /saas/* já protegidas
-# pelos blueprints SaaS dedicados.
-require_admin = require_role("user")
+# ── Autorização de rotas do app.py ────────────────────────────────────
+# Rotas deste arquivo são acessadas pelo **dono do tenant** (role='user').
+# Isso NÃO é o super-admin do painel /admin — pra esse, use:
+#     from api.admin.guard import require_admin  (4 camadas: login+role+allowlist+2FA)
+#
+# Aqui usamos require_tenant_owner = require_role("user") para garantir que:
+#   1. O user está logado (flask-login)
+#   2. O user tem role='user' (dono do workspace / taróloga)
+#
+# Rotas de blueprints SaaS (/saas/*) já têm seu próprio middleware.
+require_tenant_owner = require_role("user")
+
+# Backward compat — TODO: migrar usos para require_tenant_owner e remover.
+require_admin = require_tenant_owner
 from werkzeug.utils import secure_filename
 from flask_cors import CORS 
 from dotenv import load_dotenv
@@ -142,13 +150,41 @@ REPORTS_DIR = os.path.join(_ROOT, "scripts", "reports")
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
 # Cache de Idempotência (Evita processar a mesma msg do WhatsApp 2x)
+# Camadas (defense in depth):
+#   1. Redis SET NX EX 86400 (atômico, cross-worker, TTL 24h) — se disponível
+#   2. DB UniqueConstraint (durável, sobrevive a restart)
+#   3. deque in-memory (fallback per-process, quick check sem I/O)
 CACHE_MENSAGENS   = deque(maxlen=2000)
 LOCK_IDEMPOTENCIA = threading.Lock()
+
+# Prefixo Redis para dedup de webhook
+_WAMID_DEDUP_PREFIX = "meumisterio:wamid:"
+_WAMID_DEDUP_TTL = 86400  # 24h — Meta não reenvia após 24h
+
+
+def _try_claim_wamid_redis(wamid: str) -> bool | None:
+    """
+    Tenta clamar wamid via Redis SET NX (atômico, cross-worker).
+    Retorna True (clamou), False (duplicata), None (Redis indisponível).
+    """
+    try:
+        from reliability.redis_inbound import _client as redis_client_fn
+        r = redis_client_fn()
+        if r is None:
+            return None
+        key = f"{_WAMID_DEDUP_PREFIX}{wamid}"
+        # SET NX EX: set only if not exists, expire in 24h
+        result = r.set(key, "1", nx=True, ex=_WAMID_DEDUP_TTL)
+        return bool(result)
+    except Exception as e:
+        logger.debug("[WEBHOOK] Redis dedup indisponível (fail-open): %s", e)
+        return None
 
 
 def _try_claim_wamid_db(wamid: str) -> bool:
     """
     True = primeira vez (seguir para a fila). False = wamid já persistido (at-least-once / restart).
+    Camada durável — mantém receipt pra auditoria e sobrevive a restart.
     """
     if not wamid:
         return True
@@ -173,6 +209,33 @@ def _try_claim_wamid_db(wamid: str) -> bool:
         return True
     finally:
         db.close()
+
+
+def _is_wamid_duplicate(wamid: str) -> bool:
+    """
+    Verifica idempotência multi-layer: Redis → DB → deque.
+    Retorna True se wamid é duplicata (não processar).
+    """
+    if not wamid:
+        return False
+
+    # Layer 1: Redis (atômico, cross-worker)
+    redis_result = _try_claim_wamid_redis(wamid)
+    if redis_result is False:
+        return True  # Já clamado por outro worker
+    # Se redis_result é True, já clamamos no Redis — prosseguir para DB
+
+    # Layer 2: DB (durável)
+    if not _try_claim_wamid_db(wamid):
+        return True  # Já existia no DB
+
+    # Layer 3: deque in-memory (quick check local, sem I/O)
+    with LOCK_IDEMPOTENCIA:
+        if wamid in CACHE_MENSAGENS:
+            return True
+        CACHE_MENSAGENS.append(wamid)
+
+    return False
 
 # ── INICIALIZAÇÃO DA APLICAÇÃO ───────────────────────────────────────
 app = Flask(__name__)
@@ -202,8 +265,29 @@ app.config["SECRET_KEY"] = _secret
 # Ex.: FRONTEND_ORIGINS=https://app.meumisterio.com.br,https://meumisterio.com.br
 # Em dev, fallback liberal pra localhost:5173 (Vite) e 5000 (Flask same-origin).
 _cors_env = (os.getenv("FRONTEND_ORIGINS") or "").strip()
+_is_prod = (
+    os.getenv("FLASK_ENV", "").strip().lower() == "production"
+    or os.getenv("RAILWAY_ENVIRONMENT", "")  # Railway
+    or os.getenv("RENDER", "")  # Render
+    or os.getenv("FLY_APP_NAME", "")  # Fly.io
+)
 if _cors_env:
     _cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+elif _is_prod:
+    # Prod sem FRONTEND_ORIGINS: usa PUBLIC_URL como fallback seguro
+    _public_url = (os.getenv("PUBLIC_URL") or "").strip().rstrip("/")
+    if _public_url:
+        _cors_origins = [_public_url]
+        logger.warning(
+            "⚠️ [SECURITY] FRONTEND_ORIGINS não definida em PROD — usando PUBLIC_URL=%s. "
+            "Defina FRONTEND_ORIGINS no .env para controle explícito.", _public_url,
+        )
+    else:
+        _cors_origins = []
+        logger.error(
+            "🚨 [SECURITY] FRONTEND_ORIGINS E PUBLIC_URL não definidos em PROD! "
+            "CORS está bloqueando TODAS as origens. Configure no .env.",
+        )
 else:
     _cors_origins = [
         "http://localhost:5000",
@@ -211,10 +295,7 @@ else:
         "http://127.0.0.1:5000",
         "http://127.0.0.1:5173",
     ]
-    logger.warning(
-        "⚠️ [SECURITY] FRONTEND_ORIGINS não definida — usando lista dev (localhost). "
-        "Em prod, defina no .env com domínios reais separados por vírgula.",
-    )
+    logger.info("[CORS] Modo dev — origens localhost permitidas.")
 CORS(app, origins=_cors_origins, supports_credentials=True)
 
 # ── Rate limiting ────────────────────────────────────────────────────

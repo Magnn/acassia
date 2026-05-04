@@ -253,49 +253,89 @@ def daily_recompute_tenant_health():
     """
     Recalcula health score pra todos tenants ativos.
     Score = peso(activity 40, result 30, billing 15, engagement 15) × 100.
+
+    Otimizado: 3 aggregate queries com GROUP BY em vez de N*4 queries por user.
     """
+    from sqlalchemy import func as sql_func
+
     db = SessionLocal()
     updated = 0
     try:
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=30)
+
         users = db.query(models.User).filter(
             models.User.is_active == True,  # noqa: E712
             models.User.deleted_at.is_(None),
         ).all()
 
-        now = datetime.now(timezone.utc)
-        week_ago = now - timedelta(days=7)
+        if not users:
+            return
 
+        tenant_ids = list({u.tenant_id for u in users if u.tenant_id})
+
+        # ── Batch 1: msgs_7d por tenant (1 query) ──────────────────────
+        msgs_rows = db.query(
+            models.Lead.tenant_id,
+            sql_func.count(models.Mensagem.id),
+        ).join(
+            models.Lead, models.Mensagem.lead_id == models.Lead.id,
+        ).filter(
+            models.Lead.tenant_id.in_(tenant_ids),
+            models.Mensagem.timestamp > week_ago,
+        ).group_by(models.Lead.tenant_id).all()
+        msgs_by_tenant = {tid: int(n) for tid, n in msgs_rows}
+
+        # ── Batch 2: sales_30d por tenant (1 query) ────────────────────
+        sales_rows = db.query(
+            models.PaymentEventReceipt.tenant_id,
+            sql_func.count(models.PaymentEventReceipt.id),
+        ).filter(
+            models.PaymentEventReceipt.tenant_id.in_(tenant_ids),
+            models.PaymentEventReceipt.processed_at > month_ago,
+        ).group_by(models.PaymentEventReceipt.tenant_id).all()
+        sales_by_tenant = {tid: int(n) for tid, n in sales_rows}
+
+        # ── Batch 3: leads_total por tenant (1 query) ──────────────────
+        leads_rows = db.query(
+            models.Lead.tenant_id,
+            sql_func.count(models.Lead.id),
+        ).filter(
+            models.Lead.tenant_id.in_(tenant_ids),
+        ).group_by(models.Lead.tenant_id).all()
+        leads_by_tenant = {tid: int(n) for tid, n in leads_rows}
+
+        # ── Batch 4: TenantHealth existentes (1 query) ─────────────────
+        existing_healths = db.query(models.TenantHealth).filter(
+            models.TenantHealth.tenant_id.in_(tenant_ids),
+        ).all()
+        health_by_tenant = {h.tenant_id: h for h in existing_healths}
+
+        # ── Computar scores (0 queries adicionais) ─────────────────────
         for u in users:
-            # Activity (40%): last_login + msgs/week + leads/week
+            tid = u.tenant_id
+            if not tid:
+                continue
+
+            # Activity (40%): last_login + msgs/week
             last_login = _aware(u.last_login_at)
             login_score = 100 if last_login and last_login > week_ago else \
-                (50 if last_login and last_login > now - timedelta(days=30) else 0)
-
-            from sqlalchemy import func as sql_func
-            msgs_7d = db.query(sql_func.count(models.Mensagem.id)).join(
-                models.Lead, models.Mensagem.lead_id == models.Lead.id,
-            ).filter(
-                models.Lead.tenant_id == u.tenant_id,
-                models.Mensagem.timestamp > week_ago,
-            ).scalar() or 0
+                (50 if last_login and last_login > month_ago else 0)
+            msgs_7d = msgs_by_tenant.get(tid, 0)
             msgs_score = min(100, msgs_7d * 5)  # 20+ msgs/7d = 100
             activity = (login_score + msgs_score) / 2
 
-            # Result (30%): vendas + sentiment proxy
-            sales_30d = db.query(sql_func.count(models.PaymentEventReceipt.id)).filter(
-                models.PaymentEventReceipt.tenant_id == u.tenant_id,
-                models.PaymentEventReceipt.processed_at > now - timedelta(days=30),
-            ).scalar() or 0
+            # Result (30%): vendas
+            sales_30d = sales_by_tenant.get(tid, 0)
             sales_score = min(100, sales_30d * 20)  # 5+ vendas/30d = 100
             result = sales_score
 
             # Billing (15%): plano pago, sem dunning
             billing = 100 if u.dunning_status is None else 30
 
-            # Engagement (15%): proxy via leads totais (proxy weak)
-            leads_total = db.query(sql_func.count(models.Lead.id)).filter(
-                models.Lead.tenant_id == u.tenant_id,
-            ).scalar() or 0
+            # Engagement (15%): proxy via leads totais
+            leads_total = leads_by_tenant.get(tid, 0)
             engagement = min(100, leads_total * 2)  # 50+ leads = 100
 
             score = int(
@@ -306,34 +346,33 @@ def daily_recompute_tenant_health():
             )
             band = "healthy" if score >= 80 else ("at_risk" if score >= 50 else "critical")
 
-            existing = db.query(models.TenantHealth).filter_by(tenant_id=u.tenant_id).first()
+            components = {
+                "activity": int(activity), "result": int(result),
+                "billing": int(billing), "engagement": int(engagement),
+            }
+
+            existing = health_by_tenant.get(tid)
             if existing:
                 old_band = existing.band
                 existing.score = score
                 existing.band = band
-                existing.components = {
-                    "activity": int(activity), "result": int(result),
-                    "billing": int(billing), "engagement": int(engagement),
-                }
+                existing.components = components
                 existing.updated_at = now
                 # Audit transição de banda
                 if old_band != band:
                     db.add(models.AuditEvent(
-                        tenant_id=u.tenant_id,
+                        tenant_id=tid,
                         actor_user_id=None,
-                        event_type=f"health.band_changed",
+                        event_type="health.band_changed",
                         target_type="tenant",
-                        target_id=u.tenant_id,
+                        target_id=tid,
                         payload={"from": old_band, "to": band, "score": score},
                     ))
             else:
                 db.add(models.TenantHealth(
-                    tenant_id=u.tenant_id,
+                    tenant_id=tid,
                     score=score, band=band,
-                    components={
-                        "activity": int(activity), "result": int(result),
-                        "billing": int(billing), "engagement": int(engagement),
-                    },
+                    components=components,
                 ))
             updated += 1
 
@@ -553,11 +592,35 @@ def daily_recompute_lead_scores():
         logger.warning("[cron.daily_recompute_lead_scores] falha: %s", exc)
 
 
+def daily_cleanup_stale_receipts():
+    """
+    Remove receipts de webhook WhatsApp com mais de 7 dias.
+    A tabela `whatsapp_inbound_receipts` cresce linearmente com volume;
+    após 7 dias a janela de retry da Meta já passou (24h).
+    Mantém o DB lean e queries de dedup rápidas.
+    """
+    db = SessionLocal()
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        deleted = db.query(models.WhatsAppInboundReceipt).filter(
+            models.WhatsAppInboundReceipt.criado_em < cutoff,
+        ).delete(synchronize_session=False)
+        db.commit()
+        if deleted:
+            logger.info("[cron.cleanup_receipts] removed=%d (older than 7d)", deleted)
+    except Exception as exc:
+        db.rollback()
+        logger.warning("[cron.cleanup_receipts] falha: %s", exc)
+    finally:
+        db.close()
+
+
 def run_daily():
     logger.info("[cron] starting daily jobs")
     daily_recompute_tenant_health()
     daily_recompute_lead_scores()
     daily_recompute_spiritual_intents()
+    daily_cleanup_stale_receipts()
     daily_hard_delete()
     logger.info("[cron] daily done")
 

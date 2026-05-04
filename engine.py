@@ -83,6 +83,7 @@ from flows.funil_estatico_meu_misterio.static_funnel_state import (
     merge_metadata_for_persist,
 )
 from reliability.lead_metadata_atomic import atomic_patch_metadata_json, atomic_update_lead_columns
+from reliability.distributed_lock import DistributedLock
 from conversation_policy import (
     acoes_reparo_entrega_padrao,
     lead_reportou_problema_entrega,
@@ -234,7 +235,25 @@ class Engine:
         
         # 🚨 CORREÇÃO CRÍTICA PARA PROTOCOLO 5 MINUTOS:
         # Reduzido de 20 para 2 minutos para garantir que o sistema deteta a pausa atempadamente.
-        self.recovery_engine.iniciar_monitor(intervalo_minutos=2)
+        # Guard: apenas UM worker Gunicorn inicia o monitor (distributed lock com TTL).
+        # Se o worker morrer, o TTL expira e outro worker assume.
+        self._recovery_monitor_started = False
+        try:
+            _monitor_lock = DistributedLock(
+                "engine:recovery_monitor",
+                ttl_ms=180_000,  # 3 min TTL — monitor roda a cada 2 min
+            )
+            if _monitor_lock.acquire(timeout=0.5):
+                self.recovery_engine.iniciar_monitor(intervalo_minutos=2)
+                self._recovery_monitor_started = True
+                logger.info("[ENGINE] Recovery monitor iniciado (este worker ganhou o lock)")
+            else:
+                logger.info("[ENGINE] Recovery monitor já ativo em outro worker — skip")
+        except Exception as exc:
+            # Fallback: inicia localmente (melhor que não ter monitor)
+            logger.warning("[ENGINE] Fallback: iniciando recovery monitor local: %s", exc)
+            self.recovery_engine.iniciar_monitor(intervalo_minutos=2)
+            self._recovery_monitor_started = True
 
         self._circuit   = CircuitBreaker()
         self._mod_cache = ModuleCache()
@@ -243,6 +262,9 @@ class Engine:
         self._lock_proc = threading.Lock()
         self._envio_locks_guard = threading.Lock()
         self._envio_locks: dict[int, threading.Lock] = {}
+        # Distributed locks per-lead (Redis se disponível, fallback local)
+        self._dist_locks: dict[int, DistributedLock] = {}
+        self._dist_locks_guard = threading.Lock()
         try:
             from tenant_context import get_engine_tenant_id
 
@@ -557,6 +579,29 @@ class Engine:
                 lk = threading.Lock()
                 self._envio_locks[lead_id] = lk
             return lk
+
+    def acquire_lead_distributed_lock(self, lead_id: int, timeout: float = 8.0) -> bool:
+        """
+        Adquire lock distribuído para processamento do lead (cross-worker).
+        Usa Redis SET NX se disponível, fallback para threading.Lock local.
+        TTL de 90s evita deadlock se o worker crashar.
+        """
+        with self._dist_locks_guard:
+            dl = self._dist_locks.get(lead_id)
+            if dl is None:
+                dl = DistributedLock(
+                    f"engine:lead:{self.tenant_id}:{lead_id}",
+                    ttl_ms=90_000,
+                )
+                self._dist_locks[lead_id] = dl
+        return dl.acquire(timeout=timeout)
+
+    def release_lead_distributed_lock(self, lead_id: int) -> None:
+        """Libera lock distribuído do lead."""
+        with self._dist_locks_guard:
+            dl = self._dist_locks.pop(lead_id, None)
+        if dl is not None:
+            dl.release()
 
     def _pular_nlu_ia(self, texto: str, tipo_msg: str) -> bool:
         """

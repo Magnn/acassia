@@ -54,16 +54,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 EXPOSE ${PORT}
 
 # Gunicorn com gevent workers para concorrência real
-# Workers = 2 * CPU + 1 (ajustar via WEB_CONCURRENCY)
+# Config em gunicorn_conf.py: monkey-patch gevent + pool dispose on fork
 CMD gunicorn app:app \
-    --bind 0.0.0.0:${PORT} \
-    --workers ${WEB_CONCURRENCY:-3} \
-    --worker-class gevent \
-    --worker-connections 1000 \
-    --timeout 120 \
-    --graceful-timeout 30 \
-    --max-requests 1000 \
-    --max-requests-jitter 50 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info
+    -c gunicorn_conf.py

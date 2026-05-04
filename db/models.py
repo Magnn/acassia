@@ -7,7 +7,7 @@ Multi-tenant (tenant_id), Studio AcassIA, mensagens com media_url.
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Text, Float,
-    DateTime, Date, ForeignKey, Boolean, JSON, UniqueConstraint,
+    DateTime, Date, ForeignKey, Boolean, JSON, UniqueConstraint, Index,
 )
 from sqlalchemy.orm import relationship
 
@@ -20,7 +20,13 @@ def _agora_utc():
 
 class Lead(Base):
     __tablename__ = "leads"
-    __table_args__ = (UniqueConstraint("tenant_id", "telefone", name="uq_lead_tenant_phone"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "telefone", name="uq_lead_tenant_phone"),
+        Index("ix_lead_tenant_node", "tenant_id", "node_atual"),
+        Index("ix_lead_tenant_pipeline", "tenant_id", "pipeline_stage"),
+        Index("ix_lead_tenant_score", "tenant_id", "score_band"),
+        Index("ix_lead_tenant_updated", "tenant_id", "atualizado_em"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(64), nullable=False, default="default", index=True)
@@ -126,6 +132,10 @@ class Lead(Base):
 
 class Mensagem(Base):
     __tablename__ = "mensagens"
+    __table_args__ = (
+        Index("ix_msg_lead_ts", "lead_id", "timestamp"),
+        Index("ix_msg_lead_remetente_ts", "lead_id", "remetente", "timestamp"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
@@ -179,6 +189,9 @@ class AudioCache(Base):
 
 class EventoAudit(Base):
     __tablename__ = "eventos_audit"
+    __table_args__ = (
+        Index("ix_evento_lead_ts", "lead_id", "timestamp"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
@@ -212,6 +225,10 @@ class LeadBehaviorEvent(Base):
     """
 
     __tablename__ = "lead_behavior_events"
+    __table_args__ = (
+        Index("ix_behavior_tenant_type_ts", "tenant_id", "event_type", "timestamp"),
+        Index("ix_behavior_lead_ts", "lead_id", "timestamp"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
@@ -644,6 +661,10 @@ class AuditEvent(Base):
     Distingue de `eventos_audit` legado (que é específico de eventos de lead).
     """
     __tablename__ = "eventos_audit_v2"
+    __table_args__ = (
+        Index("ix_audit_v2_tenant_type", "tenant_id", "event_type"),
+        Index("ix_audit_v2_tenant_ts", "tenant_id", "timestamp"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime(timezone=True), default=_agora_utc, nullable=False, index=True)
@@ -1196,6 +1217,10 @@ class FlowNodeVisit(Base):
     Persistido cada vez que lead entra/sai de um nó pra calcular funnel.
     """
     __tablename__ = "flow_node_visits"
+    __table_args__ = (
+        Index("ix_fnv_tenant_node_entered", "tenant_id", "node_id", "entered_at"),
+        Index("ix_fnv_lead_entered", "lead_id", "entered_at"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(64), nullable=False, index=True)

@@ -72,9 +72,10 @@ if DB_DRIVER == "postgresql":
         connect_args={"options": "-c statement_timeout=30000"},
     )
 else:
-    # SQLite
-    DB_POOL_SIZE = max(5, _int_env("DB_POOL_SIZE", 32))
-    DB_MAX_OVERFLOW = max(0, _int_env("DB_MAX_OVERFLOW", 64))
+    # SQLite: pool conservador — SQLite tem 1 writer por vez, muitas conexões
+    # só aumentam contention e SQLITE_BUSY. Pool >= 15 já é generoso.
+    DB_POOL_SIZE = max(3, _int_env("DB_POOL_SIZE", 5))
+    DB_MAX_OVERFLOW = max(0, _int_env("DB_MAX_OVERFLOW", 10))
     DB_POOL_TIMEOUT = max(3, _int_env("DB_POOL_TIMEOUT", 30))
     DB_POOL_RECYCLE = max(60, _int_env("DB_POOL_RECYCLE", 1800))
 
@@ -146,13 +147,12 @@ SessionLocal = sessionmaker(
 class Base(DeclarativeBase):
     pass
 
-# ── GERENCIADORES DE CONTEXTO ──
-
 @contextmanager
 def session_scope():
     """
     Gerenciador robusto com tratamento cirúrgico de erros.
     Uso: with session_scope() as db: ...
+    Faz commit automatico; rollback em caso de exceção.
     """
     session = SessionLocal()
     try:
@@ -160,10 +160,27 @@ def session_scope():
         session.commit()
     except Exception as e:
         session.rollback()
-        logger.error(f"🚨 [DB_FATAL] Falha na transação: {e}", exc_info=True)
+        logger.error("🚨 [DB_FATAL] Falha na transação: %s", e, exc_info=True)
         raise
     finally:
         session.close()
+
+
+@contextmanager
+def read_session():
+    """
+    Session read-only — sem commit/rollback, apenas close.
+    Ideal para queries de leitura que não precisam de transação.
+    Reduz overhead de pool em endpoints de leitura intensiva.
+
+    Uso: with read_session() as db: rows = db.query(...).all()
+    """
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
 
 def get_db():
     """
@@ -174,6 +191,18 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def init_teardown(app):
+    """
+    Registra cleanup automático de sessions no Flask.
+    Chamado uma vez no app factory: init_teardown(app)
+    Garante que conexões são devolvidas ao pool ao final de cada request,
+    mesmo se o handler esqueceu de chamar db.close().
+    """
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        SessionLocal.remove() if hasattr(SessionLocal, 'remove') else None
 
 
 # ── HEALTH CHECK ──
