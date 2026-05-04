@@ -63,7 +63,7 @@ def test_steps_motor_ref_pending_when_disabled(monkeypatch):
 def test_document_linear_motor_ref(monkeypatch):
     monkeypatch.setattr("flow_motor_ref._ALLOW_MOTOR_REF", True)
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "M",
         "graph": {

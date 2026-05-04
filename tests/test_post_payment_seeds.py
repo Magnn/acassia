@@ -16,14 +16,14 @@ from flows.post_payment.validator import validate_post_payment_blueprint
 def test_load_seed_express_retorna_dict():
     seed = load_seed("express")
     assert isinstance(seed, dict)
-    assert seed.get("format") == "acassia-flow"
+    assert seed.get("format") == "meumisterio-flow"
     assert seed.get("version") == 1
 
 
 def test_load_seed_premium_retorna_dict():
     seed = load_seed("premium")
     assert isinstance(seed, dict)
-    assert seed.get("format") == "acassia-flow"
+    assert seed.get("format") == "meumisterio-flow"
 
 
 def test_load_seed_inexistente_levanta():

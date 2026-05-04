@@ -49,7 +49,7 @@ def _seed_post_payment_blueprint(tenant_id: str = "default", body: dict | None =
             tenant_id=tenant_id,
             slug="post_payment",
             title="Test Post Payment",
-            body_json=body or {"format": "acassia-flow", "version": 1, "title": "T", "graph": {"nodes": [], "edges": []}},
+            body_json=body or {"format": "meumisterio-flow", "version": 1, "title": "T", "graph": {"nodes": [], "edges": []}},
         )
         db.add(bp)
         db.commit()

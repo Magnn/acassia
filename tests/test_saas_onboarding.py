@@ -72,7 +72,7 @@ def test_detect_step_inicial_eh_persona():
 
 
 def test_detect_step_apos_persona_eh_oferta():
-    save_persona("t1", "Esmeralda", "acolhedor", "Cigana ancestral com dom genuíno", [])
+    save_persona("t1", "Esmeralda", "acolhedor", "Meu Mistério ancestral com dom genuíno", [])
     assert detect_current_step("t1") == STEP_OFERTA
 
 
@@ -100,7 +100,7 @@ def test_detect_step_apos_whatsapp_eh_done():
 # ─── save_persona ────────────────────────────────────────────────────────────
 
 def test_save_persona_cria_agent_e_versao():
-    agent = save_persona("t1", "Esmeralda", "mistico", "História mística da cigana ancestral", ["nao_promete_cura"])
+    agent = save_persona("t1", "Esmeralda", "mistico", "História mística da meumisterio ancestral", ["nao_promete_cura"])
     assert agent.tenant_id == "t1"
     assert agent.name == "Esmeralda"
 
@@ -197,7 +197,7 @@ def test_save_template_express_clona_seed():
         bp = db.query(models.FlowBlueprint).filter_by(id=bp_id).first()
         assert bp is not None
         assert bp.slug == "post_payment"
-        assert bp.body_json["format"] == "acassia-flow"
+        assert bp.body_json["format"] == "meumisterio-flow"
         # Seed Express tem motor_ref pra envio de cartas
         types = [n.get("type") for n in bp.body_json["graph"]["nodes"]]
         assert "motor_ref" in types
@@ -291,7 +291,7 @@ def test_index_logado_renderiza_step_persona(logged_in_client):
     client, user = logged_in_client
     res = client.get("/saas/onboarding/")
     assert res.status_code == 200
-    assert b"Persona da cigana" in res.data
+    assert b"Persona da meumisterio" in res.data
 
 
 def test_post_persona_avanca_pra_oferta(logged_in_client):

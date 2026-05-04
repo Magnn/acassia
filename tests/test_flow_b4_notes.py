@@ -25,7 +25,7 @@ def test_anotacao_action_has_note_metadata():
 
 def test_document_linear_with_anotacao():
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "Notes",
         "graph": {

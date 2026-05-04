@@ -2,7 +2,7 @@
   "title": "Audit D1 — Blueprint puro",
   "slug": "audit_d1_puro",
   "body": {
-    "format": "acassia-flow",
+    "format": "meumisterio-flow",
     "version": 1,
     "title": "Audit D1",
     "graph": {

@@ -1,7 +1,7 @@
 """
 Coloca um lead no funil estático Meu Mistério (node `static_meumisterio_b1`).
 
-Evita mexer no SQL à mão. Usa a mesma base que o motor (`cigana.db` por defeito).
+Evita mexer no SQL à mão. Usa a mesma base que o motor (`meumisterio.db` por defeito).
 
 Uso (na pasta do projeto):
   python scripts/colocar_lead_no_funil_estatico.py 5511999998888
@@ -10,7 +10,7 @@ Uso (na pasta do projeto):
 Recomendado — mesmo número WABA, estático + IA do motor off (reiniciar o servidor após mudar):
   no .env: FUNIL_ESTATICO_ATIVO=1
 
-Para voltar ao funil com IA (Cigana nos nodes):
+Para voltar ao funil com IA (Meu Mistério nos nodes):
   FUNIL_ESTATICO_ATIVO=0
   (Leads que já estavam no estático continuam no nó atual até mudares na base ou script.)
 """
@@ -100,7 +100,7 @@ def main() -> int:
     ap.add_argument(
         "--tenant",
         default=get_engine_tenant_id(),
-        help="tenant_id (default: ACASSIA_TENANT_ID ou 'default')",
+        help="tenant_id (default: MEU_MISTERIO_TENANT_ID ou 'default')",
     )
     ap.add_argument(
         "--node",
@@ -126,7 +126,7 @@ def main() -> int:
         lead = _encontrar_lead(db, tid, args.telefone)
         if not lead:
             print(f"Nenhum lead encontrado para tenant={tid!r} e telefone parecido com {args.telefone!r}.")
-            print("Dica: confere o número em `leads.telefone` (SQLite: cigana.db).")
+            print("Dica: confere o número em `leads.telefone` (SQLite: meumisterio.db).")
             return 1
 
         antes_node = lead.node_atual

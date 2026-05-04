@@ -4,7 +4,7 @@ from flow_builder_runtime import compile_flow_plan, validate_flow_document
 
 def test_validate_simple_chain():
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "Teste",
         "graph": {
@@ -22,7 +22,7 @@ def test_validate_simple_chain():
 
 def test_cycle_detected():
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "Ciclo",
         "graph": {
@@ -39,7 +39,7 @@ def test_cycle_detected():
 
 def test_compile_empty_edges_fallback():
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "Só nós",
         "graph": {

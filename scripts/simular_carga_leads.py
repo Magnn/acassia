@@ -60,7 +60,7 @@ def _roteiros() -> List[List[str]]:
         ["boa noite", "me chamo Renato", "vamos", "sim", "já faz 1 ano e tentei de tudo"],
         ["olá", "como funciona?", "ok", "salvei", "quero prosperidade, estou travado financeiramente"],
         ["bom dia", "sou Magno", "beleza", "já sim", "medo de repetir o mesmo padrão no amor"],
-        ["Oi cigana", "sou Carla", "sim", "já salvei aqui", "desde que terminei meu namoro não durmo direito"],
+        ["Oi meumisterio", "sou Carla", "sim", "já salvei aqui", "desde que terminei meu namoro não durmo direito"],
         ["Boa noite", "me chamo Lucas", "ok", "salvei o contato", "é ansiedade no trabalho e medo de demissão"],
         ["Oi", "pode me ajudar no amor?", "sim", "já fiz", "ele sumiu tem 3 meses e não sei se volta"],
         ["Olá", "quanto tempo demora?", "sim", "já salvei", "quero destravar vendas, estou estagnado"],

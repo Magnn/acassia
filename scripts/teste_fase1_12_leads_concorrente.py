@@ -81,7 +81,7 @@ def _roteiros_12() -> List[LeadCase]:
         (["boa noite", "sou Lucas", "sim", "já salvei seu contato", "quero voltar com minha ex"], ["amor", "contato_ok"]),
         (["olá", "sim", "ok", "já mandei", "estou confusa"], ["placeholder_risco"]),
         (["bom dia", "meu nome é Paula", "não achei seu contato", "agora achei", "sinto ansiedade"], ["vcard_retry"]),
-        (["oi cigana", "sou Magno", "já salvei", "foto enviada", "faz meses que sofro"], ["burst_possivel"]),
+        (["oi meumisterio", "sou Magno", "já salvei", "foto enviada", "faz meses que sofro"], ["burst_possivel"]),
         (["oi", "quanto custa", "quero ajuda no amor", "sim salvei", "medo de perder ele"], ["preco_precoce"]),
         (["boa tarde", "sou Renata", "ok", "não chegou completo", "agora foi"], ["feedback_entrega"]),
         (["olá", "me chamo Bia", "já salvei", "palma enviada", "não durmo direito"], ["dor_forte"]),

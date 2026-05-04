@@ -12,7 +12,7 @@ from flow_graph_walk import (
 
 def _doc_branching():
     return {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "Cond test",
         "graph": {
@@ -79,7 +79,7 @@ def test_document_to_acoes_branching():
 
 def test_linear_without_context_unchanged():
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "Linear",
         "graph": {
@@ -96,7 +96,7 @@ def test_linear_without_context_unchanged():
 
 def _doc_divisao_ab():
     return {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "Div A/B",
         "graph": {

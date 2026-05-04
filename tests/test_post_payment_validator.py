@@ -13,9 +13,9 @@ from flows.post_payment.validator import (
 
 
 def _doc(graph_nodes: list, graph_edges: list, title: str = "PostPayment Test") -> dict:
-    """Helper: monta um documento acassia-flow v1 mínimo."""
+    """Helper: monta um documento meumisterio-flow v1 mínimo."""
     return {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": title,
         "graph": {"nodes": graph_nodes, "edges": graph_edges},
@@ -255,7 +255,7 @@ def test_shortest_delay_to_message_start_inexistente():
 def test_erros_da_validacao_base_propagam():
     """Documento sem título deve falhar na validação base."""
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         # sem title
         "graph": {"nodes": [_trigger(), _mensagem("m1"), _acao("a1")], "edges": [_edge("t1", "m1")]},

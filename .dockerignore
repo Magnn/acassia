@@ -1,0 +1,51 @@
+# .dockerignore — Acássia SaaS
+# Evita copiar arquivos desnecessários para o container
+
+# VCS
+.git
+.github
+.gitignore
+
+# IDE
+.cursor
+.cursorignore
+.cursorrules
+.claude
+.vscode
+*.swp
+*.swo
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+*.egg-info
+
+# Environment
+.env
+.env.*
+env.example
+
+# Database (SQLite local — prod usa PostgreSQL)
+*.db
+*.db-shm
+*.db-wal
+
+# Node/Frontend source (apenas dist é copiado)
+frontend/node_modules
+frontend/src
+frontend/.git
+
+# Binaries
+*.exe
+ngrok.exe
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Docs/experiments
+docs
+experiments
+*.md

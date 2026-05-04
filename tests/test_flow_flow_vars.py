@@ -23,7 +23,7 @@ def test_steps_http_then_message_save_as(allow_http, monkeypatch):
     monkeypatch.setattr("flow_executor.requests.request", lambda **kw: Resp())
 
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "HTTP var",
         "graph": {
@@ -58,7 +58,7 @@ def test_document_to_acoes_flow_http_key_in_template(allow_http, monkeypatch):
     monkeypatch.setattr("flow_executor.requests.request", lambda **kw: Resp())
 
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "HTTP key",
         "graph": {

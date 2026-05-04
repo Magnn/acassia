@@ -2,7 +2,7 @@ import sqlite3
 import os
 
 # Caminho do banco de dados na raiz do projeto
-db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cigana.db")
+db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "meumisterio.db")
 
 try:
     conn = sqlite3.connect(db_path)

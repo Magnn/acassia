@@ -74,7 +74,7 @@ def test_document_to_acoes_gpt_branch(monkeypatch):
     monkeypatch.setattr("flow_executor.requests.post", lambda *a, **kw: Resp())
 
     doc = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": "L",
         "graph": {

@@ -217,13 +217,13 @@ def test_inbox_filtro_pausadas(logged_in):
 def test_inbox_conversation_renderiza(logged_in):
     client, user = logged_in
     lead_id = _seed_lead(user.tenant_id, "5511999999999", nome="Maria")
-    _seed_msg(lead_id, "ola cigana")
+    _seed_msg(lead_id, "ola meumisterio")
     _seed_msg(lead_id, "oi minha querida", remetente="bot")
 
     res = client.get(f"/saas/inbox/{lead_id}")
     assert res.status_code == 200
     assert b"Maria" in res.data
-    assert "ola cigana".encode("utf-8") in res.data
+    assert "ola meumisterio".encode("utf-8") in res.data
     assert "oi minha querida".encode("utf-8") in res.data
 
 
