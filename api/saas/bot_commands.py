@@ -88,6 +88,42 @@ def intercept_bot_command(texto: str, telefone: str, tenant_id: str, phone_numbe
     cmd = texto.strip().split()[0].lower()
     args = texto[len(cmd):].strip()
     
+    def _persistir_historico(telefone: str, tenant_id: str, recebido: str, resposta: str):
+        try:
+            db = SessionLocal()
+            try:
+                # Recuperar lead
+                lead = db.query(models.Lead).filter_by(tenant_id=tenant_id, telefone=telefone).first()
+                if not lead:
+                    return
+                # Registrar msg recebida
+                msg_in = models.Mensagem(
+                    lead_id=lead.id,
+                    tenant_id=tenant_id,
+                    direcao="recebida",
+                    texto=recebido,
+                    tipo="text",
+                    status="entregue",
+                    enviado_em=datetime.now(timezone.utc)
+                )
+                db.add(msg_in)
+                # Registrar resposta do bot
+                msg_out = models.Mensagem(
+                    lead_id=lead.id,
+                    tenant_id=tenant_id,
+                    direcao="enviada",
+                    texto=resposta,
+                    tipo="text",
+                    status="enviada",
+                    enviado_em=datetime.now(timezone.utc)
+                )
+                db.add(msg_out)
+                db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error("[bot_commands] Falha ao persistir histórico no CRM: %s", e)
+
     if cmd == ".cartadodia":
         # Comando: Sorteia uma carta e envia no chat (pessoal ou grupo)
         carta, significado = random.choice(ARCANOS_MAIORES)
@@ -97,7 +133,8 @@ def intercept_bot_command(texto: str, telefone: str, tenant_id: str, phone_numbe
             f"Que esta energia guie seus passos hoje."
         )
         logger.info("[bot_commands] Comando .cartadodia acionado por %s", telefone)
-        _send_wa_message(tenant_id, phone_number_id, telefone, resposta)
+        if _send_wa_message(tenant_id, phone_number_id, telefone, resposta):
+            _persistir_historico(telefone, tenant_id, texto, resposta)
         return True
 
     elif cmd in (".convocar", ".tagall"):
@@ -109,12 +146,15 @@ def intercept_bot_command(texto: str, telefone: str, tenant_id: str, phone_numbe
         resposta = f"@todos\n\n📢 {args}"
         logger.info("[bot_commands] Comando .convocar acionado por %s no grupo %s", telefone, telefone)
         # Nota: Cloud API lida com '@todos' se o WhatsApp Business Client resolver a menção (EvolutionAPI resolve 100%).
-        _send_wa_message(tenant_id, phone_number_id, telefone, resposta)
+        if _send_wa_message(tenant_id, phone_number_id, telefone, resposta):
+            _persistir_historico(telefone, tenant_id, texto, resposta)
         return True
         
     elif cmd == ".ping":
         # Simples ping para ver se o bot está vivo
-        _send_wa_message(tenant_id, phone_number_id, telefone, "🏓 Pong! O bot está online e operante.")
+        resposta = "🏓 Pong! O bot está online e operante."
+        if _send_wa_message(tenant_id, phone_number_id, telefone, resposta):
+            _persistir_historico(telefone, tenant_id, texto, resposta)
         return True
 
     # Se não é nenhum comando conhecido, deixa a engine de IA tentar processar
