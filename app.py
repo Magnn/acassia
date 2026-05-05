@@ -4134,23 +4134,17 @@ def _triagem_meta(data):
         elif tipo == "image":
             media_id = msg.get("image", {}).get("id")
             caption = msg.get("image", {}).get("caption", "")
-            logger.info(f"🖼️ [MÍDIA] Imagem de {telefone}. Media ID: {media_id}")
-            fp, _ = _baixar_midia(media_id)
-            if fp:
-                # Mesmo host do dashboard + absoluto via PUBLIC_URL no motor
-                bn = os.path.basename(fp)
-                img_url = f"/media/{bn}"
-                media_url = img_url
+            logger.info("🖼️ [MÍDIA] Imagem de %s (deferred→worker). Media ID: %s", telefone, media_id)
+            # NÃO baixa aqui — defer para o InboxManager worker (Fix B: anti head-of-line blocking)
             texto_recebido = caption
+            # Flags para o media_resolver processar no worker
+            # _media_pending = True sinaliza que o download deve ser feito no worker
 
         elif tipo == "audio":
             media_id = msg.get("audio", {}).get("id")
             mime = msg.get("audio", {}).get("mime_type", "audio/ogg")
-            logger.info(f"🎙️ [MÍDIA] Áudio de {telefone}. Transcrevendo...")
-            fp, mime_real = _baixar_midia(media_id)
-            if fp:
-                media_url = f"/media/{os.path.basename(fp)}"
-                texto_recebido = _transcrever_audio(fp, mime_real or mime)
+            logger.info("🎙️ [MÍDIA] Áudio de %s (deferred→worker). Media ID: %s", telefone, media_id)
+            # NÃO baixa nem transcreve aqui — defer para o InboxManager worker
 
         # LGPD opt-out detection (Frente 8.17): se lead pediu STOP, marca opt-out
         # automaticamente (sem entrar na fila do bot, evitando resposta automática).
@@ -4209,6 +4203,13 @@ def _triagem_meta(data):
             "phone_number_id": phone_number_id,
             "tenant_id": resolved_tenant,
         }
+        # Fix B: sinalizar mídia pendente para resolução no worker (anti head-of-line blocking)
+        if tipo in ("image", "audio") and media_id:
+            payload["_media_pending"] = True
+            if tipo == "image":
+                payload["_media_caption"] = msg.get("image", {}).get("caption", "")
+            elif tipo == "audio":
+                payload["_media_mime"] = msg.get("audio", {}).get("mime_type", "audio/ogg")
         inbox_manager.enqueue(telefone, payload)
 
         # ── SSE: notificar browsers em real-time ──

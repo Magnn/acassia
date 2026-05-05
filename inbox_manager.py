@@ -185,6 +185,10 @@ class LeadInboxManager:
             p["media_url"] = extra["media_url"]
         if p.get("imagem_url") and p.get("tipo_mensagem") == "text":
             p["tipo_mensagem"] = "image"
+        # Preservar flags de mídia pendente (Fix B) durante fusão
+        for _mflag in ("_media_pending", "_media_caption", "_media_mime"):
+            if extra.get(_mflag) is not None:
+                p[_mflag] = extra[_mflag]
         return p
 
     def _drenar_rajada_imediata(self, q, payload: dict) -> dict:
@@ -367,6 +371,23 @@ class LeadInboxManager:
 
                     motor_payload = dict(payload)
                     motor_payload.pop("_inbox_after_text_grace", None)
+
+                    # Fix B: Resolver mídia pendente (download + STT) DENTRO do worker per-lead.
+                    # Isso isola o I/O pesado (até 40s de STT) do pipeline global.
+                    # Enquanto ESTE worker transccreve o áudio do João, os workers
+                    # da Maria, José e Ana continuam processando textos em ms.
+                    if motor_payload.get("_media_pending"):
+                        try:
+                            from webhooks.media_resolver import resolve_pending_media
+                            motor_payload = resolve_pending_media(motor_payload)
+                        except Exception as _media_exc:
+                            logger.error(
+                                "🚨 [MEDIA-RESOLVE] Falha para %s: %s", telefone, _media_exc,
+                                exc_info=True,
+                            )
+                            # Mesmo com falha no download, prossegue com o que tem
+                            motor_payload.pop("_media_pending", None)
+
                     _override_tenant = motor_payload.get("tenant_id")
                     
                     with tenant_override_ctx(_override_tenant):
