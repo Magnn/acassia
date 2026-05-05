@@ -104,6 +104,33 @@ def receive_webhook(tenant_id: str, platform: str):
                     value=parsed.get("value", 0),
                 )
                 db.add(conv)
+
+                # ── A/B Test Attribution Lookback (48h) ──
+                # Se este lead passou por algum nó ab_split nas últimas 48h,
+                # marca como convertido com o valor da compra.
+                try:
+                    from datetime import timedelta
+                    lookback = datetime.now(timezone.utc) - timedelta(hours=48)
+                    ab_exposures = db.query(models.ABTestExposure).filter(
+                        models.ABTestExposure.tenant_id == tenant_id,
+                        models.ABTestExposure.lead_id == lead.id,
+                        models.ABTestExposure.exposed_at >= lookback,
+                        models.ABTestExposure.converted == False,  # noqa: E712
+                    ).all()
+                    purchase_value = float(parsed.get("value", 0) or 0)
+                    for exp in ab_exposures:
+                        exp.converted = True
+                        exp.conversion_value = purchase_value
+                        exp.converted_at = datetime.now(timezone.utc)
+                    if ab_exposures:
+                        logger.info(
+                            "[checkout] AB attribution: lead=%s variants=%s value=%.2f",
+                            lead.id,
+                            [(e.node_id, e.variant) for e in ab_exposures],
+                            purchase_value,
+                        )
+                except Exception as ab_err:
+                    logger.debug("[checkout] AB attribution failed (non-fatal): %s", ab_err)
             elif parsed["event_type"] == "billet_printed":
                 lead.pipeline_stage = "proposta"
                 tags = list(lead.tags or [])

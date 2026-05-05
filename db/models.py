@@ -2542,6 +2542,34 @@ class FlowGoalHit(Base):
     hit_at = Column(DateTime(timezone=True), default=_agora_utc)
 
 
+class ABTestExposure(Base):
+    """Registro de exposição A/B: qual variante cada lead viu num nó ab_split.
+
+    Usado para atribuição de conversão (lookback de 48h):
+    - Quando o lead converte, consultamos: "por qual variante ele passou?"
+    - Permite calcular: impressões, conversões, taxa, receita por variante.
+    """
+    __tablename__ = "ab_test_exposures"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "blueprint_id", "node_id", "lead_id", name="uq_ab_exposure_lead_node"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    blueprint_id = Column(Integer, ForeignKey("flow_blueprints.id", ondelete="CASCADE"), nullable=False, index=True)
+    node_id = Column(String(200), nullable=False)  # ID do nó ab_split no canvas
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True)
+    variant = Column(String(1), nullable=False)  # "A" ou "B"
+    weight_a = Column(Integer, default=50)
+    weight_b = Column(Integer, default=50)
+    exposed_at = Column(DateTime(timezone=True), default=_agora_utc)
+
+    # Atribuição de conversão (preenchido no lookback)
+    converted = Column(Boolean, default=False, nullable=False)
+    conversion_value = Column(Float, default=0.0)
+    converted_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class ConversionEvent(Base):
     """Registro de conversão com atribuição (AC Conversion Attribution).
     

@@ -328,6 +328,7 @@ def _register_saas_blueprints():
     from api.saas.pipeline import pipeline_bp as saas_pipeline_bp
     from api.saas.ac_engine import ac_bp as saas_ac_bp
     from api.saas.checkout_webhooks import checkout_bp as saas_checkout_bp
+    from api.saas.ab_analytics import ab_bp as saas_ab_bp
     from api.saas.multi_atendimento import multi_bp as saas_multi_bp
     from api.saas.wa_groups import groups_bp as saas_groups_bp
     from api.saas.devzapp_extras import extras_bp as saas_extras_bp
@@ -372,6 +373,7 @@ def _register_saas_blueprints():
         saas_pipeline_bp, saas_ac_bp, saas_checkout_bp,
         saas_multi_bp, saas_groups_bp, saas_extras_bp,
         saas_smart_bp, saas_wa_conn_bp, saas_wa_devices_bp,
+        saas_ab_bp,
         b2c_bp,
     )
     _failed_bps = []

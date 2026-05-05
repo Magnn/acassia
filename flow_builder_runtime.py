@@ -35,6 +35,7 @@ ALLOWED_NODE_TYPES = frozenset(
         "agente_ia",
         "voice_studio",
         "anotacao",
+        "ab_split",
         "generic",
         "end",
     }
@@ -155,6 +156,12 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "runtime": "split",
         "required_config": (),
         "optional_keys": ("weights",),
+    },
+    "ab_split": {
+        "label": "Teste A/B",
+        "runtime": "split",
+        "required_config": (),
+        "optional_keys": ("weight_a", "weight_b"),
     },
     "api": {
         "label": "API HTTP",

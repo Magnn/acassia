@@ -743,16 +743,64 @@ def steps_to_acoes(
             continue
 
         if rk == "split":
-            weights = str(cfg.get("weights") or "").strip()
-            if weights:
-                acoes.append(
-                    Acao(
-                        tipo="text",
-                        conteudo=f"🧪 Divisão A/B: {weights}"[:900],
-                        metadata={"source": "flow_builder", "runtime": "split"},
-                    )
-                )
+            # ── A/B SPLIT RUNTIME: roleta + rastreamento de exposição ──
+            import random
+            node_id = str(st.get("node_id") or "").strip()
+            wa = max(1, min(99, int(cfg.get("weight_a") or 50)))
+            wb = 100 - wa
+            roll = random.randint(1, 100)
+            variant = "A" if roll <= wa else "B"
+            # Salva variante como flow_var para downstream ({{ab_variant}})
+            fv["ab_variant"] = variant
+            fv[f"ab_{node_id}_variant"] = variant
+            _persist_flow_var("ab_variant", variant)
+            _persist_flow_var(f"ab_{node_id}_variant", variant)
+
+            # Grava exposição no banco (rastreamento para analytics)
+            try:
+                _lead_id_val = fv.get("lead_id") or fv.get("_lead_id")
+                if _lead_id_val and tenant_id and blueprint_id:
+                    from db.database import SessionLocal as _AbSL
+                    from db import models as _ab_m
+                    _ab_db = _AbSL()
+                    try:
+                        # UPSERT: se lead já passou por este nó, atualiza variante
+                        existing = _ab_db.query(_ab_m.ABTestExposure).filter_by(
+                            tenant_id=tenant_id,
+                            blueprint_id=blueprint_id,
+                            node_id=node_id,
+                            lead_id=int(_lead_id_val),
+                        ).first()
+                        if existing:
+                            existing.variant = variant
+                            existing.weight_a = wa
+                            existing.weight_b = wb
+                        else:
+                            from datetime import datetime, timezone as _tz
+                            _ab_db.add(_ab_m.ABTestExposure(
+                                tenant_id=tenant_id,
+                                blueprint_id=blueprint_id,
+                                node_id=node_id,
+                                lead_id=int(_lead_id_val),
+                                variant=variant,
+                                weight_a=wa,
+                                weight_b=wb,
+                            ))
+                        _ab_db.commit()
+                    except Exception as _ab_err:
+                        logger.debug("[FLOW_EXEC] AB exposure save failed (non-fatal): %s", _ab_err)
+                        _ab_db.rollback()
+                    finally:
+                        _ab_db.close()
+            except Exception:
+                pass
+
+            logger.info(
+                "event=ab_split node=%s variant=%s weights=%d/%d lead=%s",
+                node_id, variant, wa, wb, fv.get("lead_id"),
+            )
             continue
+
 
         if rk == "schedule":
             tz = str(cfg.get("timezone") or "").strip()

@@ -1,4 +1,4 @@
-﻿import { Handle, Position, useReactFlow, type Node, type NodeProps } from '@xyflow/react';
+import { Handle, Position, useReactFlow, type Node, type NodeProps } from '@xyflow/react';
 import { 
   AlertCircle, AlertTriangle, MoreHorizontal, MessageSquare, 
   HelpCircle, PlayCircle, Clock, Image as ImageIcon, Video, Mic, FileText, Type,
@@ -468,10 +468,35 @@ function renderPreview(d: FlowNodeData) {
   if (type === 'ab_split') {
     const wa = numberField(config, 'weight_a') ?? 50;
     const wb = numberField(config, 'weight_b') ?? 50;
+    const stats = config.ab_stats as any;
     return (
-      <div className="flex items-center w-full h-6 rounded overflow-hidden text-[10px] font-bold text-white shadow-inner">
-        <div className="bg-fuchsia-500 h-full flex items-center justify-center transition-all" style={{ width: `${wa}%` }}>A: {wa}%</div>
-        <div className="bg-fuchsia-300 text-fuchsia-900 h-full flex items-center justify-center transition-all" style={{ width: `${wb}%` }}>B: {wb}%</div>
+      <div className="flex flex-col gap-1.5 w-full">
+        {/* Weight bar */}
+        <div className="flex items-center w-full h-6 rounded overflow-hidden text-[10px] font-bold text-white shadow-inner">
+          <div className="bg-fuchsia-500 h-full flex items-center justify-center transition-all" style={{ width: `${wa}%` }}>A: {wa}%</div>
+          <div className="bg-fuchsia-300 text-fuchsia-900 h-full flex items-center justify-center transition-all" style={{ width: `${wb}%` }}>B: {wb}%</div>
+        </div>
+        {/* Live stats (injected from analytics fetch) */}
+        {stats && (
+          <div className="flex flex-col gap-1 text-[9px] font-semibold">
+            {(['A', 'B'] as const).map((v) => {
+              const s = stats[v];
+              if (!s) return null;
+              const isWinner = stats.winner === v;
+              return (
+                <div key={v} className={`flex items-center justify-between px-1.5 py-1 rounded border ${isWinner ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                  <span>{isWinner ? '🏆' : '🧪'} Variante {v}</span>
+                  <span>{s.impressions ?? 0} views → {s.conversions ?? 0} vendas ({s.rate ?? 0}%)</span>
+                </div>
+              );
+            })}
+            {stats.total_revenue > 0 && (
+              <div className="text-[8px] text-right text-emerald-600 font-bold">
+                Receita total: R$ {stats.total_revenue?.toFixed(2)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
