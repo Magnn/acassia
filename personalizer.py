@@ -200,7 +200,7 @@ class Personalizer:
 
     @staticmethod
     def _bloco_meumisterio_studio(metadata: Optional[dict]) -> str:
-        """Perfil publicado do Studio AcassIA (engine injeta __meumisterio_studio__)."""
+        """Perfil publicado do Studio Meu Mistério (engine injeta __meumisterio_studio__)."""
         if not isinstance(metadata, dict):
             return ""
         snap = metadata.get("__meumisterio_studio__")

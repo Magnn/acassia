@@ -1,5 +1,5 @@
 """
-Runtime avançado do Flow Builder AcassIA.
+Runtime avançado do Flow Builder Meu Mistério.
 
 - Catálogo de blocos (schema por tipo)
 - Validação estrutural + por config

@@ -1,5 +1,5 @@
 """
-flows/fase_1_saudacao/node_1_apresentacao.py — Node 1 (apresentação / AcassIA)
+flows/fase_1_saudacao/node_1_apresentacao.py — Node 1 (apresentação / Meu Mistério)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 A CHEGADA DA AUTORIDADE — Lead primeiro, funil em segundo; menos fallback por truncamento.
 

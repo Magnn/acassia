@@ -1181,7 +1181,7 @@ def api_flows_summary():
 
     return jsonify({
         "ok": True,
-        "engine": "AcassIA / Meu Mistério",
+        "engine": "Meu Mistério",
         "total_nodes": int(total_nodes),
         "phases": phases,
         "motor_nodes": motor_nodes,

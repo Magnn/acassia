@@ -1,7 +1,7 @@
 """
 db/models.py — SUPREME v4.0 (A MEMÓRIA DO ORÁCULO)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Multi-tenant (tenant_id), Studio AcassIA, mensagens com media_url.
+Multi-tenant (tenant_id), Studio Meu Mistério, mensagens com media_url.
 """
 
 from datetime import datetime, timezone

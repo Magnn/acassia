@@ -1,5 +1,5 @@
 """
-Runtime do Studio AcassIA: snapshot publicado injetado no motor (engine → personalizer).
+Runtime do Studio Meu Mistério: snapshot publicado injetado no motor (engine → personalizer).
 Escopado por tenant_id (uma publicação ativa por conta).
 """
 from __future__ import annotations
