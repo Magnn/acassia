@@ -766,7 +766,9 @@ class DreamEntry(Base):
     sign = Column(String(32), nullable=True)
 
     # Tarot conexão (carta que representa o sonho)
-    tarot_card_id = Column(Integer, ForeignKey("tarot_cards.id"), nullable=True)
+    # Nota: TarotCard tem PK composta (id, deck_id), FK parcial não é válida.
+    # Armazena card_id como soft-reference (string).
+    tarot_card_id = Column(String(40), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
