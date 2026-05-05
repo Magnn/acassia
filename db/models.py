@@ -369,7 +369,7 @@ class FlowRun(Base):
     tenant_id = Column(String(64), nullable=False, index=True)
     blueprint_id = Column(Integer, ForeignKey("flow_blueprints.id", ondelete="SET NULL"), nullable=True, index=True)
     lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True)
-    status = Column(String(32), nullable=False, default="queued")
+    status = Column(String(32), nullable=False, default="queued", index=True)
     meta_json = Column(JSON, default=dict)
     started_at = Column(DateTime(timezone=True), default=_agora_utc)
     finished_at = Column(DateTime(timezone=True), nullable=True)
@@ -747,7 +747,7 @@ class DreamEntry(Base):
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(64), nullable=True, index=True)
     consumer_id = Column(Integer, ForeignKey("consumer_profiles.id"), nullable=True, index=True)
-    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
 
     content = Column(Text, nullable=False)  # relato do sonho
     title = Column(String(200), nullable=True)  # título auto-gerado
@@ -787,7 +787,7 @@ class VisionBoardItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(64), nullable=True, index=True)
     consumer_id = Column(Integer, ForeignKey("consumer_profiles.id"), nullable=True, index=True)
-    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
 
     category = Column(String(32), nullable=False)  # amor, prosperidade, saude, carreira, espiritual
     affirmation = Column(Text, nullable=False)  # "Eu atraio abundância ilimitada"
@@ -845,7 +845,7 @@ class CommunityMember(Base):
     group_id = Column(Integer, ForeignKey("community_groups.id"), nullable=False, index=True)
     consumer_id = Column(Integer, ForeignKey("consumer_profiles.id"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # se for terapeuta
-    tenant_id = Column(String(64), nullable=True)
+    tenant_id = Column(String(64), nullable=True, index=True)
 
     role = Column(String(16), default="member")  # admin, moderator, member
     notifications_on = Column(Boolean, default=True)
@@ -947,7 +947,7 @@ class TarotDeck(Base):
     id = Column(String(40), primary_key=True)
     name = Column(String(100), nullable=False)
     is_default = Column(Boolean, default=False, nullable=False)
-    tenant_id = Column(String(64), nullable=True)  # null = global/shared
+    tenant_id = Column(String(64), nullable=True, index=True)  # null = global/shared
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
@@ -1935,7 +1935,7 @@ class MemberAreaAsset(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     consumer_id = Column(Integer, ForeignKey("consumer_profiles.id"), nullable=False, index=True)
-    tenant_id = Column(String(64), nullable=False) # Expert que gerou
+    tenant_id = Column(String(64), nullable=False, index=True) # Expert que gerou
     asset_type = Column(String(32), nullable=False) # reading_audio, therapy_video, ebook
     title = Column(String(128), nullable=False)
     content_url = Column(Text, nullable=False)
@@ -1974,7 +1974,7 @@ class RitualLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     consumer_id = Column(Integer, ForeignKey("consumer_profiles.id"), nullable=True, index=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
-    tenant_id = Column(String(64), nullable=True)
+    tenant_id = Column(String(64), nullable=True, index=True)
     ritual_type = Column(String(32), nullable=False)  # breathing, mantra, meditation, intention
     duration_seconds = Column(Integer, nullable=True)
     mood_before = Column(String(32), nullable=True)  # ansioso, triste, grato, motivado
@@ -2010,7 +2010,7 @@ class BroadcastCampaign(Base):
     #   {"tags": ["vip", "retiro"], "score_band": ["hot", "warm"],
     #    "signo": ["leao", "touro"], "bot_ativo": false}
 
-    status = Column(String(24), default="draft", nullable=False)
+    status = Column(String(24), default="draft", nullable=False, index=True)
     # draft → scheduled → sending → completed → cancelled
     scheduled_at = Column(DateTime(timezone=True), nullable=True)  # agendar envio
 
@@ -2182,12 +2182,12 @@ class ContentAsset(Base):
     delivery_message = Column(Text, nullable=True)  # mensagem pós-compra
 
     # Status
-    status = Column(String(16), default="draft", nullable=False)  # draft, published, archived
+    status = Column(String(16), default="draft", nullable=False, index=True)  # draft, published, archived
     total_sales = Column(Integer, default=0, nullable=False)
     total_revenue_cents = Column(Integer, default=0, nullable=False)
 
     metadata_json = Column(JSON, default=dict)
-    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False, index=True)
 
 
 class ContentPurchase(Base):
@@ -2401,7 +2401,7 @@ class TrailEnrollment(Base):
     trail_id = Column(Integer, ForeignKey("learning_trails.id"), nullable=False, index=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
     consumer_id = Column(Integer, ForeignKey("consumer_profiles.id"), nullable=True)
-    tenant_id = Column(String(64), nullable=True)
+    tenant_id = Column(String(64), nullable=True, index=True)
 
     current_day = Column(Integer, default=1)
     completed_steps = Column(JSON, default=list)  # [1, 2, 3] - step IDs concluídos
@@ -2422,7 +2422,7 @@ class UserBadge(Base):
     id = Column(Integer, primary_key=True, index=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True, index=True)
     consumer_id = Column(Integer, ForeignKey("consumer_profiles.id"), nullable=True)
-    tenant_id = Column(String(64), nullable=True)
+    tenant_id = Column(String(64), nullable=True, index=True)
 
     badge_name = Column(String(64), nullable=False)  # "Mestre da Lua"
     badge_icon = Column(String(32), nullable=True)

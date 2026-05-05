@@ -21,6 +21,12 @@ else
     echo "⏩ [ENTRYPOINT] Skipping migrations (SKIP_MIGRATIONS=${SKIP_MIGRATIONS:-0})"
 fi
 
+# ── Indexes + ANALYZE (idempotente, roda a cada boot) ───────
+if [ -f "scripts/add_missing_indexes.py" ]; then
+    echo "🔧 [ENTRYPOINT] Ensuring PostgreSQL indexes..."
+    python scripts/add_missing_indexes.py 2>&1 || true
+fi
+
 # ── Gunicorn ────────────────────────────────────────────────
 echo "🌐 [ENTRYPOINT] Starting gunicorn..."
 exec gunicorn app:app -c gunicorn_conf.py
