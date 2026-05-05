@@ -2982,26 +2982,76 @@ def get_leads():
         leads = leads_q.limit(limit).all()
 
         out = []
+
+        # ── BATCH: buscar últimas mensagens para TODOS os leads de uma vez ──
+        # Elimina N+1: antes = 3 queries por lead, agora = 3 queries TOTAL
+        lead_ids = [l.id for l in leads]
+        last_msgs = {}     # lead_id → Mensagem (última de qualquer remetente)
+        last_users = {}    # lead_id → Mensagem (última do user)
+        last_bots = {}     # lead_id → Mensagem (última do bot)
+
+        if lead_ids:
+            from sqlalchemy import func as sa_func
+
+            # Subquery: MAX(id) agrupado por lead_id (mais rápido que MAX(timestamp))
+            # Usamos id como proxy para timestamp pois são inseridos em ordem crescente.
+
+            # 1. Última mensagem (qualquer remetente)
+            sq_any = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    sa_func.max(models.Mensagem.id).label("max_id"),
+                )
+                .filter(models.Mensagem.lead_id.in_(lead_ids))
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(
+                sq_any, models.Mensagem.id == sq_any.c.max_id
+            ).all():
+                last_msgs[m.lead_id] = m
+
+            # 2. Última mensagem do USER
+            sq_user = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    sa_func.max(models.Mensagem.id).label("max_id"),
+                )
+                .filter(
+                    models.Mensagem.lead_id.in_(lead_ids),
+                    models.Mensagem.remetente == "user",
+                )
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(
+                sq_user, models.Mensagem.id == sq_user.c.max_id
+            ).all():
+                last_users[m.lead_id] = m
+
+            # 3. Última mensagem do BOT
+            sq_bot = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    sa_func.max(models.Mensagem.id).label("max_id"),
+                )
+                .filter(
+                    models.Mensagem.lead_id.in_(lead_ids),
+                    models.Mensagem.remetente == "bot",
+                )
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(
+                sq_bot, models.Mensagem.id == sq_bot.c.max_id
+            ).all():
+                last_bots[m.lead_id] = m
+
         for l in leads:
             md = _lead_metadata_as_dict(getattr(l, "metadata_json", None))
-            last_msg = (
-                db.query(models.Mensagem)
-                .filter(models.Mensagem.lead_id == l.id)
-                .order_by(models.Mensagem.timestamp.desc())
-                .first()
-            )
-            last_user = (
-                db.query(models.Mensagem)
-                .filter(models.Mensagem.lead_id == l.id, models.Mensagem.remetente == "user")
-                .order_by(models.Mensagem.timestamp.desc())
-                .first()
-            )
-            last_bot = (
-                db.query(models.Mensagem)
-                .filter(models.Mensagem.lead_id == l.id, models.Mensagem.remetente == "bot")
-                .order_by(models.Mensagem.timestamp.desc())
-                .first()
-            )
+            last_msg = last_msgs.get(l.id)
+            last_user = last_users.get(l.id)
+            last_bot = last_bots.get(l.id)
             waiting_human = False
             unread_human = False
             sla_wait_minutes = 0
@@ -3230,6 +3280,26 @@ def api_chat_rebalance():
         carga = {str(op): 0 for op in ops}
         pendentes = []
         now = datetime.now(timezone.utc)
+        # Batch: buscar última mensagem do USER para leads com bot_pausado
+        pausado_ids = [ld.id for ld in leads if bool(getattr(ld, "bot_pausado", False))]
+        last_user_by_lead = {}
+        if pausado_ids:
+            from sqlalchemy import func as sa_func
+            sq = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    sa_func.max(models.Mensagem.id).label("max_id"),
+                )
+                .filter(
+                    models.Mensagem.lead_id.in_(pausado_ids),
+                    models.Mensagem.remetente == "user",
+                )
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(sq, models.Mensagem.id == sq.c.max_id).all():
+                last_user_by_lead[m.lead_id] = m
+
         for ld in leads:
             md = _lead_metadata_as_dict(getattr(ld, "metadata_json", None))
             owner = str(md.get("chat_owner_operator") or "")
@@ -3237,12 +3307,7 @@ def api_chat_rebalance():
                 carga[owner] += 1
             if not bool(getattr(ld, "bot_pausado", False)):
                 continue
-            last_user = (
-                db.query(models.Mensagem)
-                .filter(models.Mensagem.lead_id == ld.id, models.Mensagem.remetente == "user")
-                .order_by(models.Mensagem.timestamp.desc())
-                .first()
-            )
+            last_user = last_user_by_lead.get(ld.id)
             if not last_user or not last_user.timestamp:
                 continue
             tsu = last_user.timestamp
