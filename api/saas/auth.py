@@ -440,10 +440,10 @@ def me():
         "role": current_user.role,
     }
 
-    if getattr(current_user, "is_impersonating", False):
-        # Carrega info do admin pra mostrar no banner
-        db = SessionLocal()
-        try:
+    # Uma única sessão para todas as queries (evita pool contention)
+    db = SessionLocal()
+    try:
+        if getattr(current_user, "is_impersonating", False):
             admin = db.query(models.User).filter_by(
                 id=current_user.impersonator_id,
             ).first()
@@ -453,12 +453,8 @@ def me():
                 "email": admin.email if admin else "deleted",
                 "name": admin.name if admin else None,
             }
-        finally:
-            db.close()
 
-    # Buscar nome do user real (campo `name` não está no AuthenticatedUser)
-    db = SessionLocal()
-    try:
+        # Buscar nome do user real (campo `name` não está no AuthenticatedUser)
         u = db.query(models.User).filter_by(id=current_user.id).first()
         if u:
             payload["name"] = u.name

@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import requests
@@ -442,8 +443,20 @@ def steps_to_acoes(
             return
         flow_vars_metadata_out[str(key)] = value
 
+    # Guard: timeout global para evitar runaway execution (LLM + HTTP loops)
+    _max_exec_s = min(300, max(30, int(os.getenv("FLOW_EXECUTOR_MAX_SECONDS", "120") or 120)))
+    _started_at = time.time()
+
     acoes: List[Acao] = []
     for st in steps:
+        # Timeout check a cada step
+        if (time.time() - _started_at) > _max_exec_s:
+            logger.warning(
+                "[FLOW_EXEC] Timeout após %.1fs processando %d steps (max=%ds) — retornando %d ações parciais",
+                time.time() - _started_at, len(steps), _max_exec_s, len(acoes),
+            )
+            break
+
         ntype = str(st.get("type") or "generic").lower()
         cfg = st.get("config") if isinstance(st.get("config"), dict) else {}
         spec = NODE_SPECS.get(ntype) or NODE_SPECS["generic"]

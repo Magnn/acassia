@@ -39,7 +39,8 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 COPY . .
 
 # Diretórios necessários
-RUN mkdir -p downloads scripts/reports media
+RUN mkdir -p downloads scripts/reports media \
+    && chmod +x entrypoint.sh
 
 # Variáveis de ambiente padrão
 ENV PYTHONUNBUFFERED=1 \
@@ -53,7 +54,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 
 EXPOSE ${PORT}
 
-# Gunicorn com gevent workers para concorrência real
+# Entrypoint: migrations + gunicorn
 # Config em gunicorn_conf.py: monkey-patch gevent + pool dispose on fork
-CMD gunicorn app:app \
-    -c gunicorn_conf.py
+CMD ["./entrypoint.sh"]
