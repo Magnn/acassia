@@ -46,10 +46,16 @@ htmlcov/
 
 # Binários / ferramentas locais (não versionar)
 ngrok.exe
+*.exe
+
+# Legado (dashboard monolítico substituído pelo React SPA)
+dashboard.html
+
+# Media / uploads
+media/
 
 # Frontend (Vite + React)
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/*.tsbuildinfo
-

@@ -219,6 +219,25 @@ def check_db_health() -> dict:
         return {"status": "error", "driver": DB_DRIVER, "error": str(exc)[:200]}
 
 
+def set_tenant_rls(session, tenant_id: str) -> None:
+    """
+    Ativa Row-Level Security para a sessão corrente.
+    Deve ser chamado no início de cada request autenticada.
+
+    Em SQLite (dev), é no-op — RLS é feature do PostgreSQL.
+
+    Uso:
+        db = SessionLocal()
+        set_tenant_rls(db, current_user.tenant_id)
+    """
+    if DB_DRIVER != "postgresql" or not tenant_id:
+        return
+    try:
+        session.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+    except Exception:
+        pass  # Non-fatal: RLS is defense-in-depth, not primary filter
+
+
 # Log de inicialização
 if DB_DRIVER == "postgresql":
     # Oculta credenciais no log

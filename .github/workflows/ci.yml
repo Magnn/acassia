@@ -77,7 +77,8 @@ jobs:
           DATABASE_URL: "sqlite:///test.db"
         run: |
           python -c "from db.database import engine, Base; from db.models import *; Base.metadata.create_all(bind=engine)"
-          pytest tests/ -v --tb=short -x || true
+          pytest tests/ -v --tb=short -x --co -q 2>/dev/null | head -5 || true
+          pytest tests/ -v --tb=short -x
 
       - name: Run tests (PostgreSQL)
         env:
@@ -85,7 +86,7 @@ jobs:
           REDIS_URL: "redis://localhost:6379/0"
         run: |
           python -c "from db.database import engine, Base; from db.models import *; Base.metadata.create_all(bind=engine)"
-          pytest tests/ -v --tb=short -x || true
+          pytest tests/ -v --tb=short -x --cov=. --cov-report=term-missing:skip-covered
 
       - name: Verify health endpoint
         env:
