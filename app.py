@@ -4266,6 +4266,16 @@ def _triagem_meta(data):
             except Exception as exc:
                 logger.warning("[privacy.opt_out.detect] falha (fail open): %s", exc)
 
+            # ── INTERCEPTAÇÃO DE COMANDOS BOT (.cartadodia, .convocar) ──
+            if texto_recebido.startswith("."):
+                try:
+                    from api.saas.bot_commands import intercept_bot_command
+                    # Se for um comando conhecido, ele já envia a resposta e retorna True.
+                    if intercept_bot_command(texto_recebido, telefone, resolved_tenant, phone_number_id, value):
+                        return  # Interceptado! Não precisa ir para o motor de IA (InboxManager).
+                except Exception as exc:
+                    logger.warning("[bot_commands.intercept] falhou: %s", exc)
+
         # Envia para a Fila do Lead via Manager
         payload = {
             "telefone": telefone,
