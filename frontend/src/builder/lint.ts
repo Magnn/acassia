@@ -20,7 +20,8 @@ export type LintCode =
   | 'condition_no_branches'
   | 'self_loop'
   | 'duplicate_edge'
-  | 'empty_label';
+  | 'empty_label'
+  | 'missing_config';
 
 export function lintGraph(
   nodes: Node<FlowNodeData>[],
@@ -93,6 +94,7 @@ export function lintGraph(
     const inc = incoming.get(n.id) ?? [];
     const out = outgoing.get(n.id) ?? [];
     const t = n.data.meumisterioType;
+    const cfg = n.data.config ?? {};
 
     if (inc.length === 0 && out.length === 0) {
       issues.push({
@@ -138,6 +140,67 @@ export function lintGraph(
         nodeId: n.id,
         message: 'Sem rótulo.',
       });
+    }
+
+    // ── Pre-flight: validação de conteúdo por tipo de nó ──
+    if (t === 'api') {
+      const url = String(cfg.url || cfg.api_url || '').trim();
+      if (!url) {
+        issues.push({
+          code: 'missing_config',
+          level: 'error',
+          nodeId: n.id,
+          message: `"${n.data.label}" — URL não configurada. O nó API vai falhar em produção.`,
+        });
+      }
+    }
+
+    if (t === 'gpt' || t === 'agente_ia') {
+      const prompt = String(cfg.prompt || cfg.instructions || cfg.ai_system_prompt || cfg.system_prompt || '').trim();
+      if (!prompt) {
+        issues.push({
+          code: 'missing_config',
+          level: 'error',
+          nodeId: n.id,
+          message: `"${n.data.label}" — sem prompt/instruções. A IA não sabe o que fazer.`,
+        });
+      }
+    }
+
+    if (t === 'conteudo') {
+      const hasContents = Array.isArray(cfg.contents) && cfg.contents.length > 0;
+      const hasBody = String(cfg.body || cfg.text || cfg.content_text || '').trim();
+      if (!hasContents && !hasBody) {
+        issues.push({
+          code: 'missing_config',
+          level: 'warning',
+          nodeId: n.id,
+          message: `"${n.data.label}" — sem conteúdo configurado. Nada será enviado.`,
+        });
+      }
+    }
+
+    if (t === 'pergunta') {
+      const q = String(cfg.question || cfg.body || cfg.question_text || '').trim();
+      if (!q) {
+        issues.push({
+          code: 'missing_config',
+          level: 'error',
+          nodeId: n.id,
+          message: `"${n.data.label}" — texto da pergunta vazio. O lead não vai receber nada.`,
+        });
+      }
+    }
+
+    if (t === 'ab_split') {
+      if (out.length < 2) {
+        issues.push({
+          code: 'missing_config',
+          level: 'error',
+          nodeId: n.id,
+          message: `"${n.data.label}" — A/B precisa de 2 saídas (Variante A e Variante B).`,
+        });
+      }
     }
   }
 

@@ -158,7 +158,8 @@ def graph_has_divisao(doc: Mapping[str, Any]) -> bool:
     for n in nodes:
         if not isinstance(n, dict):
             continue
-        if str(n.get("type") or "").lower() == "divisao":
+        ntype = str(n.get("type") or "").lower()
+        if ntype in ("divisao", "ab_split"):
             return True
     return False
 
@@ -416,6 +417,29 @@ def graph_walk_steps(
             logger.debug("event=flow_divisao_branch node=%s next=%s", nid, nxt)
             if nxt:
                 dfs(nxt, path)
+            return
+
+        if typ == "ab_split":
+            # A/B Split: adiciona como step (para exposure tracking) e branch
+            import random as _rng
+            outs_ab = by_from.get(nid, [])
+            wa = max(1, min(99, int(cfg.get("weight_a") or 50)))
+            roll = _rng.randint(1, 100)
+            variant = "A" if roll <= wa else "B"
+            # Adiciona step para o executor gravar a exposure
+            order.append({
+                "order": len(order) + 1,
+                "node_id": nid,
+                "type": typ,
+                "config": {**cfg, "_chosen_variant": variant},
+            })
+            # Roteia: edge index 0 = A, index 1 = B
+            idx = 0 if variant == "A" else (1 if len(outs_ab) > 1 else 0)
+            if idx < len(outs_ab):
+                nxt = str(outs_ab[idx].get("to") or "").strip()
+                logger.debug("event=flow_ab_split node=%s variant=%s next=%s", nid, variant, nxt)
+                if nxt:
+                    dfs(nxt, path)
             return
 
         if typ in ("end",):

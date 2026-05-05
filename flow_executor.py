@@ -279,7 +279,11 @@ def _format_flow_var_value(v: Any) -> str:
 
 
 def apply_flow_template(template: str, ctx: Mapping[str, Any]) -> str:
-    """Substitui `{{chave}}` / `{{ chave }}` usando valores do contexto (B3)."""
+    """Substitui `{{chave}}` / `{{ chave }}` usando valores do contexto (B3).
+
+    Variáveis ausentes são removidas silenciosamente (Graceful Degradation)
+    para nunca enviar `{{nome_espiritual}}` cru ao cliente.
+    """
     s = str(template or "")
     if "{{" not in s:
         return s
@@ -291,6 +295,12 @@ def apply_flow_template(template: str, ctx: Mapping[str, Any]) -> str:
         rep = _format_flow_var_value(v)
         out = out.replace("{{" + key + "}}", rep)
         out = out.replace("{{ " + key + " }}", rep)
+    # Graceful cleanup: remove variáveis não resolvidas (typos, campos nulos)
+    # Regex: {{qualquer_coisa}} → "" (string vazia)
+    if "{{" in out:
+        out = re.sub(r"\{\{\s*[^{}]+?\s*\}\}", "", out)
+        # Limpa espaços duplos criados pela remoção
+        out = re.sub(r"  +", " ", out).strip()
     return out
 
 
@@ -446,16 +456,37 @@ def steps_to_acoes(
     # Guard: timeout global para evitar runaway execution (LLM + HTTP loops)
     _max_exec_s = min(300, max(30, int(os.getenv("FLOW_EXECUTOR_MAX_SECONDS", "120") or 120)))
     _started_at = time.time()
+    _MAX_STEPS = 200  # Hard limit — nenhum fluxo legítimo tem 200 nós
+    _seen_node_ids: set = set()  # Detecta ciclos no plano compilado
 
     acoes: List[Acao] = []
-    for st in steps:
-        # Timeout check a cada step
+    for _step_idx, st in enumerate(steps):
+        # Circuit Breaker 1: Limite de passos
+        if _step_idx >= _MAX_STEPS:
+            logger.error(
+                "[FLOW_EXEC] CIRCUIT_BREAK: atingiu %d steps — possível loop infinito. Abortando.",
+                _MAX_STEPS,
+            )
+            break
+
+        # Circuit Breaker 2: Timeout por tempo
         if (time.time() - _started_at) > _max_exec_s:
             logger.warning(
                 "[FLOW_EXEC] Timeout após %.1fs processando %d steps (max=%ds) — retornando %d ações parciais",
                 time.time() - _started_at, len(steps), _max_exec_s, len(acoes),
             )
             break
+
+        # Circuit Breaker 3: Detecção de ciclo (mesmo node_id apareceu 2x)
+        _nid = str(st.get("node_id") or "").strip()
+        if _nid:
+            if _nid in _seen_node_ids:
+                logger.error(
+                    "[FLOW_EXEC] CYCLE_DETECTED: node '%s' já foi executado — interrompendo ciclo.",
+                    _nid,
+                )
+                break
+            _seen_node_ids.add(_nid)
 
         ntype = str(st.get("type") or "generic").lower()
         cfg = st.get("config") if isinstance(st.get("config"), dict) else {}

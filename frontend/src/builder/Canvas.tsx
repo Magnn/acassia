@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -56,6 +56,29 @@ function CanvasInner({
 }: CanvasProps) {
   const { screenToFlowPosition, setCenter } = useReactFlow();
 
+  // ── Conexão segura: rejeita self-loops, duplicatas e conexões heréticas ──
+  const isValidConnection = useCallback(
+    (conn: Connection) => {
+      if (!conn.source || !conn.target) return false;
+      // Self-loop
+      if (conn.source === conn.target) return false;
+      // Duplicata (mesma source+target já existe)
+      if (edges.some((e) => e.source === conn.source && e.target === conn.target)) return false;
+      // Não pode conectar a um trigger (só saída)
+      const targetNode = nodes.find((n) => n.id === conn.target);
+      if (targetNode?.data.meumisterioType === 'trigger') return false;
+      // Nós de saída única (não-branching) já têm 1 edge de saída?
+      const sourceNode = nodes.find((n) => n.id === conn.source);
+      const branchingTypes = new Set(['condicao', 'ab_split', 'pergunta', 'divisao']);
+      if (sourceNode && !branchingTypes.has(sourceNode.data.meumisterioType)) {
+        const existingOut = edges.filter((e) => e.source === conn.source);
+        if (existingOut.length >= 1) return false;
+      }
+      return true;
+    },
+    [nodes, edges],
+  );
+
   useEffect(() => {
     if (!focusRequest) return;
     const node = nodes.find((n) => n.id === focusRequest.id);
@@ -103,6 +126,7 @@ function CanvasInner({
         nodesConnectable={editable}
         elementsSelectable
         deleteKeyCode={editable ? ['Delete', 'Backspace'] : null}
+        isValidConnection={isValidConnection}
         proOptions={{ hideAttribution: true }}
       >
         <Background
