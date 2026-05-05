@@ -157,6 +157,8 @@ from webhooks.idempotency import (
     is_wamid_duplicate as _is_wamid_duplicate,
 )
 
+# Cache Redis para APIs analíticas pesadas (dashboard, KPIs, executive)
+from reliability.api_cache import cached_api
 
 def _safe_thread(target, args=(), name: str = "bg-task", daemon: bool = True) -> threading.Thread:
     """
@@ -1681,6 +1683,7 @@ def api_flows_blueprint_execute(bid: int):
 
 
 @app.route("/api/stats", methods=["GET"])
+@cached_api(ttl_s=300, key_fn=lambda: f"stats:{get_request_tenant_id()}")
 def api_stats():
     """KPIs para o dashboard + campos extras para evolução da UI."""
     db = SessionLocal()
@@ -1856,6 +1859,7 @@ def api_stats():
 
 
 @app.route("/api/dashboard/kpis", methods=["GET"])
+@cached_api(ttl_s=180, key_fn=lambda: f"kpis:{get_request_tenant_id()}:{request.args.get('days', 7)}")
 def api_dashboard_kpis():
     """KPIs executivos para leitura rápida no dashboard."""
     db = SessionLocal()
@@ -2277,6 +2281,7 @@ def api_studio_publish_status():
 
 
 @app.route("/api/executive/overview", methods=["GET"])
+@cached_api(ttl_s=300, key_fn=lambda: f"executive:{get_request_tenant_id()}")
 def api_executive_overview():
     """
     Visão executiva geral com departamentos:
