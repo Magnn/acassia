@@ -27,13 +27,15 @@ export default function Dashboard() {
   const { data: kpis, isLoading, error } = useQuery({
     queryKey: ['saas-metrics'],
     queryFn: metricsApi.get,
-    refetchInterval: 30000,
+    staleTime: 5 * 60_000,    // matches Redis cache TTL (300s)
+    refetchInterval: 5 * 60_000,
   });
 
   const { data: exec } = useQuery({
     queryKey: ['executive-kpis', 7],
     queryFn: () => metricsApi.getExecutive(7),
-    refetchInterval: 60000,
+    staleTime: 5 * 60_000,    // matches Redis cache TTL (300s)
+    refetchInterval: 5 * 60_000,
   });
 
   if (isLoading) {

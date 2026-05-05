@@ -176,14 +176,14 @@ export default function Leads() {
       sort: 'score',
       limit: 200,
     }),
-    refetchInterval: 10000,
+    refetchInterval: 60_000, // fallback safety-net (SSE handles real-time via invalidation)
   });
 
   const { data: conversationData } = useQuery({
     queryKey: ['leads-conversation', selectedLeadId],
     queryFn: () => inboxApi.getConversation(selectedLeadId!),
     enabled: selectedLeadId !== null,
-    refetchInterval: 5000,
+    refetchInterval: 30_000, // fallback safety-net (SSE pushes conversation updates)
   });
 
   const takeoverMutation = useMutation({
