@@ -262,9 +262,12 @@ class Engine:
         self._lock_proc = threading.Lock()
         self._envio_locks_guard = threading.Lock()
         self._envio_locks: dict[int, threading.Lock] = {}
+        self._envio_locks_ts: dict[int, float] = {}  # lead_id → last_used timestamp
         # Distributed locks per-lead (Redis se disponível, fallback local)
         self._dist_locks: dict[int, DistributedLock] = {}
         self._dist_locks_guard = threading.Lock()
+        self._lock_gc_interval_s = 600  # GC a cada 10 min
+        self._lock_max_idle_s = 600     # locks não usados há 10 min são removidos
         try:
             from tenant_context import get_engine_tenant_id
 
@@ -486,11 +489,21 @@ class Engine:
         grace_s = max(120, min(grace_s, 3600))
         cooldown_s = max(120, min(cooldown_s, 7200))
 
+        _gc_counter = 0
+        _gc_every = max(1, int(self._lock_gc_interval_s / max(20, interval_s)))
         while True:
             try:
                 self._executar_ciclo_retomada_estatica(grace_s=grace_s, cooldown_s=cooldown_s)
             except Exception as e:
                 logger.warning("⚠️ [STATIC-RECOVER] ciclo falhou: %s", e)
+            # GC periódico de lock dicts (a cada ~10 min)
+            _gc_counter += 1
+            if _gc_counter >= _gc_every:
+                try:
+                    self._gc_lock_dicts()
+                except Exception:
+                    pass
+                _gc_counter = 0
             time.sleep(interval_s)
 
     def _executar_ciclo_retomada_estatica(self, *, grace_s: int, cooldown_s: int) -> None:
@@ -593,7 +606,42 @@ class Engine:
             if lk is None:
                 lk = threading.Lock()
                 self._envio_locks[lead_id] = lk
+            self._envio_locks_ts[lead_id] = time.time()
             return lk
+
+    def _gc_lock_dicts(self) -> None:
+        """
+        Garbage-collect de lock dicts para evitar memory leak.
+        Remove locks não usados há mais de _lock_max_idle_s.
+        Chamado periodicamente pelo monitor de retomada estática.
+        """
+        cutoff = time.time() - self._lock_max_idle_s
+        evicted = 0
+
+        # 1. _envio_locks — remove locks idle
+        with self._envio_locks_guard:
+            stale = [lid for lid, ts in self._envio_locks_ts.items() if ts < cutoff]
+            for lid in stale:
+                lk = self._envio_locks.get(lid)
+                # Só remove se o lock NÃO está adquirido
+                if lk is not None and not lk.locked():
+                    self._envio_locks.pop(lid, None)
+                    self._envio_locks_ts.pop(lid, None)
+                    evicted += 1
+
+        # 2. _leads_em_processamento — remove leads com timestamp stale
+        with self._lock_proc:
+            stale_proc = [lid for lid, ts in self._leads_em_processamento.items() if ts < cutoff]
+            for lid in stale_proc:
+                self._leads_em_processamento.pop(lid, None)
+                evicted += 1
+
+        if evicted > 0:
+            logger.info(
+                "[ENGINE_GC] Evicted %d stale locks (envio=%d, proc=%d, dist remaining=%d)",
+                evicted, len(self._envio_locks), len(self._leads_em_processamento),
+                len(self._dist_locks),
+            )
 
     def acquire_lead_distributed_lock(self, lead_id: int, timeout: float = 8.0) -> bool:
         """

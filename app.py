@@ -157,6 +157,26 @@ os.makedirs(REPORTS_DIR, exist_ok=True)
 CACHE_MENSAGENS   = deque(maxlen=2000)
 LOCK_IDEMPOTENCIA = threading.Lock()
 
+
+def _safe_thread(target, args=(), name: str = "bg-task", daemon: bool = True) -> threading.Thread:
+    """
+    Wrapper para threads fire-and-forget com error reporting.
+    Captura exceções e loga + envia para Sentry (se configurado).
+    """
+    def _wrapper():
+        try:
+            target(*args)
+        except Exception:
+            logger.error("🚨 [THREAD:%s] Exceção não tratada:", name, exc_info=True)
+            try:
+                import sentry_sdk
+                sentry_sdk.capture_exception()
+            except Exception:
+                pass
+    t = threading.Thread(target=_wrapper, daemon=daemon, name=name)
+    t.start()
+    return t
+
 # Prefixo Redis para dedup de webhook
 _WAMID_DEDUP_PREFIX = "meumisterio:wamid:"
 _WAMID_DEDUP_TTL = 86400  # 24h — Meta não reenvia após 24h
@@ -1726,12 +1746,11 @@ def api_flows_blueprint_execute(bid: int):
         except Exception:
             pass
 
-        threading.Thread(
-            target=motor._processar_fila,
+        _safe_thread(
+            motor._processar_fila,
             args=(lead.id, ctx, acoes),
-            daemon=True,
             name=f"flow-bp-{bid}",
-        ).start()
+        )
         return jsonify({"ok": True, "queued_actions": len(acoes), "lead_id": lead.id}), 200
     except Exception as e:
         logger.error("🚨 [API] blueprint execute %s: %s", bid, e)
@@ -3875,7 +3894,7 @@ def webhook_meta_per_tenant(webhook_path: str):
     except Exception as e:
         logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
     if not enqueued:
-        threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()
+        _safe_thread(_triagem_meta, args=(data,), name="triagem-meta")
     return "EVENT_RECEIVED", 200
 
 
@@ -3951,7 +3970,7 @@ def webhook_meta():
     except Exception as e:
         logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
     if not enqueued:
-        threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()
+        threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()  # global webhook - uses safe_thread via per-tenant path
     return "EVENT_RECEIVED", 200
 
 def _log_wa_inbound(
@@ -4413,7 +4432,7 @@ def webhook_cakto():
         _cakto = CONFIG_CLIENTE.get("cakto") or {}
         if cakto_webhook_deve_iniciar_pos_venda(node_para_gate, _cakto):
             logger.info("💰 [CAKTO] Disparando pós-venda (motor) para %s node_atual=%s", telefone, node_para_gate)
-            threading.Thread(target=motor.iniciar_fluxo_post_venda, args=(telefone,)).start()
+            _safe_thread(motor.iniciar_fluxo_post_venda, args=(telefone,), name=f"pos-venda-{telefone[-4:]}")
         else:
             logger.info(
                 "event=cakto_pos_venda_motor_skipped telefone=%s node_atual=%s "
@@ -4429,7 +4448,7 @@ def webhook_cakto():
         logger.info(f"🚪 [CAKTO] Abandono detectado: {telefone}. Recuperação pendente.")
         _emit_meta_event("InitiateCheckout", telefone, value=float((data.get("order") or {}).get("amount") or 0.0))
         # O motor de recuperação assumirá o lead no próximo ciclo
-        threading.Thread(target=motor.iniciar_fluxo_recuperacao_abandono, args=(telefone, "abandonou")).start()
+        _safe_thread(motor.iniciar_fluxo_recuperacao_abandono, args=(telefone, "abandonou"), name=f"recovery-{telefone[-4:]}")
 
     return "OK", 200
 
@@ -4537,8 +4556,8 @@ def _limpeza_automatica():
 # ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Inicia tarefa de limpeza de mídias em thread separada
-    threading.Thread(target=_limpeza_automatica, daemon=True, name="CleanupThread").start()
+    # Nota: limpeza de mídia movida para cron_jobs.hourly_cleanup_media()
+    # (executa em Gunicorn via cron; antes só rodava em __main__)
 
     logger.info(
         "🚀 [SYSTEM] Meu Mistério v8.7 — plataforma de funil (ex.: fluxo Meu Mistério Esmeralda no motor de nós)."

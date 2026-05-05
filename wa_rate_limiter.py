@@ -81,11 +81,46 @@ def allow_inbound(phone_number_id: str | None) -> bool:
     """
     Retorna True se a msg pode prosseguir; False se rate-limited.
     Sem phone_number_id (msg legada): allow always (mode single-tenant).
+    
+    Prioridade: Redis INCR (cross-worker) → fallback in-memory (per-process).
     """
     if not phone_number_id:
         return True
-    bucket = _get_bucket(str(phone_number_id).strip())
+    pid = str(phone_number_id).strip()
+
+    # Tentar Redis primeiro (cross-worker, atômico)
+    allowed = _try_redis_rate_check(pid)
+    if allowed is not None:
+        return allowed
+
+    # Fallback in-memory (per-process)
+    bucket = _get_bucket(pid)
     return bucket.consume(1.0)
+
+
+def _try_redis_rate_check(pid: str) -> bool | None:
+    """
+    Redis-based sliding window rate limit.
+    Retorna True (allowed), False (rate-limited), None (Redis indisponível).
+    """
+    try:
+        from reliability.redis_inbound import _client as redis_client_fn
+        r = redis_client_fn()
+        if r is None:
+            return None
+        key = f"meumisterio:ratelimit:wa:{pid}"
+        count = r.incr(key)
+        if count == 1:
+            r.expire(key, 60)  # janela de 1 minuto
+        if count > RATE_PER_MIN:
+            logger.warning(
+                "[RATE_LIMIT] phone_id=%s blocked (%d/%d per min)",
+                pid[-6:], count, RATE_PER_MIN,
+            )
+            return False
+        return True
+    except Exception:
+        return None
 
 
 def remaining(phone_number_id: str) -> int:

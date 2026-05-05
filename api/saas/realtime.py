@@ -29,20 +29,34 @@ realtime_bp = Blueprint("saas_realtime", __name__, url_prefix="/saas/inbox")
 
 # ── In-memory event bus (fallback quando Redis não disponível) ──
 # Dict[tenant_id → set[queue.Queue]]
+_redis_client = None
+_redis_init_lock = threading.Lock()
+
+# In-memory event bus (fallback quando Redis não disponível)
 _local_channels: dict[str, set[queue.Queue]] = {}
 _local_lock = threading.Lock()
 
 
 def _get_redis():
-    """Lazy Redis client."""
-    url = (os.getenv("REDIS_URL") or "").strip()
-    if not url:
-        return None
-    try:
-        import redis
-        return redis.from_url(url, decode_responses=True, socket_timeout=5)
-    except Exception:
-        return None
+    """Lazy Redis singleton client — reutiliza conexão entre chamadas."""
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    with _redis_init_lock:
+        if _redis_client is not None:
+            return _redis_client
+        url = (os.getenv("REDIS_URL") or "").strip()
+        if not url:
+            return None
+        try:
+            import redis
+            _redis_client = redis.from_url(url, decode_responses=True, socket_timeout=5)
+            _redis_client.ping()
+            logger.info("[SSE] Redis client singleton iniciado")
+            return _redis_client
+        except Exception as exc:
+            logger.warning("[SSE] Redis indisponível — fallback local: %s", exc)
+            return None
 
 
 def publish_inbox_event(tenant_id: str, event_type: str, payload: dict) -> None:

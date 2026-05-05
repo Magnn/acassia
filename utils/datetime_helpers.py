@@ -14,7 +14,7 @@ from typing import Any, Optional
 def aware(dt: Optional[datetime]) -> Optional[datetime]:
     """
     Garante que um datetime é timezone-aware (UTC).
-    SQLite pode retornar datetimes sem tzinfo mesmo com timezone=True;
+    Alguns ORMs podem retornar datetimes sem tzinfo;
     essa função normaliza para comparações seguras.
 
     Antes: 5 cópias independentes em cron_jobs, lead_scoring,

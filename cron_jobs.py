@@ -19,21 +19,40 @@ Jobs:
 
 from __future__ import annotations
 
+import glob
 import logging
+import os
 import sys
 from datetime import datetime, timezone, timedelta
 
 from db import models
 from db.database import SessionLocal
+from reliability.distributed_lock import DistributedLock
 
 
 logger = logging.getLogger(__name__)
 
+_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-def _aware(dt):
-    if dt is None:
-        return None
-    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+def _run_with_lock(job_fn, lock_name: str, ttl_ms: int = 300_000) -> None:
+    """
+    Executa job_fn apenas se conseguir adquirir lock distribuído.
+    Garante que apenas 1 worker execute cada cron job em multi-worker.
+    TTL padrão: 5 min (suficiente para a maioria dos jobs).
+    """
+    dl = DistributedLock(f"cron:{lock_name}", ttl_ms=ttl_ms)
+    if not dl.acquire(timeout=1.0):
+        logger.debug("[cron] %s — outro worker já executando, skip", lock_name)
+        return
+    try:
+        job_fn()
+    finally:
+        dl.release()
+
+
+# Centralizado em utils/datetime_helpers (evita cópias divergentes)
+from utils.datetime_helpers import aware as _aware
 
 
 # ─── Trial warnings (Frente 2.19) ─────────────────────────────────────
@@ -387,15 +406,16 @@ def daily_recompute_tenant_health():
 
 def run_hourly():
     logger.info("[cron] starting hourly jobs")
-    hourly_trial_warnings()
-    hourly_quota_warnings()
-    hourly_apply_pending_downgrades()
-    hourly_fire_lunar_triggers()
-    hourly_dispatch_daily_horoscopes()
-    hourly_dispatch_daily_personal_messages()
-    hourly_process_scheduled_readings()
-    hourly_pick_ab_winners()
-    hourly_check_launch_phases()
+    _run_with_lock(hourly_trial_warnings, "hourly_trial_warnings")
+    _run_with_lock(hourly_quota_warnings, "hourly_quota_warnings")
+    _run_with_lock(hourly_apply_pending_downgrades, "hourly_downgrades")
+    _run_with_lock(hourly_fire_lunar_triggers, "hourly_lunar_triggers")
+    _run_with_lock(hourly_dispatch_daily_horoscopes, "hourly_horoscopes")
+    _run_with_lock(hourly_dispatch_daily_personal_messages, "hourly_personal_msgs")
+    _run_with_lock(hourly_process_scheduled_readings, "hourly_scheduled_readings")
+    _run_with_lock(hourly_pick_ab_winners, "hourly_ab_winners")
+    _run_with_lock(hourly_check_launch_phases, "hourly_launch_phases")
+    _run_with_lock(hourly_cleanup_media, "hourly_cleanup_media")
     logger.info("[cron] hourly done")
 
 
@@ -617,12 +637,31 @@ def daily_cleanup_stale_receipts():
 
 def run_daily():
     logger.info("[cron] starting daily jobs")
-    daily_recompute_tenant_health()
-    daily_recompute_lead_scores()
-    daily_recompute_spiritual_intents()
-    daily_cleanup_stale_receipts()
-    daily_hard_delete()
+    _run_with_lock(daily_recompute_tenant_health, "daily_tenant_health", ttl_ms=600_000)
+    _run_with_lock(daily_recompute_lead_scores, "daily_lead_scores", ttl_ms=600_000)
+    _run_with_lock(daily_recompute_spiritual_intents, "daily_spiritual_intents", ttl_ms=600_000)
+    _run_with_lock(daily_cleanup_stale_receipts, "daily_cleanup_receipts")
+    _run_with_lock(daily_hard_delete, "daily_hard_delete", ttl_ms=600_000)
     logger.info("[cron] daily done")
+
+
+def hourly_cleanup_media():
+    """Limpa mídias temporárias com mais de 2h (downloads WhatsApp processados)."""
+    download_dir = os.path.join(_ROOT, "downloads")
+    if not os.path.isdir(download_dir):
+        return
+    import time
+    cutoff = time.time() - 7200  # 2 horas
+    removed = 0
+    for f in glob.glob(os.path.join(download_dir, "*")):
+        try:
+            if os.path.getmtime(f) < cutoff:
+                os.remove(f)
+                removed += 1
+        except Exception:
+            pass
+    if removed:
+        logger.info("[cron.cleanup_media] %d arquivos removidos", removed)
 
 
 def daily_recompute_spiritual_intents():

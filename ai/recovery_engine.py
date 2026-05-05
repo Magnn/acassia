@@ -25,6 +25,8 @@ from sqlalchemy import func, and_
 
 from db.database import SessionLocal
 from db.models import Lead, Mensagem, EventoAudit
+from reliability.distributed_lock import DistributedLock
+from utils.datetime_helpers import aware as _ts_utc_helper
 from ai.template_registry import TemplateRegistry
 from tts.audio_engine import AudioEngine
 from schema import ContextoConversa
@@ -111,7 +113,10 @@ class RecoveryEngine:
         self._rodando = False
         self.template_registry = TemplateRegistry(gemini_api_key)
         self.audio_engine = AudioEngine() if tts_ativo else None
-        self._locks: Dict[int, threading.Lock] = {}  # Lock por Lead
+        # Distributed locks per-lead (cross-worker safe via Redis, fallback local)
+        self._locks: Dict[int, DistributedLock] = {}
+        self._locks_guard = threading.Lock()  # protege acesso ao dict
+        self._locks_ts: Dict[int, float] = {}  # lead_id → last_used timestamp
 
     def iniciar_monitor(self, intervalo_minutos: int = 2):
         """Inicia o monitor de alta frequência para suportar recuperação de 5min."""
@@ -121,11 +126,20 @@ class RecoveryEngine:
         logger.info("🔄 [RECOVERY] Monitor v4.3 Ativo (Check: %dmin).", intervalo_minutos)
 
     def _loop_monitoramento(self, intervalo_minutos: int):
+        _gc_counter = 0
         while self._rodando:
             try:
                 self._executar_ciclo()
             except Exception as e:
                 logger.error("🚨 [RECOVERY] Erro crítico no ciclo: %s", e, exc_info=True)
+            # GC a cada ~10 ciclos (20 min)
+            _gc_counter += 1
+            if _gc_counter >= 10:
+                try:
+                    self._gc_locks()
+                except Exception:
+                    pass
+                _gc_counter = 0
             time.sleep(intervalo_minutos * 60)
 
     def _executar_ciclo(self):
@@ -214,17 +228,33 @@ class RecoveryEngine:
         finally:
             db.close()
 
-    def _obter_lock(self, lead_id: int) -> threading.Lock:
-        """Retorna um lock específico para o lead."""
-        if lead_id not in self._locks:
-            self._locks[lead_id] = threading.Lock()
-        return self._locks[lead_id]
+    def _obter_lock(self, lead_id: int) -> DistributedLock:
+        """Retorna um lock distribuído específico para o lead (cross-worker safe)."""
+        with self._locks_guard:
+            lk = self._locks.get(lead_id)
+            if lk is None:
+                lk = DistributedLock(
+                    f"recovery:lead:{lead_id}",
+                    ttl_ms=120_000,  # 2 min TTL — suficiente para um ciclo de recovery
+                )
+                self._locks[lead_id] = lk
+            self._locks_ts[lead_id] = time.time()
+            return lk
+
+    def _gc_locks(self, max_idle_s: int = 600) -> None:
+        """Remove locks não usados há mais de max_idle_s para evitar memory leak."""
+        cutoff = time.time() - max_idle_s
+        with self._locks_guard:
+            stale = [lid for lid, ts in self._locks_ts.items() if ts < cutoff]
+            for lid in stale:
+                self._locks.pop(lid, None)
+                self._locks_ts.pop(lid, None)
+            if stale:
+                logger.debug("[RECOVERY_GC] Evicted %d stale locks", len(stale))
 
     @staticmethod
     def _ts_utc(ts: Optional[datetime]) -> Optional[datetime]:
-        if not ts:
-            return None
-        return ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts
+        return _ts_utc_helper(ts)
 
     def _precarregar_sinais_leads(self, db, lead_ids: List[int]) -> Dict[int, Dict[str, Any]]:
         """
@@ -470,7 +500,7 @@ class RecoveryEngine:
                                 )
                             )
                             # Batch commit: persistimos em lote no final da tentativa
-                            # para reduzir contenção de escrita no SQLite.
+                            # para reduzir contenção de escrita.
                         else:
                             return False, textos_entregues
                         time.sleep(delay_entre_baloes())

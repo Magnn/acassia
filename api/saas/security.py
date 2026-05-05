@@ -31,7 +31,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
 from db import models
-from db.database import SessionLocal
+from db.database import SessionLocal, session_scope, read_session
 from extensions import limiter
 
 
@@ -269,7 +269,7 @@ def password_reset_confirm():
         if not token_row or token_row.used_at:
             return jsonify({"error": "token_invalid"}), 400
 
-        # Normaliza tz pra comparação SQLite
+        # Normaliza tz (defensivo — garante comparação tz-aware)
         expires_at = token_row.expires_at
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
@@ -387,8 +387,7 @@ def record_user_session(user_id: int, session_id: str) -> int:
 @login_required
 def list_sessions():
     """Lista sessões ativas do user logado."""
-    db = SessionLocal()
-    try:
+    with read_session() as db:
         now = datetime.now(timezone.utc)
         sessions = (
             db.query(models.UserSession)
@@ -414,16 +413,13 @@ def list_sessions():
                 } for s in sessions
             ]
         })
-    finally:
-        db.close()
 
 
 @security_bp.route("/sessions/<int:session_id>/revoke", methods=["POST"])
 @login_required
 def revoke_session(session_id: int):
     """Revoga uma sessão específica."""
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         sess = db.query(models.UserSession).filter_by(
             id=session_id, user_id=current_user.id,
         ).first()
@@ -433,19 +429,15 @@ def revoke_session(session_id: int):
             return jsonify({"error": "already_revoked"}), 409
         sess.revoked_at = datetime.now(timezone.utc)
         sess.revoked_reason = "user_revoke"
-        db.commit()
         logger.info("[session.revoked] user_id=%s session_id=%s", current_user.id, session_id)
         return jsonify({"ok": True})
-    finally:
-        db.close()
 
 
 @security_bp.route("/sessions/revoke-all-others", methods=["POST"])
 @login_required
 def revoke_all_other_sessions():
     """Revoga TODAS as sessões exceto a atual."""
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         count = (
             db.query(models.UserSession)
             .filter(
@@ -458,10 +450,7 @@ def revoke_all_other_sessions():
                 synchronize_session=False,
             )
         )
-        db.commit()
         return jsonify({"ok": True, "revoked_count": count})
-    finally:
-        db.close()
 
 
 @security_bp.route("/email/verify/confirm", methods=["GET", "POST"])
