@@ -71,7 +71,7 @@ const WAConnectionPage = lazy(() => import('./routes/WAConnection'));
 const DepartmentsPage = lazy(() => import('./routes/Departments'));
 const ServiceRatingsPage = lazy(() => import('./routes/ServiceRatings'));
 const SmartLinksPage = lazy(() => import('./routes/SmartLinks'));
-
+const FiscalPage = lazy(() => import('./routes/Fiscal'));
 // Portal do Consumidor (B2C)
 const PortalLayout = lazy(() => import('./routes/portal/PortalLayout'));
 const PortalExplore = lazy(() => import('./routes/portal/PortalExplore'));
@@ -183,6 +183,7 @@ export default function App() {
             <Route path="/departments" element={<DepartmentsPage />} />
             <Route path="/service-ratings" element={<ServiceRatingsPage />} />
             <Route path="/smart-links" element={<SmartLinksPage />} />
+            <Route path="/fiscal" element={<FiscalPage />} />
 
             {/* Configurações com submenu lateral próprio */}
             <Route path="/settings" element={<SettingsLayout />}>
