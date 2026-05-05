@@ -21,7 +21,6 @@ import logging
 import threading
 import time
 import requests
-import base64
 import glob
 import queue
 import json
@@ -29,7 +28,6 @@ import random
 import re
 import uuid
 from decimal import Decimal
-from collections import deque
 from flask import Flask, request, jsonify, redirect, send_from_directory
 from flask_login import login_required
 from api.saas.auth import require_role
@@ -149,13 +147,15 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 REPORTS_DIR = os.path.join(_ROOT, "scripts", "reports")
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
-# Cache de Idempotência (Evita processar a mesma msg do WhatsApp 2x)
-# Camadas (defense in depth):
-#   1. Redis SET NX EX 86400 (atômico, cross-worker, TTL 24h) — se disponível
-#   2. DB UniqueConstraint (durável, sobrevive a restart)
-#   3. deque in-memory (fallback per-process, quick check sem I/O)
-CACHE_MENSAGENS   = deque(maxlen=2000)
-LOCK_IDEMPOTENCIA = threading.Lock()
+# Cache de Idempotência (extraído → webhooks/idempotency.py)
+# Importações com alias para manter compatibilidade com callsites existentes
+from webhooks.idempotency import (
+    CACHE_MENSAGENS,
+    LOCK_IDEMPOTENCIA,
+    try_claim_wamid_redis as _try_claim_wamid_redis,
+    try_claim_wamid_db as _try_claim_wamid_db,
+    is_wamid_duplicate as _is_wamid_duplicate,
+)
 
 
 def _safe_thread(target, args=(), name: str = "bg-task", daemon: bool = True) -> threading.Thread:
@@ -176,86 +176,6 @@ def _safe_thread(target, args=(), name: str = "bg-task", daemon: bool = True) ->
     t = threading.Thread(target=_wrapper, daemon=daemon, name=name)
     t.start()
     return t
-
-# Prefixo Redis para dedup de webhook
-_WAMID_DEDUP_PREFIX = "meumisterio:wamid:"
-_WAMID_DEDUP_TTL = 86400  # 24h — Meta não reenvia após 24h
-
-
-def _try_claim_wamid_redis(wamid: str) -> bool | None:
-    """
-    Tenta clamar wamid via Redis SET NX (atômico, cross-worker).
-    Retorna True (clamou), False (duplicata), None (Redis indisponível).
-    """
-    try:
-        from reliability.redis_inbound import _client as redis_client_fn
-        r = redis_client_fn()
-        if r is None:
-            return None
-        key = f"{_WAMID_DEDUP_PREFIX}{wamid}"
-        # SET NX EX: set only if not exists, expire in 24h
-        result = r.set(key, "1", nx=True, ex=_WAMID_DEDUP_TTL)
-        return bool(result)
-    except Exception as e:
-        logger.debug("[WEBHOOK] Redis dedup indisponível (fail-open): %s", e)
-        return None
-
-
-def _try_claim_wamid_db(wamid: str) -> bool:
-    """
-    True = primeira vez (seguir para a fila). False = wamid já persistido (at-least-once / restart).
-    Camada durável — mantém receipt pra auditoria e sobrevive a restart.
-    """
-    if not wamid:
-        return True
-    tid = get_engine_tenant_id()
-    db = SessionLocal()
-    try:
-        db.add(
-            models.WhatsAppInboundReceipt(
-                tenant_id=tid,
-                wamid=str(wamid)[:128],
-                lead_id=None,
-            )
-        )
-        db.commit()
-        return True
-    except IntegrityError:
-        db.rollback()
-        return False
-    except Exception as e:
-        db.rollback()
-        logger.warning("⚠️ [WEBHOOK] claim wamid falhou (fail-open processa 1x): %s", e)
-        return True
-    finally:
-        db.close()
-
-
-def _is_wamid_duplicate(wamid: str) -> bool:
-    """
-    Verifica idempotência multi-layer: Redis → DB → deque.
-    Retorna True se wamid é duplicata (não processar).
-    """
-    if not wamid:
-        return False
-
-    # Layer 1: Redis (atômico, cross-worker)
-    redis_result = _try_claim_wamid_redis(wamid)
-    if redis_result is False:
-        return True  # Já clamado por outro worker
-    # Se redis_result é True, já clamamos no Redis — prosseguir para DB
-
-    # Layer 2: DB (durável)
-    if not _try_claim_wamid_db(wamid):
-        return True  # Já existia no DB
-
-    # Layer 3: deque in-memory (quick check local, sem I/O)
-    with LOCK_IDEMPOTENCIA:
-        if wamid in CACHE_MENSAGENS:
-            return True
-        CACHE_MENSAGENS.append(wamid)
-
-    return False
 
 # ── INICIALIZAÇÃO DA APLICAÇÃO ───────────────────────────────────────
 app = Flask(__name__)
@@ -4453,103 +4373,14 @@ def webhook_cakto():
     return "OK", 200
 
 # ─────────────────────────────────────────────────────────────────────
-# UTILITÁRIOS: DOWNLOAD, STT E MANUTENÇÃO
+# UTILITÁRIOS: DOWNLOAD, STT E MANUTENÇÃO (extraídos → webhooks/media.py)
 # ─────────────────────────────────────────────────────────────────────
 
-def _is_simulator_graph_media_id(media_id) -> bool:
-    """True para IDs do `simulador_fantasmas.py` — não existem na Graph API."""
-    if media_id is None:
-        return False
-    s = str(media_id).strip()
-    return s in ("ID_IMAGEM_TESTE", "ID_AUDIO_TESTE") or (
-        s.startswith("ID_") and "TESTE" in s.upper()
-    )
-
-
-def _baixar_midia(media_id):
-    """Descarrega mídia da Meta via Graph API."""
-    try:
-        if _is_simulator_graph_media_id(media_id):
-            logger.info(
-                "🧪 [DOWNLOAD] Ignorado (media_id de simulador local, sem objeto na Meta): %s",
-                media_id,
-            )
-            return None, None
-        headers = {"Authorization": f"Bearer {WEBAPP_TOKEN}"}
-        # 1. Obtém URL temporária de download
-        r1 = requests.get(f"https://graph.facebook.com/v19.0/{media_id}", headers=headers, timeout=12)
-        if r1.status_code != 200: 
-            logger.error(f"❌ [DOWNLOAD] Erro Meta URL: {r1.text}")
-            return None, None
-            
-        url = r1.json().get("url")
-        mime = r1.json().get("mime_type", "")
-        
-        # 2. Descarrega o conteúdo binário real
-        r2 = requests.get(url, headers=headers, timeout=30)
-        if r2.status_code != 200: return None, None
-        
-        # Define extensão baseada no MIME
-        ext = mime.split("/")[-1].split(";")[0] or "bin"
-        filename = f"{media_id}.{ext}"
-        filepath = os.path.join(DOWNLOAD_DIR, filename)
-        
-        with open(filepath, "wb") as f:
-            f.write(r2.content)
-            
-        return filepath, mime
-    except Exception as e:
-        logger.error(f"❌ [DOWNLOAD] Falha fatal: {e}")
-        return None, None
-
-def _transcrever_audio(filepath, mime):
-    """Usa o Gemini Pro como motor de Speech-to-Text de alta precisão."""
-    if not os.path.exists(filepath): return "[Áudio ausente]"
-    try:
-        with open(filepath, "rb") as f:
-            audio_b64 = base64.b64encode(f.read()).decode("utf-8")
-        
-        # Endpoint de geração de conteúdo do Gemini (Flash ou Pro)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{STT_MODEL}:generateContent?key={GEMINI_API_KEY}"
-        
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"inline_data": {"mime_type": mime.split(";")[0], "data": audio_b64}},
-                    {"text": "Transcreva o áudio literalmente em português, sem adicionar comentários ou introduções."}
-                ]
-            }],
-            "generationConfig": {
-                "temperature": 0.0, # Zero para máxima fidelidade
-                "max_output_tokens": 1024
-            }
-        }
-        
-        resp = requests.post(url, json=payload, timeout=40)
-        if resp.status_code == 200:
-            res_json = resp.json()
-            text = res_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-            return text.strip() or "[Áudio inaudível]"
-            
-        logger.error(f"❌ [STT] Erro Gemini API: {resp.text}")
-        return "[Áudio recebido]"
-    except Exception as e:
-        logger.error(f"❌ [STT] Erro na transcrição: {e}")
-        return "[Falha no processamento de voz]"
-
-def _limpeza_automatica():
-    """Tarefa de background para manter o disco limpo de mídias temporárias."""
-    while True:
-        try:
-            # Limite de 2 horas para mídias (tempo suficiente para a IA processar e o dashboard exibir)
-            limite = time.time() - 7200 
-            for f in glob.glob(os.path.join(DOWNLOAD_DIR, "*")):
-                if os.path.getmtime(f) < limite:
-                    os.remove(f)
-            logger.debug("🧹 [CLEANUP] Ciclo de limpeza concluído.")
-        except Exception: pass
-        # Executa a limpeza a cada 1 hora
-        time.sleep(3600)
+from webhooks.media import (
+    is_simulator_media_id as _is_simulator_graph_media_id,
+    baixar_midia as _baixar_midia,
+    transcrever_audio as _transcrever_audio,
+)
 
 # ─────────────────────────────────────────────────────────────────────
 # BOOT DO SERVIDOR (PRODUCTION READY)
