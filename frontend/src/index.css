@@ -51,6 +51,20 @@
   .node-gradient {
     background: linear-gradient(135deg, var(--bg-surface) 0%, rgba(255,255,255,0.05) 100%);
   }
+
+  .shadow-glow-danger {
+    box-shadow: 0 0 15px -3px rgba(239, 68, 68, 0.4),
+                0 0 30px -10px rgba(239, 68, 68, 0.2);
+  }
+}
+
+/* Urgent lead pulse — gentler than Tailwind's animate-pulse */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* ── Edge path — Meu Mistério purple bezier curves ── */

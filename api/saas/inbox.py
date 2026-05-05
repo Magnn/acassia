@@ -15,7 +15,7 @@ import logging
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from sqlalchemy import or_
+from sqlalchemy import case, or_
 
 from db import models
 from db.database import SessionLocal
@@ -177,12 +177,17 @@ def list_view_data():
                 models.Lead.nome.ilike(like),
             ))
 
+        # Build sort column
         if sort == "score":
-            q = q.order_by(models.Lead.score_value.desc(), models.Lead.atualizado_em.desc())
+            sort_col = models.Lead.score_value.desc()
         elif sort == "name":
-            q = q.order_by(models.Lead.nome.asc())
+            sort_col = models.Lead.nome.asc()
         else:  # recency default
-            q = q.order_by(models.Lead.atualizado_em.desc())
+            sort_col = models.Lead.atualizado_em.desc()
+
+        # Urgent-first: leads urgentes sempre flutuam pro topo, independente do sort
+        urgent_first = case((models.Lead.is_urgent == True, 0), else_=1)  # noqa: E712
+        q = q.order_by(urgent_first, sort_col)
 
         leads = q.limit(limit).all()
         items = []
@@ -206,6 +211,10 @@ def list_view_data():
                 "ultima_msg": last_msg.texto if last_msg else "",
                 "ultima_em": last_msg.timestamp.isoformat() if last_msg and last_msg.timestamp else None,
                 "ultima_remetente": last_msg.remetente if last_msg else None,
+                "is_urgent": bool(getattr(lead, "is_urgent", False)),
+                "urgent_reason": getattr(lead, "urgent_reason", None),
+                "urgent_at": lead.urgent_at.isoformat() if getattr(lead, "urgent_at", None) else None,
+                "ultimo_sentimento": getattr(lead, "ultimo_sentimento", None),
             })
         return jsonify({
             "items": items, "filtro": filtro, "total": len(items),

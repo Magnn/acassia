@@ -1037,7 +1037,73 @@ class Engine:
                     ctx.sentimento = sent.get("sentimento", "padrao")
                     ctx.score_engajamento = sent.get("score", 0.5)
 
-                # Modo de degradação inteligente para alta concorrência/quota:
+                # ── SENTIMENT ROUTING (Roteamento de Emergência) ──
+                # Avalia urgência APÓS qualquer caminho (NLU ou skip).
+                # Fast-path keywords de crise rodam SEMPRE, mesmo sem IA.
+                try:
+                    from ai.sentiment_router import evaluate_urgency, clear_urgency_if_resolved
+                    _sent_for_routing = {
+                        "sentimento": ctx.sentimento,
+                        "score": ctx.score_engajamento,
+                        "sinais": sent.get("sinais", []) if isinstance(sent, dict) else [],
+                    } if 'sent' in dir() else {"sentimento": ctx.sentimento, "score": ctx.score_engajamento, "sinais": []}
+                    _urgency = evaluate_urgency(_sent_for_routing, texto_recebido)
+                    if _urgency.is_urgent and not getattr(lead, "is_urgent", False):
+                        lead.is_urgent = True
+                        lead.urgent_reason = (_urgency.reason or "")[:200]
+                        lead.urgent_at = datetime.now(timezone.utc)
+                        lead.ultimo_sentimento = ctx.sentimento
+                        logger.warning(
+                            "🚨 [SENTIMENT ROUTING] Lead %s marcado URGENTE: %s (severity=%s)",
+                            lead.id, _urgency.reason, _urgency.severity,
+                        )
+                        db.add(EventoAudit(
+                            lead_id=lead.id,
+                            evento="sentiment_urgent_flagged",
+                            dados={
+                                "reason": _urgency.reason[:180],
+                                "severity": _urgency.severity,
+                                "sentimento": ctx.sentimento,
+                                "score": round(ctx.score_engajamento, 3),
+                            },
+                        ))
+                        # SSE push — operador vê lead pulando no topo do CRM em tempo real
+                        try:
+                            from api.saas.realtime_hooks import notify_lead_updated
+                            notify_lead_updated(self.tenant_id, lead.id, changes={
+                                "is_urgent": True,
+                                "urgent_reason": _urgency.reason[:120],
+                                "severity": _urgency.severity,
+                            })
+                        except Exception:
+                            pass
+                    elif getattr(lead, "is_urgent", False) and not _urgency.is_urgent:
+                        # Auto-clear: sentimento melhorou
+                        if clear_urgency_if_resolved(_sent_for_routing):
+                            lead.is_urgent = False
+                            lead.urgent_reason = None
+                            lead.urgent_at = None
+                            lead.ultimo_sentimento = ctx.sentimento
+                            logger.info(
+                                "✅ [SENTIMENT ROUTING] Lead %s urgência resolvida (sentimento=%s score=%.2f)",
+                                lead.id, ctx.sentimento, ctx.score_engajamento,
+                            )
+                            db.add(EventoAudit(
+                                lead_id=lead.id,
+                                evento="sentiment_urgent_cleared",
+                                dados={"sentimento": ctx.sentimento, "score": round(ctx.score_engajamento, 3)},
+                            ))
+                            try:
+                                from api.saas.realtime_hooks import notify_lead_updated
+                                notify_lead_updated(self.tenant_id, lead.id, changes={"is_urgent": False})
+                            except Exception:
+                                pass
+                    else:
+                        # Apenas persiste sentimento atual
+                        lead.ultimo_sentimento = ctx.sentimento
+                except Exception as _sr_exc:
+                    logger.debug("[SENTIMENT ROUTING] Falhou (fail-open): %s", _sr_exc)
+
                 # se qualquer submódulo IA entrou em cooldown, evita novas chamadas caras dos nodes.
                 _ia_cooldown = False
                 try:

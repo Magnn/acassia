@@ -112,6 +112,11 @@ class Lead(Base):
     spiritual_intent = Column(JSON, nullable=True)
     spiritual_intent_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Sentiment Routing: urgência detectada pela IA → CRM prioriza no topo
+    is_urgent = Column(Boolean, default=False, nullable=False, index=True)
+    urgent_reason = Column(String(200), nullable=True)
+    urgent_at = Column(DateTime(timezone=True), nullable=True)
+
     criado_em = Column(DateTime(timezone=True), default=_agora_utc)
     atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
     # Controle de concorrência (motor vs thread de envio): merge otimista em metadata_json

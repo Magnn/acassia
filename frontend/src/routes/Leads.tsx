@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   MessageSquare,
   User,
   Send,
@@ -443,9 +444,11 @@ export default function Leads() {
                 <div
                   key={l.id}
                   onClick={() => setSelectedLeadId(l.id)}
-                  className={`${isCompact ? 'p-2.5' : 'p-4'} rounded-2xl cursor-pointer transition-all border border-transparent relative group mb-1 ${
-                    selectedLeadId === l.id ? 'bg-bg-surface border-border shadow-md' : 'hover:bg-bg-surface/40'
-                  } ${(unreadMap.get(l.id) || 0) > 0 ? 'ring-1 ring-accent-amethyst/30' : ''}`}
+                  className={`${isCompact ? 'p-2.5' : 'p-4'} rounded-2xl cursor-pointer transition-all border relative group mb-1 ${
+                    l.is_urgent
+                      ? 'border-red-500/60 ring-2 ring-red-500/30 animate-pulse-subtle bg-red-500/5'
+                      : selectedLeadId === l.id ? 'bg-bg-surface border-border shadow-md' : 'border-transparent hover:bg-bg-surface/40'
+                  } ${(unreadMap.get(l.id) || 0) > 0 && !l.is_urgent ? 'ring-1 ring-accent-amethyst/30' : ''}`}
                 >
                   {selectedLeadId === l.id && (
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-amethyst rounded-r-full shadow-[0_0_15px_rgba(var(--accent-amethyst-rgb),0.5)]" />
@@ -494,6 +497,15 @@ export default function Leads() {
                       {l.bot_pausado && (
                         <span className="bg-amber-500/10 text-amber-500 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-amber-500/20">
                           Pausado
+                        </span>
+                      )}
+                      {l.is_urgent && (
+                        <span
+                          className="bg-red-500/15 text-red-400 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-red-500/30 flex items-center gap-1 animate-pulse"
+                          title={l.urgent_reason || 'Lead em crise detectada pela IA'}
+                        >
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          Urgente
                         </span>
                       )}
                       {l.convertido && (
