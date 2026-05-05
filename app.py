@@ -3690,6 +3690,19 @@ def send_whatsapp_template(lead_id):
         db.close()
 
 
+def _get_dlq_info() -> dict:
+    """Retorna info da Dead Letter Queue (mensagens falhadas para reprocessamento)."""
+    try:
+        from reliability.redis_inbound import _client as _dlq_r
+        r = _dlq_r()
+        if r:
+            depth = r.llen("meumisterio:wa:dlq")
+            return {"key": "meumisterio:wa:dlq", "depth": int(depth)}
+    except Exception:
+        pass
+    return {"key": "meumisterio:wa:dlq", "depth": None}
+
+
 @app.route("/api/integrations/summary", methods=["GET"])
 def integrations_summary():
     """URLs públicas e estado de configuração para o painel Integrações (sem expor segredos)."""
@@ -3728,6 +3741,7 @@ def integrations_summary():
             "verify_token_configured": bool(VERIFY_TOKEN),
         },
         "redis_inbound": redis_inbound,
+        "redis_dlq": _get_dlq_info(),
         "docs": {
             "whatsapp_cloud": "https://developers.facebook.com/docs/whatsapp/cloud-api",
             "webhooks_graph": "https://developers.facebook.com/docs/graph-api/webhooks/getting-started",
@@ -3877,8 +3891,9 @@ def webhook_meta():
                 pass
             return "Invalid Signature", 403
 
-    data = data_preview if data_preview else request.get_json(silent=True)
-    if not data: return "NO_DATA", 400
+    data = data_preview
+    if not data:
+        return "NO_DATA", 400
 
     # Com REDIS_URL: fila durável (LPUSH) + worker BRPOP → mesma _triagem_meta. Senão: thread in-process.
     enqueued = False
@@ -3890,7 +3905,7 @@ def webhook_meta():
     except Exception as e:
         logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
     if not enqueued:
-        threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()  # global webhook - uses safe_thread via per-tenant path
+        _safe_thread(_triagem_meta, args=(data,), name="triagem-meta-global")
     return "EVENT_RECEIVED", 200
 
 def _log_wa_inbound(
@@ -4221,6 +4236,21 @@ def _triagem_meta(data):
 
     except Exception as e:
         logger.error(f"🚨 [TRIAGEM] Erro crítico na extração: {e}", exc_info=True)
+        # DLQ: salvar payload para reprocessamento posterior
+        try:
+            import json as _json_dlq
+            from reliability.redis_inbound import _client as _dlq_redis
+            r = _dlq_redis()
+            if r:
+                dlq_entry = _json_dlq.dumps({
+                    "payload": data,
+                    "error": str(e)[:500],
+                    "ts": time.time(),
+                }, ensure_ascii=False)
+                r.lpush("meumisterio:wa:dlq", dlq_entry)
+                logger.info("📮 [DLQ] Payload salvo para reprocessamento (%d bytes)", len(dlq_entry))
+        except Exception:
+            pass
         try:
             # Tenta extrair phone_id do payload pra contextualizar o erro
             _pid = ""
