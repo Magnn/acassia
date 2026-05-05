@@ -255,6 +255,30 @@ def mp_webhook():
                     lead = db.query(models.Lead).filter_by(id=pix.lead_id).first()
                     if lead:
                         lead.convertido = True
+                        # ── A/B Test Attribution Lookback (48h) ──
+                        try:
+                            from datetime import timedelta
+                            lookback = datetime.now(timezone.utc) - timedelta(hours=48)
+                            ab_exposures = db.query(models.ABTestExposure).filter(
+                                models.ABTestExposure.tenant_id == pix.tenant_id,
+                                models.ABTestExposure.lead_id == pix.lead_id,
+                                models.ABTestExposure.exposed_at >= lookback,
+                                models.ABTestExposure.converted == False,  # noqa: E712
+                            ).all()
+                            pix_value = (pix.amount_brl_cents or 0) / 100
+                            for exp in ab_exposures:
+                                exp.converted = True
+                                exp.conversion_value = pix_value
+                                exp.converted_at = datetime.now(timezone.utc)
+                            if ab_exposures:
+                                logger.info(
+                                    "[pix.webhook] AB attribution: lead=%s variants=%s value=%.2f",
+                                    pix.lead_id,
+                                    [(e.node_id, e.variant) for e in ab_exposures],
+                                    pix_value,
+                                )
+                        except Exception as ab_err:
+                            logger.debug("[pix.webhook] AB attribution failed (non-fatal): %s", ab_err)
             db.commit()
 
             # Audit

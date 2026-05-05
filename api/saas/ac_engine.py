@@ -295,6 +295,31 @@ def register_conversion():
         lead.conversion_source = data.get("source_name", "Manual")
         lead.conversion_at = datetime.now(timezone.utc)
         lead.deal_value = data.get("value", lead.deal_value)
+
+        # ── A/B Test Attribution Lookback (48h) ──
+        try:
+            lookback = datetime.now(timezone.utc) - timedelta(hours=48)
+            ab_exposures = db.query(models.ABTestExposure).filter(
+                models.ABTestExposure.tenant_id == current_user.tenant_id,
+                models.ABTestExposure.lead_id == data["lead_id"],
+                models.ABTestExposure.exposed_at >= lookback,
+                models.ABTestExposure.converted == False,  # noqa: E712
+            ).all()
+            conv_value = float(data.get("value", 0) or 0)
+            for exp in ab_exposures:
+                exp.converted = True
+                exp.conversion_value = conv_value
+                exp.converted_at = datetime.now(timezone.utc)
+            if ab_exposures:
+                logger.info(
+                    "[ac_engine] AB attribution: lead=%s variants=%s value=%.2f",
+                    data["lead_id"],
+                    [(e.node_id, e.variant) for e in ab_exposures],
+                    conv_value,
+                )
+        except Exception as ab_err:
+            logger.debug("[ac_engine] AB attribution failed (non-fatal): %s", ab_err)
+
         db.commit()
         return jsonify({"ok": True, "event_id": evt.id}), 201
     finally:

@@ -121,4 +121,29 @@ export const blueprintsApi = {
     );
     return data.blueprint;
   },
+
+  // ── A/B Analytics ────────────────────────────────────────────────────
+  abAnalytics: (blueprintId: number) =>
+    api.get<ABAnalyticsResponse>(`/saas/ab/${blueprintId}/analytics`),
 };
+
+export interface ABVariantStats {
+  impressions: number;
+  conversions: number;
+  rate: number;
+  revenue: number;
+}
+
+export interface ABNodeAnalytics {
+  node_id: string;
+  variants: Record<string, ABVariantStats>;
+  winner: string | null;
+  confidence: string;
+  total_impressions: number;
+  total_revenue: number;
+}
+
+export interface ABAnalyticsResponse {
+  blueprint_id: number;
+  nodes: Record<string, ABNodeAnalytics>;
+}

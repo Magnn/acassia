@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -91,19 +91,45 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
   const inspectorDirtyRef = useRef(false);
   const inspectorRequestCloseRef = useRef<(() => void) | null>(null);
 
+  // ── A/B Analytics: fetch e inject nos nós ab_split ──
+  const hasAbNodes = useMemo(
+    () => fs.nodes.some((n) => n.data.meumisterioType === 'ab_split'),
+    [fs.nodes],
+  );
+  const { data: abData } = useQuery({
+    queryKey: ['ab-analytics', blueprint.id],
+    queryFn: () => blueprintsApi.abAnalytics(blueprint.id),
+    enabled: hasAbNodes,
+    refetchInterval: 30_000, // Poll a cada 30s
+    retry: false,
+  });
+
   const decoratedNodes = useMemo(
     () =>
-      fs.nodes.map((n) => ({
-        ...n,
-        data: {
+      fs.nodes.map((n) => {
+        const base = {
           ...n.data,
           lintLevel: issueLevels.get(n.id),
           simActive: simCurrent === n.id || undefined,
           onEdit: () => setEditingNodeId(n.id),
           onDuplicate: () => fs.duplicateNode(n.id),
-        },
-      })),
-    [fs.nodes, issueLevels, simCurrent, fs.duplicateNode],
+        };
+        // Inject AB stats into ab_split nodes
+        if (n.data.meumisterioType === 'ab_split' && abData?.nodes?.[n.id]) {
+          const nodeStats = abData.nodes[n.id];
+          base.config = {
+            ...base.config,
+            ab_stats: {
+              ...nodeStats.variants,
+              winner: nodeStats.winner,
+              total_revenue: nodeStats.total_revenue,
+              confidence: nodeStats.confidence,
+            },
+          };
+        }
+        return { ...n, data: base };
+      }),
+    [fs.nodes, issueLevels, simCurrent, fs.duplicateNode, abData],
   );
 
   const requestFocus = useCallback((nodeId: string) => {
