@@ -85,10 +85,49 @@ def baixar_midia(media_id):
         return None, None
 
 
+# Variável global para o modelo Whisper (Lazy Load para não estourar RAM no boot)
+_whisper_model = None
+
+def _get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+        # 'turbo' ou 'base' são ideais para rodar rápido na VPS em CPU.
+        # device="cpu", compute_type="int8" reduz drasticamente o consumo de memória.
+        _whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+    return _whisper_model
+
+
 def transcrever_audio(filepath, mime):
-    """Usa o Gemini Pro como motor de Speech-to-Text de alta precisão."""
+    """
+    Motor Híbrido de Speech-to-Text.
+    1. Tenta usar Whisper Local (Custo $0).
+    2. Fallback para Gemini Pro/Flash se Whisper falhar ou não estiver instalado.
+    """
     if not os.path.exists(filepath):
         return "[Áudio ausente]"
+
+    # TENTATIVA 1: Whisper Local (Open Source / Zero Custo)
+    try:
+        import faster_whisper
+        logger.info(f"🎙️ [STT] Iniciando transcrição com Whisper local: {filepath}")
+        
+        # O Whisper pode falhar se o OGG do WhatsApp estiver mal formatado, mas o FFmpeg embutido geralmente resolve
+        model = _get_whisper_model()
+        segments, info = model.transcribe(filepath, language="pt", beam_size=5)
+        
+        texto_whisper = " ".join([segment.text for segment in segments])
+        texto_final = texto_whisper.strip()
+        
+        if texto_final:
+            logger.info("✅ [STT] Transcrição Whisper concluída com sucesso.")
+            return texto_final
+    except ImportError:
+        logger.info("🎙️ [STT] faster-whisper não detectado. Iniciando fallback para Gemini API...")
+    except Exception as e:
+        logger.error(f"❌ [STT] Erro no processamento Whisper: {e}. Acionando fallback Gemini...")
+
+    # TENTATIVA 2: Fallback Gemini (Nuvem)
     try:
         with open(filepath, "rb") as f:
             audio_b64 = base64.b64encode(f.read()).decode("utf-8")
@@ -119,5 +158,5 @@ def transcrever_audio(filepath, mime):
         logger.error(f"❌ [STT] Erro Gemini API: {resp.text}")
         return "[Áudio recebido]"
     except Exception as e:
-        logger.error(f"❌ [STT] Erro na transcrição: {e}")
+        logger.error(f"❌ [STT] Erro na transcrição Gemini: {e}")
         return "[Falha no processamento de voz]"
