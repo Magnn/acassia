@@ -305,6 +305,23 @@ class Personalizer:
             "Depois integre o roteiro da etapa sem ignorar o que já foi endereçado.\n\n"
         )
 
+    @staticmethod
+    def _bloco_knowledge_base(metadata: Optional[dict]) -> str:
+        """Injeta Base de Conhecimento Dinâmica do tenant (Context Stuffing via Redis)."""
+        if not isinstance(metadata, dict):
+            return ""
+        cfg = metadata.get("__config__")
+        if not isinstance(cfg, dict):
+            return ""
+        tenant_id = str(cfg.get("_tenant_id") or metadata.get("tenant_id") or "").strip()
+        if not tenant_id:
+            return ""
+        try:
+            from api.saas.knowledge import get_knowledge_base_cached
+            return get_knowledge_base_cached(tenant_id)
+        except Exception:
+            return ""
+
     def _montar_fatos_contexto(self, metadata: dict) -> str:
         """Extrai dados do metadata e transforma em fatos para a IA."""
         if not metadata:
@@ -450,11 +467,12 @@ class Personalizer:
         prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
         guard = self._bloco_copy_guardrails(metadata)
         studio = self._bloco_meumisterio_studio(metadata)
+        knowledge = self._bloco_knowledge_base(metadata)
         si = (metadata or {}).get("stage_intel") or {}
         longo = bool(si.get("varias_perguntas_detectadas"))
 
         prompt_final = (
-            f"{prioridade}{guard}{studio}"
+            f"{prioridade}{guard}{studio}{knowledge}"
             f"DIRETRIZ DE PERSONALIDADE:\n{system_prompt}\n\n"
             f"FATOS CONHECIDOS SOBRE O CLIENTE (Não esqueça disto):\n{fatos_cliente}\n\n"
             f"HISTÓRICO RECENTE DA CONVERSA:\n{contexto_dialogo}\n\n"
@@ -524,8 +542,9 @@ class Personalizer:
             prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
             guard = self._bloco_copy_guardrails(metadata)
             studio = self._bloco_meumisterio_studio(metadata)
+            knowledge = self._bloco_knowledge_base(metadata)
             prompt_final = (
-                f"{prioridade}{guard}{studio}"
+                f"{prioridade}{guard}{studio}{knowledge}"
                 f"{system_prompt}\n\n"
                 f"FATOS CONHECIDOS SOBRE O CLIENTE:\n{fatos_cliente}\n\n"
                 f"HISTÓRICO RECENTE:\n{contexto_dialogo}\n\n"
@@ -582,11 +601,12 @@ class Personalizer:
             prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
             guard = self._bloco_copy_guardrails(metadata)
             studio = self._bloco_meumisterio_studio(metadata)
+            knowledge = self._bloco_knowledge_base(metadata)
             si = (metadata or {}).get("stage_intel") or {}
             longo = bool(si.get("varias_perguntas_detectadas"))
 
             prompt_final = (
-                f"{prioridade}{guard}{studio}"
+                f"{prioridade}{guard}{studio}{knowledge}"
                 f"SISTEMA: {system_prompt}\n\n"
                 f"FATOS SOBRE O CLIENTE:\n{fatos_cliente}\n\n"
                 f"MENSAGEM ANEXA: {mensagem_lead}"

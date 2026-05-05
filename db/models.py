@@ -2924,3 +2924,31 @@ class GroupLinkVisit(Base):
     group_id = Column(Integer, ForeignKey("wa_groups.id", ondelete="SET NULL"), nullable=True)
     lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), nullable=True)
     visited_at = Column(DateTime(timezone=True), default=_agora_utc)
+
+
+class AIKnowledgeFact(Base):
+    """Fato da Base de Conhecimento Dinâmica do Tenant.
+
+    Armazena regras de negócio, FAQs, preços e tom de voz que a IA
+    deve usar como verdade absoluta (Context Stuffing no Gemini).
+
+    Sources:
+      - wizard: preenchido via wizard interativo de onboarding
+      - auto_learn: operador confirmou aprendizado no CRM
+      - manual: inserido manualmente pelo painel de configurações
+    """
+    __tablename__ = "ai_knowledge_facts"
+    __table_args__ = (
+        Index("ix_ai_kb_tenant_active", "tenant_id", "active"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    category = Column(String(50), nullable=False, default="geral")  # servico, preco, politica, faq, tom, geral
+    question = Column(Text, nullable=True)   # "Atende criança com autismo?"
+    answer = Column(Text, nullable=False)    # "Sim! A partir de 7 anos..."
+    source = Column(String(30), nullable=False, default="manual")  # wizard, auto_learn, manual
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
+
