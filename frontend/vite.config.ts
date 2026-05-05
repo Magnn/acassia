@@ -16,6 +16,9 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-query': ['@tanstack/react-query'],
           'vendor-icons': ['lucide-react'],
+          // Libs pesadas — carregam APENAS com suas rotas lazy
+          'vendor-charts': ['recharts'],      // ~150KB, só Dashboard
+          'vendor-flow': ['@xyflow/react'],   // ~200KB, só Builder
         },
       },
     },
