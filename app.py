@@ -336,6 +336,7 @@ def _register_saas_blueprints():
     from api.saas.wa_connection import wa_conn_bp as saas_wa_conn_bp
     from api.saas.wa_devices import devices_bp as saas_wa_devices_bp
     from api.saas.knowledge import knowledge_bp as saas_knowledge_bp
+    from api.saas.fiscal import fiscal_bp as saas_fiscal_bp
     from api.b2c_marketplace import b2c_bp
 
 
@@ -376,6 +377,7 @@ def _register_saas_blueprints():
         saas_smart_bp, saas_wa_conn_bp, saas_wa_devices_bp,
         saas_ab_bp,
         saas_knowledge_bp,
+        saas_fiscal_bp,
         b2c_bp,
     )
     _failed_bps = []

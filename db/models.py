@@ -2952,3 +2952,45 @@ class AIKnowledgeFact(Base):
     created_at = Column(DateTime(timezone=True), default=_agora_utc)
     updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
 
+
+class NotaFiscal(Base):
+    """
+    Rastreamento de Documentos Fiscais Eletrônicos (NFe/NFCe/NFSe) emitidos.
+    Integrado com APIs de terceiros (como Nuvem Fiscal ou Focus NFe).
+    """
+    __tablename__ = "notas_fiscais"
+    __table_args__ = (
+        Index("ix_nf_tenant_status", "tenant_id", "status"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    # Metadados da Emissão
+    ambiente = Column(String(20), default="homologacao") # homologacao / producao
+    tipo_documento = Column(String(10), nullable=False)  # NFe, NFCe, NFSe
+    numero = Column(Integer, nullable=True)              # Numero da nota retornada
+    serie = Column(String(10), nullable=True)
+    chave_acesso = Column(String(44), nullable=True)     # Chave da NFe
+    
+    # Dados da Venda
+    valor_total = Column(Float, nullable=False)
+    cpf_cnpj = Column(String(20), nullable=True)
+    nome_cliente = Column(String(150), nullable=True)
+    descricao_servico = Column(String(255), nullable=True)
+    
+    # Status na API Terceira
+    status = Column(String(30), nullable=False, default="processando") # processando, autorizada, rejeitada, cancelada
+    api_reference_id = Column(String(100), nullable=True)              # ID da NFe na API tercera (ex: NuvemFiscal ID)
+    mensagem_sefaz = Column(Text, nullable=True)
+    
+    # Arquivos (Links para S3 ou Base64 curto)
+    url_pdf = Column(String(500), nullable=True)
+    url_xml = Column(String(500), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), default=_agora_utc)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
+
+    # Relacionamentos
+    lead = relationship("Lead", backref="notas_fiscais")
