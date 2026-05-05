@@ -50,6 +50,55 @@ def emitir_nota_na_api(tenant_id: str, dados_nota: dict) -> dict:
     }
 
 
+def emitir_nota_automatica_webhook(tenant_id: str, lead_id: int, valor: float, cpf_cnpj: str, nome_cliente: str, descricao: str) -> bool:
+    """Helper para emissão assíncrona automática via webhooks de faturamento (Cakto)."""
+    db: Session = SessionLocal()
+    set_tenant_rls(db, tenant_id)
+    try:
+        dados_api = {
+            "ambiente": "producao",
+            "tipo": "NFSe",
+            "valor_total": float(valor),
+            "tomador": {
+                "cpf_cnpj": cpf_cnpj,
+                "nome": nome_cliente
+            },
+            "servico": {
+                "descricao": descricao
+            }
+        }
+        
+        retorno_api = emitir_nota_na_api(tenant_id, dados_api)
+        
+        nova_nota = NotaFiscal(
+            tenant_id=tenant_id,
+            lead_id=lead_id,
+            ambiente=retorno_api.get("ambiente", "homologacao"),
+            tipo_documento="NFSe",
+            numero=retorno_api.get("numero"),
+            serie=retorno_api.get("serie"),
+            chave_acesso=retorno_api.get("chave_acesso"),
+            valor_total=float(valor),
+            cpf_cnpj=cpf_cnpj,
+            nome_cliente=nome_cliente,
+            descricao_servico=descricao,
+            status=retorno_api.get("status", "processando"),
+            api_reference_id=retorno_api.get("id"),
+            url_pdf=retorno_api.get("pdf_url"),
+            url_xml=retorno_api.get("xml_url")
+        )
+        db.add(nova_nota)
+        db.commit()
+        return True
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Erro ao emitir NF automática: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
 @fiscal_bp.route("/emitir", methods=["POST"])
 @login_required
 def emitir_nota():

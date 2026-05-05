@@ -4456,6 +4456,24 @@ def webhook_cakto():
     if status in ["paid", "approved", "completed"]:
         logger.info(f"💰 [CAKTO] Venda aprovada para {telefone}.")
         _emit_meta_event("Purchase", telefone, value=float((data.get("order") or {}).get("amount") or 0.0))
+        
+        # Emissão Automática de Nota Fiscal
+        try:
+            from api.saas.fiscal import emitir_nota_automatica_webhook
+            _nome_cliente = (data.get("customer") or {}).get("name") or (data.get("data") or {}).get("customer", {}).get("name") or "Cliente não identificado"
+            _cpf_cliente = (data.get("customer") or {}).get("cpf") or (data.get("data") or {}).get("customer", {}).get("cpf") or (data.get("customer") or {}).get("document") or "00000000000"
+            _amount_nf = float((data.get("order") or {}).get("amount") or (data.get("data") or {}).get("amount") or data.get("amount") or 0.0)
+            _produto_nf = str((data.get("order") or {}).get("product_name") or (data.get("data") or {}).get("product_name") or "Serviço Prestado")
+            if lead and _tid and _amount_nf > 0:
+                _safe_thread(
+                    emitir_nota_automatica_webhook, 
+                    args=(_tid, lead.id, _amount_nf, _cpf_cliente, _nome_cliente, _produto_nf),
+                    name=f"nf-{telefone[-4:]}"
+                )
+                logger.info(f"🧾 [CAKTO] Emissão de NF agendada para {telefone}.")
+        except Exception as e:
+            logger.error(f"Erro ao tentar disparar emissão de NF: {e}")
+
         _cakto = CONFIG_CLIENTE.get("cakto") or {}
         if cakto_webhook_deve_iniciar_pos_venda(node_para_gate, _cakto):
             logger.info("💰 [CAKTO] Disparando pós-venda (motor) para %s node_atual=%s", telefone, node_para_gate)
