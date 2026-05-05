@@ -8,7 +8,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: false, // desabilitar em prod (reduz ~30% do output)
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks — mudam raramente, cache longa
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-icons': ['lucide-react'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,

@@ -2,16 +2,19 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
-import AdminLayout from './components/AdminLayout';
-import SettingsLayout from './components/SettingsLayout';
 import Toaster from './components/Toaster';
-import CommandPalette, { useCmdK } from './components/CommandPalette';
-import OnboardingTour from './components/OnboardingTour';
 import ImpersonateBanner from './components/ImpersonateBanner';
 import CookieBanner from './components/CookieBanner';
 import QuotaWarningBanner from './components/QuotaWarningBanner';
-import OnboardingChecklist from './components/OnboardingChecklist';
-import BlueprintsList from './routes/BlueprintsList';
+import { useCmdK } from './hooks/useCmdK';
+
+// Shell components — lazy (não bloqueiam o first paint)
+const AdminLayout = lazy(() => import('./components/AdminLayout'));
+const SettingsLayout = lazy(() => import('./components/SettingsLayout'));
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
+const OnboardingTour = lazy(() => import('./components/OnboardingTour'));
+const OnboardingChecklist = lazy(() => import('./components/OnboardingChecklist'));
+const BlueprintsList = lazy(() => import('./routes/BlueprintsList'));
 
 // Telas SaaS — lazy.
 const Dashboard = lazy(() => import('./routes/Dashboard'));
@@ -108,10 +111,10 @@ function PageFallback() {
 function AppShell() {
   const { open: cmdkOpen, setOpen: setCmdkOpen } = useCmdK();
   return (
-    <>
+    <Suspense fallback={null}>
       <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
       <OnboardingTour />
-    </>
+    </Suspense>
   );
 }
 
