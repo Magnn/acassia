@@ -54,9 +54,20 @@ def _normalize(s: str) -> str:
 
 
 def _evaluate_one_rule(rule: Mapping[str, Any], ctx: Mapping[str, Any]) -> bool:
+    op_aliases = {
+        "equals": "eq",
+        "not_equals": "ne",
+        "before": "lt",
+        "after": "gt",
+    }
     op = str(rule.get("op") or "eq").strip().lower()
-    left = _resolve_operand(rule.get("var"), ctx)
-    right = _resolve_operand(rule.get("val"), ctx)
+    op = op_aliases.get(op, op)
+    raw_var = rule.get("var")
+    custom_field = str(rule.get("custom_field") or "").strip()
+    if custom_field and str(raw_var or "") in ("contact.custom", "flow.field", "webhook.data"):
+        raw_var = custom_field
+    left = _resolve_operand(raw_var, ctx)
+    right = _resolve_operand(rule.get("val") if "val" in rule else rule.get("value"), ctx)
     if op == "eq":
         return _normalize(left) == _normalize(right)
     if op == "ne":
@@ -67,15 +78,29 @@ def _evaluate_one_rule(rule: Mapping[str, Any], ctx: Mapping[str, Any]) -> bool:
         return _normalize(right) not in _normalize(left)
     if op == "gt":
         try:
-            a = float(str(left).replace(",", ".").replace(" ", ""))
-            b = float(str(right).replace(",", ".").replace(" ", ""))
+            def _number(value: Any) -> float:
+                raw = str(value).strip()
+                if re.fullmatch(r"\d{1,2}:\d{2}", raw):
+                    hours, minutes = raw.split(":", 1)
+                    return float(int(hours) * 60 + int(minutes))
+                return float(raw.replace(",", ".").replace(" ", ""))
+
+            a = _number(left)
+            b = _number(right)
             return a > b
         except (TypeError, ValueError):
             return False
     if op == "lt":
         try:
-            a = float(str(left).replace(",", ".").replace(" ", ""))
-            b = float(str(right).replace(",", ".").replace(" ", ""))
+            def _number(value: Any) -> float:
+                raw = str(value).strip()
+                if re.fullmatch(r"\d{1,2}:\d{2}", raw):
+                    hours, minutes = raw.split(":", 1)
+                    return float(int(hours) * 60 + int(minutes))
+                return float(raw.replace(",", ".").replace(" ", ""))
+
+            a = _number(left)
+            b = _number(right)
             return a < b
         except (TypeError, ValueError):
             return False
@@ -123,11 +148,19 @@ def pick_condicao_next_node(
     lab_sim = None
     lab_nao = None
     for e in outgoing:
-        lab = str(e.get("label") or "")
-        if re.search(r"sim|yes|true|v\b", lab, re.I):
+        # Prioriza o novo padrão (sourceHandle: 'true' / 'false')
+        sh = str(e.get("sourceHandle") or "").lower()
+        if sh == "true":
             lab_sim = e
-        if re.search(r"não|nao|no|false|f\b", lab, re.I):
+        elif sh == "false":
             lab_nao = e
+        else:
+            # Fallback para o padrão legado (edges com texto 'sim' / 'não')
+            lab = str(e.get("label") or "")
+            if re.search(r"sim|yes|true|v\b", lab, re.I):
+                lab_sim = e
+            if re.search(r"não|nao|no|false|f\b", lab, re.I):
+                lab_nao = e
     if pass_true:
         pick = lab_sim or (outgoing[0] if outgoing else None)
     else:
@@ -330,6 +363,8 @@ def graph_walk_steps(
                         "to": b,
                         "id": e.get("id"),
                         "label": str(e.get("label") or ""),
+                        "sourceHandle": str(e.get("sourceHandle") or ""),
+                        "targetHandle": str(e.get("targetHandle") or ""),
                     }
                 )
 
@@ -364,6 +399,7 @@ def graph_walk_steps(
 
     order: List[Dict[str, Any]] = []
     steps = 0
+    visited_global: Set[str] = set()
 
     def dfs(nid: str, path: Set[str]) -> None:
         nonlocal steps
@@ -375,6 +411,11 @@ def graph_walk_steps(
         if nid in path:
             logger.warning("graph_walk_steps: ciclo detetado em %s", nid)
             return
+            
+        if nid in visited_global:
+            return
+            
+        visited_global.add(nid)
         path = set(path)
         path.add(nid)
         steps += 1
@@ -420,26 +461,65 @@ def graph_walk_steps(
             return
 
         if typ == "ab_split":
-            # A/B Split: adiciona como step (para exposure tracking) e branch
-            import random as _rng
+            # A/B Split: roteamento determinístico + persistência (fim do random flutuante)
+            pkey = divisao_persist_key(nid)
+            stored = ctx.get(pkey)
+            variant = None
+            
+            if isinstance(stored, dict):
+                variant = str(stored.get("variant") or "").upper()
+            elif isinstance(stored, str):
+                variant = stored.strip().upper()
+                
             outs_ab = by_from.get(nid, [])
-            wa = max(1, min(99, int(cfg.get("weight_a") or 50)))
-            roll = _rng.randint(1, 100)
-            variant = "A" if roll <= wa else "B"
-            # Adiciona step para o executor gravar a exposure
+            
+            # Backwards compatibility e suporte dinâmico a N pesos
+            weights_arr = []
+            raw_wts = cfg.get("weights")
+            if isinstance(raw_wts, list) and len(raw_wts) >= 2:
+                weights_arr = [float(w) for w in raw_wts]
+            else:
+                wa = max(1, min(99, int(cfg.get("weight_a") or 50)))
+                weights_arr = [float(wa), 100.0 - float(wa)]
+            
+            if variant is None or variant == "":
+                lid = str(ctx.get("lead_id") or "")
+                tid = str(tenant_id or ctx.get("tenant_id") or "default")
+                bid = str(blueprint_id or ctx.get("blueprint_id") or "0")
+                seed = (tid, lid, nid, bid)
+                idx = stable_weighted_index(weights_arr, seed)
+                # idx 0 -> A, idx 1 -> B, idx 2 -> C...
+                variant = chr(65 + idx)
+                
+                # Persiste a variante para que o frontend/motor consigam recarregar exatamente a mesma rota
+                payload = {"variant": variant, "blueprint_id": blueprint_id}
+                ctx[pkey] = payload
+                if divisao_metadata_out is not None:
+                    divisao_metadata_out[pkey] = dict(payload)
+
             order.append({
                 "order": len(order) + 1,
                 "node_id": nid,
                 "type": typ,
                 "config": {**cfg, "_chosen_variant": variant},
             })
-            # Roteia: edge index 0 = A, index 1 = B
-            idx = 0 if variant == "A" else (1 if len(outs_ab) > 1 else 0)
-            if idx < len(outs_ab):
-                nxt = str(outs_ab[idx].get("to") or "").strip()
+
+            nxt = None
+            for e in outs_ab:
+                sh = str(e.get("sourceHandle") or "").upper()
+                if sh == variant:
+                    nxt = str(e.get("to") or "").strip()
+                    break
+            
+            if not nxt:
+                # Fallback: a variante 'A' é índice 0, 'B' é 1, 'C' é 2...
+                idx = ord(variant) - 65
+                if 0 <= idx < len(outs_ab):
+                    nxt = str(outs_ab[idx].get("to") or "").strip()
+                    
+            if nxt:
                 logger.debug("event=flow_ab_split node=%s variant=%s next=%s", nid, variant, nxt)
-                if nxt:
-                    dfs(nxt, path)
+                dfs(nxt, path)
             return
 
         if typ in ("end",):
@@ -447,10 +527,8 @@ def graph_walk_steps(
 
         if typ in ("trigger", "webhook"):
             outs = by_from.get(nid, [])
-            if len(outs) == 1:
-                dfs(str(outs[0]["to"]), path)
-            elif len(outs) > 1:
-                dfs(str(outs[0]["to"]), path)
+            for edge in outs:
+                dfs(str(edge["to"]), path)
             return
 
         order.append(
@@ -465,10 +543,10 @@ def graph_walk_steps(
         outs = by_from.get(nid, [])
         if not outs:
             return
-        if len(outs) == 1:
-            dfs(str(outs[0]["to"]), path)
-        else:
-            dfs(str(outs[0]["to"]), path)
+        
+        # Faz o trace em todas as rotas filhas, garantindo que timeouts e respostas não sejam perdidos
+        for edge in outs:
+            dfs(str(edge["to"]), path)
 
     dfs(start, set())
     return order

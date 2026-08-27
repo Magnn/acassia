@@ -260,7 +260,8 @@ function CreateSlotModal({ onClose, onCreated }: { onClose: () => void; onCreate
           if (day >= 1 && day <= 5) dates.push(d.toISOString().split('T')[0]);
           d.setDate(d.getDate() + 1);
         }
-        return schedulingApi.bulkSlots({ dates, start_time: startTime, end_time: endTime, duration_minutes: duration });
+        return schedulingApi.bulkSlots({ dates, start_time: startTime, end_time: endTime, duration_minutes: duration })
+          .then((res) => ({ ...res, ids: [] as number[] }));
       }
       return schedulingApi.createSlot({ date, start_time: startTime, end_time: endTime, duration_minutes: duration });
     },

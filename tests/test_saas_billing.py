@@ -28,6 +28,7 @@ def _setup_db():
     db = SessionLocal()
     db.query(models.User).delete()
     db.query(models.TenantFlowVariable).delete()
+    db.query(models.TenantBilling).delete()
     db.commit()
     db.close()
     # Resetar stripe.api_key entre testes
@@ -61,7 +62,7 @@ def logged_in_client(app):
 # ─── stripe_client funções puras ─────────────────────────────────────────────
 
 def test_plan_labels_tem_3_planos():
-    assert set(PLAN_LABELS.keys()) == {"starter", "pro", "premium"}
+    assert set(PLAN_LABELS.keys()) == {"starter", "pro", "enterprise", "premium"}
 
 
 def test_price_id_for_plan_le_env(monkeypatch):
@@ -150,7 +151,7 @@ def test_checkout_caminho_feliz_redireciona_pra_stripe(logged_in_client, monkeyp
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_xxx")
     monkeypatch.setenv("STRIPE_PRICE_STARTER", "price_test_starter")
 
-    fake_session = SimpleNamespace(url="https://checkout.stripe.com/c/xyz")
+    fake_session = SimpleNamespace(url="https://checkout.stripe.com/c/xyz", id="sess_fake_123")
     with patch("api.saas.billing.create_checkout_session", return_value=fake_session) as m:
         client, user = logged_in_client
         res = client.post("/saas/billing/checkout/starter", follow_redirects=False)
@@ -191,6 +192,13 @@ def test_portal_com_customer_id_redireciona_pro_stripe(logged_in_client, monkeyp
     try:
         db.add(models.TenantFlowVariable(
             tenant_id=user.tenant_id, key="stripe.customer_id", value_json="cus_test_xxx",
+        ))
+        db.add(models.TenantBilling(
+            tenant_id=user.tenant_id,
+            plan="starter",
+            billing_period="monthly",
+            status="active",
+            customer_id="cus_test_xxx"
         ))
         db.commit()
     finally:

@@ -506,12 +506,26 @@ def _validar_foto_mao_com_gemini(ctx) -> bool:
     if not media_bytes:
         img_url = getattr(ctx, "imagem_url", None) or (getattr(ctx, "metadata", {}) or {}).get("imagem_url")
         if img_url:
-            try:
-                resp = requests.get(img_url, timeout=10)
-                if resp.status_code == 200:
-                    media_bytes = resp.content
-            except Exception as e:
-                logger.warning("⚠️ [VISION] Erro URL: %s", e)
+            # Tenta ler do arquivo local primeiro (evita requests externas e problemas de DNS/PUBLIC_URL)
+            filename = os.path.basename(img_url.split("?")[0])
+            _curr_dir = os.path.dirname(os.path.abspath(__file__))
+            local_path = os.path.join(os.path.dirname(os.path.dirname(_curr_dir)), "downloads", filename)
+            if os.path.exists(local_path):
+                try:
+                    with open(local_path, "rb") as f:
+                        media_bytes = f.read()
+                    logger.info("✅ [VISION] Bytes da imagem carregados localmente do arquivo: %s", local_path)
+                except Exception as e:
+                    logger.warning("⚠️ [VISION] Erro ao ler arquivo local %s: %s", local_path, e)
+            
+            # Fallback para HTTP requests
+            if not media_bytes:
+                try:
+                    resp = requests.get(img_url, timeout=10)
+                    if resp.status_code == 200:
+                        media_bytes = resp.content
+                except Exception as e:
+                    logger.warning("⚠️ [VISION] Erro URL: %s", e)
 
     if not media_bytes:
         logger.warning("⚠️ [VISION] Sem bytes de imagem para validação.")
@@ -591,7 +605,8 @@ _SYSTEM_EXTRACAO_RICA = """Do texto do lead abaixo, extraia (use INDEFINIDO se n
 NOME_PESSOA::nome da outra pessoa ou INDEFINIDO
 TEMPO_EXATO::há quanto tempo pesa ou INDEFINIDO
 EVENTO_GATILHO::momento ou fatos que pioraram ou INDEFINIDO
-Só estas três linhas, formato exato."""
+SIGNO_MENCIONADO::signo zodiacal ou data de nascimento mencionada (ex: "Escorpião" ou "15/03") ou INDEFINIDO
+Só estas quatro linhas, formato exato."""
 
 
 def _graceful_exit(ctx, nome_fmt: str, msg_lead: str) -> List[Acao]:
@@ -644,7 +659,7 @@ def _tratar_frases_ia(texto: str) -> List[str]:
 
 
 def _parse_extracao_rica(texto: str) -> Dict[str, str]:
-    out = {"nome_pessoa_envolvida": "", "tempo_exato": "", "evento_gatilho": ""}
+    out = {"nome_pessoa_envolvida": "", "tempo_exato": "", "evento_gatilho": "", "signo_mencionado": ""}
     if not texto:
         return out
     for linha in texto.split("\n"):
@@ -653,6 +668,10 @@ def _parse_extracao_rica(texto: str) -> Dict[str, str]:
         k, _, v = linha.partition("::")
         key = k.strip().upper()
         val = v.strip().strip('"').strip("'")
+        # Proteção contra vazamento de múltiplas chaves na mesma linha (ex: "Magnus TEMPO_EXATO::1 ano")
+        val = re.split(r"(?i)\b(?:NOME_PESSOA|TEMPO_EXATO|EVENTO_GATILHO|SIGNO_MENCIONADO|INDEFINIDO)\b", val)[0].strip()
+        # Remove pontuações residuais no fim da extração
+        val = val.rstrip(" :;.,|")
         if key == "NOME_PESSOA":
             out["nome_pessoa_envolvida"] = val
         elif key == "TEMPO_EXATO":
@@ -660,6 +679,8 @@ def _parse_extracao_rica(texto: str) -> Dict[str, str]:
         elif key == "EVENTO_GATILHO":
             if not _RE_GATILHO_INVALIDO.search(val):
                 out["evento_gatilho"] = val
+        elif key == "SIGNO_MENCIONADO":
+            out["signo_mencionado"] = val
     return out
 
 
@@ -684,13 +705,99 @@ def _extrair_dados_ricos_ia(ctx, meta: dict) -> None:
             metadata=meta,
         )
         parsed = _parse_extracao_rica(raw or "")
+        nome_lead_lower = str(meta.get("nome_lead") or "").strip().lower()
         for k, v in parsed.items():
-            if v and v.upper() != "INDEFINIDO":
-                meta[k] = v
+            if not v or v.upper() == "INDEFINIDO":
+                continue
+            if k == "nome_pessoa_envolvida" and v.strip().lower() == nome_lead_lower:
+                continue
+            if k == "signo_mencionado":
+                # Tenta normalizar e resolver o signo passivamente
+                signo_resolvido = _calcular_signo(v)
+                if signo_resolvido and not meta.get("signo"):
+                    meta["signo"] = signo_resolvido
+                    meta["lead_birth_date_capturado"] = v[:60]
+                    logger.info("event=node3_signo_passivo signo=%s lead=%s", signo_resolvido, nome_lead_lower)
+                continue
+            meta[k] = v
         meta["node3_extracao_feita"] = True
         logger.info("event=node3_extracao_ok lead_fields=%s", list(parsed.keys()))
     except Exception as e:
         logger.error("🚨 [NODE3] Extração rica: %s", e)
+
+
+_MESES_PT: Dict[str, int] = {
+    "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+    "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12,
+    "janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3,
+    "abril": 4, "maio": 5, "junho": 6, "julho": 7, "agosto": 8,
+    "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+}
+
+_FAIXAS_SIGNO: List[Tuple[int, int, int, int, str]] = [
+    (3, 21, 4, 19, "Áries"),
+    (4, 20, 5, 20, "Touro"),
+    (5, 21, 6, 20, "Gêmeos"),
+    (6, 21, 7, 22, "Câncer"),
+    (7, 23, 8, 22, "Leão"),
+    (8, 23, 9, 22, "Virgem"),
+    (9, 23, 10, 22, "Libra"),
+    (10, 23, 11, 21, "Escorpião"),
+    (11, 22, 12, 21, "Sagitário"),
+    (12, 22, 12, 31, "Capricórnio"),
+    (1, 1, 1, 19, "Capricórnio"),
+    (1, 20, 2, 18, "Aquário"),
+    (2, 19, 3, 20, "Peixes"),
+]
+
+
+_SIGNO_DIRETO: Dict[str, str] = {
+    "aries": "Áries", "áries": "Áries",
+    "touro": "Touro",
+    "gemeos": "Gêmeos", "gêmeos": "Gêmeos", "gémeos": "Gêmeos",
+    "cancer": "Câncer", "câncer": "Câncer",
+    "leao": "Leão", "leão": "Leão",
+    "virgem": "Virgem",
+    "libra": "Libra",
+    "escorpiao": "Escorpião", "escorpião": "Escorpião",
+    "sagitario": "Sagitário", "sagitário": "Sagitário",
+    "capricornio": "Capricórnio", "capricórnio": "Capricórnio",
+    "aquario": "Aquário", "aquário": "Aquário",
+    "peixes": "Peixes",
+}
+
+
+def _calcular_signo(texto: str) -> Optional[str]:
+    """Extrai signo de texto livre: data numérica, data por extenso ou nome do signo."""
+    t = (texto or "").lower().strip()
+    # Nome direto do signo (ex: "sou peixes", "capricórnio")
+    for token, signo in _SIGNO_DIRETO.items():
+        if re.search(rf"\b{re.escape(token)}\b", t):
+            return signo
+    dia: Optional[int] = None
+    mes: Optional[int] = None
+    # DD/MM[/YYYY] ou DD-MM[-YYYY]
+    m = re.search(r"\b(\d{1,2})[/\-\.](\d{1,2})(?:[/\-\.]\d{2,4})?\b", t)
+    if m:
+        d, mo = int(m.group(1)), int(m.group(2))
+        if 1 <= d <= 31 and 1 <= mo <= 12:
+            dia, mes = d, mo
+    if dia is None:
+        # "15 de março" ou "15 março"
+        m2 = re.search(r"\b(\d{1,2})\s+(?:de\s+)?([a-záéíóúãõçêâîôû]{3,})", t)
+        if m2:
+            d = int(m2.group(1))
+            mes_txt = m2.group(2)[:8]
+            mo = _MESES_PT.get(mes_txt[:3])
+            if mo and 1 <= d <= 31:
+                dia, mes = d, mo
+    if dia is None or mes is None:
+        return None
+    cur = mes * 100 + dia
+    for mi, di, mf, df, nome in _FAIXAS_SIGNO:
+        if mi * 100 + di <= cur <= mf * 100 + df:
+            return nome
+    return None
 
 
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
@@ -821,16 +928,24 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     _append_node3_ancora(meta, desejo_precoce[:240])
                     _append_node3_ancora(meta, aprofundamento_precoce[:260])
                     _extrair_dados_ricos_ia(ctx, meta)
+                    acoes_iniciais.extend([
+                        Acao(tipo="delay", segundos=random.randint(9, 14)),
+                        Acao(tipo="text", conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção."),
+                    ])
+                    if not meta.get("signo"):
+                        meta["node3_estado"] = "aguardando_nascimento"
+                        acoes_iniciais.extend([
+                            Acao(tipo="delay", segundos=random.randint(7, 11)),
+                            Acao(tipo="text", conteudo="Me diz só o dia e o mês que você nasceu?"),
+                        ])
+                        ctx.metadata = meta
+                        return _normalizar_acoes_texto_node3(acoes_iniciais), "3_coleta_profunda"
                     meta["node3_estado"] = "coleta_completa"
                     ctx.estado_coleta = "node3_camada4_extracao_ok"
-                    acoes_iniciais.extend(
-                        [
-                            Acao(tipo="delay", segundos=random.randint(9, 14)),
-                            Acao(tipo="text", conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção."),
-                            Acao(tipo="delay", segundos=random.randint(8, 12)),
-                            Acao(tipo="text", conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos."),
-                        ]
-                    )
+                    acoes_iniciais.extend([
+                        Acao(tipo="delay", segundos=random.randint(8, 12)),
+                        Acao(tipo="text", conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos."),
+                    ])
                     ctx.metadata = meta
                     return _normalizar_acoes_texto_node3(acoes_iniciais), "4_instagram"
 
@@ -1015,20 +1130,24 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     _append_node3_ancora(meta, desejo_precoce[:240])
                     _append_node3_ancora(meta, aprofundamento_precoce[:260])
                     _extrair_dados_ricos_ia(ctx, meta)
+                    fechar_ft: List[Acao] = [
+                        Acao(tipo="delay", segundos=random.randint(8, 12)),
+                        Acao(tipo="text", conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção."),
+                    ]
+                    if not meta.get("signo"):
+                        meta["node3_estado"] = "aguardando_nascimento"
+                        fechar_ft.extend([
+                            Acao(tipo="delay", segundos=random.randint(7, 11)),
+                            Acao(tipo="text", conteudo="Me diz só o dia e o mês que você nasceu?"),
+                        ])
+                        ctx.metadata = meta
+                        return _normalizar_acoes_texto_node3(fechar_ft), "3_coleta_profunda"
                     meta["node3_estado"] = "coleta_completa"
                     ctx.estado_coleta = "node3_camada4_extracao_ok"
-                    fechar_ft = [
-                        Acao(tipo="delay", segundos=random.randint(8, 12)),
-                        Acao(
-                            tipo="text",
-                            conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção.",
-                        ),
+                    fechar_ft.extend([
                         Acao(tipo="delay", segundos=random.randint(7, 11)),
-                        Acao(
-                            tipo="text",
-                            conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos.",
-                        ),
-                    ]
+                        Acao(tipo="text", conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos."),
+                    ])
                     ctx.metadata = meta
                     return _normalizar_acoes_texto_node3(fechar_ft), "4_instagram"
                 meta["node3_estado"] = "aguardando_aprofundamento_tempo"
@@ -1207,6 +1326,16 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             meta.pop("node3_aprofundamento_acumulado", None)
             _append_node3_ancora(meta, str(meta.get("aprofundamento_texto") or "")[:260])
             _extrair_dados_ricos_ia(ctx, meta)
+            if not meta.get("signo"):
+                meta["node3_estado"] = "aguardando_nascimento"
+                fechar = [
+                    Acao(tipo="delay", segundos=delay_dramatico()),
+                    Acao(tipo="text", conteudo=f"{nome_fmt}, o que você trouxe fecha com o que as linhas já sussurravam."),
+                    Acao(tipo="delay", segundos=random.randint(8, 13)),
+                    Acao(tipo="text", conteudo="Me diz só o dia e o mês que você nasceu?"),
+                ]
+                ctx.metadata = meta
+                return _normalizar_acoes_texto_node3(fechar), "3_coleta_profunda"
             meta["node3_estado"] = "coleta_completa"
             ctx.estado_coleta = "node3_camada4_extracao_ok"
             fechar = [
@@ -1232,6 +1361,38 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 metadata={"skip_gancho_final": True},
             ),
         ], proximo_node
+
+    # ── signo: captura data de nascimento (estado intermediário após extração rica) ──
+    if estado == "aguardando_nascimento":
+        signo = _calcular_signo(msg_lead)
+        if signo:
+            meta["signo"] = signo
+            meta["lead_birth_date_capturado"] = msg_lead[:60]
+            logger.info("event=node3_signo_capturado signo=%s lead=%s", signo, nome_fmt)
+            meta["node3_estado"] = "coleta_completa"
+            ctx.estado_coleta = "node3_camada4_extracao_ok"
+            ctx.metadata = meta
+            return _normalizar_acoes_texto_node3([
+                Acao(tipo="delay", segundos=random.randint(6, 10)),
+                Acao(tipo="text", conteudo=f"Anotei. Seguimos agora com a leitura. ✨"),
+            ]), "4_instagram"
+        # Lead não deu data reconhecível — tenta mais uma vez ou avança
+        tentativas_signo = int(meta.get("node3_tentativas_signo", 0) or 0) + 1
+        meta["node3_tentativas_signo"] = tentativas_signo
+        if tentativas_signo < 2:
+            ctx.metadata = meta
+            return [
+                Acao(tipo="delay", segundos=6),
+                Acao(tipo="text", conteudo="Pode ser bem simples: tipo 15/03 ou 15 de março, só o dia e o mês?"),
+            ], "3_coleta_profunda"
+        # Desiste do signo, avança sem ele
+        meta["node3_estado"] = "coleta_completa"
+        ctx.estado_coleta = "node3_camada4_extracao_ok"
+        ctx.metadata = meta
+        return _normalizar_acoes_texto_node3([
+            Acao(tipo="delay", segundos=random.randint(6, 10)),
+            Acao(tipo="text", conteudo="Tudo bem, seguimos com o que você trouxe. ✨"),
+        ]), "4_instagram"
 
     ctx.metadata = meta
     ctx.estado_coleta = "node3_fallback_instagram"

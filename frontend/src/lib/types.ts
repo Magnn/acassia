@@ -9,7 +9,10 @@ export type MeuMisterioNodeType =
   | 'delay'
   | 'condicao'
   | 'gpt'
+  | 'agente_ia'
+  | 'voice_studio'
   | 'api'
+  | 'integration'
   | 'ab_split'
   | 'motor_ref'
   | 'anotacao'
@@ -33,6 +36,8 @@ export interface MeuMisterioEdge {
   id: string;
   from: string;
   to: string;
+  sourceHandle?: string;
+  targetHandle?: string;
   label?: string;
   /** deltas do ponto de controle Bezier — descartados na Fase 1 (React Flow tem Bezier nativo) */
   dc1x?: number;

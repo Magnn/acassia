@@ -51,6 +51,16 @@ def perfil_copy_para_prompt(meta: Mapping[str, Any], msg_lead: str) -> str:
     if arq and arq.lower() not in ("o ferido", "ferido"):
         partes.append(f"Arquétipo percebido: {arq}.")
 
+    cet = str(meta.get("ceticismo_lead") or "").strip().lower()
+    if cet == "alto":
+        partes.append("Ceticismo alto: ancore em prova social concreta, evite linguagem mística abstrata.")
+    elif cet == "baixo":
+        partes.append("Ceticismo baixo: pode usar linguagem simbólica e espiritual com mais profundidade.")
+
+    sof = str(meta.get("sofisticacao_lead") or "").strip()
+    if sof in ("2", "3"):
+        partes.append("Sofisticação elevada: lead conhece o mercado — evite clichês, seja preciso e direto.")
+
     return " ".join(partes) if partes else "Tom padrão: acolhimento firme, sem telemarketing."
 
 

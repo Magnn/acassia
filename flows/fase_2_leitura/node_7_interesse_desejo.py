@@ -138,6 +138,8 @@ DADOS DA HIVE MIND:
 - Nome/Pessoa envolvida no relato: {nome_pessoa_envolvida}
 - Tempo exato citado pelo lead (quando houver): {tempo_exato}
 - Evento gatilho citado pelo lead (quando houver): {evento_gatilho}
+- Objeção silenciosa (medo/resistência que o lead não verbalizou — Node 5): {obj_silenciosa}
+- Signo do lead (quando houver — use com sutileza para fortalecer autoridade na agitação): {signo}
 - Última reação do lead: "{msg_lead}"
 
 {contexto_desejo_resultado}
@@ -156,6 +158,7 @@ MISSÃO (7 BLOCOS, prefixo BLOCO_1:: … BLOCO_7::; pode continuar o texto nas l
 8. MICRO-SINS: conduza com pequenos "sim" lógicos (ressonou -> faz sentido agir -> pedir explicação do próximo passo).
 9. POR QUE AGORA FUNCIONA: personalize em 1 linha usando dor + tempo + mecanismo; sem genérico.
 10. ANTIBARNUM: se houver {tempo_exato} e/ou {evento_gatilho}, use de forma natural para ancorar; evite abertura genérica.
+10.1 OBJEÇÃO SILENCIOSA: se {obj_silenciosa} não for "Nenhuma" nem INDEFINIDO, dissolva-a sutilmente em 1 bloco (sem citar a objeção com rótulo técnico — transforme em empatia com a resistência interna).
 11. POTENCIAL REPRESADO: inclua um bloco sobre "você já era para estar em patamar mais alto".
 12. CTA FORTE: termine pedindo permissão com pergunta de compromisso (sem "me responde sim").
 
@@ -216,6 +219,7 @@ def executar_v2(ctx) -> tuple:
     evento_gatilho = limpar_meta_textual(
         str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO"), 120
     ) or "INDEFINIDO"
+    obj_silenciosa = str(meta.get("objecao_silenciosa") or "Nenhuma").strip()[:180]
     perfil_copy = perfil_copy_para_prompt(meta, msg_lead)
 
     blocos_gerados = []
@@ -249,6 +253,8 @@ def executar_v2(ctx) -> tuple:
                 nome_pessoa_envolvida=nome_pessoa_envolvida,
                 tempo_exato=tempo_exato,
                 evento_gatilho=evento_gatilho,
+                obj_silenciosa=obj_silenciosa,
+                signo=str(meta.get("signo") or "INDEFINIDO"),
                 msg_lead=msg_lead,
                 contexto_desejo_resultado=ctx_desejo_res,
                 norte_venda_fria=norte_editorial_venda_fria_direta_para_prompt(),
@@ -309,13 +315,13 @@ def executar_v2(ctx) -> tuple:
             else ""
         )
         blocos_gerados = [
-            f"O que você trouxe aqui bate exatamente com o que as linhas mostraram, {nome_fmt}. Não é coincidência, é padrão real.",
-            f"Isso que você veio trazer não é de hoje: há {tempo_ctx} esse ciclo vem drenando sua energia, mesmo quando você tenta seguir em frente.{gatilho_ctx}",
-            "Se continuar do mesmo jeito, o custo cresce em silêncio. O padrão muda de forma, mas continua no comando.",
-            f"O {mecanismo} é firmação voltada ao que você pediu, com honestidade: corta o nó na raiz, sem promessa de milagre nem prazo mágico.",
-            "Com o que vejo em você, já era para estar em um patamar muito mais alto do que está agora.",
-            "Não é falta de fé nem de força sua. É uma causa ativa que ainda não foi tocada na raiz.",
-            "Se eu te mostrar agora, passo a passo, como esse resgate funciona para o seu caso, você topa seguir comigo?",
+            f"Recebi seu retorno, {nome_fmt}. Essa sua honestidade é o primeiro passo real para a mudança.",
+            "Quando olhei suas linhas, vi que o seu maior obstáculo não é a falta de merecimento. É uma barreira invisível que dispersa a sua energia antes que ela se concretize.",
+            "Você passa a sensação de que corre, corre, mas no final volta para a mesma estaca. Isso esgota o peito e cansa a alma.",
+            f"O trabalho de {mecanismo} foi desenhado exatamente para redirecionar essa força, limpando os caminhos e removendo o que está travado.",
+            "Não se trata de sorte ou de esperar o tempo resolver sozinho. Trata-se de reordenar o que está desalinhado por dentro.",
+            "Muitas pessoas chegam até mim com essa mesma sensação de estagnação, e é lindo ver a leveza retornar quando a firmação é feita.",
+            "Se você me permitir, posso te explicar agora como funciona esse próximo passo prático. Posso prosseguir?",
         ]
 
     if blocos_gerados:

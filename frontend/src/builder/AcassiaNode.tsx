@@ -121,7 +121,7 @@ export default function MeuMisterioNode({ id, data, selected }: NodeProps<MeuMis
   }
 
   // Simulate a random traffic count for visual parity with the screenshot
-  const trafficCount = d.config.stats_count !== undefined ? d.config.stats_count : Math.abs(parseInt(d.label || '0', 36)) % 500;
+  const trafficCount = numberField(d.config, 'stats_count') ?? Math.abs(parseInt(d.label || '0', 36)) % 500;
 
   return (
     <div

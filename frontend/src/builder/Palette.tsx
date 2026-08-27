@@ -1,10 +1,12 @@
-﻿import { X } from 'lucide-react';
+import { useState } from 'react';
+import { X, Plus } from 'lucide-react';
 import { visualForType, type NodeVisual } from './nodeStyles';
 import type { MeuMisterioNodeType } from '../lib/types';
 
 export const DRAG_MIME = 'application/x-meumisterio-node';
 
 const ITEMS: MeuMisterioNodeType[] = [
+  'trigger',
   'menu',
   'conteudo',
   'pergunta',
@@ -14,30 +16,53 @@ const ITEMS: MeuMisterioNodeType[] = [
   'condicao',
   'notificar_atendente',
   'ab_split',
-  'gpt',
   'api',
-  'motor_ref',
+  'integration',
+  'gpt',
+  'agente_ia',
+  'voice_studio',
   'anotacao',
+  'end',
 ];
 
 export default function Palette() {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <aside className="absolute left-0 top-0 w-[280px] bg-white border-r border-slate-200 overflow-hidden shadow-[4px_0_24px_rgba(0,0,0,0.06)] flex flex-col h-full z-20">
-      <div className="px-4 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
-        <span className="font-bold text-slate-800 text-[15px]">Menu de opções</span>
-        <button className="text-slate-400 hover:text-slate-600 transition-colors">
-           <X className="w-4 h-4" />
-        </button>
+    <>
+      {/* Botão Flutuante (FAB) - z-10 para ficar atrás da Paleta */}
+      <div className="absolute bottom-6 left-6 z-10 flex flex-col items-center gap-2">
+         <button
+            onClick={() => setIsOpen(!isOpen)}
+            className={`w-[52px] h-[52px] rounded-full flex items-center justify-center text-white shadow-lg transition-transform duration-300 hover:scale-105 active:scale-95 ${isOpen ? 'bg-[#7e22ce] rotate-45' : 'bg-[#9333ea] rotate-0'}`}
+         >
+            <Plus className="w-8 h-8" strokeWidth={2.5} />
+         </button>
       </div>
 
-      <div className="p-3 flex-1 overflow-y-auto custom-scrollbar">
-         <div className="flex flex-col gap-2">
-           {ITEMS.map((t) => (
-             <PaletteItem key={t} type={t} />
-           ))}
-         </div>
-      </div>
-    </aside>
+      {/* Painel Retrátil da Paleta - z-20 para cobrir o FAB */}
+      <aside 
+        className={`absolute left-0 top-0 w-[280px] bg-white border-r border-slate-200 shadow-[4px_0_24px_rgba(0,0,0,0.06)] flex flex-col h-full z-20 transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="px-4 py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
+          <span className="font-bold text-slate-800 text-[15px]">Menu de opções</span>
+          <button 
+             onClick={() => setIsOpen(false)}
+             className="text-slate-400 hover:text-slate-600 transition-colors bg-slate-100 p-1.5 rounded-full"
+          >
+             <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-3 flex-1 overflow-y-auto custom-scrollbar">
+           <div className="flex flex-col gap-2">
+             {ITEMS.map((t) => (
+               <PaletteItem key={t} type={t} />
+             ))}
+           </div>
+        </div>
+      </aside>
+    </>
   );
 }
 

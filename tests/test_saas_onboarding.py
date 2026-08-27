@@ -37,6 +37,7 @@ def _setup_db():
     db.query(models.FlowBlueprint).delete()
     db.query(models.TenantFlowVariable).delete()
     db.query(models.TenantFlowSecret).delete()
+    db.query(models.WaPhoneTenantBinding).delete()
     db.commit()
     db.close()
     yield

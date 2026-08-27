@@ -1,4 +1,4 @@
-﻿import type { Edge, Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import type { FlowNodeData } from './adapt';
 import type { MeuMisterioDocument, MeuMisterioEdge, MeuMisterioNode } from './types';
 
@@ -36,6 +36,8 @@ function reactFlowNodeToMeuMisterio(n: Node<FlowNodeData>): MeuMisterioNode {
 
 function reactFlowEdgeToMeuMisterio(e: Edge): MeuMisterioEdge {
   const out: MeuMisterioEdge = { id: e.id, from: e.source, to: e.target };
+  if (e.sourceHandle) out.sourceHandle = e.sourceHandle;
+  if (e.targetHandle) out.targetHandle = e.targetHandle;
   if (typeof e.label === 'string' && e.label.trim()) out.label = e.label;
   return out;
 }

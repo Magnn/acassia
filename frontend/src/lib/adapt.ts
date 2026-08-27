@@ -1,4 +1,4 @@
-﻿import { type Edge, type Node } from '@xyflow/react';
+import { type Edge, type Node } from '@xyflow/react';
 import type { MeuMisterioDocument, MeuMisterioEdge, MeuMisterioNode } from './types';
 
 export interface FlowNodeData extends Record<string, unknown> {
@@ -45,12 +45,13 @@ function meumisterioNodeToReactFlow(n: MeuMisterioNode): Node<FlowNodeData> {
     },
   };
 }
-
 function meumisterioEdgeToReactFlow(e: MeuMisterioEdge): Edge {
   return {
     id: e.id,
     source: e.from,
     target: e.to,
+    sourceHandle: e.sourceHandle || null,
+    targetHandle: e.targetHandle || null,
     type: 'default', // Smooth bezier curve
     label: e.label,
     animated: false,

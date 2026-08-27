@@ -26,10 +26,7 @@ _PRAGMA_JA_LOGADO = False
 
 # ── CONFIGURAÇÃO DE CAMINHOS ──
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Prefer meumisterio.db, fallback to meumisterio.db for backwards compatibility
-_NEW_DB = os.path.join(_BASE_DIR, "meumisterio.db")
-_LEGACY_DB = os.path.join(_BASE_DIR, "meumisterio.db")
-DB_PATH = _NEW_DB if os.path.exists(_NEW_DB) else (_LEGACY_DB if os.path.exists(_LEGACY_DB) else _NEW_DB)
+DB_PATH = os.path.join(_BASE_DIR, "meumisterio.db")
 
 # Detecta driver a partir de DATABASE_URL
 _raw_url = os.getenv("DATABASE_URL", "").strip()

@@ -4,6 +4,7 @@ import unittest
 from schema import ContextoConversa
 
 from flows.funil_estatico_meu_misterio import node_static_meumisterio_b2 as b2
+from flows.funil_estatico_meu_misterio import roteiro as R
 
 
 class TestStaticMeumisterioB2(unittest.TestCase):
@@ -33,8 +34,8 @@ class TestStaticMeumisterioB2(unittest.TestCase):
         self.assertEqual(ctx.metadata.get("static_mm_b2_phase"), "awaiting_nome_amado")
         delays = [a.segundos for a in acoes if a.tipo == "delay"]
         self.assertIn(0, delays)
-        self.assertIn(180, delays)
-        self.assertIn(26, delays)
+        self.assertIn(R.B2_DELAY_PRE_AUDIO_S, delays)
+        self.assertIn(R.B2_DELAY_POS_AUDIO_S, delays)
         tipos = [a.tipo for a in acoes]
         self.assertIn("text", tipos)
         self.assertGreaterEqual(tipos.count("text"), 2)

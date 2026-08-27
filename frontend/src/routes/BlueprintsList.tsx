@@ -38,15 +38,10 @@ import { toast } from '../lib/toast';
 
 const INTEGRATIONS = [
   { id: 'whatsapp', icon: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg', name: 'WhatsApp' },
-  { id: 'activecampaign', icon: null, text: 'AC', name: 'ActiveCampaign' },
   { id: 'kiwify', icon: null, text: 'Ki', name: 'Kiwify' },
-  { id: 'paypal', icon: null, text: 'P', name: 'PayPal' },
-  { id: 'payt', icon: null, text: 'Payt', name: 'PayT' },
   { id: 'hotmart', icon: null, text: '🔥', name: 'Hotmart' },
-  { id: 'braip', icon: null, text: 'B', name: 'Braip' },
-  { id: 'eduzz', icon: null, text: 'E', name: 'Eduzz' },
   { id: 'asaas', icon: null, text: 'Asaas', name: 'Asaas' },
-  { id: 'tray', icon: null, text: 'Tray', name: 'Tray' },
+  { id: 'stripe', icon: null, text: 'S', name: 'Stripe' },
 ];
 
 export default function BlueprintsList() {
@@ -83,7 +78,6 @@ export default function BlueprintsList() {
   const [modalInput, setModalInput] = useState('');
   const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
 
-  const [selectedApiType, setSelectedApiType] = useState<'oficial' | 'business'>('oficial');
   const [selectedIntegration, setSelectedIntegration] = useState('whatsapp');
   const [selectedEvent, setSelectedEvent] = useState('');
 
@@ -119,7 +113,11 @@ export default function BlueprintsList() {
     const val = modalInput.trim();
 
     if (modalType === 'createFlow' && val) {
-      createBlueprint(val);
+      createBlueprint({
+        title: val,
+        integration: selectedIntegration,
+        event: selectedEvent,
+      });
     } else if (modalType === 'createFolder' && val) {
       updateFolders(addFolder(folders, val));
       toast.success('Pasta criada.');
@@ -358,33 +356,6 @@ export default function BlueprintsList() {
                 </div>
 
                 <div className="p-8">
-                  <div className="flex justify-center mb-8">
-                    <div className="bg-bg-primary rounded-full p-1 flex items-center shadow-inner border border-border">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedApiType('oficial')}
-                        className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
-                          selectedApiType === 'oficial' 
-                            ? 'bg-accent-amethyst text-white shadow-md' 
-                            : 'text-secondary hover:text-primary'
-                        }`}
-                      >
-                        Whatsapp API Oficial
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedApiType('business')}
-                        className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
-                          selectedApiType === 'business' 
-                            ? 'bg-accent-amethyst text-white shadow-md' 
-                            : 'text-secondary hover:text-primary'
-                        }`}
-                      >
-                        Whatsapp Business
-                      </button>
-                    </div>
-                  </div>
-
                   <form onSubmit={handleModalSubmit}>
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-primary mb-1">
@@ -402,12 +373,15 @@ export default function BlueprintsList() {
                       <p className="text-[11px] text-secondary/60 mt-1">O nome deve conter no mínimo 4 caracteres</p>
                     </div>
 
-                    <div className="grid grid-cols-6 gap-3 mb-8">
+                    <div className="grid grid-cols-5 gap-3 mb-8">
                       {INTEGRATIONS.map(int => (
                         <button
                           key={int.id}
                           type="button"
-                          onClick={() => setSelectedIntegration(int.id)}
+                          onClick={() => {
+                            setSelectedIntegration(int.id);
+                            setSelectedEvent('');
+                          }}
                           className={`aspect-square rounded-xl border flex items-center justify-center transition-all bg-bg-primary ${
                             selectedIntegration === int.id 
                               ? 'border-accent-amethyst shadow-[0_0_0_1px_#8b5cf6]' 
@@ -446,9 +420,18 @@ export default function BlueprintsList() {
                         className="w-full bg-bg-primary border border-border rounded-xl px-4 py-3 text-primary text-sm focus:outline-none focus:border-accent-amethyst focus:ring-1 focus:ring-accent-amethyst transition-all shadow-sm appearance-none"
                       >
                         <option value="" disabled>Selecione um evento</option>
-                        <option value="keyword">Mensagem de Palavra-chave</option>
-                        <option value="purchase">Compra Aprovada</option>
-                        <option value="abandon">Carrinho Abandonado</option>
+                        {selectedIntegration === 'whatsapp' ? (
+                          <>
+                            <option value="keyword">Mensagem de palavra-chave</option>
+                            <option value="message_received">Qualquer mensagem recebida</option>
+                            <option value="inicio_conversa">Início de conversa</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="purchase">Compra aprovada</option>
+                            <option value="abandon">Carrinho abandonado</option>
+                          </>
+                        )}
                       </select>
                     </div>
 

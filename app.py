@@ -15,6 +15,12 @@ ESTA VERSÃO É O ÁPICE DA ARQUITETURA MAGNO 2026:
 
 import os
 import sys
+
+# Carrega .env ANTES de qualquer import que leia variáveis de ambiente
+# (db.database, engine, etc. leem DATABASE_URL/GEMINI_API_KEY no nível de módulo)
+from dotenv import load_dotenv
+load_dotenv()
+
 import hmac
 import hashlib
 import logging
@@ -37,26 +43,26 @@ from api.saas.auth import require_role
 # Isso NÃO é o super-admin do painel /admin — pra esse, use:
 #     from api.admin.guard import require_admin  (4 camadas: login+role+allowlist+2FA)
 #
-# Aqui usamos require_tenant_owner = require_role("user") para garantir que:
+# Aqui usamos require_tenant_owner = require_role("user", "admin") para garantir que:
 #   1. O user está logado (flask-login)
-#   2. O user tem role='user' (dono do workspace / taróloga)
+#   2. O user é dono de um tenant — role='user' (taróloga comum) OU role='admin'
+#      (que deve poder fazer tudo que um 'user' faz, nunca menos — sem o
+#      "admin" aqui, require_role("user") exigia a role EXATA "user" e
+#      travava a própria conta admin fora do builder de funil).
 #
 # Rotas de blueprints SaaS (/saas/*) já têm seu próprio middleware.
-require_tenant_owner = require_role("user")
+require_tenant_owner = require_role("user", "admin")
 
 # Backward compat — TODO: migrar usos para require_tenant_owner e remover.
 require_admin = require_tenant_owner
 from werkzeug.utils import secure_filename
-from flask_cors import CORS 
-from dotenv import load_dotenv
+from flask_cors import CORS
 from datetime import datetime, timezone, timedelta
 
 # ── AJUSTE DE PATH E AMBIENTE ────────────────────────────────────────
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
-
-load_dotenv()
 
 # ── SENTRY (opcional) ────────────────────────────────────────────────
 _SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
@@ -337,6 +343,7 @@ def _register_saas_blueprints():
     from api.saas.wa_devices import devices_bp as saas_wa_devices_bp
     from api.saas.knowledge import knowledge_bp as saas_knowledge_bp
     from api.saas.fiscal import fiscal_bp as saas_fiscal_bp
+    from api.saas.credentials import credentials_bp as saas_credentials_bp
     from api.b2c_marketplace import b2c_bp
 
 
@@ -378,6 +385,7 @@ def _register_saas_blueprints():
         saas_ab_bp,
         saas_knowledge_bp,
         saas_fiscal_bp,
+        saas_credentials_bp,
         b2c_bp,
     )
     _failed_bps = []
@@ -424,6 +432,7 @@ motor = Engine(
     gemini_api_key=GEMINI_API_KEY,
     tenant_id=get_engine_tenant_id(),
 )
+app.extensions["flow_engine"] = motor
 
 # ─────────────────────────────────────────────────────────────────────
 # GESTÃO DE FILA POR LEAD (LeadInboxManager)

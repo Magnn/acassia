@@ -16,6 +16,8 @@ export interface LeadPreview {
   tags?: string[];
   spiritual_category?: string | null;
   spiritual_urgency?: 'low' | 'med' | 'high' | null;
+  is_urgent?: boolean;
+  urgent_reason?: string | null;
 }
 
 export type SpiritualCategory =

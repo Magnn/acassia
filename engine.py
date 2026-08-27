@@ -31,7 +31,15 @@ from typing import Any, Optional, List, Set
 import requests
 
 from db.database import SessionLocal
-from db.models import Lead, Mensagem, EventoAudit, LeadBehaviorEvent, FlowBlueprint
+from db.models import (
+    ABTestExposure,
+    EventoAudit,
+    FlowBlueprint,
+    FlowPublish,
+    Lead,
+    LeadBehaviorEvent,
+    Mensagem,
+)
 from ai.intent_classifier import IntentClassifier
 from ai.context_compressor import ContextCompressor
 from ai.sentiment_analyzer import SentimentAnalyzer
@@ -257,6 +265,11 @@ class Engine:
 
         self._circuit   = CircuitBreaker()
         self._mod_cache = ModuleCache()
+        # Pool reutilizável para NLU paralelo (intent + sentiment) — evita
+        # criar/destruir threads a cada mensagem em alta carga.
+        self._nlu_pool  = ThreadPoolExecutor(
+            max_workers=4, thread_name_prefix="nlu",
+        )
         
         self._leads_em_processamento: dict[int, float] = {}
         self._lock_proc = threading.Lock()
@@ -906,7 +919,10 @@ class Engine:
                         _bd_result = _bde.sniff_and_persist(texto_sniff, lead)
                         if _bd_result is not None and _bd_result.date is not None:
                             ctx.metadata["lead_birth_date_capturado"] = _bd_result.date.isoformat()
-                            ctx.metadata["lead_signo_capturado"] = getattr(lead, "signo", None)
+                            _signo_bd = getattr(lead, "signo", None)
+                            ctx.metadata["lead_signo_capturado"] = _signo_bd
+                            if _signo_bd and not ctx.metadata.get("signo"):
+                                ctx.metadata["signo"] = _signo_bd
                             try:
                                 db.add(EventoAudit(
                                     lead_id=lead.id,
@@ -1007,21 +1023,20 @@ class Engine:
                     ctx.score_engajamento = 0.5
                 else:
                     try:
-                        with ThreadPoolExecutor(max_workers=2) as pool:
-                            fut_i = pool.submit(
-                                self.intent_classifier.classificar,
-                                ctx.texto_recebido,
-                                ctx.historico,
-                                ctx.node_atual,
-                                lead.id,
-                            )
-                            fut_s = pool.submit(
-                                self.sentiment_analyzer.analisar,
-                                ctx.texto_recebido,
-                                ctx.historico,
-                            )
-                            ctx.intencao = fut_i.result()
-                            sent = fut_s.result()
+                        fut_i = self._nlu_pool.submit(
+                            self.intent_classifier.classificar,
+                            ctx.texto_recebido,
+                            ctx.historico,
+                            ctx.node_atual,
+                            lead.id,
+                        )
+                        fut_s = self._nlu_pool.submit(
+                            self.sentiment_analyzer.analisar,
+                            ctx.texto_recebido,
+                            ctx.historico,
+                        )
+                        ctx.intencao = fut_i.result()
+                        sent = fut_s.result()
                     except Exception as exc:
                         logger.warning(
                             "⚠️ [ENGINE] NLU paralelo falhou (%s); a cair para sequencial.",
@@ -1129,8 +1144,10 @@ class Engine:
                         sentimento=ctx.sentimento,
                     )
 
-                # Máquina de estados
-                acoes = self._rotear_state_machine(db, lead, ctx)
+                # Fluxo publicado do builder tem prioridade no WhatsApp. Se o
+                # gatilho não casar, o funil legado continua normalmente.
+                flow_handled, flow_actions = self._try_published_flow_turn(db, lead, ctx)
+                acoes = flow_actions if flow_handled else self._rotear_state_machine(db, lead, ctx)
                 acoes, motivos_redundancia = self._filtrar_acoes_redundantes_por_contexto(ctx, acoes)
                 resumo_turno = self._resumo_acoes_turno(acoes or [])
                 self._registrar_evento_comportamental(
@@ -1533,6 +1550,18 @@ class Engine:
                             getattr(ctx, "node_atual", ""),
                         )
                         continue
+                    # Flow Builder — notificação de atendente (notificar/notificar_atendente): não enviar ao lead.
+                    if (
+                        str(_meta_ac.get("source") or "").strip().lower() == "flow_builder"
+                        and _meta_ac.get("notify")
+                    ):
+                        logger.info(
+                            "event=flow_builder_notify_atendente lead=%s node=%s msg=%s",
+                            lead_id,
+                            getattr(ctx, "node_atual", ""),
+                            str(acao.conteudo or "")[:200],
+                        )
+                        continue
                     # Flow Builder — motor_ref sem execução ou com erro (C3): não enviar texto técnico ao lead.
                     _rt_m = str(_meta_ac.get("runtime") or "").strip().lower()
                     if str(_meta_ac.get("source") or "").strip().lower() == "flow_builder" and _rt_m in (
@@ -1644,8 +1673,28 @@ class Engine:
                     if self.audio_engine and acao.tts_template:
                         try:
                             roteiro = preparar_texto_envio(acao.tts_template, "engine_tts")
-                            audio_url = self.audio_engine.gerar(roteiro)
-                            if audio_url and self._enviar_com_retry(ctx.telefone, "audio", audio_url):
+                            tts_meta = getattr(acao, "metadata", None) or {}
+                            try:
+                                voice_style = float(tts_meta.get("voice_style") or 0.5)
+                            except (TypeError, ValueError):
+                                voice_style = 0.5
+                            try:
+                                voice_speed = float(tts_meta.get("voice_speed") or 1.0)
+                            except (TypeError, ValueError):
+                                voice_speed = 1.0
+                            audio_url = self.audio_engine.gerar(
+                                roteiro,
+                                voice_name=str(tts_meta.get("voice_profile") or "").strip() or None,
+                                style=max(0.0, min(1.0, voice_style)),
+                                speed=max(0.5, min(2.0, voice_speed)),
+                            )
+                            sent_audio = bool(audio_url) and self._enviar_com_retry(
+                                ctx.telefone,
+                                "audio",
+                                audio_url,
+                                audio_voice=bool(tts_meta.get("whatsapp_voice", True)),
+                            )
+                            if sent_audio:
                                 _registrar_source_entregue(acao)
                                 self._salvar_mensagem(db, lead_id, "bot", "[tts]", "audio", auto_commit=False)
                                 enviados += 1
@@ -1654,6 +1703,19 @@ class Engine:
                                     db.commit()
                                     pendentes_db = 0
                                 time.sleep(delay_escuta_pos_audio())
+                            else:
+                                logger.warning("[TTS] Áudio indisponível. Fallback para texto.")
+                                fb = preparar_texto_envio(acao.tts_template, "engine_tts_fallback")
+                                if self._enviar_com_retry(ctx.telefone, "text", fb):
+                                    _registrar_source_entregue(acao)
+                                    self._salvar_mensagem(db, lead_id, "bot", fb, "text", auto_commit=False)
+                                    enviados += 1
+                                    pendentes_db += 1
+                                    if pendentes_db >= batch_commit:
+                                        db.commit()
+                                        pendentes_db = 0
+                                else:
+                                    falhas += 1
                         except Exception as e:
                             logger.warning(f"⚠️ [TTS] Falha: {e}. Fallback para texto.")
                             fb = preparar_texto_envio(acao.tts_template, "engine_tts_fallback")
@@ -1665,6 +1727,20 @@ class Engine:
                                 if pendentes_db >= batch_commit:
                                     db.commit()
                                     pendentes_db = 0
+                            else:
+                                falhas += 1
+                    elif acao.tts_template:
+                        fb = preparar_texto_envio(acao.tts_template, "engine_tts_disabled_fallback")
+                        if self._enviar_com_retry(ctx.telefone, "text", fb):
+                            _registrar_source_entregue(acao)
+                            self._salvar_mensagem(db, lead_id, "bot", fb, "text", auto_commit=False)
+                            enviados += 1
+                            pendentes_db += 1
+                            if pendentes_db >= batch_commit:
+                                db.commit()
+                                pendentes_db = 0
+                        else:
+                            falhas += 1
 
                 elif acao.tipo == "audio":
                     payload_url = acao.url or acao.conteudo
@@ -2258,6 +2334,321 @@ class Engine:
             or meta.get("departamento_humano_ativo")
         )
 
+    def _apply_published_flow_effects(
+        self,
+        db,
+        lead: Lead,
+        ctx: ContextoConversa,
+        effects: list[dict],
+    ) -> None:
+        """Aplica no lead as ações internas configuradas no bloco Ação."""
+        for effect in effects or []:
+            if not isinstance(effect, dict):
+                continue
+            kind = str(effect.get("kind") or "").strip().lower()
+            payload = str(effect.get("payload") or "").strip()
+            if kind == "ab_exposure":
+                try:
+                    blueprint_id = int(effect.get("blueprint_id"))
+                except (TypeError, ValueError):
+                    blueprint_id = 0
+                node_id = str(effect.get("node_id") or "").strip()[:200]
+                variant = str(effect.get("variant") or "").strip().upper()[:1]
+                if blueprint_id and node_id and variant:
+                    exposure = (
+                        db.query(ABTestExposure)
+                        .filter_by(
+                            tenant_id=str(getattr(lead, "tenant_id", None) or self.tenant_id or "default"),
+                            blueprint_id=blueprint_id,
+                            node_id=node_id,
+                            lead_id=lead.id,
+                        )
+                        .first()
+                    )
+                    if exposure is None:
+                        db.add(
+                            ABTestExposure(
+                                tenant_id=str(getattr(lead, "tenant_id", None) or self.tenant_id or "default"),
+                                blueprint_id=blueprint_id,
+                                node_id=node_id,
+                                lead_id=lead.id,
+                                variant=variant,
+                                weight_a=int(effect.get("weight_a") or 0),
+                                weight_b=int(effect.get("weight_b") or 0),
+                            )
+                        )
+            elif kind in ("tag_add", "tag_remove"):
+                tags = [str(tag) for tag in (getattr(lead, "tags", None) or []) if str(tag).strip()]
+                if kind == "tag_add" and payload and payload not in tags:
+                    tags.append(payload[:120])
+                elif kind == "tag_remove" and payload:
+                    tags = [tag for tag in tags if tag.casefold() != payload.casefold()]
+                lead.tags = tags
+            elif kind == "assign_user":
+                ctx.metadata["assigned_user_id"] = payload or None
+            elif kind == "unassign_user":
+                ctx.metadata["assigned_user_id"] = None
+            elif kind == "open_chat":
+                lead.bot_pausado = False
+                ctx.metadata["flow_chat_status"] = "open"
+            elif kind == "close_chat":
+                lead.bot_pausado = True
+                ctx.metadata["flow_chat_status"] = "closed"
+            elif kind == "update_contact":
+                field_name = str(effect.get("target_field") or "").strip().lower()
+                if field_name in ("name", "nome") and payload:
+                    lead.nome = payload[:200]
+                    ctx.nome_lead = lead.nome
+                elif field_name in ("email", "e-mail") and payload:
+                    lead.email = payload[:200]
+                elif field_name in ("phone", "telefone", "whatsapp") and payload:
+                    phone = re.sub(r"\D+", "", payload)[:20]
+                    if len(phone) >= 7:
+                        lead.telefone = phone
+                        ctx.telefone = phone
+                elif field_name and payload:
+                    custom = dict(getattr(lead, "custom_fields", None) or {})
+                    custom[field_name[:120]] = payload[:4000]
+                    lead.custom_fields = custom
+            elif kind == "start_flow":
+                # O alvo fica registrado para o próximo despacho. A troca não
+                # altera a publicação global do tenant.
+                ctx.metadata["flow_requested_start"] = payload[:128]
+            elif kind == "end_flow":
+                ctx.metadata["flow_forced_end"] = True
+            elif kind == "notify_attendant":
+                lead.bot_pausado = True
+                ctx.metadata["flow_chat_status"] = "waiting_attendant"
+                attendant_id = str(effect.get("attendant_id") or "").strip()
+                if attendant_id:
+                    ctx.metadata["assigned_user_id"] = attendant_id
+
+            if kind:
+                db.add(
+                    EventoAudit(
+                        lead_id=lead.id,
+                        evento="flow_builder_side_effect",
+                        dados={
+                            "kind": kind[:80],
+                            "payload": payload[:240],
+                            "blueprint_id": (ctx.metadata.get("flow_builder_runtime") or {}).get("blueprint_id"),
+                        },
+                    )
+                )
+
+    def _try_published_flow_turn(
+        self,
+        db,
+        lead: Lead,
+        ctx: ContextoConversa,
+        *,
+        event_type: str = "message",
+        event_data: Optional[dict] = None,
+    ) -> tuple[bool, list[Acao]]:
+        """Tenta consumir a mensagem no blueprint publicado deste tenant."""
+        if (
+            event_type == "message"
+            and str(getattr(lead, "node_atual", "") or "").startswith("static_meumisterio_")
+        ):
+            return False, []
+        try:
+            from flow_executor import flow_context_from_lead
+            from published_flow_runtime import RUNTIME_STATE_KEY, execute_published_flow_turn
+
+            tenant_id = str(getattr(lead, "tenant_id", None) or self.tenant_id or "default")
+            published = db.query(FlowPublish).filter_by(tenant_id=tenant_id).first()
+            if not published or not published.published_blueprint_id:
+                return False, []
+            blueprint = (
+                db.query(FlowBlueprint)
+                .filter_by(id=published.published_blueprint_id, tenant_id=tenant_id)
+                .first()
+            )
+            if not blueprint or not isinstance(blueprint.body_json, dict):
+                return False, []
+
+            existing_state = ctx.metadata.get(RUNTIME_STATE_KEY)
+            if not isinstance(existing_state, dict):
+                existing_state = (getattr(lead, "metadata_json", None) or {}).get(RUNTIME_STATE_KEY)
+            runtime_context = flow_context_from_lead(lead, tenant_id=tenant_id)
+            runtime_context.update(ctx.metadata or {})
+            runtime_context["chat.message"] = ctx.texto_recebido or ""
+            runtime_context["texto_recebido"] = ctx.texto_recebido or ""
+            if isinstance(event_data, dict):
+                runtime_context["event"] = dict(event_data)
+                runtime_context["event.platform"] = str(event_data.get("platform") or "")
+                runtime_context["platform"] = str(event_data.get("platform") or "")
+                for key, value in event_data.items():
+                    runtime_context[f"event.{key}"] = value
+
+            turn = execute_published_flow_turn(
+                blueprint.body_json,
+                blueprint_id=int(blueprint.id),
+                tenant_id=tenant_id,
+                lead_id=int(lead.id),
+                message=ctx.texto_recebido or "",
+                interactive_reply_id=ctx.interactive_reply_id,
+                event_type=event_type,
+                existing_state=(
+                    existing_state
+                    if event_type == "message" and isinstance(existing_state, dict)
+                    else None
+                ),
+                context=runtime_context,
+            )
+            if not turn.handled:
+                return False, []
+
+            ctx.metadata[RUNTIME_STATE_KEY] = turn.state
+            flow_vars = turn.state.get("vars") if isinstance(turn.state, dict) else {}
+            if isinstance(flow_vars, dict):
+                ctx.metadata.update(flow_vars)
+            self._apply_published_flow_effects(db, lead, ctx, turn.side_effects)
+            combined_actions = list(turn.actions)
+            requested_flow = str(ctx.metadata.get("flow_requested_start") or "").strip()
+            ctx.metadata["flow_requested_start"] = None
+            started_blueprint_id = None
+            if requested_flow:
+                target_blueprint = None
+                if requested_flow.isdigit():
+                    target_blueprint = (
+                        db.query(FlowBlueprint)
+                        .filter_by(id=int(requested_flow), tenant_id=tenant_id)
+                        .first()
+                    )
+                if target_blueprint is None:
+                    target_blueprint = (
+                        db.query(FlowBlueprint)
+                        .filter_by(slug=requested_flow.lower(), tenant_id=tenant_id)
+                        .first()
+                    )
+                if target_blueprint is not None and isinstance(target_blueprint.body_json, dict):
+                    target_nodes = (
+                        (target_blueprint.body_json.get("graph") or {}).get("nodes")
+                        if isinstance(target_blueprint.body_json.get("graph"), dict)
+                        else []
+                    )
+                    target_trigger = next(
+                        (
+                            str(node.get("id") or "").strip()
+                            for node in (target_nodes or [])
+                            if isinstance(node, dict)
+                            and str(node.get("type") or "").lower() in ("trigger", "webhook")
+                        ),
+                        "",
+                    )
+                    if target_trigger:
+                        forced_state = {
+                            "version": 1,
+                            "blueprint_id": int(target_blueprint.id),
+                            "status": "running",
+                            "current_node_id": target_trigger,
+                            "waiting": None,
+                            "vars": dict(flow_vars or {}),
+                        }
+                        next_turn = execute_published_flow_turn(
+                            target_blueprint.body_json,
+                            blueprint_id=int(target_blueprint.id),
+                            tenant_id=tenant_id,
+                            lead_id=int(lead.id),
+                            message=ctx.texto_recebido or "",
+                            interactive_reply_id=ctx.interactive_reply_id,
+                            event_type="message",
+                            existing_state=forced_state,
+                            context=runtime_context,
+                        )
+                        if next_turn.handled:
+                            started_blueprint_id = int(target_blueprint.id)
+                            turn = next_turn
+                            combined_actions.extend(next_turn.actions)
+                            ctx.metadata[RUNTIME_STATE_KEY] = next_turn.state
+                            next_vars = next_turn.state.get("vars") or {}
+                            if isinstance(next_vars, dict):
+                                ctx.metadata.update(next_vars)
+                            self._apply_published_flow_effects(db, lead, ctx, next_turn.side_effects)
+            db.add(
+                EventoAudit(
+                    lead_id=lead.id,
+                    evento="flow_builder_turn",
+                    dados={
+                        "blueprint_id": int(blueprint.id),
+                        "started_blueprint_id": started_blueprint_id,
+                        "status": str(turn.state.get("status") or ""),
+                        "actions": len(turn.actions),
+                        "trace": turn.trace[:80],
+                    },
+                )
+            )
+            return True, combined_actions
+        except Exception as exc:
+            logger.exception("event=flow_builder_turn_error lead=%s err=%s", getattr(lead, "id", None), exc)
+            try:
+                db.add(
+                    EventoAudit(
+                        lead_id=lead.id,
+                        evento="flow_builder_turn_error",
+                        dados={"error": str(exc)[:500]},
+                    )
+                )
+            except Exception:
+                pass
+            return False, []
+
+    def processar_evento_fluxo(
+        self,
+        lead_id: int,
+        event_type: str,
+        event_data: Optional[dict] = None,
+        tenant_id: Optional[str] = None,
+    ) -> dict:
+        """Dispara o blueprint publicado a partir de compra/abandono do checkout."""
+        db = SessionLocal()
+        try:
+            resolved_tenant_id = str(tenant_id or self.tenant_id or "default")
+            lead = db.query(Lead).filter_by(id=int(lead_id), tenant_id=resolved_tenant_id).first()
+            if not lead:
+                return {"status": "lead_not_found"}
+            ctx = ContextoConversa(
+                lead_id=lead.id,
+                telefone=lead.telefone,
+                node_atual=lead.node_atual or "1_apresentacao",
+                texto_recebido="",
+                tipo_mensagem="event",
+                historico=self._buscar_historico(db, lead.id, 20),
+                nome_lead=lead.nome or "",
+                personalizer=self.personalizer,
+            )
+            self._restaurar_memoria(lead, ctx)
+            handled, actions = self._try_published_flow_turn(
+                db,
+                lead,
+                ctx,
+                event_type=str(event_type or ""),
+                event_data=event_data or {},
+            )
+            if not handled:
+                db.commit()
+                return {"status": "ignored"}
+            self._persistir_memoria(db, lead, ctx)
+            threading.Thread(
+                target=self._processar_fila,
+                args=(lead.id, ctx, actions),
+                daemon=True,
+                name=f"flow-event-{str(event_type)[:24]}-{lead.id}",
+            ).start()
+            return {"status": "queued", "actions": len(actions)}
+        except Exception as exc:
+            db.rollback()
+            logger.exception(
+                "event=flow_builder_external_event_error lead=%s type=%s err=%s",
+                lead_id,
+                event_type,
+                exc,
+            )
+            return {"status": "error", "error": str(exc)}
+        finally:
+            db.close()
+
     def _rotear_state_machine(self, db, lead, ctx: ContextoConversa) -> list[Acao]:
         if self._lead_reportou_problema_entrega(ctx.texto_recebido or ""):
             try:
@@ -2601,12 +2992,26 @@ class Engine:
                     payload.update({"type": "contacts", "contacts": [contato]})
 
                 elif tipo == "audio":
-                    audio_obj: dict = {"link": conteudo}
+                    media_link = str(conteudo or "").strip()
+                    if media_link.startswith("/"):
+                        public_base = str(os.getenv("PUBLIC_URL") or "").rstrip("/")
+                        if not public_base:
+                            logger.error("[WA] PUBLIC_URL ausente para mídia local: %s", media_link[:160])
+                            return False
+                        media_link = f"{public_base}{media_link}"
+                    audio_obj: dict = {"link": media_link}
                     if audio_voice:
                         audio_obj["voice"] = True
                     payload.update({"type": "audio", "audio": audio_obj})
                 else:
-                    payload.update({"type": tipo, tipo: {"link": conteudo}})
+                    media_link = str(conteudo or "").strip()
+                    if media_link.startswith("/"):
+                        public_base = str(os.getenv("PUBLIC_URL") or "").rstrip("/")
+                        if not public_base:
+                            logger.error("[WA] PUBLIC_URL ausente para mídia local: %s", media_link[:160])
+                            return False
+                        media_link = f"{public_base}{media_link}"
+                    payload.update({"type": tipo, tipo: {"link": media_link}})
 
                 headers = {
                     "Authorization": f"Bearer {self.whatsapp_token}",
@@ -2706,6 +3111,11 @@ class Engine:
                 ctx.estado_coleta = getattr(lead, "estado_coleta", None) or "inicial"
         else:
             ctx.estado_coleta = getattr(lead, "estado_coleta", None) or "inicial"
+        # Seed signo from DB column when metadata_json doesn't have it (birthdate extractor path)
+        if not ctx.metadata.get("signo"):
+            _signo_col = getattr(lead, "signo", None)
+            if _signo_col:
+                ctx.metadata["signo"] = str(_signo_col)[:20]
 
     def _persistir_memoria(self, db, lead, ctx: ContextoConversa):
         lead_id = int(getattr(lead, "id", 0) or 0)
@@ -2730,6 +3140,8 @@ class Engine:
                 patch[Lead.nome_mecanismo] = str(m["nome_mecanismo"])[:200]
             if m.get("genero_lead"):
                 patch[Lead.genero] = str(m["genero_lead"])[:24]
+            if m.get("signo") and not getattr(lead_row, "signo", None):
+                patch[Lead.signo] = str(m["signo"])[:20]
 
             if ctx.metadata:
                 existente = self._meta_as_dict(getattr(lead_row, "metadata_json", None))
@@ -2774,6 +3186,8 @@ class Engine:
                 lead.nome_mecanismo = str(m["nome_mecanismo"])[:200]
             if m.get("genero_lead"):
                 lead.genero = str(m["genero_lead"])[:24]
+            if m.get("signo") and not getattr(lead, "signo", None):
+                lead.signo = str(m["signo"])[:20]
             existente = self._meta_as_dict(getattr(lead, "metadata_json", None))
             combinado = merge_metadata_for_persist(existente, dict(ctx.metadata))
             lead.metadata_json = self._metadata_persistivel(combinado)

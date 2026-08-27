@@ -485,3 +485,11 @@ def email_verify_confirm():
         return jsonify({"ok": True, "verified": True})
     finally:
         db.close()
+
+
+def reset_lockout_counters_for_test() -> None:
+    """Reseta in-memory lockout counters para isolamento de testes."""
+    global _inmem_counters
+    with _inmem_lock:
+        _inmem_counters.clear()
+

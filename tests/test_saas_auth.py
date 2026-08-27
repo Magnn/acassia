@@ -282,14 +282,14 @@ def test_signup_loga_user_automaticamente(client):
         "/saas/signup",
         data={"email": "auto@x.com", "password": "senha-1234"},
     )
-    res = client.get("/saas/signup/done")
-    assert res.status_code == 200
-    assert b"auto@x.com" in res.data
+    res = client.get("/saas/signup/done", follow_redirects=False)
+    assert res.status_code == 302
+    assert "/builder/dashboard" in res.headers.get("Location", "")
 
 
 # ─── AuthenticatedUser wrapper ───────────────────────────────────────────────
 
 def test_authenticated_user_get_id_eh_str():
-    u = AuthenticatedUser(user_id=42, email="x@x.com", tenant_id="tenant_xyz")
+    u = AuthenticatedUser(user_id=42, email="x@x.com", tenant_id="tenant_xyz", role="operator")
     assert u.get_id() == "42"
     assert u.is_authenticated is True

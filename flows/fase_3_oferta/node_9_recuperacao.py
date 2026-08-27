@@ -112,6 +112,9 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
     dor_ctx = frase_dor_contextualizada(dor_real, abertura="quando você traz")
     gatilho = resolver_gatilho_emocional(metadata)
     gatilho = preparar_texto_envio(gatilho, "node9_gatilho").strip() or "essa trava"
+    desejo_oculto = str(metadata.get("desejo_oculto") or "").strip()[:120]
+    nome_pessoa = str(metadata.get("nome_pessoa_envolvida") or "").strip()
+    nome_pessoa = nome_pessoa.split()[0] if nome_pessoa and nome_pessoa.upper() != "INDEFINIDO" else ""
     
     # Configurações Dinâmicas
     config = metadata.get("__config__", {})
@@ -126,7 +129,12 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
         txt1 = f"{nome_fmt}..."
         txt2 = "Você ainda está por aqui? Vi que ficou em silêncio e passei pra te acompanhar. 🕯️"
         txt3 = "Às vezes a correria corta o ritmo mesmo. Se travou em alguma parte, eu te guio passo a passo."
-        txt4 = f"Tua foto ainda está aqui comigo. Não quero que você perca esse momento por causa de {gatilho}."
+        _ancora_t1 = (
+            f"de {desejo_oculto}" if desejo_oculto
+            else f"de {nome_pessoa}" if nome_pessoa
+            else "disso"
+        )
+        txt4 = f"Tua foto ainda está aqui comigo. Não quero que você perca esse momento em direção {_ancora_t1}."
 
         acoes += [
             Acao(tipo="delay", segundos=random.randint(6, 10)),
@@ -157,7 +165,11 @@ def executar_v2(ctx, tentativa: int = 1) -> tuple:
             Acao(tipo="delay", segundos=random.randint(10, 15)),
             Acao(tipo="text", conteudo=txt_u2),
             Acao(tipo="delay", segundos=random.randint(12, 18)),
-            Acao(tipo="text", conteudo=f"Ainda vejo que, {dor_ctx}, isso segue te travando. Se fizer sentido pra você, o caminho ainda está aberto."),
+            Acao(tipo="text", conteudo=(
+                f"Ainda vejo que, {dor_ctx}, isso segue te travando"
+                + (f" e o que você quer — {desejo_oculto} — ainda está ao alcance" if desejo_oculto else "")
+                + ". Se fizer sentido pra você, o caminho ainda está aberto."
+            )),
             Acao(tipo="delay", segundos=random.randint(8, 12)),
             Acao(
                 tipo="text",

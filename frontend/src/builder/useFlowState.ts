@@ -217,8 +217,19 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     [markDirty],
   );
 
-  const selectedNodeId = nodes.find((n) => n.selected)?.id ?? null;
-  const selectedNode = nodes.find((n) => n.selected) ?? null;
+  const saveNow = useCallback(async () => {
+    const doc = reactFlowToDocument(docRef.current, nodes, edges);
+    docRef.current = doc;
+    setStatus('saving');
+    await mutation.mutateAsync(doc);
+    return doc;
+  }, [edges, mutation, nodes]);
+
+  const selectedNode = useMemo(
+    () => nodes.find((n) => n.selected) ?? null,
+    [nodes],
+  );
+  const selectedNodeId = selectedNode?.id ?? null;
 
   return {
     nodes,
@@ -233,6 +244,7 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     addNode,
     duplicateNode,
     updateNode,
+    saveNow,
     undo,
     redo,
     canUndo: history.past.length > 0,

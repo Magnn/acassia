@@ -105,7 +105,7 @@ export default function Pipeline() {
   });
 
   const autoTagMut = useMutation({
-    mutationFn: () => api.post('/saas/pipeline/auto-tag', {}),
+    mutationFn: () => api.post<{ leads_tagged: number; total_checked: number }>('/saas/pipeline/auto-tag', {}),
     onSuccess: (res: { leads_tagged: number; total_checked: number }) => {
       qc.invalidateQueries({ queryKey: ['pipeline-board'] });
       toast.success(`${res.leads_tagged} leads auto-tagged de ${res.total_checked} verificados`);

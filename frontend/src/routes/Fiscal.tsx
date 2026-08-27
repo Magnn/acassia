@@ -10,8 +10,7 @@ import {
   Plus,
   RefreshCw
 } from 'lucide-react';
-import api from '../api/client';
-import { toast } from 'react-hot-toast';
+import { api } from '../api/client';
 
 interface NotaFiscal {
   id: number;
@@ -26,11 +25,18 @@ interface NotaFiscal {
   created_at: string;
 }
 
+interface ApiEnvelope<T> {
+  ok: boolean;
+  data: T;
+  error?: string;
+}
+
 export default function Fiscal() {
   const [notas, setNotas] = useState<NotaFiscal[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEmitting, setIsEmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
   
   // Form state
   const [valor, setValor] = useState('');
@@ -42,12 +48,12 @@ export default function Fiscal() {
   const fetchNotas = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/saas/fiscal/notas');
-      if (data.ok) {
-        setNotas(data.data);
+      const response = await api.get<ApiEnvelope<NotaFiscal[]>>('/saas/fiscal/notas');
+      if (response.ok) {
+        setNotas(response.data);
       }
     } catch (error) {
-      toast.error('Erro ao buscar notas fiscais');
+      setFeedback('Erro ao buscar notas fiscais');
       console.error(error);
     } finally {
       setLoading(false);
@@ -69,14 +75,14 @@ export default function Fiscal() {
         descricao,
         tipo
       };
-      const { data } = await api.post('/saas/fiscal/emitir', payload);
-      if (data.ok) {
-        toast.success('Nota emitida com sucesso!');
+      const response = await api.post<ApiEnvelope<unknown>>('/saas/fiscal/emitir', payload);
+      if (response.ok) {
+        setFeedback('Nota emitida com sucesso!');
         setShowModal(false);
         fetchNotas();
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Erro ao emitir nota');
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Erro ao emitir nota');
     } finally {
       setIsEmitting(false);
     }
@@ -129,6 +135,12 @@ export default function Fiscal() {
           </button>
         </div>
       </div>
+
+      {feedback && (
+        <div className="rounded-xl border border-indigo-400/20 bg-indigo-400/10 px-4 py-3 text-sm text-indigo-100">
+          {feedback}
+        </div>
+      )}
 
       {/* Tabela de Notas */}
       <div className="bg-zinc-900/50 rounded-2xl border border-white/5 overflow-hidden">

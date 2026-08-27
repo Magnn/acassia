@@ -151,6 +151,28 @@ def sniffer_instagram_meta(meta: Dict[str, Any], texto_full: str, lead_id: int) 
         logger.info("📸 [SNIFFER] lead_declarou_visita_insta (lead=%s)", lead_id)
 
 
+def limpar_enxerto_extracao(texto: str, nome_lead: str = "") -> str:
+    if not texto:
+        return ""
+    # Remove marcas de concatenação de histórico
+    t = re.sub(r"\s*\|\s*", " ", texto)
+    # Remove saudações no início/fim
+    t = re.sub(r"(?i)\b(oi|ol[áa]|bom\s+dia|boa\s+tarde|boa\s+noite|tudo\s+bem|como\s+vai)\b\s*[,.!?]?", "", t)
+    # Remove declarações de nome típicas
+    t = re.sub(r"(?i)\b(me\s+chamo|meu\s+nome\s+[eé]|sou\s+[oa])\s+[a-zà-ú][a-zà-ú'\-]{1,24}\b\s*[,.!?]?", "", t)
+    # Remove ruídos operacionais como "sim", "ok", "pronto", "salvei" soltos
+    t = re.sub(r"(?i)\b(ok|pronto|vamos|sim|blz|beleza|salvei|salvar|contato|n[uú]mero|numero|insta|instagram)\b\s*[,.!?]?", "", t)
+    
+    # Remove o nome do próprio lead se fornecido (evita vazar em concatenação isolada)
+    if nome_lead:
+        nome_clean = re.escape(nome_lead.strip())
+        t = re.sub(r"(?i)\b" + nome_clean + r"\b\s*[,.!?]?", "", t)
+
+    # Limpa espaços duplicados e pontuações soltas
+    t = re.sub(r"\s+", " ", t).strip(" ,.;:!?|")
+    return t
+
+
 def promover_burst_fase1_meta(meta: Dict[str, Any], texto_full: str, lead_id: int, lead: Any) -> None:
     if meta.get("node3_estado") == "coleta_completa":
         if meta.get("lead_declarou_visita_insta") and not meta.get("insta_enviado"):
@@ -170,10 +192,12 @@ def promover_burst_fase1_meta(meta: Dict[str, Any], texto_full: str, lead_id: in
     if not _RE_BURST_DESEJO_DOR.search(texto_full or ""):
         return
     blob = (texto_full or "").strip()
+    nm_lead = meta.get("nome_lead") or getattr(lead, "nome", "")
+    clean_blob = limpar_enxerto_extracao(blob, nome_lead=nm_lead)
     meta["node3_estado"] = "coleta_completa"
-    meta["desabafo_original"] = (meta.get("desabafo_original") or blob[:2000]).strip()[:2000]
-    meta["desejo_declarado"] = (meta.get("desejo_declarado") or blob[:900]).strip()[:2000]
-    meta["aprofundamento_texto"] = (meta.get("aprofundamento_texto") or blob[:2000]).strip()[:2000]
+    meta["desabafo_original"] = (meta.get("desabafo_original") or clean_blob[:2000]).strip()[:2000]
+    meta["desejo_declarado"] = (meta.get("desejo_declarado") or clean_blob[:900]).strip()[:2000]
+    meta["aprofundamento_texto"] = (meta.get("aprofundamento_texto") or clean_blob[:2000]).strip()[:2000]
     if not (meta.get("universo_desejo") or "").strip():
         meta["universo_desejo"] = "geral"
     if _RE_VISITA_INSTA.search(texto_full):
@@ -202,14 +226,17 @@ def enriquecer_dados_node3_precoce(meta: Dict[str, Any], texto_full: str, lead_i
     if not _RE_RELEVANCIA_LEITURA.search(low):
         return
 
+    nm_lead = meta.get("nome_lead") or ""
+    clean_texto = limpar_enxerto_extracao(texto, nome_lead=nm_lead)
+
     if _RE_DESEJO.search(low) and not (meta.get("desejo_declarado") or "").strip():
-        meta["desejo_declarado"] = texto[:900]
+        meta["desejo_declarado"] = clean_texto[:900]
         logger.info("🧩 [PREFLIGHT] desejo_declarado precoce (lead=%s)", lead_id)
 
     if (_RE_TEMPO.search(low) or _RE_TENTATIVA.search(low) or _RE_GATILHO.search(low)) and not (
         meta.get("aprofundamento_texto") or ""
     ).strip():
-        meta["aprofundamento_texto"] = texto[:2000]
+        meta["aprofundamento_texto"] = clean_texto[:2000]
         logger.info("🧩 [PREFLIGHT] aprofundamento_texto precoce (lead=%s)", lead_id)
 
     if _RE_TEMPO.search(low) and not (meta.get("tempo_exato") or "").strip():

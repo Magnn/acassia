@@ -81,12 +81,12 @@
   stroke: #6d28d9;
 }
 
-/* ── Handles — 22px circles with play arrows (matching original Meu Mistério design) ── */
+/* ── Handles — default 22px circles with play arrows ── */
 .react-flow__handle {
-  width: 22px !important;
-  height: 22px !important;
+  width: 22px;
+  height: 22px;
   border-radius: 50% !important;
-  border: 2px solid #3b82f6 !important;
+  border: 2px solid #3b82f6;
   z-index: 25;
   cursor: grab !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.12);
@@ -99,20 +99,20 @@
   cursor: grabbing !important;
 }
 .react-flow__handle:hover {
-  transform: scale(1.15);
+  scale: 1.15;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 2px 6px rgba(0,0,0,0.15);
 }
 
 /* ── Input handle (target / left) — white bg, blue border ── */
 .react-flow__handle-left {
-  background: #ffffff !important;
-  border: 2px solid #3b82f6 !important;
+  background: #ffffff;
+  border: 2px solid #3b82f6;
 }
 
 /* ── Output handle (source / right) — blue bg, white border ── */
 .react-flow__handle-right {
-  background: #3b82f6 !important;
-  border: 2px solid #ffffff !important;
+  background: #3b82f6;
+  border: 2px solid #ffffff;
 }
 
 

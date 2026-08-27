@@ -323,6 +323,8 @@ DADOS (use com respeito):
 - Nome/Pessoa envolvida no relato: {nome_pessoa_envolvida}
 - Tempo exato citado pelo lead (quando houver): {tempo_exato}
 - Evento gatilho citado pelo lead (quando houver): {evento_gatilho}
+- Desejo oculto (Hive Mind Node 5 — o que ela mais quer mas não verbalizou diretamente): {desejo_oculto}
+- Gatilho emocional central (Node 5 — o que ativa o medo/anseio mais fundo): {gatilho_emocional}
 - Última mensagem do lead: "{msg_lead}"
 
 {entregaveis}
@@ -341,7 +343,7 @@ VALORES (não altere números):
 - Pagamento online: Cakto (cartão ou PIX). Não escreva o link; o sistema envia depois.
 
 MISSÃO — exatamente 9 BLOCOS (BLOCO_1:: … BLOCO_9::); cada bloco CURTO (ritmo celular, ~160 caracteres ou menos quando possível); pode continuar o texto nas linhas abaixo até o próximo BLOCO_N::; nunca coloque o próximo BLOCO_N:: no fim da mesma linha do texto anterior:
-1. Pergunte com naturalidade se a leitura ressoou; pode usar "Gostou da sua leitura?" de forma humilde.
+1. ESPELHO EXATO (obrigatório): abra devolvendo em 1-2 frases o que o lead carrega — use `desejo_oculto` e `gatilho_emocional` se não forem INDEFINIDO; mostre que você VIU o que ela não disse em voz alta. Só depois pergunte humildemente se a leitura ressoou. Se ambos forem INDEFINIDO, ancora só na dor e no desejo declarado.
 2. CENA DO RESULTADO DESEJADO: convide a imaginar o caminho **em direção ao que ela já disse que quer** (trazer a pessoa de volta, **separar com clareza do cônjuge**, **superar e fechar ciclo com o ex**, **encontrar um novo amor**, fortalecer o casamento atual, justiça, prosperidade…), com imagem viva — não frase genérica nem "o que você precisa entender". Não troque o desejo dela por outro.
 3. CONTRASTE: ficar só na dor repetida vs dar o passo que favorece o que ela busca — sem humilhar.
 4. MECANISMO: nomeie o trabalho com o nome exato «{mecanismo}» como firmação **alinhada ao pedido dela** (sem trocadilho nem título ridículo); não venda "lição", venda continuidade honesta do que ela veio buscar.
@@ -376,6 +378,7 @@ def _fallback_oferta(
     p_serv: str,
     p_promo_total: str,
     ancora_quer: str = "",
+    msg_lead: str = "",
 ) -> list[str]:
     dor_ctx = frase_dor_contextualizada(dor_c, abertura="quando você traz")
     tempo_ctx = tempo_exato if (tempo_exato or "").upper() != "INDEFINIDO" else tempo
@@ -387,15 +390,23 @@ def _fallback_oferta(
     alvo = (ancora_quer or "").strip()
     if len(alvo) > 140:
         alvo = alvo[:137].rstrip() + "…"
+    
+    respondeu_cta = bool(re.search(r"\b(pode|sim|manda|quero|sim|ok|tudo|combinado)\b", msg_lead.lower()))
+    
+    if respondeu_cta:
+        intro_bloco = f"Que bom que você deseja dar esse passo, {nome_fmt}. Vou te explicar tudo com o máximo de transparência."
+    else:
+        intro_bloco = f"{nome_fmt}, a leitura mostrou com clareza onde está a trava. Agora, a escolha de agir sobre ela está em suas mãos."
+        
     b2 = (
-        f"Imagina o caminho ficando mais claro em direção ao que você veio buscar, {voc}, com menos peso repetido no peito."
+        f"Visualizar o seu caminho livre desse peso e alinhado com a sua intenção de {alvo} é o que nos move aqui, {voc}."
         if alvo
-        else f"Imagina os próximos dias com menos peso no peito e mais direção prática, {voc}."
+        else f"Visualizar os seus caminhos livres desse peso e com mais clareza para os seus próximos dias é o que nos move aqui, {voc}."
     )
     mec_linha = (
-        f"O {mecanismo} é firmação séria voltada ao que você pediu"
-        + (f" — no que você descreveu: {alvo}" if alvo else "")
-        + ". Corta o nó na raiz, sem promessa de milagre nem data certa."
+        f"O {mecanismo} é uma firmação séria voltada para a sua intenção"
+        + (f" de {alvo}" if alvo else "")
+        + "."
     )
     bloco_valor = (
         f"O valor de referência é R$ {p_ref},00. Eu consigo fazer por R$ {p_promo_total} pra você, em pagamento direto hoje."
@@ -407,20 +418,15 @@ def _fallback_oferta(
         )
     )
     return [
-        f"{nome_fmt}, a leitura que você recebeu tocou em algo real. Posso te mostrar o próximo passo com clareza?",
+        intro_bloco,
         b2,
-        f"O caminho é simples: ou a gente toca a raiz agora, ou o ciclo continua — há {tempo_ctx} você carrega esse peso sem sair do lugar.{gatilho_ctx}",
-        f"{mec_linha} Com o que apareceu nas suas linhas, você já era pra estar em um patamar mais alto do que está hoje.",
+        "O caminho é simples: ou a gente resolve a causa real agora, ou o ciclo continua se repetindo. A escolha é sempre sua.",
+        f"{mec_linha} Essa firmação atua diretamente na origem do bloqueio, abrindo as portas para a energia fluir livremente. Sem ilusões, mas com compromisso real com a sua jornada.",
         bloco_valor,
-        "A leitura já mostrou o padrão. A decisão agora é honesta: mudar de verdade ou continuar no mesmo ciclo. "
-        "Sem história de vaga limitada, isso é respeito com você.",
-        "O pagamento é pela Cakto: plataforma segura, confiável, cartão ou PIX.",
-        "Se decidir seguir, me envia o comprovante pra gente iniciar — eu monto seu nome no altar e te mando a foto da firmação.",
-        (
-            f"{nome_fmt}, você carrega isso há {tempo_ctx}.{gatilho_ctx} "
-            "Chegou a hora de atacar a raiz, não só o sintoma. "
-            "Se quiser começar hoje, me manda FIRMO aqui que na mensagem seguinte eu te envio o link de pagamento, tudo bem?"
-        ),
+        "A decisão agora está com você: dar esse passo de transformação ou continuar no mesmo padrão de antes. Sem pressões, por puro respeito a você.",
+        "O pagamento é feito de forma segura pela Cakto, com opção de cartão ou PIX.",
+        "Assim que concluir, me avisa aqui. Eu mesma firmo seu nome no altar e te mando a foto do ritual para começarmos.",
+        f"Se quiser seguir hoje, {nome_fmt}, me manda *FIRMO* aqui que na mensagem seguinte eu te envio o link de pagamento, tudo bem?",
     ]
 
 
@@ -438,6 +444,8 @@ def executar_v2(ctx) -> tuple:
     tempo_exato = str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO")
     evento_gatilho = str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO")
     nome_pessoa_envolvida = str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO")
+    desejo_oculto = str(meta.get("desejo_oculto") or "INDEFINIDO").strip()[:200]
+    gatilho_emocional = str(meta.get("gatilho_emocional") or "INDEFINIDO").strip()[:150]
     mecanismo = definir_nome_mecanismo_se_generico(meta, dor)
     ctx_desejo_res = contexto_desejo_resultado_para_prompt(meta, mecanismo)
     ancora_quer_fb = str(meta.get("desejo_declarado") or meta.get("desejo_oculto") or "").strip()
@@ -688,6 +696,8 @@ def executar_v2(ctx) -> tuple:
                 nome_pessoa_envolvida=nome_pessoa_envolvida,
                 tempo_exato=tempo_exato,
                 evento_gatilho=evento_gatilho,
+                desejo_oculto=desejo_oculto,
+                gatilho_emocional=gatilho_emocional,
                 entregaveis=entregaveis,
                 instrucao_ancoragem=instrucao_anc,
                 instrucao_eco_esforco=instrucao_eco_esf,
@@ -758,6 +768,7 @@ def executar_v2(ctx) -> tuple:
             p_serv,
             p_promo_total,
             ancora_quer=ancora_quer_fb,
+            msg_lead=msg_lead,
         )
 
     idx_preco = -1

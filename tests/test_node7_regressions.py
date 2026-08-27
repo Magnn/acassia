@@ -8,6 +8,9 @@ from flows.fase_2_leitura import node_7_interesse_desejo as n7
 from schema import ContextoConversa
 
 
+from copy_sanitizer import historico_limpo_para_ia
+
+
 class TestNode7Regressoes(unittest.TestCase):
     def test_sanear_citacao_aberta_remove_aspas_soltas(self):
         txt = "Quando você me diz 'Bom dia tudo bem? essa consulta é paga?"
@@ -27,7 +30,7 @@ class TestNode7Regressoes(unittest.TestCase):
                 {"remetente": "user", "texto": "minha mulher me deixou | quero saber se tem volta"},
             ],
         )
-        out = n7._historico_limpo_para_ia(ctx)
+        out = historico_limpo_para_ia(ctx)
         joined = " ".join(str(x.get("texto", "")) for x in out).lower()
         self.assertNotIn("|", joined)
         self.assertNotIn(" oi ", f" {joined} ")

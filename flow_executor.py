@@ -39,10 +39,40 @@ def flow_context_from_lead(lead: Any, tenant_id: Optional[str] = None) -> Dict[s
     ctx: Dict[str, Any] = {str(k): v for k, v in meta.items()}
     if getattr(lead, "nome", None) is not None:
         ctx["nome"] = lead.nome
+        ctx["lead.nome"] = lead.nome
+        ctx["contact.name"] = lead.nome
+        ctx["contact.first_name"] = str(lead.nome or "").strip().split(" ", 1)[0]
     if getattr(lead, "telefone", None) is not None:
         ctx["telefone"] = lead.telefone
+        ctx["lead.telefone"] = lead.telefone
+        ctx["contact.phone"] = lead.telefone
+        digits = re.sub(r"\D+", "", str(lead.telefone or ""))
+        ctx["contact.ddd"] = digits[-11:-9] if len(digits) >= 10 else ""
     if getattr(lead, "node_atual", None) is not None:
         ctx["node_atual"] = lead.node_atual
+    for attr in (
+        "email",
+        "idade",
+        "cidade",
+        "pipeline_stage",
+        "score_value",
+        "score_band",
+        "convertido",
+        "produto_comprado",
+        "timezone",
+    ):
+        value = getattr(lead, attr, None)
+        if value is not None:
+            ctx[attr] = value
+            ctx[f"lead.{attr}"] = value
+    tags = list(getattr(lead, "tags", None) or [])
+    ctx["tags"] = tags
+    ctx["etiqueta"] = tags
+    custom_fields = getattr(lead, "custom_fields", None) or {}
+    if isinstance(custom_fields, dict):
+        for key, value in custom_fields.items():
+            ctx[str(key)] = value
+            ctx[f"contact.custom.{key}"] = value
     ctx["lead_id"] = str(getattr(lead, "id", "") or "")
     if tenant_id is not None:
         ctx["tenant_id"] = str(tenant_id).strip() or "default"
@@ -91,6 +121,8 @@ def _llm_max_output_tokens() -> int:
 
 def _sanitize_gemini_model(raw: Optional[str]) -> str:
     s = re.sub(r"[^\w.\-]", "", str(raw or "").strip())[:80]
+    if s.lower().startswith(("gpt-", "openai")):
+        return _DEFAULT_FLOW_LLM_MODEL
     return s or _DEFAULT_FLOW_LLM_MODEL
 
 
@@ -126,6 +158,7 @@ def flow_gemini_generate_text(
     temperature: float,
     api_key: Optional[str],
     system_instruction: Optional[str] = None,
+    max_output_tokens: Optional[int] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     Uma chamada `generateContent` ao Gemini (REST v1beta).
@@ -140,11 +173,16 @@ def flow_gemini_generate_text(
         return "", "GEMINI_API_KEY ausente"
     m = _sanitize_gemini_model(model)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key.strip()}"
+    try:
+        output_tokens = int(max_output_tokens or _llm_max_output_tokens())
+    except (TypeError, ValueError):
+        output_tokens = _llm_max_output_tokens()
+    output_tokens = max(64, min(output_tokens, 8192))
     payload: Dict[str, Any] = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": float(temperature),
-            "maxOutputTokens": _llm_max_output_tokens(),
+            "maxOutputTokens": output_tokens,
         },
     }
     if system_instruction and system_instruction.strip():
@@ -564,7 +602,13 @@ def steps_to_acoes(
                 continue
             body = apply_flow_template(
                 (
-                    str(cfg.get("body") or cfg.get("question") or cfg.get("payload") or "").strip()
+                    str(
+                        cfg.get("body")
+                        or cfg.get("message")
+                        or cfg.get("question")
+                        or cfg.get("payload")
+                        or ""
+                    ).strip()
                     or str(cfg.get("step_name") or "").strip()
                 ),
                 fv,
@@ -577,6 +621,31 @@ def steps_to_acoes(
                 rm = str(cfg.get("reply_mode") or "").strip()
                 if rm:
                     meta["reply_mode"] = rm
+                
+                # Suporte avançado para "pergunta" (mapeamento Frontend -> Motor)
+                if ntype == "pergunta":
+                    qr = cfg.get("quick_replies")
+                    if isinstance(qr, list) and len(qr) > 0:
+                        meta["quick_replies"] = qr
+                    sv = str(cfg.get("save_to_flow_field") or "").strip()
+                    if sv:
+                        meta["save_to_flow_field"] = sv
+                    to_sec = cfg.get("question_timeout_seconds")
+                    if to_sec is not None:
+                        try:
+                            meta["question_timeout_seconds"] = int(to_sec)
+                        except ValueError:
+                            pass
+                
+                # Suporte avançado para "menu" (mapeamento Frontend -> Motor)
+                if ntype == "menu":
+                    opts = cfg.get("options")
+                    if isinstance(opts, list) and len(opts) > 0:
+                        meta["quick_replies"] = [str(o) for o in opts if str(o).strip()]
+                    sv = str(cfg.get("save_to_flow_field") or "").strip()
+                    if sv:
+                        meta["save_to_flow_field"] = sv
+
                 acoes.append(Acao(tipo="text", conteudo=body[:4000], metadata=meta))
             continue
 
@@ -585,8 +654,23 @@ def steps_to_acoes(
                 sec = float(cfg.get("seconds") or 0)
             except (TypeError, ValueError):
                 sec = 0.0
+            if str(cfg.get("mode") or "").strip().lower() == "inteligente":
+                try:
+                    sec_max = float(cfg.get("seconds_max") or sec)
+                except (TypeError, ValueError):
+                    sec_max = sec
+                low, high = sorted((sec, sec_max))
+                sec = random.uniform(low, high)
             sec = max(0.0, min(sec, _MAX_DELAY_S))
             if sec > 0:
+                if str(cfg.get("status_typing") or "").lower() == "true":
+                    acoes.append(
+                        Acao(tipo="typing", metadata={"source": "flow_builder", "whatsapp_typing": "text"})
+                    )
+                if str(cfg.get("status_recording") or "").lower() == "true":
+                    acoes.append(
+                        Acao(tipo="typing", metadata={"source": "flow_builder", "whatsapp_typing": "audio"})
+                    )
                 dmeta: Dict[str, Any] = {"source": "flow_builder"}
                 note = apply_flow_template(str(cfg.get("body") or "").strip(), fv)
                 if note:
@@ -594,8 +678,83 @@ def steps_to_acoes(
                 acoes.append(Acao(tipo="delay", segundos=int(sec), metadata=dmeta))
             continue
 
+        if rk == "integration":
+            node_id = str(st.get("node_id") or "integration").strip()
+            service = str(cfg.get("service") or "").strip()
+            action = str(cfg.get("action") or "").strip()
+            credential_id = cfg.get("credential_id")
+            save_as = str(cfg.get("save_as") or cfg.get("output_var") or "").strip()
+
+            vault_data = {}
+            if credential_id:
+                _db = None
+                try:
+                    from db.database import SessionLocal
+                    from db import models
+                    from api.utils.crypto import decrypt_credential
+                    _db = SessionLocal()
+                    query = _db.query(models.TenantIntegrationCredential).filter_by(id=int(credential_id))
+                    if tenant_id:
+                        query = query.filter_by(tenant_id=str(tenant_id))
+                    cred = query.first()
+                    if cred:
+                        vault_data = decrypt_credential(cred.encrypted_data)
+                except Exception as e:
+                    logger.warning("flow_executor integration vault: %s", e)
+                finally:
+                    if _db is not None:
+                        _db.close()
+
+            try:
+                from api.saas.integration_runners import execute_integration
+                cfg_eval = dict(cfg)
+                if "payload" in cfg_eval and isinstance(cfg_eval["payload"], str):
+                    cfg_eval["payload"] = apply_flow_template(cfg_eval["payload"], fv)
+
+                result_str = execute_integration(service, action, cfg_eval, vault_data, fv)
+
+                payload = {"status": 200, "body": result_str}
+                http_key = _flow_http_var_key(node_id)
+                fv[http_key] = payload
+                _persist_flow_var(http_key, payload)
+                if save_as:
+                    fv[save_as] = result_str[:4000]
+                    _persist_flow_var(save_as, fv[save_as])
+                logger.info("flow_executor integration ok: service=%s action=%s node=%s", service, action, node_id)
+            except Exception as e:
+                logger.warning("flow_executor integration error: service=%s action=%s err=%s", service, action, e)
+                http_key = _flow_http_var_key(node_id)
+                payload = {"status": 500, "body": "", "error": str(e)[:500]}
+                fv[http_key] = payload
+                _persist_flow_var(http_key, payload)
+            continue
+
         if rk == "http" and _ALLOW_HTTP:
             node_id = str(st.get("node_id") or "api").strip()
+            
+            # --- n8n-style Vault Integration ---
+            vault_hdrs = {}
+            credential_id = cfg.get("credential_id")
+            if credential_id:
+                try:
+                    from db.database import SessionLocal
+                    from db import models
+                    from api.utils.crypto import decrypt_credential
+                    
+                    db = SessionLocal()
+                    query = db.query(models.TenantIntegrationCredential).filter_by(id=int(credential_id))
+                    if tenant_id:
+                        query = query.filter_by(tenant_id=str(tenant_id))
+                    cred = query.first()
+                    if cred:
+                        vault_data = decrypt_credential(cred.encrypted_data)
+                        if "headers" in vault_data and isinstance(vault_data["headers"], dict):
+                            vault_hdrs.update(vault_data["headers"])
+                    db.close()
+                except Exception as e:
+                    logger.warning(f"[FLOW EXECUTOR] Falha ao carregar cofre: {e}")
+            # -----------------------------------
+
             save_as = str(cfg.get("save_as") or cfg.get("output_var") or "").strip()
             url = apply_flow_template(str(cfg.get("url") or cfg.get("api_url") or "").strip(), fv)
             method = str(cfg.get("method") or cfg.get("api_method") or "GET").upper()
@@ -611,6 +770,11 @@ def steps_to_acoes(
                         hdrs = {str(k): str(v) for k, v in parsed.items()}
                 except (json.JSONDecodeError, TypeError, ValueError):
                     pass
+            
+            # Inject vault headers
+            if vault_hdrs:
+                hdrs.update(vault_hdrs)
+
             body_raw = apply_flow_template(str(cfg.get("body") or cfg.get("api_body") or "").strip(), fv)
             if url.startswith("https://") or url.startswith("http://"):
                 try:
@@ -627,13 +791,6 @@ def steps_to_acoes(
                             req_kw["data"] = body_raw
                     r = requests.request(**req_kw)
                     text_full = r.text or ""
-                    preview = text_full[:280]
-                    hmeta: Dict[str, Any] = {
-                        "source": "flow_builder",
-                        "http_status": r.status_code,
-                    }
-                    if hdrs:
-                        hmeta["http_headers_sent"] = True
                     payload = {"status": r.status_code, "body": text_full[:8000]}
                     http_key = _flow_http_var_key(node_id)
                     fv[http_key] = payload
@@ -641,22 +798,17 @@ def steps_to_acoes(
                     if save_as:
                         fv[save_as] = text_full[:4000]
                         _persist_flow_var(save_as, fv[save_as])
-                    acoes.append(
-                        Acao(
-                            tipo="text",
-                            conteudo=f"🔧 API {method} {url[:96]}… → HTTP {r.status_code}\n{preview}",
-                            metadata=hmeta,
-                        )
-                    )
                 except Exception as e:
                     logger.warning("flow_executor http: %s", e)
-                    acoes.append(
-                        Acao(
-                            tipo="text",
-                            conteudo=f"🔧 API falhou: {url[:80]}… ({e})"[:900],
-                            metadata={"source": "flow_builder", "error": str(e)},
-                        )
-                    )
+                    http_key = _flow_http_var_key(node_id)
+                    payload = {"status": 599, "body": "", "error": str(e)[:500]}
+                    fv[http_key] = payload
+                    _persist_flow_var(http_key, payload)
+            else:
+                http_key = _flow_http_var_key(node_id)
+                payload = {"status": 400, "body": "", "error": "URL HTTP inválida"}
+                fv[http_key] = payload
+                _persist_flow_var(http_key, payload)
             continue
 
         if rk == "http" and not _ALLOW_HTTP:
@@ -664,6 +816,11 @@ def steps_to_acoes(
                 "event=flow_http_disabled node_id=%s — defina FLOW_BLUEPRINT_ALLOW_HTTP=1 no servidor para executar API HTTP",
                 st.get("node_id"),
             )
+            node_id = str(st.get("node_id") or "api").strip()
+            http_key = _flow_http_var_key(node_id)
+            payload = {"status": 503, "body": "", "error": "execução HTTP desativada"}
+            fv[http_key] = payload
+            _persist_flow_var(http_key, payload)
             continue
 
         if rk == "notify":
@@ -685,9 +842,20 @@ def steps_to_acoes(
             )
             if script:
                 tmeta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype}
-                vp = str(cfg.get("voice_profile") or "").strip()
+                vp = str(cfg.get("voice_profile") or cfg.get("voice_id") or "").strip()
                 if vp:
                     tmeta["voice_profile"] = vp[:64]
+                for source_key, meta_key in (
+                    ("stability", "voice_stability"),
+                    ("similarity", "voice_similarity"),
+                    ("style", "voice_style"),
+                    ("speed", "voice_speed"),
+                ):
+                    if cfg.get(source_key) is not None:
+                        tmeta[meta_key] = cfg.get(source_key)
+                tmeta["whatsapp_voice"] = str(
+                    cfg.get("send_as_voice") or cfg.get("send_as_voice_note") or "true"
+                ).lower() == "true"
                 acoes.append(Acao(tipo="tts", tts_template=script[:2000], metadata=tmeta))
             continue
 
@@ -696,6 +864,7 @@ def steps_to_acoes(
                 str(
                     cfg.get("prompt")
                     or cfg.get("instructions")
+                    or cfg.get("context_prompt")
                     or cfg.get("body")
                     or cfg.get("step_name")
                     or ""
@@ -704,6 +873,13 @@ def steps_to_acoes(
             )
             if not prompt:
                 continue
+            if ntype == "agente_ia":
+                inbound = str(fv.get("chat.message") or fv.get("texto_recebido") or "").strip()
+                if inbound:
+                    prompt = f"{prompt}\n\nMensagem atual do contato:\n{inbound}"
+            node_id = str(st.get("node_id") or ntype).strip()
+            safe_node_id = re.sub(r"[^\w\-.]+", "_", node_id)
+            llm_key = f"flow_llm__{safe_node_id}"
             api_key = os.getenv("GEMINI_API_KEY") or ""
             model_raw = ""
             for k in ("ai_model", "model"):
@@ -712,6 +888,9 @@ def steps_to_acoes(
                     model_raw = str(v).strip()
                     break
             temp = _parse_llm_temperature(cfg)
+            save_as = str(
+                cfg.get("save_as") or cfg.get("output_var") or cfg.get("ai_output_var") or ""
+            ).strip().strip("{} ")
             lmeta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype}
             for key in ("model", "temperature"):
                 v = cfg.get(key)
@@ -721,6 +900,15 @@ def steps_to_acoes(
             # Agente Studio publicado: vira systemInstruction (personalidade + base + FAQ).
             studio_snap = fv.get("__meumisterio_studio__")
             system_instruction = _build_system_instruction_from_studio(studio_snap)
+            
+            # Combina a instrução global do Studio com o `system_prompt` local deste nó
+            local_sys = apply_flow_template(str(cfg.get("system_prompt") or "").strip(), fv)
+            if local_sys:
+                if system_instruction:
+                    system_instruction = f"{system_instruction}\n\n## Instruções do Nó GPT\n{local_sys}"
+                else:
+                    system_instruction = local_sys
+
             if system_instruction:
                 lmeta["studio_agent"] = (
                     studio_snap.get("agent_name") if isinstance(studio_snap, dict) else None
@@ -736,22 +924,36 @@ def steps_to_acoes(
                     temperature=temp,
                     api_key=api_key,
                     system_instruction=system_instruction,
+                    max_output_tokens=cfg.get("max_tokens"),
                 )
                 if err:
                     logger.warning("flow_executor llm: %s", err)
                     lmeta["runtime"] = "llm_gemini"
                     lmeta["llm_error"] = err[:300]
+                    llm_result = {"status": 500, "body": "", "error": err[:500]}
+                    fv[llm_key] = llm_result
+                    _persist_flow_var(llm_key, llm_result)
                     fb = "Desculpe, não consegui gerar a mensagem agora. Tente de novo em instantes."
                     acoes.append(Acao(tipo="text", conteudo=fb[:400], metadata=lmeta))
                 else:
                     lmeta["runtime"] = "llm_gemini"
                     lmeta["llm_model"] = _sanitize_gemini_model(model_raw or _DEFAULT_FLOW_LLM_MODEL)
-                    acoes.append(Acao(tipo="text", conteudo=text[:4000], metadata=lmeta))
+                    if save_as:
+                        fv[save_as] = text[:4000]
+                        _persist_flow_var(save_as, fv[save_as])
+                    llm_result = {"status": 200, "body": text[:4000]}
+                    fv[llm_key] = llm_result
+                    _persist_flow_var(llm_key, llm_result)
+                    if ntype == "agente_ia" or str(cfg.get("send_as_text") or "true").lower() != "false":
+                        acoes.append(Acao(tipo="text", conteudo=text[:4000], metadata=lmeta))
             else:
                 # Placeholder: engine não envia (runtime=llm) — ver A1 / C2.
                 if _ALLOW_LLM and not api_key.strip():
                     logger.info("event=flow_llm_disabled_reason reason=missing_gemini_key")
                 lmeta["runtime"] = "llm"
+                llm_result = {"status": 503, "body": "", "error": "execução LLM desativada"}
+                fv[llm_key] = llm_result
+                _persist_flow_var(llm_key, llm_result)
                 acoes.append(
                     Acao(
                         tipo="text",
@@ -762,15 +964,8 @@ def steps_to_acoes(
             continue
 
         if rk == "branch":
-            expr = str(cfg.get("expression") or "").strip()
-            if expr:
-                acoes.append(
-                    Acao(
-                        tipo="text",
-                        conteudo=f"🔀 Condição: {expr}"[:900],
-                        metadata={"source": "flow_builder", "runtime": "branch"},
-                    )
-                )
+            # Routing-only node — no message sent to user.
+            logger.debug("flow_executor branch: expr=%s", str(cfg.get("expression") or "")[:200])
             continue
 
         if rk == "split":
@@ -834,15 +1029,8 @@ def steps_to_acoes(
 
 
         if rk == "schedule":
-            tz = str(cfg.get("timezone") or "").strip()
-            if tz:
-                acoes.append(
-                    Acao(
-                        tipo="text",
-                        conteudo=f"🕒 Expediente ({tz}) configurado."[:900],
-                        metadata={"source": "flow_builder", "runtime": "schedule"},
-                    )
-                )
+            # Config-only node — no message sent to user.
+            logger.debug("flow_executor schedule: tz=%s", str(cfg.get("timezone") or ""))
             continue
 
         if ntype == "motor_ref":
@@ -898,15 +1086,8 @@ def steps_to_acoes(
             continue
 
         if rk == "system":
-            hint = str(cfg.get("body") or cfg.get("module_hint") or cfg.get("step_name") or "").strip()
-            if hint:
-                acoes.append(
-                    Acao(
-                        tipo="text",
-                        conteudo=f"⚙️ Sistema: {hint}"[:900],
-                        metadata={"source": "flow_builder", "runtime": "system"},
-                    )
-                )
+            # Internal system node — no message sent to user.
+            logger.debug("flow_executor system: hint=%s", str(cfg.get("body") or cfg.get("step_name") or "")[:200])
             continue
 
         logger.info("flow_executor skip runtime=%s type=%s node_id=%s", rk, ntype, st.get("node_id"))

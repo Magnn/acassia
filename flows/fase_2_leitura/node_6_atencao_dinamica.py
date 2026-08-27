@@ -134,6 +134,7 @@ DADOS DA HIVE MIND (use tudo com respeito):
 - Nome/Pessoa envolvida no relato: {nome_pessoa_envolvida}
 - Tempo exato citado pelo lead (quando houver): {tempo_exato}
 - Evento gatilho citado pelo lead (quando houver): {evento_gatilho}
+- Signo do lead (quando houver — use com sutileza astrológica para reforçar autoridade): {signo}
 - Dado concreto do lead para ecoar no diagnóstico (quando houver): {dado_concreto}
 - Última interação: "{msg_lead}"
 - Nome provisório do trabalho espiritual (use como fio condutor, pode ecoar em 1–2 blocos): {nome_mecanismo}
@@ -311,6 +312,7 @@ def executar_v2(ctx) -> tuple:
                 nome_pessoa_envolvida=nome_pessoa_envolvida,
                 tempo_exato=tempo_exato,
                 evento_gatilho=evento_gatilho,
+                signo=str(meta.get("signo") or "INDEFINIDO"),
                 dado_concreto=dado_concreto or "INDEFINIDO",
                 msg_lead=msg_lead,
                 nome_mecanismo=nome_mecanismo_ctx,

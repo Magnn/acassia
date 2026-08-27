@@ -406,6 +406,23 @@ class TenantFlowSecret(Base):
     atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
 
 
+class TenantIntegrationCredential(Base):
+    """
+    Cofre de Integrações Nativo (Estilo n8n). 
+    Armazena tokens OAuth e API Keys isolados do fluxo para segurança máxima.
+    """
+
+    __tablename__ = "tenant_integration_credentials"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    service = Column(String(64), nullable=False, index=True)  # ex: google_sheets, activecampaign
+    name = Column(String(128), nullable=False)  # ex: "Conta Google Pessoal"
+    encrypted_data = Column(Text, nullable=False)  # JSON criptografado
+    criado_em = Column(DateTime(timezone=True), default=_agora_utc)
+    atualizado_em = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc)
+
+
 class TenantFlowVariable(Base):
     """Variáveis não sensíveis (JSON) por tenant."""
 

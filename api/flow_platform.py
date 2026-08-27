@@ -24,9 +24,10 @@ from db import models
 from db.database import SessionLocal
 from tenant_context import get_request_tenant_id
 
-# Atalho local — permitimos "user" pois a filtragem é por tenant_id, 
-# e donos de tenant precisam gerenciar seus próprios fluxos.
-_admin = require_role("user")
+# Atalho local — permitimos "user" e "admin" pois a filtragem é por tenant_id,
+# e donos de tenant (role='user' ou 'admin') precisam gerenciar seus próprios
+# fluxos. Sem "admin" aqui, uma conta admin ficava travada fora do builder.
+_admin = require_role("user", "admin")
 
 logger = logging.getLogger(__name__)
 
@@ -270,22 +271,53 @@ def register_flow_platform_routes(app: Flask) -> None:
         finally:
             db.close()
 
-    @app.route("/api/flows/publish", methods=["POST"])
+    @app.route("/api/flows/publish", methods=["POST", "DELETE"])
     @login_required
     @_admin
     def api_flow_publish():
         tid = get_request_tenant_id()
         body = request.get_json(silent=True) or {}
         bid = body.get("blueprint_id")
-        if bid is None:
+        if bid is None and request.method == "POST":
             return jsonify({"ok": False, "error": "blueprint_id obrigatório"}), 400
             
         db = SessionLocal()
         try:
-            bid = int(bid)
+            bid = int(bid) if bid is not None else None
+            if request.method == "DELETE":
+                pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+                if pub and (
+                    bid is None
+                    or pub.published_blueprint_id is None
+                    or int(pub.published_blueprint_id) == bid
+                ):
+                    pub.published_blueprint_id = None
+                    db.commit()
+                    return jsonify({"ok": True, "published_blueprint_id": None}), 200
+                if pub and bid is not None:
+                    return jsonify({"ok": False, "error": "este fluxo não está publicado"}), 409
+                return jsonify({"ok": True, "published_blueprint_id": None}), 200
+
             bp = _bp_row(db, tid, bid)
             if not bp:
                 return jsonify({"ok": False, "error": "fluxo não encontrado"}), 404
+
+            from flow_builder_runtime import validate_flow_document
+
+            doc = dict(bp.body_json) if isinstance(bp.body_json, dict) else {}
+            doc.setdefault("title", bp.title)
+            validation = validate_flow_document(doc, strict=True)
+            if not validation.get("ok"):
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "error": "corrija os erros do fluxo antes de publicar",
+                            "validation": validation,
+                        }
+                    ),
+                    422,
+                )
                 
             pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
             if not pub:
@@ -1258,23 +1290,15 @@ def register_flow_platform_routes(app: Flask) -> None:
         raw = json.dumps(body)
         if len(raw) > _MAX_BODY_PREVIEW:
             return jsonify({"ok": False, "error": "documento muito grande"}), 413
-        rep = validate_flow_document(body)
+        rep = validate_flow_document(body, strict=True)
         extra = []
-        nodes = body.get("nodes") if isinstance(body.get("nodes"), list) else []
-        edges = body.get("edges") if isinstance(body.get("edges"), list) else []
+        graph = body.get("graph") if isinstance(body.get("graph"), dict) else body
+        nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
+        edges = graph.get("edges") if isinstance(graph.get("edges"), list) else []
         if len(nodes) > 500:
             extra.append({"level": "warning", "code": "too_many_nodes", "message": "Mais de 500 nós."})
         if len(edges) > 2000:
             extra.append({"level": "warning", "code": "too_many_edges", "message": "Mais de 2000 arestas."})
-        return (
-            jsonify(
-                _json_safe(
-                    {
-                        "ok": True,
-                        "validation": rep,
-                        "lint": extra,
-                    }
-                )
-            ),
-            200,
-        )
+        result = dict(rep)
+        result["warnings"] = list(rep.get("warnings") or []) + extra
+        return jsonify(_json_safe(result)), 200

@@ -124,7 +124,7 @@ export default function App() {
       <ImpersonateBanner />
       <QuotaWarningBanner />
       <CookieBanner />
-      <OnboardingChecklist />
+      {/* <OnboardingChecklist /> */}
       <AppShell />
       <Suspense fallback={<PageFallback />}>
         <Routes>
@@ -257,7 +257,10 @@ export default function App() {
               />
             </Route>
           </Route>
-          <Route path="/flows/:id" element={<Builder />} />
+          {/* Builder movido para DENTRO do Layout */}
+          <Route element={<Layout />}>
+            <Route path="/flows/:id" element={<Builder />} />
+          </Route>
 
           {/* Admin God-Mode (Frente 1) — tema escuro/sóbrio distinto */}
           <Route path="/admin/setup-2fa" element={<AdminSetup2FA />} />

@@ -191,14 +191,22 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
     onError: (e) => toast.error(`Falha ao validar: ${(e as Error).message}`),
   });
 
-  // Publish
+  // Publish / unpublish
   const publishMutation = useMutation({
-    mutationFn: () => blueprintsApi.publish(blueprint.id),
+    mutationFn: async () => {
+      if (isPublished) return blueprintsApi.unpublish(blueprint.id);
+      await fs.saveNow();
+      return blueprintsApi.publish(blueprint.id);
+    },
     onSuccess: () => {
-      toast.success(`"${blueprint.title}" publicado.`);
+      toast.success(
+        isPublished
+          ? `"${blueprint.title}" desativado.`
+          : `"${blueprint.title}" publicado.`,
+      );
       qc.invalidateQueries({ queryKey: ['publish-status'] });
     },
-    onError: (e) => toast.error(`Falha ao publicar: ${(e as Error).message}`),
+    onError: (e) => toast.error(`Falha ao alterar publicação: ${(e as Error).message}`),
   });
 
   // Status atual de publicação (pra mostrar badge "publicado")
@@ -336,6 +344,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
                   publishMutation.mutate();
                }
             }}
+            disabled={publishMutation.isPending}
             className={`w-[38px] h-[38px] rounded-lg flex items-center justify-center transition-colors shadow-sm ${isPublished ? 'bg-[#10b981] hover:bg-[#059669] text-white' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}
             title={isPublished ? "Fluxo Ativo (Clique para desativar)" : "Ativar Fluxo"}
           >
@@ -416,7 +425,6 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
               onAddNode={fs.addNode}
             />
           </div>
-          <LintPanel issues={issues} onFocus={requestFocus} />
         </div>
         {sidePanel}
       </div>

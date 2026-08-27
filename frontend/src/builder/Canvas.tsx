@@ -3,7 +3,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -58,7 +57,7 @@ function CanvasInner({
 
   // ── Conexão segura: rejeita self-loops, duplicatas e conexões heréticas ──
   const isValidConnection = useCallback(
-    (conn: Connection) => {
+    (conn: Connection | Edge) => {
       if (!conn.source || !conn.target) return false;
       // Self-loop
       if (conn.source === conn.target) return false;
@@ -69,7 +68,7 @@ function CanvasInner({
       if (targetNode?.data.meumisterioType === 'trigger') return false;
       // Nós de saída única (não-branching) já têm 1 edge de saída?
       const sourceNode = nodes.find((n) => n.id === conn.source);
-      const branchingTypes = new Set(['condicao', 'ab_split', 'pergunta', 'divisao']);
+      const branchingTypes = new Set(['condicao', 'ab_split', 'pergunta', 'divisao', 'menu']);
       if (sourceNode && !branchingTypes.has(sourceNode.data.meumisterioType)) {
         const existingOut = edges.filter((e) => e.source === conn.source);
         if (existingOut.length >= 1) return false;
@@ -129,21 +128,17 @@ function CanvasInner({
         isValidConnection={isValidConnection}
         proOptions={{ hideAttribution: true }}
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={22}
-          size={1}
-          color="rgba(15, 23, 42, 0.06)"
+        <Background 
+          variant={BackgroundVariant.Lines} 
+          gap={24} 
+          size={1} 
+          color="#e2e8f0" 
         />
-        <MiniMap
-          pannable
-          zoomable
-          maskColor="var(--bg-primary)"
-          nodeColor={() => 'var(--accent-amethyst)'}
-          nodeStrokeWidth={2}
-          className="bg-bg-surface border border-border rounded-xl shadow-lg !bottom-4 !right-4"
+        <Controls 
+          position="top-right" 
+          showInteractive={false} 
+          className="!mt-4 !mr-4 !bg-white !border-slate-200 !shadow-sm rounded-lg overflow-hidden [&>button]:!border-b [&>button]:!border-slate-100 hover:[&>button]:!bg-slate-50 [&>button]:!text-slate-600" 
         />
-        <Controls position="bottom-right" showInteractive={false} className="!bottom-4 !left-4 !flex-row !bg-bg-surface !border-border !shadow-lg" />
       </ReactFlow>
     </div>
   );

@@ -190,7 +190,7 @@ class RecoveryEngine:
             for lead in leads:
                 try:
                     lock = self._obter_lock(lead.id)
-                    if lock.acquire(blocking=False):
+                    if lock.acquire(timeout=0):
                         try:
                             # Sempre opera no tenant do lead (multi-tenant safe)
                             lead_tenant = lead.tenant_id or "default"

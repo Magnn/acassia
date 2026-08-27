@@ -16,11 +16,6 @@ const BUILTIN_FIELDS = [
   { value: 'lead.email', label: 'lead.email' },
 ];
 
-const REPLY_MODES = [
-  { v: 'texto_livre', label: 'Texto livre', icon: '💬', desc: 'O lead responde livremente' },
-  { v: 'botoes', label: 'Botões rápidos', icon: '🔘', desc: 'Botões WhatsApp (máx. 3)' },
-];
-
 /* ── Helpers de expiração (idênticos ao dashboard.html) ── */
 function splitExpiry(sec: number): { amt: number; unit: 'minute' | 'hour' | 'day' } {
   const s = Number.isFinite(sec) && sec > 0 ? sec : 3600;
@@ -44,11 +39,11 @@ function expiryToSeconds(amt: number, unit: string) {
 }
 
 function expiryLabel(sec: number) {
-  if (sec < 60) return `Se não responder em ${Math.round(sec)}s`;
-  if (sec < 3600) { const m = Math.round(sec / 60); return m <= 1 ? 'Se não responder em 1 min' : `Se não responder em ${m} min`; }
-  if (sec < 86400) { const h = Math.round(sec / 3600); return h <= 1 ? 'Se não responder em 1h' : `Se não responder em ${h}h`; }
+  if (sec < 60) return `Resposta após ${Math.round(sec)}s usa a saída expirada`;
+  if (sec < 3600) { const m = Math.round(sec / 60); return `Resposta após ${m} min usa a saída expirada`; }
+  if (sec < 86400) { const h = Math.round(sec / 3600); return `Resposta após ${h}h usa a saída expirada`; }
   const d = Math.round(sec / 86400);
-  return d <= 1 ? 'Se não responder em 1 dia' : `Se não responder em ${d} dias`;
+  return `Resposta após ${d} dia${d === 1 ? '' : 's'} usa a saída expirada`;
 }
 
 function isContactVar(k: string) {
@@ -65,9 +60,6 @@ export default function PerguntaInspector({ node, onUpdate }: InspectorProps) {
   const saveField = readStr(cfg, 'save_to_flow_field') || readStr(cfg, 'output_var');
   const rawSec = readNum(cfg, 'question_timeout_seconds');
   const timeoutSec = typeof rawSec === 'number' && rawSec > 0 ? rawSec : 3600;
-  const replyMode = readStr(cfg, 'reply_mode') || 'texto_livre';
-  const quickReplies = Array.isArray(cfg.quick_replies) ? (cfg.quick_replies as string[]) : [];
-
   /* ── State ── */
   const [varsOpen, setVarsOpen] = useState(false);
   const [tenantVars, setTenantVars] = useState<{ key: string }[]>([]);
@@ -137,265 +129,226 @@ export default function PerguntaInspector({ node, onUpdate }: InspectorProps) {
   const currentExpirySec = expiryToSeconds(exAmt, exUnit);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* ── Intro ── */}
+      <div className="space-y-3">
+        <p className="text-[10px] text-slate-500 leading-relaxed">
+          Esse bloco possibilita uma conversa humanizada com perguntas e respostas. A pergunta será enviada e o fluxo ficará pausado até o contato responder. Respostas recebidas após o prazo seguem pela saída expirada.
+        </p>
+        <p className="text-[10px] text-slate-500 leading-relaxed">
+          <strong>Dica importante:</strong> você pode inserir apenas um "espaço" no campo "Faça uma pergunta", a pausa será ativada e nenhum texto será enviado ao contato. Assim, você poderá enviar perguntas por áudio na seguinte estrutura: Bloco com áudio → Bloco de pergunta configurado com "espaço".
+        </p>
+      </div>
 
-      {/* ── Intro (como o legado) ── */}
-      <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-3 space-y-1.5">
-        <p className="text-[11px] text-[#475569] leading-[1.5]">
-          Este bloco envia uma <strong>pergunta</strong> ao contato e aguarda a resposta.
-          O fluxo ficará <strong>pausado</strong> até que o contato responda ou até que o bloco expire.
-        </p>
-        <p className="text-[10px] text-[#94a3b8] leading-[1.45]">
-          <strong>Dica:</strong> insira apenas um "espaço" no campo da pergunta para pausar sem enviar texto.
-          Assim, você pode enviar perguntas por áudio: <em>Bloco com áudio → Bloco de pergunta configurado com "espaço"</em>.
-        </p>
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Configurar</span>
+        <div className="h-px flex-1 bg-slate-200" />
       </div>
 
       {/* ── 1. Faça uma pergunta ── */}
-      <div className="rounded-xl border border-[#ff5722]/25 overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-[#ff5722]/8 to-[#ff5722]/3 border-b border-[#ff5722]/15">
-          <div className="w-5 h-5 rounded-md bg-[#ff5722] flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold">?</span>
-          </div>
-          <span className="text-[11px] font-bold text-[#ff5722] uppercase tracking-[0.06em]">
-            Faça uma pergunta
-          </span>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex justify-between items-center">
+          <label className="text-[13px] font-semibold text-slate-800">Faça uma pergunta:</label>
           <button
             type="button"
             onClick={() => { setVarsOpen((v) => !v); if (!varsOpen) fetchVars(); }}
-            className={[
-              'ml-auto flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors border',
-              varsOpen ? 'border-[#ff5722] bg-[#ff5722]/10 text-[#ff5722]' : 'border-[#e2e8f0] text-[#64748b] hover:border-[#ff5722]/50 hover:text-[#ff5722]',
-            ].join(' ')}
+            className="text-[11px] font-bold text-blue-500 flex items-center gap-1 hover:text-blue-600 transition-colors"
           >
-            {varsOpen ? '✕ Fechar' : '👁 Campos Personalizados'}
+            {varsOpen ? '✕ Fechar' : '👁️ Campos Personalizados'}
           </button>
         </div>
-        <div className="p-3 space-y-2">
-          <textarea
-            ref={textareaRef}
-            value={question}
-            onChange={(e) => onUpdate(patchConfig(node, { question: e.target.value, body: e.target.value }))}
-            rows={5}
-            placeholder="Ex.: Qual o seu nome?"
-            className="w-full rounded-[10px] border border-[#e2e8f0] bg-[#f1f5f9] px-2.5 py-2 text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#ff5722] focus:ring-[3px] focus:ring-[rgba(255,87,34,0.12)] focus:bg-white transition-colors resize-y min-h-[100px] max-h-[220px] leading-[1.45]"
-            style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}
-          />
-          <p className="text-[10px] text-[#94a3b8]">
-            Use <code className="bg-[#f1f5f9] px-1 rounded text-[9px] font-mono">{'{{variavel}}'}</code> para personalizar.
-          </p>
+        <textarea
+          ref={textareaRef}
+          value={question}
+          onChange={(e) => onUpdate(patchConfig(node, { question: e.target.value, body: e.target.value }))}
+          rows={4}
+          className="w-full rounded border border-slate-200 p-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors resize-y shadow-sm"
+        />
 
-          {/* Painel de variáveis (Contact / Flow, como legado) */}
-          {varsOpen && (
-            <div className="rounded-lg border border-[#e2e8f0] bg-white p-2.5 space-y-2">
-              {loadingVars ? (
-                <p className="text-[10px] text-[#94a3b8] text-center py-2">Carregando variáveis...</p>
-              ) : (
-                <>
-                  {/* Campos de contato */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-px flex-1 bg-[#e2e8f0]" />
-                      <span className="text-[9px] font-bold text-[#94a3b8] uppercase tracking-wider shrink-0">Campos de contato</span>
-                      <div className="h-px flex-1 bg-[#e2e8f0]" />
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {contactVars.length === 0 ? (
-                        <span className="text-[10px] text-[#cbd5e1]">Nenhuma variável nesta categoria.</span>
-                      ) : contactVars.map((k) => (
-                        <button key={k} type="button" onClick={() => insertVar(k)}
-                          className="px-2 py-0.5 rounded-full bg-[#2563eb]/10 text-[#2563eb] text-[10px] font-mono font-medium hover:bg-[#2563eb]/20 transition-colors cursor-pointer">
-                          {`{{${k}}}`}
-                        </button>
-                      ))}
-                    </div>
+        {/* Painel de variáveis */}
+        {varsOpen && (
+          <div className="bg-white mt-2 space-y-4">
+            {loadingVars ? (
+              <p className="text-[10px] text-slate-400 text-center py-2">Carregando...</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-px flex-1 bg-slate-200" />
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Campos de contato</span>
+                    <div className="h-px flex-1 bg-slate-200" />
                   </div>
-                  {/* Campos do fluxo */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-px flex-1 bg-[#e2e8f0]" />
-                      <span className="text-[9px] font-bold text-[#94a3b8] uppercase tracking-wider shrink-0">Campos do fluxo</span>
-                      <div className="h-px flex-1 bg-[#e2e8f0]" />
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {flowVars.length === 0 ? (
-                        <span className="text-[10px] text-[#cbd5e1]">Nenhuma variável nesta categoria.</span>
-                      ) : flowVars.map((k) => (
-                        <button key={k} type="button" onClick={() => insertVar(k)}
-                          className="px-2 py-0.5 rounded-full bg-[#10b981]/10 text-[#10b981] text-[10px] font-mono font-medium hover:bg-[#10b981]/20 transition-colors cursor-pointer">
-                          {`{{${k}}}`}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {contactVars.map((k) => (
+                      <button key={k} type="button" onClick={() => insertVar(k)} className="px-2 py-1.5 rounded bg-slate-50 border border-slate-200 text-slate-500 text-[10px] font-bold hover:bg-[#9333ea] hover:text-white hover:border-[#9333ea] transition-all truncate text-center shadow-sm">
+                        {`{{${k}}}`}
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-[9px] text-[#94a3b8] text-center pt-1">Toque numa variável para inserir na posição do cursor.</p>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── 2. Salvar resposta em campo de fluxo (dropdown + criar novo) ── */}
-      <div className="rounded-xl border border-[#2563eb]/25 overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-[#2563eb]/8 to-[#2563eb]/3 border-b border-[#2563eb]/15">
-          <div className="w-5 h-5 rounded-md bg-[#2563eb] flex items-center justify-center">
-            <span className="text-white text-[10px]">📦</span>
-          </div>
-          <span className="text-[11px] font-bold text-[#2563eb] uppercase tracking-[0.06em]">
-            Salvar resposta em campo
-          </span>
-          <span className="text-[10px] text-[#94a3b8] ml-auto">(opcional)</span>
-        </div>
-        <div className="p-3 space-y-2">
-          <div className="flex items-center gap-1.5">
-            <select
-              value={saveField}
-              onChange={(e) => {
-                const v = e.target.value;
-                onUpdate(patchConfig(node, { save_to_flow_field: v || undefined }));
-              }}
-              className="flex-1 rounded-[10px] border border-[#e2e8f0] bg-[#f1f5f9] px-2.5 py-[7px] text-[13px] text-slate-800 focus:outline-none focus:border-[#2563eb] focus:ring-[3px] focus:ring-[rgba(37,99,235,0.12)] focus:bg-white transition-colors"
-              style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}
-            >
-              {allFieldOptions.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setShowNewField((v) => !v)}
-              className="w-8 h-8 rounded-lg border border-[#e2e8f0] bg-white flex items-center justify-center text-[#2563eb] hover:bg-[#2563eb]/10 hover:border-[#2563eb]/50 transition-colors text-[14px] font-bold shrink-0"
-              title="Adicionar campo no catálogo do tenant"
-            >+</button>
-          </div>
-
-          {/* Form inline para criar campo novo */}
-          {showNewField && (
-            <div className="flex items-center gap-1.5 p-2 rounded-lg border border-[#2563eb]/25 bg-[#2563eb]/5">
-              <input
-                type="text"
-                value={newFieldName}
-                onChange={(e) => setNewFieldName(e.target.value.replace(/[^a-zA-Z0-9_.]/g, '').toLowerCase())}
-                placeholder="nome_do_campo"
-                className="flex-1 rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-[12px] text-slate-800 font-mono placeholder:text-slate-400 focus:outline-none focus:border-[#2563eb]"
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!newFieldName.trim()) return;
-                  try {
-                    await fetch('/api/flows/tenant/variables', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ key: newFieldName.trim(), value: '' }),
-                    });
-                    await fetchVars();
-                    onUpdate(patchConfig(node, { save_to_flow_field: newFieldName.trim() }));
-                    setNewFieldName('');
-                    setShowNewField(false);
-                  } catch { /* ignore */ }
-                }}
-                disabled={!newFieldName.trim()}
-                className="px-3 py-1 rounded-lg bg-[#2563eb] text-white text-[11px] font-semibold hover:bg-[#1d4ed8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >Criar</button>
-            </div>
-          )}
-
-          {saveField && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#2563eb]/8 border border-[#2563eb]/20">
-              <span className="text-[10px] text-[#2563eb] font-medium">
-                A resposta será salva em <code className="bg-white px-1 rounded text-[9px] font-mono font-bold">{`{{${saveField}}}`}</code>
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── 3. Modo de resposta ── */}
-      <div className="rounded-xl border border-[#e2e8f0] overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-[#f8fafc] border-b border-[#e2e8f0]">
-          <span className="text-[11px] font-bold text-[#475569] uppercase tracking-[0.06em]">
-            Modo de Resposta
-          </span>
-        </div>
-        <div className="p-3 space-y-3">
-          <div className="grid grid-cols-2 gap-1.5">
-            {REPLY_MODES.map((m) => (
-              <button
-                key={m.v}
-                type="button"
-                onClick={() => onUpdate(patchConfig(node, { reply_mode: m.v }))}
-                className={[
-                  'flex flex-col items-center gap-1 py-2.5 px-2 rounded-lg border text-center transition-all',
-                  replyMode === m.v
-                    ? 'border-[#ff5722] bg-[#ff5722]/8 text-[#ff5722] shadow-sm'
-                    : 'border-[#e2e8f0] bg-white text-[#64748b] hover:border-[#cbd5e1] hover:bg-[#f8fafc]',
-                ].join(' ')}
-              >
-                <span className="text-[18px]">{m.icon}</span>
-                <span className="text-[10px] font-semibold">{m.label}</span>
-                <span className="text-[9px] opacity-70">{m.desc}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Botões rápidos — só quando reply_mode = botoes */}
-          {replyMode === 'botoes' && (
-            <div className="space-y-2 pt-1">
-              {quickReplies.map((reply, i) => (
-                <div key={i} className="flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-[#10b981] text-white text-[9px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                  <input type="text" value={reply} maxLength={20}
-                    onChange={(e) => { const next = [...quickReplies]; next[i] = e.target.value; onUpdate(patchConfig(node, { quick_replies: next })); }}
-                    placeholder={`Opção ${i + 1}`}
-                    className="flex-1 rounded-lg border border-[#e2e8f0] bg-[#f1f5f9] px-2.5 py-1.5 text-[12px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#10b981] focus:ring-[2px] focus:ring-[rgba(16,185,129,0.12)] focus:bg-white transition-colors" />
-                  <button type="button" onClick={() => { const next = quickReplies.filter((_, j) => j !== i); onUpdate(patchConfig(node, { quick_replies: next })); }}
-                    className="w-6 h-6 rounded-md flex items-center justify-center text-[#94a3b8] hover:text-red-500 hover:bg-red-50 transition-colors" title="Remover">×</button>
                 </div>
-              ))}
-              {quickReplies.length < 3 && (
-                <button type="button" onClick={() => onUpdate(patchConfig(node, { quick_replies: [...quickReplies, ''] }))}
-                  className="w-full py-2 rounded-lg border-2 border-dashed border-[#e2e8f0] text-[11px] font-semibold text-[#94a3b8] hover:border-[#10b981] hover:text-[#10b981] hover:bg-[#10b981]/5 transition-all">
-                  + Adicionar opção
-                </button>
-              )}
-              <p className="text-[10px] text-[#94a3b8]">Botões do WhatsApp. Máx. 3 opções, 20 caracteres cada.</p>
-            </div>
-          )}
-        </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-px flex-1 bg-slate-200" />
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Campos do fluxo</span>
+                    <div className="h-px flex-1 bg-slate-200" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {flowVars.map((k) => (
+                      <button key={k} type="button" onClick={() => insertVar(k)} className="px-2 py-1.5 rounded bg-[#16a34a] border border-[#16a34a] text-white text-[10px] font-bold hover:bg-[#15803d] transition-all truncate text-center shadow-sm">
+                        {`{{${k}}}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ── 4. Bloco expira em (minutos/horas/dias com slider, como legado) ── */}
-      <div className="rounded-xl border border-[#ef4444]/25 overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-[#ef4444]/8 to-[#ef4444]/3 border-b border-[#ef4444]/15">
-          <div className="w-5 h-5 rounded-md bg-[#ef4444] flex items-center justify-center">
-            <span className="text-white text-[10px]">⏱️</span>
-          </div>
-          <span className="text-[11px] font-bold text-[#ef4444] uppercase tracking-[0.06em]">
-            Bloco Expira em
-          </span>
+      {/* ── 2. Salvar resposta em campo de fluxo (opcional) ── */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[13px] font-semibold text-slate-800">Salvar resposta em um campo de fluxo (opcional)</label>
+        <div className="flex items-center gap-2">
+          <select
+             className="flex-1 rounded border border-slate-200 bg-white px-3 py-2 text-[12px] text-slate-700 outline-none shadow-sm"
+             value={saveField || ''}
+             onChange={(e) => onUpdate(patchConfig(node, { save_to_flow_field: e.target.value, output_var: e.target.value }))}
+          >
+             {allFieldOptions.map((opt) => (
+               <option key={opt.value} value={opt.value}>{opt.label}</option>
+             ))}
+          </select>
+          <button 
+             className="ml-1 flex items-center justify-center w-[30px] h-[30px] shrink-0 rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors shadow-sm"
+             onClick={() => setShowNewField(true)}
+          >
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
         </div>
 
-        {/* Card clicável (como legado) */}
+        {/* Modal de Campos Personalizados */}
+        {showNewField && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-[500px] overflow-hidden flex flex-col">
+              {/* Header Roxo */}
+              <div className="bg-[#a855f7] px-5 py-4 flex items-center justify-between shrink-0">
+                 <h2 className="text-white font-bold text-[18px]">Campos Personalizados</h2>
+                 <button onClick={() => setShowNewField(false)} className="bg-white text-[#a855f7] hover:bg-slate-100 p-1 rounded-full transition-colors flex items-center justify-center">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                 </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 flex flex-col flex-1">
+                 <div className="mb-5">
+                    <span className="inline-block border border-[#a855f7] text-[#a855f7] px-3 py-1 rounded-full text-[11px] font-bold shadow-sm">
+                       Campos de fluxo
+                    </span>
+                 </div>
+                 
+                 <div className="flex flex-col gap-4">
+                    {/* Nome */}
+                    <div className="flex flex-col gap-1.5">
+                       <label className="text-[13px] font-bold text-slate-800 flex items-center gap-1">
+                          Nome <span className="text-[10px] font-medium text-slate-500">(Máximo de 15 caracteres e apenas letras e _)</span>
+                       </label>
+                       <input 
+                          type="text" 
+                          maxLength={15}
+                          value={newFieldName}
+                          onChange={(e) => setNewFieldName(e.target.value.replace(/[^a-zA-Z_]/g, ''))}
+                          placeholder="Nome do campo de fluxo"
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-md text-[13px] outline-none focus:border-purple-500 text-slate-700"
+                       />
+                    </div>
+
+                    {/* Tipo do campo */}
+                    <div className="flex flex-col gap-1.5">
+                       <label className="text-[13px] font-bold text-slate-800">Tipo do campo</label>
+                       <select className="w-full px-3 py-2.5 border border-slate-200 rounded-md text-[13px] outline-none focus:border-purple-500 text-slate-700 bg-white">
+                          <option value="Texto">Texto</option>
+                          <option value="Número">Número</option>
+                          <option value="Data/Hora">Data/Hora</option>
+                       </select>
+                    </div>
+
+                    {/* Descrição */}
+                    <div className="flex flex-col gap-1.5">
+                       <label className="text-[13px] font-bold text-slate-800">Descrição</label>
+                       <input 
+                          type="text" 
+                          placeholder="Descrição do campo de fluxo"
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-md text-[13px] outline-none focus:border-purple-500 text-slate-700"
+                       />
+                    </div>
+                 </div>
+
+                 {/* Botões Ação */}
+                 <div className="flex items-center gap-3 mt-8">
+                    <button 
+                       onClick={() => setShowNewField(false)}
+                       className="flex-1 bg-[#ef4444] hover:bg-[#dc2626] text-white py-3 rounded text-[14px] font-bold transition-colors"
+                    >
+                       Cancelar
+                    </button>
+                    <button 
+                       onClick={async () => {
+                         if (!newFieldName.trim()) return;
+                         try {
+                           await fetch('/api/flows/tenant/variables', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({ key: newFieldName.trim(), value: '' }),
+                           });
+                           await fetchVars();
+                           onUpdate(patchConfig(node, { save_to_flow_field: newFieldName.trim(), output_var: newFieldName.trim() }));
+                           setNewFieldName('');
+                           setShowNewField(false);
+                         } catch { /* ignore */ }
+                       }}
+                       disabled={!newFieldName.trim()}
+                       className={`flex-1 py-3 rounded text-[14px] font-bold transition-colors ${newFieldName.trim() ? 'bg-[#10b981] hover:bg-[#059669] text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                    >
+                       Salvar Campos
+                    </button>
+                 </div>
+
+                 <p className="text-[10px] text-slate-400 mt-5 text-center leading-relaxed px-4">
+                    Você pode utilizar palavras ou frases como palavra-chave. O fluxo será acionado quando o cliente enviar uma mensagem exatamente igual à palavra-chave. Uma dica é copiar o texto pronto que está configurado na sua campanha de mensagem.
+                 </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Prazo da resposta</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      {/* ── 3. Bloco expira em ── */}
+      <div className="flex flex-col gap-2">
         <button
           type="button"
           onClick={() => setExpiryOpen((v) => !v)}
-          className="w-full flex flex-col items-center py-3 px-3 text-center hover:bg-[#fef2f2]/50 transition-colors border-b border-[#ef4444]/10"
+          className="w-full flex flex-col items-center justify-center py-4 rounded-lg border border-dashed border-red-400 hover:bg-red-50 transition-colors bg-white"
         >
-          <span className="text-[13px] font-bold text-[#ef4444]">
+          <span className="text-[13px] font-bold text-red-500">
             {expiryLabel(currentExpirySec)}
           </span>
-          <span className="text-[10px] text-[#94a3b8]">
-            {expiryOpen ? 'Fechar configuração' : 'Clique para configurar'}
+          <span className="text-[10px] text-slate-400 mt-0.5">
+            Clique para configurar
           </span>
         </button>
 
-        {/* Painel expansível com slider + unit selector (como legado) */}
         {expiryOpen && (
-          <div className="p-3 space-y-2">
-            <p className="text-[10px] text-[#475569] font-semibold">Tempo para expirar esse bloco</p>
-            <div className="flex items-center gap-2">
+          <div className="p-3.5 bg-white border border-slate-200 rounded-lg space-y-3 mt-1 shadow-sm">
+            <label className="text-[11px] font-bold text-slate-800">Tempo para expirar esse bloco</label>
+            <div className="flex items-center gap-3 mt-2">
               <input
                 type="range"
                 min={1}
@@ -407,8 +360,7 @@ export default function PerguntaInspector({ node, onUpdate }: InspectorProps) {
                   setExAmt(v);
                   updateExpiry(v, exUnit);
                 }}
-                className="flex-1"
-                style={{ accentColor: '#ef4444' }}
+                className="flex-1 accent-[#9333ea] h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"
               />
               <select
                 value={exUnit}
@@ -423,21 +375,17 @@ export default function PerguntaInspector({ node, onUpdate }: InspectorProps) {
                   setExAmt(newAmt);
                   updateExpiry(newAmt, newUnit);
                 }}
-                className="rounded-lg border border-[#e2e8f0] bg-[#f1f5f9] px-2 py-1 text-[12px] text-[#475569] focus:outline-none focus:border-[#ef4444]"
+                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-[12px] font-medium text-slate-700 focus:outline-none focus:border-[#9333ea] w-24 shadow-sm"
               >
                 <option value="minute">Minutos</option>
                 <option value="hour">Horas</option>
                 <option value="day">Dias</option>
               </select>
             </div>
-            <div className="flex items-start gap-1.5 px-2.5 py-2 rounded-lg bg-[#fef2f2] border border-[#fecaca]">
-              <span className="text-[10px] leading-tight text-[#991b1b]">
-                ⚠️ {expiryLabel(currentExpirySec)} — o fluxo seguirá pela saída de timeout (vermelha).
-              </span>
-            </div>
           </div>
         )}
       </div>
+
     </div>
   );
 }

@@ -15,6 +15,12 @@ import {
   MotorRefInspector,
   TriggerInspector,
   AcaoInspector,
+  IntegrationInspector,
+  VoiceStudioInspector,
+  AgenteIaInspector,
+  MenuInspector,
+  ExpedienteInspector,
+  NotificarAtendenteInspector,
 } from './inspectors';
 import PerguntaInspector from './pergunta/PerguntaInspector';
 import type { InspectorProps } from './helpers';
@@ -79,9 +85,15 @@ export default function Inspector({ node, onUpdate, onClose, onDirtyChange, onRe
     }
     return () => {
       if (onRequestCloseRef) onRequestCloseRef.current = null;
+    };
+  }, [requestClose, onRequestCloseRef]);
+
+  // Ensure dirty state is reset ONLY on unmount
+  useEffect(() => {
+    return () => {
       onDirtyChange?.(false);
     };
-  }, [requestClose, onRequestCloseRef, onDirtyChange]);
+  }, [onDirtyChange]);
 
   // Auto-focus input when editing starts
   useEffect(() => {
@@ -295,12 +307,24 @@ function renderTypeBody(p: InspectorProps) {
       return <AcaoInspector {...p} />;
     case 'delay':
       return <DelayInspector {...p} />;
+    case 'expediente':
+      return <ExpedienteInspector {...p} />;
+    case 'notificar_atendente':
+      return <NotificarAtendenteInspector {...p} />;
+    case 'menu':
+      return <MenuInspector {...p} />;
     case 'condicao':
       return <CondicaoInspector {...p} />;
     case 'gpt':
       return <GptInspector {...p} />;
     case 'api':
       return <ApiInspector {...p} />;
+    case 'integration':
+      return <IntegrationInspector {...p} />;
+    case 'voice_studio':
+      return <VoiceStudioInspector {...p} />;
+    case 'agente_ia':
+      return <AgenteIaInspector {...p} />;
     case 'ab_split':
       return <AbSplitInspector {...p} />;
     case 'motor_ref':

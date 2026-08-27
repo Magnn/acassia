@@ -258,6 +258,7 @@ def _handle_checkout_completed(session: dict, event_id: str) -> None:
     patch = {
         "customer_id": customer_id or None,
         "subscription_id": subscription_id or None,
+        "status": "active",
     }
     if plan_meta:
         patch["plan"] = plan_meta
@@ -269,6 +270,7 @@ def _handle_checkout_completed(session: dict, event_id: str) -> None:
         _set_legacy_kv(tenant_id, "stripe.customer_id", customer_id)
     if subscription_id:
         _set_legacy_kv(tenant_id, "stripe.subscription_id", subscription_id)
+        _set_legacy_kv(tenant_id, "stripe.subscription_status", "active")
     if plan_meta:
         _set_legacy_kv(tenant_id, "stripe.plan", plan_meta)
 

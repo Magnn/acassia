@@ -399,43 +399,45 @@ export default function Layout() {
       {/* ═══ MAIN CONTENT ═══ */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         {/* Header Bar */}
-        <header className="h-[64px] border-b border-border bg-bg-header backdrop-blur-md px-6 flex items-center justify-between flex-shrink-0 z-20 shadow-sm">
-          <div className="flex items-center gap-3">
-            {!panelOpen && (
+        {!location.pathname.startsWith('/flows/') && (
+          <header className="h-[64px] border-b border-border bg-bg-header backdrop-blur-md px-6 flex items-center justify-between flex-shrink-0 z-20 shadow-sm">
+            <div className="flex items-center gap-3">
+              {!panelOpen && (
+                <button
+                  onClick={() => setPanelOpen(true)}
+                  className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-bg-surface transition-all mr-1"
+                >
+                  <PanelLeftOpen className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-5">
               <button
-                onClick={() => setPanelOpen(true)}
-                className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-bg-surface transition-all mr-1"
+                onClick={toggle}
+                className="p-2 rounded-xl text-secondary hover:text-primary hover:bg-bg-surface transition-all border border-transparent hover:border-border"
+                title="Alternar tema"
               >
-                <PanelLeftOpen className="w-4 h-4" />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 5a7 7 0 100 14 7 7 0 000-14z" />
+                </svg>
               </button>
-            )}
-          </div>
-          <div className="flex items-center gap-5">
-            <button
-              onClick={toggle}
-              className="p-2 rounded-xl text-secondary hover:text-primary hover:bg-bg-surface transition-all border border-transparent hover:border-border"
-              title="Alternar tema"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 5a7 7 0 100 14 7 7 0 000-14z" />
-              </svg>
-            </button>
-            <div className="h-5 w-px bg-border/60" />
-            <div className="flex items-center gap-3 group cursor-pointer">
-              <div className="flex flex-col items-end leading-tight">
-                <span className="text-[11px] font-black text-primary uppercase tracking-tight truncate max-w-[120px]">
-                  {user?.name || user?.email?.split('@')[0] || 'Usuário'}
-                </span>
-                <span className="text-[8px] font-black text-accent-amethyst uppercase tracking-widest bg-accent-amethyst/10 px-1.5 py-0.5 rounded-md">
-                  {user?.role === 'admin' ? 'Admin' : 'Tarólogo'}
-                </span>
-              </div>
-              <div className="w-9 h-9 rounded-2xl bg-bg-surface border-2 border-border shadow-sm flex items-center justify-center text-[10px] font-black text-accent-amethyst group-hover:scale-110 transition-transform uppercase">
-                {(user?.name || user?.email || '??').substring(0, 2)}
+              <div className="h-5 w-px bg-border/60" />
+              <div className="flex items-center gap-3 group cursor-pointer">
+                <div className="flex flex-col items-end leading-tight">
+                  <span className="text-[11px] font-black text-primary uppercase tracking-tight truncate max-w-[120px]">
+                    {user?.name || user?.email?.split('@')[0] || 'Usuário'}
+                  </span>
+                  <span className="text-[8px] font-black text-accent-amethyst uppercase tracking-widest bg-accent-amethyst/10 px-1.5 py-0.5 rounded-md">
+                    {user?.role === 'admin' ? 'Admin' : 'Tarólogo'}
+                  </span>
+                </div>
+                <div className="w-9 h-9 rounded-2xl bg-bg-surface border-2 border-border shadow-sm flex items-center justify-center text-[10px] font-black text-accent-amethyst group-hover:scale-110 transition-transform uppercase">
+                  {(user?.name || user?.email || '??').substring(0, 2)}
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-auto bg-bg-primary scroll-smooth">

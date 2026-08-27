@@ -5,9 +5,9 @@ Recebe webhooks de Hotmart, Kiwify, Asaas, Stripe.
 Dispara automações: confirmação, boleto/PIX, carrinho abandonado, reembolso.
 """
 from __future__ import annotations
-import logging, re
+import logging, re, threading
 from datetime import datetime, timezone
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, request, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
@@ -155,6 +155,25 @@ def receive_webhook(tenant_id: str, platform: str):
         logger.info("[checkout] %s/%s event=%s lead=%s",
                      tenant_id, platform, parsed["event_type"],
                      lead.id if lead else "none")
+        if lead and parsed["event_type"] in ("purchase_approved", "cart_abandoned"):
+            flow_engine = current_app.extensions.get("flow_engine")
+            if flow_engine is not None:
+                event_payload = {
+                    "platform": platform,
+                    "event_type": parsed["event_type"],
+                    "product": parsed.get("product"),
+                    "product_id": parsed.get("product_id"),
+                    "value": parsed.get("value", 0),
+                    "payment_method": parsed.get("payment_method"),
+                    "payment_url": parsed.get("payment_url"),
+                }
+                threading.Thread(
+                    target=flow_engine.processar_evento_fluxo,
+                    args=(lead.id, parsed["event_type"], event_payload),
+                    kwargs={"tenant_id": tenant_id},
+                    daemon=True,
+                    name=f"checkout-flow-{platform}-{lead.id}",
+                ).start()
         return jsonify({"ok": True, "event_id": evt.id}), 200
     except Exception as e:
         logger.error("[checkout] Error: %s", e)

@@ -43,7 +43,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await res.text();
   const data = text ? safeJson(text) : null;
   if (!res.ok) {
-    throw new ApiError(res.status, data, `${method} ${path} → ${res.status}`);
+    const serverMessage =
+      data && typeof data === 'object'
+        ? String((data as { error?: unknown; message?: unknown }).error
+          || (data as { message?: unknown }).message
+          || '')
+        : '';
+    throw new ApiError(
+      res.status,
+      data,
+      serverMessage || `${method} ${path} → ${res.status}`,
+    );
   }
   return data as T;
 }
@@ -62,4 +72,5 @@ export const api = {
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
+  delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
 };

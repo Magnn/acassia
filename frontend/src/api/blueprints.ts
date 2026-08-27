@@ -57,6 +57,12 @@ interface UpdateInput {
   body?: Record<string, unknown>;
 }
 
+interface CreateBlueprintInput {
+  title: string;
+  integration: string;
+  event: string;
+}
+
 export const blueprintsApi = {
   list: async (): Promise<BlueprintSummary[]> => {
     const data = await api.get<ListResponse>('/api/flows/blueprints');
@@ -81,6 +87,11 @@ export const blueprintsApi = {
   // ── Publicação ──────────────────────────────────────────────────────
   publish: (blueprintId: number) =>
     api.post<{ ok: boolean; published_blueprint_id: number }>(
+      '/api/flows/publish',
+      { blueprint_id: blueprintId },
+    ),
+  unpublish: (blueprintId: number) =>
+    api.delete<{ ok: boolean; published_blueprint_id: null }>(
       '/api/flows/publish',
       { blueprint_id: blueprintId },
     ),
@@ -114,10 +125,38 @@ export const blueprintsApi = {
       '/api/flows/blueprints/import',
       payload,
     ),
-  create: async (title: string): Promise<BlueprintDetail> => {
+  create: async ({ title, integration, event }: CreateBlueprintInput): Promise<BlueprintDetail> => {
+    const triggerId = 'trigger-start';
+    const endId = 'flow-end';
+    const body = {
+      format: 'meumisterio-flow',
+      version: 1,
+      title,
+      graph: {
+        nodes: [
+          {
+            id: triggerId,
+            type: 'trigger',
+            label: integration === 'whatsapp' ? 'WhatsApp' : integration,
+            x: 80,
+            y: 160,
+            config: { integration, event, keyword: '' },
+          },
+          {
+            id: endId,
+            type: 'end',
+            label: 'Fim',
+            x: 460,
+            y: 160,
+            config: {},
+          },
+        ],
+        edges: [{ id: 'edge-start-end', from: triggerId, to: endId }],
+      },
+    };
     const data = await api.post<{ ok: boolean; blueprint: BlueprintDetail }>(
       '/api/flows/blueprints/import',
-      { title, body: { format: 'meumisterio-flow', version: 1, graph: { nodes: [], edges: [] } } },
+      { title, body },
     );
     return data.blueprint;
   },

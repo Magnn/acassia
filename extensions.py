@@ -14,4 +14,9 @@ from flask_limiter.util import get_remote_address
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=[],  # sem limite global; aplicar por rota
+    # Se o storage (Redis) cair ou ficar inalcançável, não derruba a rota —
+    # loga e deixa passar sem aplicar o limite (fail-open). Sem isso, um
+    # Redis fora do ar (ex.: Upstash indisponível) vira 500 em toda rota
+    # limitada, incluindo /saas/login.
+    swallow_errors=True,
 )

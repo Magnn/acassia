@@ -353,6 +353,30 @@ class Personalizer:
         if metadata.get("detalhe_especifico"):
             fatos.append(f"- Detalhes: {metadata['detalhe_especifico']}")
 
+        # Dados relacionais coletados no Node 3
+        if metadata.get("nome_pessoa_envolvida"):
+            fatos.append(f"- Nome da pessoa envolvida: {str(metadata['nome_pessoa_envolvida']).strip()[:60]}")
+        if metadata.get("tempo_exato"):
+            fatos.append(f"- Tempo de sofrimento citado: {str(metadata['tempo_exato']).strip()[:60]}")
+        if metadata.get("evento_gatilho"):
+            fatos.append(f"- Evento gatilho (o que desencadeou): {str(metadata['evento_gatilho']).strip()[:120]}")
+
+        # Dados do profiler (Node 5)
+        if metadata.get("gatilho_emocional"):
+            _ge = str(metadata["gatilho_emocional"]).strip()[:120]
+            fatos.append(f"- Gatilho emocional central: {_ge}")
+        if metadata.get("objecao_silenciosa"):
+            _ob = str(metadata["objecao_silenciosa"]).strip()[:150]
+            fatos.append(f"- Objeção silenciosa (maior medo): {_ob}")
+        if metadata.get("arquetipo_lead"):
+            fatos.append(f"- Arquétipo emocional: {metadata['arquetipo_lead']}")
+
+        # Astrologia — coletada no Node 3
+        if metadata.get("signo"):
+            fatos.append(f"- Signo: {metadata['signo']}")
+        if metadata.get("lead_birth_date_capturado"):
+            fatos.append(f"- Data de nascimento: {metadata['lead_birth_date_capturado']}")
+
         si = metadata.get("stage_intel") or {}
         if isinstance(si, dict) and si:
             if si.get("prioridade"):
@@ -591,12 +615,26 @@ class Personalizer:
             return ""
 
         try:
-            resp = requests.get(imagem_url, timeout=15)
-            if resp.status_code != 200:
-                logger.warning(f"⚠️ Imagem não encontrada: Status {resp.status_code}")
-                return ""
+            img = None
+            # Tenta ler do arquivo local primeiro (evita requests externas e problemas de DNS/PUBLIC_URL)
+            filename = os.path.basename(imagem_url.split("?")[0])
+            _curr_dir = os.path.dirname(os.path.abspath(__file__))
+            local_path = os.path.join(_curr_dir, "downloads", filename)
+            if os.path.exists(local_path):
+                try:
+                    img = Image.open(local_path)
+                    logger.info("✅ [VISION] Imagem aberta localmente do arquivo: %s", local_path)
+                except Exception as e:
+                    logger.warning("⚠️ [VISION] Erro ao abrir arquivo local %s: %s", local_path, e)
+            
+            # Fallback para HTTP requests
+            if img is None:
+                resp = requests.get(imagem_url, timeout=15)
+                if resp.status_code != 200:
+                    logger.warning(f"⚠️ Imagem não encontrada: Status {resp.status_code}")
+                    return ""
+                img = Image.open(BytesIO(resp.content))
 
-            img = Image.open(BytesIO(resp.content))
             fatos_cliente = self._montar_fatos_contexto(metadata)
             prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
             guard = self._bloco_copy_guardrails(metadata)
