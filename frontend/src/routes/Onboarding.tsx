@@ -132,7 +132,7 @@ export default function Onboarding() {
             <div className="w-10 h-10 bg-accent-amethyst rounded-2xl flex items-center justify-center shadow-lg shadow-accent-amethyst/20">
               <Zap className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight">Meu Mistério <span className="text-accent-amethyst">Studio</span></h1>
+            <h1 className="text-2xl font-black tracking-tight">Acássia <span className="text-purple-400">Studio</span></h1>
           </div>
 
           <div className="space-y-8">

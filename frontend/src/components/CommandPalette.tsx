@@ -30,7 +30,7 @@ const STATIC_NAV: CommandItem[] = [
   { id: 'nav-pix', label: 'Pix QR', group: 'navegar', Icon: CreditCard, to: '/pix', keywords: 'pagamento pix qr' },
   { id: 'nav-voice', label: 'Voice Cloning', group: 'navegar', Icon: Volume2, to: '/voice', keywords: 'audio voz clonada' },
   { id: 'nav-audio-lib', label: 'Biblioteca de Áudios', group: 'navegar', Icon: Library, to: '/audio-library', keywords: 'audios pre gravados' },
-  { id: 'nav-coach', label: 'Meu Mistério Coach', group: 'navegar', Icon: Bot, to: '/coach', keywords: 'ia coach review' },
+  { id: 'nav-coach', label: 'Acássia Copilot', group: 'navegar', Icon: Bot, to: '/coach', keywords: 'ia coach review copilot' },
   { id: 'nav-affiliate', label: 'Afiliados', group: 'navegar', Icon: CreditCard, to: '/affiliate', keywords: 'indicacao referral' },
   { id: 'nav-lunar', label: 'Lunar', group: 'navegar', Icon: Sparkles, to: '/lunar', keywords: 'lua fase' },
   { id: 'nav-spiritual', label: 'Perfil Espiritual', group: 'navegar', Icon: Compass, to: '/spiritual', keywords: 'mapa astral numerologia signo' },

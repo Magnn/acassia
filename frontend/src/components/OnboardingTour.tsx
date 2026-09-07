@@ -17,39 +17,39 @@ interface TourStep {
 const FIRST_LOGIN_TOUR: TourStep[] = [
   {
     id: 'welcome',
-    title: 'Bem-vinda ao Meu Mistério ✨',
-    body: 'Esse é seu painel — vou te guiar em 5 passos rápidos. Pode pular a qualquer momento.',
+    title: 'Bem-vindo à Acássia 🚀',
+    body: 'Esse é seu painel de automação de vendas e funis com IA. Vou te guiar em passos rápidos.',
     position: 'center',
   },
   {
     id: 'sidebar',
     title: 'Navegação',
-    body: 'No menu lateral você acessa Conversas, Fluxos, Tarot, Voice, e tudo mais. Use Ctrl+K (ou Cmd+K) pra busca rápida em qualquer lugar.',
+    body: 'No menu lateral você acessa Conversas, Funis (Blueprints), Agentes de IA, Integrações e Métricas. Use Ctrl+K para busca rápida.',
     target: 'aside, nav, [data-tour="sidebar"]',
     position: 'right',
   },
   {
     id: 'inbox',
-    title: 'Inbox',
-    body: 'Aqui rolam todas as conversas com seus leads em tempo real. Filtros de score (Hot/Warm/Cold) e tema espiritual no topo. Atalhos: j/k pra navegar, / pra buscar.',
+    title: 'Live Inbox',
+    body: 'Aqui você acompanha todas as conversas dos seus clientes em tempo real com qualificação de leads (Hot/Warm/Cold).',
     route_match: /\/leads/,
     position: 'center',
   },
   {
     id: 'flows',
-    title: 'Fluxos',
-    body: 'Crie e edite seus funis no /blueprints. Use templates prontos no /templates pra começar em 1 clique.',
+    title: 'Funis & Automações',
+    body: 'Crie e edite seus fluxos interativos de WhatsApp. Conecte nós de mensagem, áudio, IA e gatilhos.',
     position: 'center',
   },
   {
     id: 'integrations',
-    title: 'Conectar WhatsApp',
-    body: 'Pra deixar o sistema vivo, vá em Integrações e cole sua credencial Meta Cloud API. A gente valida na hora.',
+    title: 'Conectar WhatsApp Oficial',
+    body: 'Em Conexões (Meta Cloud API), conecte seu número de WhatsApp corporativo em menos de 2 minutos.',
     position: 'center',
   },
 ];
 
-const TOURS_DONE_KEY = 'meumisterio.tours.done';
+const TOURS_DONE_KEY = 'acassia.tours.done';
 
 function tourCompleted(tourId: string): boolean {
   try {

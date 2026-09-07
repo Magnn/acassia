@@ -138,7 +138,7 @@ export default function AdminLayout() {
           </div>
           <h1 className="text-2xl font-black">Acesso Restrito</h1>
           <p className="text-zinc-400 text-sm">
-            Esta área é exclusiva pra administradores da plataforma Meu Mistério.
+            Esta área é exclusiva pra administradores da plataforma Acássia.
           </p>
           <button
             onClick={() => navigate('/dashboard')}
@@ -223,7 +223,7 @@ export default function AdminLayout() {
             <ShieldCheck className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
           <div className="flex flex-col leading-none">
-            <span className="text-sm font-black tracking-tight">MEU MISTÉRIO</span>
+            <span className="text-sm font-black tracking-tight">ACÁSSIA</span>
             <span className="text-[9px] text-red-500 font-black tracking-[0.2em] uppercase mt-0.5">
               Admin Console
             </span>

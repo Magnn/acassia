@@ -100,9 +100,9 @@ const AdminRecover = lazy(() => import('./routes/admin/Recover'));
 function PageFallback() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-      <div className="w-12 h-12 border-4 border-accent-amethyst/20 border-t-accent-amethyst rounded-full animate-spin" />
-      <div className="text-secondary text-[11px] font-black uppercase tracking-[0.2em] animate-pulse">
-        Carregando Meu Mistério Studio…
+      <div className="w-12 h-12 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
+      <div className="text-zinc-400 text-[11px] font-bold uppercase tracking-[0.2em] animate-pulse">
+        Carregando Acássia Studio…
       </div>
     </div>
   );

@@ -1,23 +1,16 @@
 interface Props {
   size?: number;
   className?: string;
-  /** Sólido (padrão), só contorno (outline), ou monograma sem ornamentos. */
   variant?: 'default' | 'outline' | 'minimal';
 }
 
 /**
- * Meu Mistério — marca visual.
- *
- * Composição: lua crescente partida por um eixo vertical (axis mundi)
- * + ponto astral no canto superior direito. Single-color (currentColor)
- * pra herdar de qualquer contexto.
- *
- * Tokens internos da paleta usam prefix `sibila-*` — nomenclatura interna.
+ * Acássia — marca visual.
+ * Símbolo moderno de nós de automação e inteligência artificial conectada.
  */
 export default function Logo({
   size = 24,
   className = '',
-  variant = 'default',
 }: Props) {
   return (
     <svg
@@ -29,21 +22,13 @@ export default function Logo({
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
-      aria-label="Meu Mistério"
+      aria-label="Acássia"
     >
-      {/* Lua crescente — design mais refinado */}
       <path
-        d="M12 2 A10 10 0 0 1 12 22"
+        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
         strokeWidth="2"
-        fill="currentColor"
-        fillOpacity={variant === 'outline' ? 0 : 0.15}
+        className="stroke-purple-500"
       />
-      {/* Eixo vertical */}
-      <line x1="12" y1="2" x2="12" y2="22" strokeWidth="2" />
-      {/* Ponto astral */}
-      {variant !== 'minimal' && (
-        <circle cx="19" cy="6" r="1.5" fill="var(--accent-amethyst)" stroke="none" />
-      )}
     </svg>
   );
 }

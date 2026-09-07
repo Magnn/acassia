@@ -180,10 +180,10 @@ export default function Billing() {
       {/* Header */}
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-black tracking-tight">
-          Sua Assinatura <span className="text-accent-amethyst">Meu Mistério</span>
+          Sua Assinatura <span className="text-purple-400">Acássia</span>
         </h1>
         <p className="text-secondary font-medium max-w-2xl mx-auto">
-          Escolha o plano ideal pra escalar seu atendimento espiritual
+          Escolha o plano ideal pra escalar seus funis de vendas, automações e agentes de IA
         </p>
       </div>
 
@@ -219,7 +219,7 @@ export default function Billing() {
         <div className="bg-purple-500/10 border border-purple-500/30 rounded-3xl p-6 flex items-center gap-4 max-w-3xl mx-auto">
           <Crown className="w-6 h-6 text-purple-400 flex-shrink-0" />
           <div className="text-sm">
-            Plano <strong className="text-purple-300">{state.effective_label}</strong> ativo via cortesia da equipe Meu Mistério.
+            Plano <strong className="text-purple-300">{state.effective_label}</strong> ativo via cortesia da equipe Acássia.
           </div>
         </div>
       )}
