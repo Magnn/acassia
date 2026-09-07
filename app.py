@@ -4540,18 +4540,20 @@ if __name__ == "__main__":
 
     use_waitress = os.environ.get("USE_WAITRESS", "1").strip() in ("1", "true", "yes")
 
+    port = int(os.environ.get("PORT", "5000"))
+
     if use_waitress:
         try:
             from waitress import serve
             _threads = int(os.environ.get("WAITRESS_THREADS", "8"))
-            logger.info("🏭 [SERVER] Waitress production server — %d threads — port 5000", _threads)
-            logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
-            serve(app, host="0.0.0.0", port=5000, threads=_threads,
+            logger.info("🏭 [SERVER] Waitress production server — %d threads — port %d", _threads, port)
+            logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:%d/dashboard", port)
+            serve(app, host="0.0.0.0", port=port, threads=_threads,
                   channel_timeout=120, recv_bytes=65536,
                   url_scheme="https" if os.getenv("FORCE_HTTPS") else "http")
         except ImportError:
             logger.warning("⚠️ Waitress não instalado, caindo pro Flask dev server")
-            app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+            app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
     else:
-        logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
-        app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+        logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:%d/dashboard", port)
+        app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
