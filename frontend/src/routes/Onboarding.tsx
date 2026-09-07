@@ -212,11 +212,11 @@ function PersonaStep({ onSave, isPending }: { onSave: (d: PersonaDraft) => void,
         <div className="space-y-3">
           <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">Tom de Voz</label>
           <div className="grid grid-cols-2 gap-3">
-            {['acolhedor', 'direto', 'mistico', 'sedutor'].map(t => (
+            {['consultivo', 'direto', 'persuasivo', 'acolhedor'].map(t => (
               <button
                 key={t}
                 onClick={() => setFormData({ ...formData, tone: t })}
-                className={`py-4 rounded-2xl border-2 text-xs font-black uppercase tracking-widest transition-all ${
+                className={`py-4 rounded-2xl border-2 text-xs font-black uppercase tracking-widest transition-all capitalize ${
                   formData.tone === t ? 'bg-accent-amethyst border-accent-amethyst text-white' : 'bg-bg-primary border-border/50 text-secondary hover:border-accent-amethyst/30'
                 }`}
               >
@@ -232,7 +232,7 @@ function PersonaStep({ onSave, isPending }: { onSave: (d: PersonaDraft) => void,
             rows={5}
             value={formData.backstory}
             onChange={e => setFormData({ ...formData, backstory: e.target.value })}
-            placeholder="Descreva seu negócio, público, diferenciais e como o atendente deve ajudar. Para a Cigana, inclua sua história e estilo de leitura."
+            placeholder="Descreva sua empresa, produtos ou serviços, público-alvo, diferenciais e como o atendente de IA deve conduzir o lead para o fechamento no WhatsApp."
             className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-medium focus:border-accent-amethyst transition-all outline-none resize-none leading-relaxed"
           />
           <p className="text-[9px] text-secondary italic">Mínimo de 20 caracteres.</p>
@@ -269,7 +269,7 @@ function OfertaStep({ onSave, isPending }: { onSave: (d: OfertaDraft) => void, i
               type="text"
               value={formData.nome}
               onChange={e => setFormData({ ...formData, nome: e.target.value })}
-              placeholder="Ex: Consulta Completa"
+              placeholder="Ex: Plano Trimestral / Consultoria Premium"
               className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-bold focus:border-accent-amethyst transition-all outline-none"
             />
           </div>

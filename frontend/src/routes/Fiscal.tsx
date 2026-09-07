@@ -321,7 +321,7 @@ export default function Fiscal() {
                   required
                   value={descricao}
                   onChange={e => setDescricao(e.target.value)}
-                  placeholder="Ex: Consulta Terapêutica Online (40 min)"
+                  placeholder="Ex: Consultoria e Automação de Atendimento WhatsApp"
                   rows={3}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition-colors resize-none"
                 />

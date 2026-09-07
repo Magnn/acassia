@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Node } from '@xyflow/react';
-import { SquarePen, Check } from 'lucide-react';
+import { SquarePen, Check, X } from 'lucide-react';
 import type { FlowNodeData } from '../lib/adapt';
 import { visualForType } from '../builder/nodeStyles';
 import {
@@ -205,9 +205,9 @@ export default function Inspector({ node, onUpdate, onClose, onDirtyChange, onRe
 
   return (
     <>
-      <aside className="w-[340px] flex-shrink-0 border-l border-slate-200 bg-white flex flex-col h-full animate-slide-in-right shadow-xl">
-        {/* Header — title (editable) + rename icon */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-slate-200 flex-shrink-0 bg-white min-h-[48px]">
+      <aside className="w-[360px] flex-shrink-0 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col h-full animate-slide-in-right shadow-2xl z-30 font-sans">
+        {/* Header — title (editable) + rename icon + close icon */}
+        <header className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-950 min-h-[52px]">
           {editing ? (
             <input
               ref={inputRef}
@@ -219,66 +219,73 @@ export default function Inspector({ node, onUpdate, onClose, onDirtyChange, onRe
                 if (e.key === 'Escape') { setEditValue(node.data.label || v.label); setEditing(false); }
               }}
               onBlur={confirmRename}
-              className="flex-1 text-[15px] font-semibold text-slate-900 tracking-tight border border-[#7c3aed] rounded-md px-2 py-1 outline-none focus:ring-2 focus:ring-[#7c3aed]/30 mr-2"
+              className="flex-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight border border-indigo-500 rounded-xl px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500/30 mr-2 bg-zinc-50 dark:bg-zinc-900"
             />
           ) : (
-            <span className="text-[15px] font-semibold text-slate-900 tracking-tight">
-              {node.data.label || v.label}
-            </span>
+            <div className="flex flex-col min-w-0 pr-2">
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight truncate">
+                {node.data.label || v.label}
+              </span>
+              <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">
+                Configurar Parâmetros
+              </span>
+            </div>
           )}
-          <button
-            type="button"
-            className="w-7 h-7 rounded-md text-slate-400 hover:text-[#7c3aed] hover:bg-slate-100 flex items-center justify-center transition-colors"
-            title={editing ? "Confirmar" : "Renomear"}
-            onClick={() => {
-              if (editing) {
-                confirmRename();
-              } else {
-                setEditing(true);
-              }
-            }}
-          >
-            {editing ? <Check className="w-4 h-4 text-[#059669]" /> : <SquarePen className="w-4 h-4" />}
-          </button>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              className="w-7 h-7 rounded-lg text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors"
+              title={editing ? "Confirmar" : "Renomear"}
+              onClick={() => {
+                if (editing) {
+                  confirmRename();
+                } else {
+                  setEditing(true);
+                }
+              }}
+            >
+              {editing ? <Check className="w-4 h-4 text-emerald-600" /> : <SquarePen className="w-4 h-4" />}
+            </button>
+
+            <button
+              type="button"
+              className="w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors"
+              title="Fechar painel"
+              onClick={requestClose}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </header>
 
         {/* Dirty indicator */}
         {isDirty && (
-          <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-[11px] text-amber-700 font-medium">Alterações não salvas</span>
+          <div className="px-5 py-1.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200/60 dark:border-amber-900/40 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">Alterações não salvas</span>
           </div>
         )}
 
         {/* Body — type-specific inspector */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 custom-scrollbar text-zinc-800 dark:text-zinc-200">
           {renderTypeBody(inspectorProps)}
         </div>
 
         {/* Footer — Salvar button */}
-        <footer className="px-4 py-3 border-t border-slate-100 flex-shrink-0"
-          style={{ background: 'linear-gradient(180deg, #fff 0%, #f8fafc 100%)', boxShadow: '0 -4px 12px rgba(15,23,42,0.04)' }}
-        >
+        <footer className="px-5 py-3.5 border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950 flex-shrink-0">
           <button
             type="button"
             onClick={handleSave}
             disabled={!isDirty}
             className={[
-              "w-full py-3 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.99]",
+              "w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-xs",
               isDirty
-                ? "text-white hover:brightness-105"
-                : "text-white/70 cursor-default"
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 active:scale-[0.99]"
+                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-default"
             ].join(' ')}
-            style={{
-              background: isDirty
-                ? 'linear-gradient(180deg, #059669 0%, #047857 100%)'
-                : 'linear-gradient(180deg, #94a3b8 0%, #64748b 100%)',
-              boxShadow: isDirty
-                ? '0 2px 8px rgba(5,150,105,0.35)'
-                : 'none',
-            }}
           >
-            {isDirty ? '✓ Salvar Dados' : 'Salvo'}
+            {isDirty ? '✓ Salvar Alterações' : 'Configurações Salvas'}
           </button>
         </footer>
       </aside>

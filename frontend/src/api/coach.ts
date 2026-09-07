@@ -38,7 +38,7 @@ export const coachApi = {
   generateCopy: (params: {
     intent: string;
     persona?: string;
-    tone?: 'casual' | 'formal' | 'mistico' | 'direto';
+    tone?: 'casual' | 'formal' | 'consultivo' | 'persuasivo' | 'direto' | 'mistico';
     length?: 'curto' | 'medium' | 'longo';
     include_cta?: boolean;
   }) =>

@@ -596,7 +596,7 @@ function CreateListingModal({
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
               className="w-full bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-sm"
-              placeholder="Ex.: Fluxo de Tarot Amoroso 7 etapas"
+              placeholder="Ex.: Funil de Captação Odontológica & Agendamento"
             />
           </Field>
 

@@ -48,7 +48,7 @@ export default function Scheduling() {
             <h1 className="text-3xl font-black tracking-tight">Agendamento</h1>
           </div>
           <p className="text-secondary text-sm font-medium">
-            Gerencie seus horários, consultas e disponibilidade para clientes.
+            Gerencie seus horários, reuniões e disponibilidade para clientes.
           </p>
         </div>
         <button
@@ -88,7 +88,7 @@ export default function Scheduling() {
               tab === t ? 'bg-accent-amethyst text-white shadow-lg' : 'text-secondary hover:text-primary'
             }`}
           >
-            {t === 'agenda' ? '📅 Hoje' : t === 'slots' ? '🕐 Horários' : '📋 Consultas'}
+            {t === 'agenda' ? '📅 Hoje' : t === 'slots' ? '🕐 Horários' : '📋 Agendamentos'}
           </button>
         ))}
       </div>
@@ -101,7 +101,7 @@ export default function Scheduling() {
               {[1,2,3].map(i => <div key={i} className="h-20 bg-bg-surface rounded-2xl" />)}
             </div>
           ) : todayAppts.length === 0 ? (
-            <EmptyState icon={Calendar} title="Agenda livre hoje" subtitle="Nenhuma consulta marcada para hoje." />
+            <EmptyState icon={Calendar} title="Agenda livre hoje" subtitle="Nenhum agendamento marcado para hoje." />
           ) : (
             todayAppts.map(a => <AppointmentCard key={a.id} appt={a} onRefresh={() => qc.invalidateQueries({ queryKey: ['scheduling-today'] })} />)
           )}
@@ -152,7 +152,7 @@ export default function Scheduling() {
             ))}
           </div>
           {allAppts.length === 0 ? (
-            <EmptyState icon={CalendarClock} title="Nenhuma consulta" subtitle="As consultas aparecerão quando clientes agendarem." />
+            <EmptyState icon={CalendarClock} title="Nenhum agendamento" subtitle="Os agendamentos aparecerão quando os leads marcarem horários." />
           ) : (
             allAppts.map(a => <AppointmentCard key={a.id} appt={a} onRefresh={() => qc.invalidateQueries({ queryKey: ['scheduling-appointments'] })} />)
           )}

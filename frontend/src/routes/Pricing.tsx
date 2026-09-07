@@ -14,10 +14,10 @@ const PLANS = [
     border: 'border-zinc-700',
     features: [
       '1 número WhatsApp',
-      'Até 100 leads/mês',
-      'Tarot Virtual básico',
+      'Até 500 leads/mês',
+      '1 Agente de IA Conversacional',
       'Agendamento online',
-      'Link de pagamento',
+      'Link de pagamento Pix',
       'Suporte por email',
     ],
     cta: 'Começar Grátis',

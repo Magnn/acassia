@@ -244,7 +244,7 @@ function FunnelReviewTab() {
 
 function CopyGenTab() {
   const [intent, setIntent] = useState('');
-  const [tone, setTone] = useState<'casual' | 'formal' | 'mistico' | 'direto'>('casual');
+  const [tone, setTone] = useState<'casual' | 'formal' | 'consultivo' | 'direto'>('casual');
   const [length, setLength] = useState<'curto' | 'medium' | 'longo'>('medium');
   const [includeCta, setIncludeCta] = useState(false);
   const [variations, setVariations] = useState<CopyVariation[]>([]);
@@ -269,7 +269,7 @@ function CopyGenTab() {
             value={intent}
             onChange={(e) => setIntent(e.target.value)}
             rows={3}
-            placeholder="Ex: oferecer tarô do amor por R$67 com leitura em áudio em 1h"
+            placeholder="Ex: oferecer proposta exclusiva com 20% de desconto para fechamento hoje no WhatsApp"
             className="w-full bg-bg-primary border border-border rounded-xl px-4 py-3 text-sm placeholder:text-secondary/40 focus:outline-none focus:border-accent-amethyst/30 resize-none"
           />
         </div>
@@ -278,7 +278,7 @@ function CopyGenTab() {
           <div>
             <label className="text-[10px] uppercase font-black tracking-widest text-secondary mb-1.5 block">Tom</label>
             <div className="flex gap-2 flex-wrap">
-              {(['casual', 'formal', 'mistico', 'direto'] as const).map((t) => (
+              {(['casual', 'formal', 'consultivo', 'direto'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTone(t)}
@@ -374,7 +374,7 @@ function RewriteTab() {
         <div>
           <label className="text-[10px] uppercase font-black tracking-widest text-secondary mb-1.5 block">Tom alvo</label>
           <div className="flex gap-2">
-            {['casual', 'formal', 'mistico', 'direto'].map((t) => (
+            {['casual', 'formal', 'consultivo', 'direto'].map((t) => (
               <button
                 key={t}
                 onClick={() => setTargetTone(t)}
@@ -409,11 +409,11 @@ function RewriteTab() {
 }
 
 function PersonaGenTab() {
-  const [tom, setTom] = useState('casual');
+  const [tom, setTom] = useState('consultivo');
   const [energia, setEnergia] = useState('media');
   const [emojiLevel, setEmojiLevel] = useState('moderado');
   const [length, setLength] = useState('medium');
-  const [specialty, setSpecialty] = useState('amor');
+  const [specialty, setSpecialty] = useState('vendas');
   const [name, setName] = useState('');
   const [persona, setPersona] = useState<GeneratedPersona | null>(null);
 
@@ -429,11 +429,11 @@ function PersonaGenTab() {
     <div className="space-y-6">
       <div className="bg-bg-surface border border-border rounded-3xl p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <PickerField label="Tom" value={tom} onChange={setTom} options={['casual', 'formal', 'mistico', 'direto']} />
-          <PickerField label="Energia" value={energia} onChange={setEnergia} options={['calma', 'media', 'energetica', 'poetica']} />
+          <PickerField label="Tom" value={tom} onChange={setTom} options={['casual', 'formal', 'consultivo', 'direto']} />
+          <PickerField label="Energia" value={energia} onChange={setEnergia} options={['calma', 'media', 'energetica', 'direta']} />
           <PickerField label="Emojis" value={emojiLevel} onChange={setEmojiLevel} options={['nenhum', 'moderado', 'muitos']} />
           <PickerField label="Comprimento" value={length} onChange={setLength} options={['curto', 'medium', 'longo']} />
-          <PickerField label="Especialidade" value={specialty} onChange={setSpecialty} options={['amor', 'dinheiro', 'protecao', 'espiritualidade', 'geral']} />
+          <PickerField label="Especialidade" value={specialty} onChange={setSpecialty} options={['vendas', 'suporte', 'reativacao', 'qualificacao', 'geral']} />
           <div>
             <label className="text-[10px] uppercase font-black tracking-widest text-secondary mb-1.5 block">Nome (opcional)</label>
             <input

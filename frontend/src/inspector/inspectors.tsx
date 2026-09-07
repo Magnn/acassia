@@ -82,7 +82,7 @@ export function TriggerInspector({ node, onUpdate }: InspectorProps) {
           <TextInput
             value={readStr(cfg, 'keyword')}
             onChange={(v) => onUpdate(patchConfig(node, { keyword: v }))}
-            placeholder='Ex.: "quero minha consulta"'
+            placeholder='Ex.: "QUERO_PROPOSTA" ou "COMPRAR"'
           />
         </Field>
       )}

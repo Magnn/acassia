@@ -56,22 +56,58 @@ function CanvasInner({
   const { screenToFlowPosition, setCenter } = useReactFlow();
 
   // ── Conexão segura: rejeita self-loops, duplicatas e conexões heréticas ──
+  // ── Conexão segura: rejeita self-loops, duplicatas e conexões heréticas ──
   const isValidConnection = useCallback(
     (conn: Connection | Edge) => {
       if (!conn.source || !conn.target) return false;
       // Self-loop
       if (conn.source === conn.target) return false;
-      // Duplicata (mesma source+target já existe)
-      if (edges.some((e) => e.source === conn.source && e.target === conn.target)) return false;
-      // Não pode conectar a um trigger (só saída)
+      // Duplicata (mesma source+target e mesmo sourceHandle já existe)
+      if (
+        edges.some(
+          (e) =>
+            e.source === conn.source &&
+            e.target === conn.target &&
+            (conn.sourceHandle ? e.sourceHandle === conn.sourceHandle : true),
+        )
+      ) {
+        return false;
+      }
+      // Não pode conectar como entrada em um trigger (trigger só tem saída)
       const targetNode = nodes.find((n) => n.id === conn.target);
       if (targetNode?.data.meumisterioType === 'trigger') return false;
-      // Nós de saída única (não-branching) já têm 1 edge de saída?
-      const sourceNode = nodes.find((n) => n.id === conn.source);
-      const branchingTypes = new Set(['condicao', 'ab_split', 'pergunta', 'divisao', 'menu']);
-      if (sourceNode && !branchingTypes.has(sourceNode.data.meumisterioType)) {
-        const existingOut = edges.filter((e) => e.source === conn.source);
-        if (existingOut.length >= 1) return false;
+
+      // Se conectar a partir de um handle específico (ex: botões, sucesso, erro, true, false):
+      if (conn.sourceHandle) {
+        const handleAlreadyConnected = edges.some(
+          (e) => e.source === conn.source && e.sourceHandle === conn.sourceHandle,
+        );
+        if (handleAlreadyConnected) return false;
+      } else {
+        // Conexão sem handle específico (saída default)
+        const sourceNode = nodes.find((n) => n.id === conn.source);
+        const branchingTypes = new Set([
+          'condicao',
+          'ab_split',
+          'pergunta',
+          'divisao',
+          'menu',
+          'agente_ia',
+          'gpt',
+          'api',
+          'integration',
+          'voice_studio',
+          'expediente',
+        ]);
+        const cfg = (sourceNode?.data?.config || {}) as Record<string, unknown>;
+        const hasButtons =
+          (Array.isArray(cfg.buttons) && cfg.buttons.length > 0) ||
+          (Array.isArray(cfg.quick_replies) && cfg.quick_replies.length > 0);
+
+        if (sourceNode && !branchingTypes.has(sourceNode.data.meumisterioType) && !hasButtons) {
+          const existingOut = edges.filter((e) => e.source === conn.source);
+          if (existingOut.length >= 1) return false;
+        }
       }
       return true;
     },

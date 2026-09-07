@@ -127,7 +127,7 @@ export default function Catalog() {
                   required
                   value={formData.title}
                   onChange={e => setFormData({...formData, title: e.target.value})}
-                  placeholder="Ex: Tarot do Amor ao Vivo"
+                  placeholder="Ex: Mentoria Comercial / Consultoria de Vendas"
                 />
               </div>
               <div>
