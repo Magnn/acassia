@@ -53,8 +53,7 @@ RUN mkdir -p downloads scripts/reports media \
 # Variáveis de ambiente padrão
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    FLASK_ENV=production \
-    PORT=5000
+    FLASK_ENV=production
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
