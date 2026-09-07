@@ -7,6 +7,21 @@ export interface PersonaDraft {
   restrictions: string[];
 }
 
+export interface LaunchStep {
+  key: string;
+  label: string;
+  completed: boolean;
+  href: string;
+}
+
+export interface LaunchReadiness {
+  steps: LaunchStep[];
+  completed_count: number;
+  total: number;
+  next_step: LaunchStep | null;
+  checks_complete: boolean;
+}
+
 export interface OfertaDraft {
   nome: string;
   preco: string;
@@ -44,6 +59,7 @@ interface StepResponse {
 }
 
 export const onboardingApi = {
+  getReadiness: () => api.get<LaunchReadiness>('/saas/onboarding/readiness'),
   // Backend index() retorna JSON quando Accept inclui application/json — o
   // client.ts já manda isso por default; resposta tem { current_step, done? }.
   getStatus: () =>

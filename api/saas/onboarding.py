@@ -26,6 +26,7 @@ Wiring no app.py (1 linha)::
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Optional
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
@@ -67,11 +68,15 @@ def detect_current_step(tenant_id: str) -> str:
             return STEP_PERSONA
         if not _has_var(db, tenant_id, "oferta.nome"):
             return STEP_OFERTA
-        if not db.query(models.FlowBlueprint).filter_by(
-            tenant_id=tenant_id, slug="post_payment"
-        ).first():
+        if not db.query(models.FlowBlueprint).filter_by(tenant_id=tenant_id).first():
             return STEP_TEMPLATE
-        if not _has_var(db, tenant_id, "whatsapp.phone_number_id"):
+        phone = db.query(models.TenantFlowVariable).filter_by(
+            tenant_id=tenant_id, key="whatsapp.phone_number_id"
+        ).first()
+        binding = db.query(models.WaPhoneTenantBinding).filter_by(
+            tenant_id=tenant_id, phone_number_id=str(phone.value_json)
+        ).first() if phone and phone.value_json else None
+        if not binding or binding.status != "active" or not binding.last_verified_at:
             return STEP_WHATSAPP
         return STEP_DONE
     finally:
@@ -100,7 +105,7 @@ def save_persona(
     backstory = (backstory or "").strip()
 
     if not name:
-        raise ValueError("nome da meumisterio é obrigatório")
+        raise ValueError("nome do atendente é obrigatório")
     if tone not in ALLOWED_TONES:
         raise ValueError(f"tom inválido; aceitos: {ALLOWED_TONES}")
     if len(backstory) < 20:
@@ -124,9 +129,12 @@ def save_persona(
             "backstory": backstory[:2000],
             "restrictions": valid_restrictions,
         }
+        latest = db.query(models.StudioAgentVersion).filter_by(agent_id=agent.id).order_by(
+            models.StudioAgentVersion.version_number.desc()
+        ).first()
         version = models.StudioAgentVersion(
             agent_id=agent.id,
-            version_number=1,
+            version_number=(latest.version_number + 1) if latest else 1,
             body_json=body,
             note="onboarding wizard step 1",
         )
@@ -157,7 +165,7 @@ def save_oferta(
         preco_float = float((preco or "").replace(",", ".").strip())
     except ValueError:
         raise ValueError("preço inválido")
-    if preco_float <= 0:
+    if not math.isfinite(preco_float) or preco_float <= 0:
         raise ValueError("preço deve ser positivo")
     if gateway not in ALLOWED_GATEWAYS:
         raise ValueError(f"gateway inválido; aceitos: {ALLOWED_GATEWAYS}")
@@ -184,13 +192,22 @@ def save_template(tenant_id: str, template: str) -> Optional[int]:
     """
     raw_template = (template or "").strip()
     template = raw_template.lower().replace(" ", "_")
-    _set_var(tenant_id, "template_escolhido", template)
 
     body = None
     title = None
+    slug = "post_payment"
 
     # 1. em_branco
-    if template == "em_branco":
+    if template == "atendimento_comercial":
+        from flows.business_templates import sales_starter
+        with SessionLocal() as config_db:
+            offer = {v.key: v.value_json for v in config_db.query(models.TenantFlowVariable).filter_by(tenant_id=tenant_id).all()}
+        if not offer.get("oferta.nome"):
+            raise ValueError("Cadastre a oferta antes de escolher este modelo")
+        body = sales_starter(str(offer["oferta.nome"]), str(offer.get("oferta.descricao") or ""))
+        title = body["title"]
+        slug = "atendimento_comercial"
+    elif template == "em_branco":
         body = {
             "format": "meumisterio-flow",
             "version": 1,
@@ -245,11 +262,12 @@ def save_template(tenant_id: str, template: str) -> Optional[int]:
     db = SessionLocal()
     try:
         existing = db.query(models.FlowBlueprint).filter_by(
-            tenant_id=tenant_id, slug="post_payment"
+            tenant_id=tenant_id, slug=slug
         ).first()
         if existing:
             existing.body_json = body
             existing.title = title[:300]
+            _set_var(tenant_id, "template_escolhido", template, db_session=db)
             db.commit()
             db.refresh(existing)
             logger.info("[onboarding] template updated tenant=%s template=%s", tenant_id, template)
@@ -257,11 +275,12 @@ def save_template(tenant_id: str, template: str) -> Optional[int]:
 
         bp = models.FlowBlueprint(
             tenant_id=tenant_id,
-            slug="post_payment",
+            slug=slug,
             title=title[:300],
             body_json=body,
         )
         db.add(bp)
+        _set_var(tenant_id, "template_escolhido", template, db_session=db)
         db.commit()
         db.refresh(bp)
         logger.info("[onboarding] template saved tenant=%s template=%s blueprint=%s", tenant_id, template, bp.id)
@@ -303,16 +322,7 @@ def save_whatsapp(
 
     # 1) Validação Graph API (best-effort: se falhar e skip_validation=False, levanta)
     info: dict = {}
-    import sys
-    import os
-    is_testing = "pytest" in sys.modules or bool(os.environ.get("PYTEST_CURRENT_TEST"))
-    try:
-        from flask import current_app
-        is_testing = is_testing or current_app.config.get("TESTING", False)
-    except Exception:
-        pass
-
-    if not skip_validation and not is_testing:
+    if not skip_validation:
         try:
             from api.saas.integrations_whatsapp import _validate_token_and_phone
             ok, info = _validate_token_and_phone(access_token, phone_number_id)
@@ -322,13 +332,7 @@ def save_whatsapp(
         except ValueError:
             raise
         except Exception as exc:
-            logger.warning("[onboarding.whatsapp] validacao falhou (fail-open): %s", exc)
-
-    # 2) Persist secrets/vars
-    _set_var(tenant_id, "whatsapp.phone_number_id", phone_number_id)
-    _set_var(tenant_id, "whatsapp.waba_id", waba_id)
-    _set_var(tenant_id, "whatsapp.provider", "meta_cloud")
-    _set_secret(tenant_id, "whatsapp.access_token", access_token)
+            raise ValueError("Não foi possível validar o WhatsApp. Tente novamente.") from exc
 
     # 3) Upsert binding + auto-subscribe
     db = SessionLocal()
@@ -338,6 +342,12 @@ def save_whatsapp(
         ).first()
         if existing and existing.tenant_id != tenant_id:
             raise ValueError("phone_number_id já vinculado a outro tenant")
+
+        # Configuração e vínculo são uma única transação; conflito não altera a conta.
+        _set_var(tenant_id, "whatsapp.phone_number_id", phone_number_id, db_session=db)
+        _set_var(tenant_id, "whatsapp.waba_id", waba_id, db_session=db)
+        _set_var(tenant_id, "whatsapp.provider", "meta_cloud", db_session=db)
+        _set_secret(tenant_id, "whatsapp.access_token", access_token, db_session=db)
 
         if existing:
             binding = existing
@@ -352,6 +362,8 @@ def save_whatsapp(
         binding.status = "pending" if skip_validation else "active"
         binding.last_verified_at = None if skip_validation else _dt.now(_tz.utc)
         binding.last_error = None
+        binding.subscribed_at = None
+        binding.subscribe_error = None
         binding.updated_at = _dt.now(_tz.utc)
 
         # Auto-subscribe (best-effort)
@@ -427,8 +439,8 @@ def save_whatsapp(
 # ─── Helpers DB ──────────────────────────────────────────────────────────────
 
 
-def _set_var(tenant_id: str, key: str, value: Any) -> None:
-    db = SessionLocal()
+def _set_var(tenant_id: str, key: str, value: Any, *, db_session=None) -> None:
+    db = db_session if db_session is not None else SessionLocal()
     try:
         existing = db.query(models.TenantFlowVariable).filter_by(
             tenant_id=tenant_id, key=key
@@ -437,13 +449,15 @@ def _set_var(tenant_id: str, key: str, value: Any) -> None:
             existing.value_json = value
         else:
             db.add(models.TenantFlowVariable(tenant_id=tenant_id, key=key, value_json=value))
-        db.commit()
+        if db_session is None:
+            db.commit()
     finally:
-        db.close()
+        if db_session is None:
+            db.close()
 
 
-def _set_secret(tenant_id: str, key: str, cipher: str) -> None:
-    db = SessionLocal()
+def _set_secret(tenant_id: str, key: str, cipher: str, *, db_session=None) -> None:
+    db = db_session if db_session is not None else SessionLocal()
     try:
         existing = db.query(models.TenantFlowSecret).filter_by(
             tenant_id=tenant_id, key=key
@@ -452,12 +466,21 @@ def _set_secret(tenant_id: str, key: str, cipher: str) -> None:
             existing.value_cipher = cipher
         else:
             db.add(models.TenantFlowSecret(tenant_id=tenant_id, key=key, value_cipher=cipher))
-        db.commit()
+        if db_session is None:
+            db.commit()
     finally:
-        db.close()
+        if db_session is None:
+            db.close()
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
+
+
+@onboarding_bp.route("/readiness", methods=["GET"])
+@login_required
+def readiness():
+    from launch_readiness import launch_readiness
+    return jsonify(launch_readiness(current_user.tenant_id))
 
 
 @onboarding_bp.route("/", methods=["GET"])
@@ -544,7 +567,7 @@ def template_step():
 @login_required
 def whatsapp():
     data = request.get_json() if request.is_json else request.form
-    skip_validation = bool(data.get("skip_validation"))
+    skip_validation = data.get("skip_validation") in (True, "true", "1", "on")
     try:
         result = save_whatsapp(
             tenant_id=current_user.tenant_id,
@@ -562,7 +585,7 @@ def whatsapp():
     if request.is_json:
         return jsonify({
             "ok": True,
-            "next_step": STEP_DONE,
+            "next_step": detect_current_step(current_user.tenant_id),
             "binding": result,
             "instructions": [
                 "1. Va em developers.facebook.com -> seu app -> WhatsApp -> Configuracao",
@@ -572,5 +595,8 @@ def whatsapp():
                 "5. Mande uma msg pro numero pra confirmar — vai aparecer aqui em segundos",
             ],
         })
-    flash("Onboarding concluído! Tua meumisterio está pronta pra ser ativada.", "success")
+    if detect_current_step(current_user.tenant_id) != STEP_DONE:
+        flash("Configuração salva. Valide a conexão para continuar.", "info")
+        return redirect(url_for("saas_onboarding.index"))
+    flash("Configuração salva. Confirme o recebimento de uma mensagem e teste seu fluxo.", "success")
     return redirect(url_for("saas_auth.signup_done"))

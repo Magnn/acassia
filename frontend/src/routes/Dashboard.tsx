@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { Activity, CheckCircle, DollarSign, PauseCircle, Users } from 'lucide-react';
 import { metricsApi } from '../api/metrics';
+import LaunchChecklist from '../components/LaunchChecklist';
 
 // Cores dos charts — alinhado à paleta interna sibila-*.
 const CHART = {
@@ -52,6 +53,7 @@ export default function Dashboard() {
   if (error || !kpis) {
     return (
       <div className="p-12 max-w-7xl mx-auto">
+        <LaunchChecklist />
         <div className="bg-red-500/5 border border-red-500/20 text-red-500 rounded-3xl p-8 text-center shadow-sm">
           <div className="font-black text-xl mb-2">Ops! Falha nas métricas</div>
           <div className="text-sm opacity-80">{(error as Error)?.message}</div>
@@ -77,6 +79,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI cards */}
+      <LaunchChecklist />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Total Leads"

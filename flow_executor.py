@@ -560,6 +560,7 @@ def steps_to_acoes(
             body = apply_flow_template(
                 (
                     str(cfg.get("body") or "").strip()
+                    or str(cfg.get("content_text") or "").strip()
                     or str(cfg.get("step_name") or "").strip()
                 ),
                 fv,

@@ -28,6 +28,12 @@ _TEMPLATE_DIR = str(_PROJECT_ROOT / "templates")
 
 
 @pytest.fixture(autouse=True)
+def _mock_meta(monkeypatch):
+    monkeypatch.setattr("api.saas.integrations_whatsapp._validate_token_and_phone", lambda *args: (True, {}))
+    monkeypatch.setattr("meta_graph_admin.subscribe_apps_to_waba", lambda *args: (True, {"success": True}))
+
+
+@pytest.fixture(autouse=True)
 def _setup_db():
     Base.metadata.create_all(bind=db_engine)
     db = SessionLocal()
@@ -35,6 +41,7 @@ def _setup_db():
     db.query(models.StudioAgent).delete()
     db.query(models.StudioAgentVersion).delete()
     db.query(models.FlowBlueprint).delete()
+    db.query(models.FlowPublish).delete()
     db.query(models.TenantFlowVariable).delete()
     db.query(models.TenantFlowSecret).delete()
     db.query(models.WaPhoneTenantBinding).delete()
@@ -232,6 +239,106 @@ def test_save_template_em_branco_cria_blueprint_vazio():
 def test_save_template_invalido_levanta():
     with pytest.raises(ValueError, match="template"):
         save_template("t1", "nao_existe")
+    with SessionLocal() as db:
+        assert not db.query(models.TenantFlowVariable).filter_by(tenant_id="t1", key="template_escolhido").first()
+
+
+def test_persona_edit_preserves_version_history():
+    agent = save_persona("t1", "Ana", "direto", "Atendimento da nossa empresa", [])
+    save_persona("t1", "Bia", "acolhedor", "Atendimento atualizado da empresa", [])
+    with SessionLocal() as db:
+        versions = db.query(models.StudioAgentVersion).filter_by(agent_id=agent.id).order_by(models.StudioAgentVersion.version_number).all()
+        assert [v.version_number for v in versions] == [1, 2]
+        assert versions[0].body_json["tone"] == "direto"
+
+
+@pytest.mark.parametrize("price", ["nan", "inf", "-inf"])
+def test_nonfinite_price_rejected(price):
+    with pytest.raises(ValueError):
+        save_oferta("t1", "Produto", price, "", "stripe")
+
+
+def test_phone_conflict_does_not_change_tenant_configuration():
+    save_whatsapp("owner", "12345", "67890", "EAAxxxxxxxxxxxxxxxxxx")
+    with pytest.raises(ValueError, match="outro tenant"):
+        save_whatsapp("other", "12345", "99999", "EAAyyyyyyyyyyyyyyyyyy")
+    with SessionLocal() as db:
+        assert db.query(models.TenantFlowVariable).filter_by(tenant_id="other").count() == 0
+        assert db.query(models.TenantFlowSecret).filter_by(tenant_id="other").count() == 0
+        assert db.get(models.WaPhoneTenantBinding, "12345").tenant_id == "owner"
+
+
+def test_validation_outage_does_not_activate_phone(monkeypatch):
+    def unavailable(*args):
+        raise ConnectionError("offline")
+    monkeypatch.setattr("api.saas.integrations_whatsapp._validate_token_and_phone", unavailable)
+    with pytest.raises(ValueError, match="validar"):
+        save_whatsapp("t1", "12345", "67890", "EAAxxxxxxxxxxxxxxxxxx")
+    with SessionLocal() as db:
+        assert db.get(models.WaPhoneTenantBinding, "12345") is None
+        assert db.query(models.TenantFlowVariable).filter_by(tenant_id="t1").count() == 0
+
+
+def test_pending_whatsapp_does_not_finish_onboarding():
+    save_persona("t1", "Ana", "direto", "Atendimento da nossa empresa", [])
+    save_oferta("t1", "Produto", "10", "", "stripe")
+    save_template("t1", "em_branco")
+    save_whatsapp("t1", "12345", "67890", "EAAxxxxxxxxxxxxxxxxxx", skip_validation=True)
+    assert detect_current_step("t1") == STEP_WHATSAPP
+
+
+def test_readiness_requires_authentication(client):
+    assert client.get("/saas/onboarding/readiness").status_code == 302
+
+
+def test_readiness_is_scoped_to_logged_in_tenant(logged_in_client):
+    client, user = logged_in_client
+    save_persona("other", "Ana", "direto", "Atendimento da nossa empresa", [])
+    save_oferta("other", "Produto", "10", "", "stripe")
+    save_template("other", "tarot_express")
+    save_whatsapp("other", "12345", "67890", "EAAxxxxxxxxxxxxxxxxxx")
+    response = client.get("/saas/onboarding/readiness?tenant=other")
+    assert response.status_code == 200
+    assert response.json["completed_count"] == 0
+    assert "EAA" not in response.get_data(as_text=True)
+
+
+def test_readiness_distinguishes_saved_connection_from_received_message():
+    from launch_readiness import launch_readiness
+    save_whatsapp("t1", "12345", "67890", "EAAxxxxxxxxxxxxxxxxxx")
+    steps = {s["key"]: s["completed"] for s in launch_readiness("t1")["steps"]}
+    assert steps["whatsapp"] is True
+    assert steps["inbound"] is False
+    assert steps["published"] is False
+    with SessionLocal() as db:
+        db.get(models.WaPhoneTenantBinding, "12345").inbound_count = 1
+        db.commit()
+    steps = {s["key"]: s["completed"] for s in launch_readiness("t1")["steps"]}
+    assert steps["inbound"] is True
+
+
+def test_sales_starter_keeps_post_payment_and_waits_for_each_reply():
+    from flow_builder_runtime import validate_flow_document
+    from published_flow_runtime import execute_published_flow_turn
+    save_oferta("t1", "Consultoria", "100", "Sessão de planejamento", "stripe")
+    post_payment_id = save_template("t1", "tarot_express")
+    commercial_id = save_template("t1", "atendimento_comercial")
+    assert commercial_id != post_payment_id
+    with SessionLocal() as db:
+        doc = db.get(models.FlowBlueprint, commercial_id).body_json
+        assert db.get(models.FlowBlueprint, post_payment_id).slug == "post_payment"
+    assert validate_flow_document(doc, strict=True)["ok"]
+    args = dict(blueprint_id=commercial_id, tenant_id="t1", lead_id=42)
+    first = execute_published_flow_turn(doc, message="Olá", **args)
+    assert first.state["status"] == "waiting"
+    assert not any("Consultoria" in a.conteudo for a in first.actions)
+    second = execute_published_flow_turn(doc, message="Planejar minha empresa", existing_state=first.state, **args)
+    assert second.state["vars"]["necessidade"] == "Planejar minha empresa"
+    assert any("Consultoria" in a.conteudo for a in second.actions)
+    assert second.state["status"] == "waiting"
+    third = execute_published_flow_turn(doc, message="Como agendar?", existing_state=second.state, **args)
+    assert third.state["vars"]["duvida_comercial"] == "Como agendar?"
+    assert third.state["status"] == "completed"
 
 
 def test_save_template_idempotente_atualiza():

@@ -26,7 +26,6 @@ import {
   type OfertaDraft,
   type PersonaDraft,
   type TemplateDraft,
-  type WhatsAppDraft,
   type WhatsAppStepResult,
 } from '../api/onboarding';
 import { integrationsApi } from '../api/integrations';
@@ -35,10 +34,10 @@ import { toast } from '../lib/toast';
 import { track } from '../lib/analytics';
 
 const STEPS = [
-  { id: 'persona', label: 'Sua Alma', icon: Sparkles, desc: 'Dê vida à sua atendente que vende 24/7' },
+  { id: 'persona', label: 'Seu Atendimento', icon: Sparkles, desc: 'Dê vida à sua atendente que vende 24/7' },
   { id: 'oferta', label: 'Seu Produto', icon: ShoppingBag, desc: 'Monte o que vai gerar o primeiro "sim"' },
-  { id: 'template', label: 'Seu Funil', icon: Layout, desc: 'Vendendo em 5 min, não em 5 dias' },
-  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, desc: 'Conecte e comece a faturar' },
+  { id: 'template', label: 'Seu Funil', icon: Layout, desc: 'Escolha e adapte seu modelo de atendimento' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, desc: 'Conecte e teste sua primeira conversa' },
 ];
 
 export default function Onboarding() {
@@ -46,10 +45,11 @@ export default function Onboarding() {
   const { data: status, isLoading: isLoadingStatus, error: statusError } = useQuery({
     queryKey: ['onboarding-status'],
     queryFn: onboardingApi.getStatus,
+    retry: false,
   });
 
   useEffect(() => {
-    if (statusError) {
+    if (statusError instanceof ApiError && statusError.status === 401) {
       window.location.href = '/saas/login?next=' + encodeURIComponent('/builder/onboarding');
     }
   }, [statusError]);
@@ -101,15 +101,12 @@ export default function Onboarding() {
     onError: (e) => toast.error(errMsg(e, 'Erro ao salvar template')),
   });
 
-  const whatsappMutation = useMutation({
-    mutationFn: onboardingApi.saveWhatsApp,
-    onSuccess: () => {
-      track('onboarding_step_completed', { step: 'whatsapp', next: 'done' });
-      toast.success('Onboarding concluído!');
-      navigate('/dashboard');
-    },
-    onError: (e) => toast.error(errMsg(e, 'Erro ao salvar WhatsApp')),
-  });
+  if (statusError) {
+    return <div role="alert" className="p-12 text-center space-y-4">
+      <p>Não foi possível carregar sua configuração.</p>
+      <button onClick={() => window.location.reload()} className="underline">Tentar novamente</button>
+    </div>;
+  }
 
   if (isLoadingStatus || !currentStep) {
     return (
@@ -170,7 +167,7 @@ export default function Onboarding() {
 
         <div className="relative z-10 p-6 bg-bg-primary/50 border border-border rounded-3xl">
           <p className="text-[11px] font-bold text-secondary leading-relaxed">
-            "Terapeutas que usam IA faturam 3x mais. A ferramenta é o multiplicador do seu dom."
+            Configure o atendimento, teste a conversa e acompanhe os resultados do seu negócio.
           </p>
         </div>
       </aside>
@@ -181,7 +178,7 @@ export default function Onboarding() {
           {currentStep === 'persona' && <PersonaStep onSave={personaMutation.mutate} isPending={personaMutation.isPending} />}
           {currentStep === 'oferta' && <OfertaStep onSave={ofertaMutation.mutate} isPending={ofertaMutation.isPending} />}
           {currentStep === 'template' && <TemplateStep onSave={templateMutation.mutate} isPending={templateMutation.isPending} />}
-          {currentStep === 'whatsapp' && <WhatsAppStep onSave={whatsappMutation.mutate} isPending={whatsappMutation.isPending} />}
+          {currentStep === 'whatsapp' && <WhatsAppStep />}
         </div>
       </main>
     </div>
@@ -197,17 +194,17 @@ function PersonaStep({ onSave, isPending }: { onSave: (d: PersonaDraft) => void,
     <div className="space-y-10">
       <div className="space-y-4">
         <h2 className="text-5xl font-black tracking-tighter leading-tight">Dê vida à sua <br/><span className="text-accent-amethyst">atendente digital</span></h2>
-        <p className="text-lg text-secondary font-medium">Ela vai atender seus clientes 24/7, gerar vendas enquanto você descansa e nunca perder um lead.</p>
+        <p className="text-lg text-secondary font-medium">Defina como seu negócio conversa com clientes, apresenta ofertas e encaminha dúvidas para sua equipe.</p>
       </div>
 
       <div className="space-y-8 bg-bg-surface p-10 rounded-[40px] border border-border shadow-premium">
         <div className="space-y-3">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">Nome do Meu Mistério / Especialista</label>
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">Nome do atendente / Especialista</label>
           <input 
             type="text"
             value={formData.name}
             onChange={e => setFormData({ ...formData, name: e.target.value })}
-            placeholder="Ex: Meu Mistério Esmeralda"
+            placeholder="Ex: Ana, assistente da sua empresa"
             className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-bold focus:border-accent-amethyst transition-all outline-none"
           />
         </div>
@@ -230,12 +227,12 @@ function PersonaStep({ onSave, isPending }: { onSave: (d: PersonaDraft) => void,
         </div>
 
         <div className="space-y-3">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">História de Origem (Backstory)</label>
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary ml-1">Sobre o negócio e o atendimento</label>
           <textarea 
             rows={5}
             value={formData.backstory}
             onChange={e => setFormData({ ...formData, backstory: e.target.value })}
-            placeholder="Conte um pouco sobre como ela aprendeu a ler as cartas..."
+            placeholder="Descreva seu negócio, público, diferenciais e como o atendente deve ajudar. Para a Cigana, inclua sua história e estilo de leitura."
             className="w-full bg-bg-primary border-2 border-border/50 rounded-2xl px-6 py-4 text-sm font-medium focus:border-accent-amethyst transition-all outline-none resize-none leading-relaxed"
           />
           <p className="text-[9px] text-secondary italic">Mínimo de 20 caracteres.</p>
@@ -352,10 +349,10 @@ function TemplateStep({ onSave, isPending }: { onSave: (d: TemplateDraft) => voi
       <div className="space-y-4">
         <h2 className="text-5xl font-black tracking-tighter leading-tight">
           Monte sua <br/>
-          <span className="text-accent-amethyst">tarot card</span>
+          <span className="text-accent-amethyst">jornada de atendimento</span>
         </h2>
         <p className="text-lg text-secondary font-medium">
-          Kits prontos validados — 5min até seu primeiro funil rodando.
+          Escolha um modelo, ajuste as mensagens e teste antes de publicar.
         </p>
       </div>
 
@@ -367,6 +364,13 @@ function TemplateStep({ onSave, isPending }: { onSave: (d: TemplateDraft) => voi
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button type="button" aria-pressed={selectedId === 'atendimento_comercial'}
+            onClick={() => setSelectedId('atendimento_comercial')}
+            className={`p-6 rounded-3xl border-2 text-left ${selectedId === 'atendimento_comercial' ? 'border-accent-amethyst bg-accent-amethyst/10' : 'border-border bg-bg-surface'}`}>
+            <span className="block text-lg font-bold">Atendimento comercial inicial</span>
+            <span className="block mt-2 text-sm text-secondary">Receba o cliente, entenda sua necessidade, apresente a oferta cadastrada e registre dúvidas. Adapte para seu negócio no editor.</span>
+            <span className="block mt-3 text-xs font-bold">{selectedId === 'atendimento_comercial' ? 'Selecionado' : 'Selecionar modelo'}</span>
+          </button>
           {items.map((t) => {
             const badge = CATEGORY_BADGE[t.category || ''] ?? { label: 'Kit', color: 'bg-bg-primary text-secondary' };
             const isSelected = selectedId === t.id;
@@ -550,7 +554,7 @@ function KitPreviewModal({
   );
 }
 
-function WhatsAppStep({ onSave, isPending }: { onSave: (d: WhatsAppDraft) => void, isPending: boolean }) {
+function WhatsAppStep() {
   const [formData, setFormData] = useState({ phone_number_id: '', waba_id: '', access_token: '' });
   const [showToken, setShowToken] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -575,21 +579,10 @@ function WhatsAppStep({ onSave, isPending }: { onSave: (d: WhatsAppDraft) => voi
     onError: (e) => toast.error((e as Error).message || 'Erro ao testar'),
   });
 
-  const handleSave = () => {
-    setSavedBinding(null);
-    onSave({
-      phone_number_id: formData.phone_number_id.trim(),
-      waba_id: formData.waba_id.trim(),
-      access_token: formData.access_token.trim(),
-    });
-  };
-
   const valid = formData.phone_number_id.length >= 6 &&
                 formData.waba_id.length >= 6 &&
                 formData.access_token.length > 20;
 
-  // Recebe binding via custom event (simples) ou via callback no parent —
-  // como onSave é fire-and-forget via parent mutation, observamos via /saas/integrations
   const { data: bindingStatus } = useQuery({
     queryKey: ['onboarding-binding-status'],
     queryFn: integrationsApi.whatsapp.status,
@@ -597,29 +590,16 @@ function WhatsAppStep({ onSave, isPending }: { onSave: (d: WhatsAppDraft) => voi
     refetchInterval: 5_000,
   });
 
-  // Quando salva com sucesso (parent chama onSave que retorna), capturamos
-  // o resultado fazendo nosso próprio call em paralelo com o save do parent.
-  // Para isso, fazemos save direto via integrations endpoint — mais robusto:
   const saveMut = useMutation({
-    mutationFn: () => integrationsApi.whatsapp.save({
+    mutationFn: () => onboardingApi.saveWhatsApp({
       access_token: formData.access_token.trim(),
       phone_number_id: formData.phone_number_id.trim(),
-      waba_id: formData.waba_id.trim() || undefined,
+      waba_id: formData.waba_id.trim(),
     }),
     onSuccess: (res) => {
-      setSavedBinding({
-        phone_number_id: res.binding.phone_number_id,
-        verify_token: res.verify_token,
-        webhook_url: res.webhook_url,
-        subscribed: res.binding.subscribed_at !== null,
-        subscribe_error: res.binding.subscribe_error,
-        display_phone_number: res.binding.display_phone_number,
-      });
-      // Também marca o step do onboarding como done
-      handleSave();
-      track('onboarding_whatsapp_bound' as any, {
-        subscribed: res.binding.subscribed_at !== null,
-      });
+      if (res.binding) setSavedBinding(res.binding);
+      setFormData(previous => ({ ...previous, access_token: '' }));
+      track('onboarding_step_completed', { step: 'whatsapp', next: res.next_step });
     },
     onError: (e) => toast.error((e as Error).message || 'Erro ao conectar'),
   });
@@ -735,10 +715,10 @@ function WhatsAppStep({ onSave, isPending }: { onSave: (d: WhatsAppDraft) => voi
 
         <button
           onClick={() => saveMut.mutate()}
-          disabled={!valid || saveMut.isPending || isPending}
+          disabled={!valid || saveMut.isPending}
           className="w-full py-5 bg-accent-amethyst text-white rounded-3xl text-sm font-black uppercase tracking-[0.2em] shadow-2xl shadow-accent-amethyst/40 hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:scale-100 transition-all flex items-center justify-center gap-3"
         >
-          {(saveMut.isPending || isPending) ? 'Conectando…' : 'Conectar WhatsApp'}
+          {saveMut.isPending ? 'Conectando…' : 'Conectar WhatsApp'}
           <ArrowRight className="w-5 h-5" />
         </button>
       </div>
@@ -813,13 +793,13 @@ function PostSaveSuccess({
         </div>
         <p className="text-xs text-secondary leading-relaxed">
           {inboundReceived
-            ? `Total recebido: ${currentStatus?.inbound_count}. Você já pode publicar seu fluxo no /blueprints.`
+            ? `Total recebido: ${currentStatus?.inbound_count}. Abra seus funis, teste as etapas e publique quando estiver pronto.`
             : 'Confirme o webhook na Meta acima — assim que chegar a primeira msg, você verá aqui em tempo real.'}
         </p>
         {!inboundReceived && binding.subscribe_error && (
           <div className="mt-3 text-[11px] text-amber-300 flex items-start gap-1">
             <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-            <span>Auto-subscribe falhou: {binding.subscribe_error}. Você pode rodar manualmente no /integrations depois.</span>
+            <span>Auto-subscribe falhou: {binding.subscribe_error}. Revise a conexão na página Integrações.</span>
           </div>
         )}
       </div>
@@ -829,14 +809,14 @@ function PostSaveSuccess({
           onClick={() => navigate('/dashboard')}
           className="flex-1 py-4 bg-bg-primary border-2 border-border hover:border-accent-amethyst/30 rounded-2xl text-xs font-black uppercase tracking-widest"
         >
-          Pular pro dashboard
+          Ver próximos passos
         </button>
         <button
-          onClick={() => navigate('/integrations')}
+          onClick={() => navigate(inboundReceived ? '/blueprints' : '/integrations')}
           className="flex-1 py-4 bg-accent-amethyst text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
         >
           <CheckCircle2 className="w-4 h-4" />
-          Ver detalhes em Integrações
+          {inboundReceived ? 'Preparar meu funil' : 'Ver detalhes em Integrações'}
         </button>
       </div>
     </div>
