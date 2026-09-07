@@ -61,7 +61,7 @@ export function Wordmark({
       className={`font-black tracking-tight ${className}`}
       style={{ letterSpacing: '-0.02em' }}
     >
-      Meu Mistério
+      Acássia
     </span>
   );
 }

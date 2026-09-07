@@ -46,6 +46,7 @@ import {
   ClipboardCheck,
   ChevronDown,
   Smartphone,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react';
 import Logo, { Wordmark } from './Logo';
@@ -118,32 +119,32 @@ const RAIL_HUBS: RailHub[] = [
     ],
   },
   {
-    id: 'oraculo', icon: Sparkles, label: 'Oráculo',
+    id: 'automacoes', icon: Workflow, label: 'Automações & IA',
     sections: [
-      { label: 'Automação', defaultOpen: true, items: [
-        { to: '/blueprints', icon: FolderTree, label: 'Fluxos' },
-        { to: '/templates', icon: FolderTree, label: 'Templates' },
-        { to: '/marketplace', icon: Store, label: 'Marketplace' },
+      { label: 'Funis & Construtor', defaultOpen: true, items: [
+        { to: '/blueprints', icon: FolderTree, label: 'Funis de Vendas' },
+        { to: '/templates', icon: FolderTree, label: 'Templates de Funil' },
+        { to: '/marketplace', icon: Store, label: 'Marketplace de Fluxos' },
       ]},
-      { label: 'Consultas IA', items: [
+      { label: 'Agentes & Inteligência', defaultOpen: true, items: [
+        { to: '/voice', icon: Mic, label: 'Voz & Áudios IA' },
+        { to: '/coach', icon: Bot, label: 'Agente de Vendas IA' },
+        { to: '/reading', icon: Sparkles, label: 'Análise de Imagens & Visão' },
+      ]},
+      { label: 'Módulos Especializados', items: [
         { to: '/tarot', icon: Wand2, label: 'Tarot Virtual' },
-        { to: '/reading', icon: Sparkles, label: 'Leitura Multi-Modal' },
-        { to: '/voice', icon: Mic, label: 'Voice IA' },
-        { to: '/coach', icon: Bot, label: 'Coach IA' },
-      ]},
-      { label: 'Conteúdo Espiritual', items: [
         { to: '/lunar', icon: Moon, label: 'Lunar' },
         { to: '/horoscope', icon: Star, label: 'Horóscopo Diário' },
         { to: '/spiritual', icon: Compass, label: 'Perfil Espiritual' },
         { to: '/calendar', icon: CalendarDays, label: 'Calendário Espiritual' },
       ]},
-      { label: 'Engajamento', items: [
-        { to: '/audio-library', icon: Library, label: 'Biblioteca de Áudios' },
-        { to: '/journal', icon: BookOpen, label: 'Diário Espiritual' },
-        { to: '/trails', icon: GraduationCap, label: 'Trilhas' },
-        { to: '/rituals', icon: Flame, label: 'Rituais Diários' },
+      { label: 'Comunidade & Conteúdo', items: [
+        { to: '/audio-library', icon: Library, label: 'Biblioteca de Mídia' },
+        { to: '/journal', icon: BookOpen, label: 'Diário & Notas' },
+        { to: '/trails', icon: GraduationCap, label: 'Trilhas de Conteúdo' },
+        { to: '/rituals', icon: Flame, label: 'Rotinas Diárias' },
         { to: '/dreams', icon: Eye, label: 'Sonhos' },
-        { to: '/vision-board', icon: Target, label: 'Quadro de Visão' },
+        { to: '/vision-board', icon: Target, label: 'Quadro de Metas' },
         { to: '/community', icon: Users, label: 'Comunidade' },
       ]},
     ],
