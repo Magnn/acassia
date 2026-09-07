@@ -7,24 +7,24 @@
   --bg-primary: #f8fafc;
   --bg-surface: #ffffff;
   --bg-sidebar: #f1f5f9;
-  --bg-header: rgba(255, 255, 255, 0.8);
-  --text-primary: #1e1b4b; /* Indigo 950 */
+  --bg-header: rgba(255, 255, 255, 0.85);
+  --text-primary: #0f172a; /* Slate 900 */
   --text-secondary: #64748b; /* Slate 500 */
   --border-primary: #e2e8f0;
-  --accent-amethyst: #7c6a99;
-  --accent-ember: #d4a574;
+  --accent-amethyst: #6366f1; /* Modern Indigo 500 */
+  --accent-ember: #f59e0b; /* Amber 500 */
 }
 
 [data-theme="dark"] {
-  --bg-primary: #0b0817; /* sibila-onyx */
-  --bg-surface: #14101e; /* sibila-obsidian */
-  --bg-sidebar: #1c1828; /* sibila-veil */
-  --bg-header: rgba(28, 24, 40, 0.6); /* sibila-veil with opacity */
-  --text-primary: #f3eee5; /* sibila-moonlight */
-  --text-secondary: #a8a3b3; /* sibila-fog */
-  --border-primary: #2a2538; /* sibila-mist */
-  --accent-amethyst: #7c6a99;
-  --accent-ember: #d4a574;
+  --bg-primary: #09090b; /* Zinc 950 Deep Modern */
+  --bg-surface: #121215; /* Zinc 900 Glass surface */
+  --bg-sidebar: #0e0e11; /* Clean dark sidebar */
+  --bg-header: rgba(14, 14, 17, 0.8);
+  --text-primary: #f4f4f5; /* Zinc 100 crisp text */
+  --text-secondary: #a1a1aa; /* Zinc 400 neutral subtext */
+  --border-primary: #27272a; /* Zinc 800 sharp modern border */
+  --accent-amethyst: #818cf8; /* Bright Indigo Accent */
+  --accent-ember: #fbbf24;
 }
 
 /* Custom Premium Utilities */
