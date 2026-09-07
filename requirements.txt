@@ -37,6 +37,7 @@ redis>=5.0.0
 sentry-sdk[flask]>=2.0.0
 
 # ── Production Server ──
+waitress>=3.0.0
 gunicorn>=22.0.0
 gevent>=24.0.0
 

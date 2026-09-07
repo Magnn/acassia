@@ -450,9 +450,21 @@ inbox_manager = LeadInboxManager(process_callback=motor.processar_mensagem)
 _FRONTEND_DIST = os.path.join(_ROOT, "frontend", "dist")
 
 
+@app.route("/")
+def root_index():
+    """Redireciona a raiz para o dashboard se autenticado, ou login."""
+    try:
+        from flask_login import current_user
+        if getattr(current_user, "is_authenticated", False):
+            return redirect("/dashboard", code=302)
+    except Exception:
+        pass
+    return redirect("/saas/login", code=302)
+
+
 def _flow_builder_react_enabled() -> bool:
     """FLOW_BUILDER_REACT=1/true/yes ativa redirect /dashboard → /builder/."""
-    val = (os.getenv("FLOW_BUILDER_REACT", "") or "").strip().lower()
+    val = (os.getenv("FLOW_BUILDER_REACT", "1") or "1").strip().lower()
     return val in ("1", "true", "yes", "on")
 
 
@@ -933,6 +945,7 @@ def _find_entity_in_snapshot(snapshot: dict, scope: str, entity_id: str) -> dict
 
 
 @app.route("/api/health", methods=["GET"])
+@app.route("/health", methods=["GET"])
 def api_health():
     """Liveness para monitoramento e debug rápido."""
     return jsonify({

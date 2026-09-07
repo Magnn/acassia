@@ -34,7 +34,11 @@ def frontend(path=''):
     dist = root / 'frontend' / 'dist'
     return send_from_directory(dist, path if path and (dist / path).is_file() else 'index.html')
 
-@app.get('/saas/templates/data')
+@app.get('/saas/me')
+def me():
+    return jsonify(id=999, email='fixture@example.test', name='Conta de teste', tenant_id='ui-fixture', role='user')
+
+@app.get('/saas/templates')
 def templates():
     return jsonify(templates=[])
 
@@ -46,4 +50,4 @@ def metrics():
 def kpis():
     return jsonify(ok=True, series=[])
 
-app.run(host='127.0.0.1', port=5187, debug=False)
+app.run(host='127.0.0.1', port=5188, debug=False)

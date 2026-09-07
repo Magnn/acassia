@@ -21,7 +21,11 @@ def sales_starter(offer_name: str, description: str) -> dict:
             "save_to_flow_field": "duvida_comercial", "reply_mode": "text",
         }},
         {"id": "recorded", "type": "conteudo", "label": "Confirmar registro", "config": {
-            "content_text": "Obrigado! Sua dúvida ficou registrada nesta conversa.",
+            "content_text": "Obrigado! Sua dúvida ficou registrada. Nossa equipe pode continuar o atendimento por aqui.",
+        }},
+        {"id": "handoff", "type": "notificar_atendente", "label": "Encaminhar para a equipe", "config": {
+            "message": "Atendimento comercial: {{necessidade}}. Dúvida: {{duvida_comercial}}",
+            "step_name": "Pausar automação e deixar conversa aguardando atendente",
         }},
         {"id": "end", "type": "end", "label": "Encerrar etapa", "config": {}},
     ]

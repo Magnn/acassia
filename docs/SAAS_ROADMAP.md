@@ -1,5 +1,7 @@
 # SaaS Roadmap — Plataforma de Agentes Espirituais via WhatsApp
 
+> Histórico da visão inicial. O plano atual de evolução, com entregas verificadas e pendências, está em [Evolução da plataforma a partir do ChatbotX](EVOLUCAO_PLATAFORMA_CHATBOTX.md). Os checklists abaixo não substituem a verificação do código atual.
+
 > Documento mestre. Consolida visão de produto, decisões arquiteturais e roteiro de execução. Revisar a cada fechamento de fase.
 
 ---

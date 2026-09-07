@@ -55,5 +55,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     FLASK_ENV=production
 
-# Entrypoint: migrations + gunicorn
+# Expose portas comuns de deploy (Railway/Render)
+EXPOSE 5000 8080
+
+# Entrypoint: migrations + server
 CMD ["./entrypoint.sh"]

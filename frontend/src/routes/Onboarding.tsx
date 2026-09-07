@@ -369,7 +369,7 @@ function TemplateStep({ onSave, isPending }: { onSave: (d: TemplateDraft) => voi
             onClick={() => setSelectedId('atendimento_comercial')}
             className={`p-6 rounded-3xl border-2 text-left ${selectedId === 'atendimento_comercial' ? 'border-accent-amethyst bg-accent-amethyst/10' : 'border-border bg-bg-surface'}`}>
             <span className="block text-lg font-bold">Atendimento comercial inicial</span>
-            <span className="block mt-2 text-sm text-secondary">Receba o cliente, entenda sua necessidade, apresente a oferta cadastrada e registre dúvidas. Adapte para seu negócio no editor.</span>
+            <span className="block mt-2 text-sm text-secondary">Receba o cliente, entenda sua necessidade, apresente a oferta cadastrada e encaminhe dúvidas para a equipe. Adapte para seu negócio no editor.</span>
             <span className="block mt-3 text-xs font-bold">{selectedId === 'atendimento_comercial' ? 'Selecionado' : 'Selecionar modelo'}</span>
           </button>
           {items.map((t) => {

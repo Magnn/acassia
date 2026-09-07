@@ -21,7 +21,14 @@ if [ -f "scripts/add_missing_indexes.py" ]; then
     python scripts/add_missing_indexes.py || true
 fi
 
-# ── Gunicorn ────────────────────────────────────────────────
+# ── Server Boot ─────────────────────────────────────────────
 PORT="${PORT:-5000}"
-echo "🌐 [ENTRYPOINT] Starting gunicorn on port ${PORT} with gthread workers..."
-exec gunicorn app:app --bind "0.0.0.0:${PORT}" --workers 2 --threads 4 --worker-class gthread --timeout 120
+export PORT
+
+if [ "${USE_GUNICORN:-0}" = "1" ]; then
+    echo "🌐 [ENTRYPOINT] Starting gunicorn on port ${PORT} (1 worker, 8 threads)..."
+    exec gunicorn app:app --bind "0.0.0.0:${PORT}" --workers 1 --threads 8 --worker-class gthread --timeout 180 --access-logfile - --error-logfile -
+else
+    echo "🌐 [ENTRYPOINT] Starting Waitress server via python app.py on port ${PORT}..."
+    exec python app.py
+fi

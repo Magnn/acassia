@@ -295,11 +295,11 @@ def test_whatsapp_uses_request_host_and_preserves_webhook_path(logged_in_client,
     client, user = logged_in_client
     monkeypatch.delenv("PUBLIC_URL", raising=False)
     payload = {"phone_number_id": "123456789", "waba_id": "987654321", "access_token": "EAAxxxxxxxxxxxxxxxxxx"}
-    first = client.post("/saas/onboarding/whatsapp", json=payload, base_url="https://app.example.test")
+    first = client.post("/saas/onboarding/whatsapp", json=payload, base_url="https://localhost")
     assert first.status_code == 200
     url = first.json["binding"]["webhook_url"]
-    assert url.startswith("https://app.example.test/webhook/wh_")
-    second = client.post("/saas/onboarding/whatsapp", json=payload, base_url="https://app.example.test")
+    assert url.startswith("https://localhost/webhook/wh_")
+    second = client.post("/saas/onboarding/whatsapp", json=payload, base_url="https://localhost")
     assert second.json["binding"]["webhook_url"] == url
 
 
@@ -364,6 +364,7 @@ def test_sales_starter_keeps_post_payment_and_waits_for_each_reply():
     third = execute_published_flow_turn(doc, message="Como agendar?", existing_state=second.state, **args)
     assert third.state["vars"]["duvida_comercial"] == "Como agendar?"
     assert third.state["status"] == "completed"
+    assert any(effect["kind"] == "notify_attendant" and "Como agendar?" in effect["payload"] for effect in third.side_effects)
 
 
 def test_save_template_idempotente_atualiza():
