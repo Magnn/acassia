@@ -148,4 +148,24 @@ export const integrationsApi = {
       }>(`/saas/integrations/whatsapp/inbound-logs${qs ? '?' + qs : ''}`);
     },
   },
+
+  capi: {
+    getConfig: () => api.get<{ ok: boolean; pixel_id: string; has_token: boolean; test_event_code: string; auto_purchase: boolean; auto_lead: boolean }>('/saas/capi/config'),
+    saveConfig: (data: { pixel_id: string; access_token?: string; test_event_code?: string; auto_purchase?: boolean; auto_lead?: boolean }) =>
+      api.post<{ ok: boolean; message: string }>('/saas/capi/config', data),
+    testEvent: (data: { event_name: string; phone?: string; email?: string; value?: number; test_event_code?: string }) =>
+      api.post<{ ok: boolean; data?: any; error?: string }>('/saas/capi/test-event', data),
+  },
+
+  socials: {
+    getRules: () => api.get<{ ok: boolean; rules: any[] }>('/saas/social/rules'),
+    saveRules: (rules: any[]) => api.post<{ ok: boolean; rules: any[] }>('/saas/social/rules', { rules }),
+    getTiktok: () => api.get<{ ok: boolean; business_id: string; has_token: boolean; app_id: string; active: boolean }>('/saas/tiktok/config'),
+    saveTiktok: (data: { business_id: string; access_token: string; app_id: string; active: boolean }) =>
+      api.post<{ ok: boolean; config: any }>('/saas/tiktok/config', data),
+    getYoutube: () => api.get<{ ok: boolean; channel_id: string; has_api_key: boolean; auto_broadcast_new_videos: boolean; active: boolean }>('/saas/youtube/config'),
+    saveYoutube: (data: { channel_id: string; api_key: string; auto_broadcast_new_videos: boolean; active: boolean }) =>
+      api.post<{ ok: boolean; config: any }>('/saas/youtube/config', data),
+  },
 };
+

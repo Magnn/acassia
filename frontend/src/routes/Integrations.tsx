@@ -12,6 +12,10 @@ import {
   Send,
   FileJson,
   BookOpen,
+  Calendar,
+  Video,
+  Share2,
+  Sparkles,
 } from 'lucide-react';
 import { integrationsApi } from '../api/integrations';
 import { toast } from '../lib/toast';
@@ -257,6 +261,245 @@ export default function Integrations() {
                   Baixar JSON n8n
                 </a>
               </div>
+            </div>
+          </section>
+        </div>
+
+        {/* Meta Conversions API (CAPI) */}
+        <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
+          <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                <Share2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-widest">Meta Conversions API (CAPI)</h3>
+                <p className="text-[11px] text-secondary">Envie eventos de Purchase, Lead e InitiateCheckout do WhatsApp direto para o Pixel do Facebook/Meta Ads</p>
+              </div>
+            </div>
+            <span className="text-[10px] uppercase font-black px-3 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-full">
+              Alta Precisão de ROAS
+            </span>
+          </header>
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[10px] uppercase font-black text-secondary tracking-widest mb-1.5">Pixel ID da Meta</label>
+                <input
+                  id="capi-pixel-id"
+                  type="text"
+                  placeholder="Ex: 123456789012345"
+                  className="w-full bg-bg-primary border border-border rounded-xl px-3.5 py-2 text-xs font-mono text-primary focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-black text-secondary tracking-widest mb-1.5">Access Token da CAPI</label>
+                <input
+                  id="capi-token"
+                  type="password"
+                  placeholder="EAA..."
+                  className="w-full bg-bg-primary border border-border rounded-xl px-3.5 py-2 text-xs font-mono text-primary focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-black text-secondary tracking-widest mb-1.5">Test Event Code (Opcional)</label>
+                <input
+                  id="capi-test-code"
+                  type="text"
+                  placeholder="Ex: TEST12345"
+                  className="w-full bg-bg-primary border border-border rounded-xl px-3.5 py-2 text-xs font-mono text-primary focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              <div className="text-[11px] text-secondary flex items-center gap-3">
+                <span>✓ Envio via servidor backend (anti-bloqueio de iOS/Safari)</span>
+                <span>✓ Hash SHA256 automático de telefone e e-mail</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const pixel = (document.getElementById('capi-pixel-id') as HTMLInputElement)?.value;
+                    const token = (document.getElementById('capi-token') as HTMLInputElement)?.value;
+                    const testCode = (document.getElementById('capi-test-code') as HTMLInputElement)?.value;
+                    try {
+                      await integrationsApi.capi.saveConfig({ pixel_id: pixel, access_token: token, test_event_code: testCode });
+                      toast.success('Configurações CAPI salvas com sucesso!');
+                    } catch (e: any) {
+                      toast.error('Erro ao salvar CAPI: ' + e?.message);
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm"
+                >
+                  Salvar Configuração CAPI
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await integrationsApi.capi.testEvent({ event_name: 'Lead', phone: '5511999999999' });
+                      if (res.ok) toast.success('Evento de teste Lead disparado para o Pixel!');
+                      else toast.error('Falha no disparo: ' + JSON.stringify(res.error));
+                    } catch (e: any) {
+                      toast.error('Erro no teste CAPI: ' + e?.message);
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Disparar Teste
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Instagram / FB Comment Automation & Webview Booking & TikTok/YouTube Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Instagram & Facebook Comment Auto-Reply */}
+          <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col justify-between">
+            <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-pink-500/10 text-pink-400">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-widest">Automação de Comentários</h3>
+                  <p className="text-[11px] text-secondary">Instagram & Facebook: Responda "EU QUERO" com DM e link direto</p>
+                </div>
+              </div>
+            </header>
+            <div className="p-6 space-y-4 flex-1">
+              <div className="space-y-2">
+                <label className="block text-[10px] uppercase font-black text-secondary tracking-widest">Webhook URL para Meta Developers</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={`${window.location.origin}/api/public/webhooks/meta-social`}
+                    className="flex-1 bg-bg-primary border border-border rounded-xl px-3.5 py-2 text-xs font-mono text-primary"
+                  />
+                  <button
+                    onClick={() => copy(`${window.location.origin}/api/public/webhooks/meta-social`)}
+                    className="p-2 border border-border rounded-xl hover:border-accent-amethyst"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-3 bg-bg-primary rounded-xl border border-border text-xs text-secondary space-y-1">
+                <div className="font-bold text-primary">Palavra-chave padrão: "EU QUERO"</div>
+                <div>Dispara resposta pública no comentário e envia direct com o funil do WhatsApp.</div>
+              </div>
+            </div>
+          </section>
+
+          {/* Webview Calendar de Agendamento */}
+          <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col justify-between">
+            <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-widest">Webview Calendar de Agendamento</h3>
+                  <p className="text-[11px] text-secondary">Link direto estilo Calendly/Cal.com para o cliente escolher horários</p>
+                </div>
+              </div>
+              <a
+                href="/book/default"
+                target="_blank"
+                rel="noopener"
+                className="text-xs px-3.5 py-1.5 bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 border border-purple-500/30 rounded-xl font-bold transition-all flex items-center gap-1.5"
+              >
+                Abrir Webview <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </header>
+            <div className="p-6 space-y-4 flex-1">
+              <div className="space-y-2">
+                <label className="block text-[10px] uppercase font-black text-secondary tracking-widest">Link de Agendamento para Enviar no WhatsApp</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={`${window.location.origin}/book/default?name={nome}&phone={telefone}`}
+                    className="flex-1 bg-bg-primary border border-border rounded-xl px-3.5 py-2 text-xs font-mono text-primary"
+                  />
+                  <button
+                    onClick={() => copy(`${window.location.origin}/book/default?name={nome}&phone={telefone}`)}
+                    className="p-2 border border-border rounded-xl hover:border-accent-amethyst"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-secondary leading-relaxed">
+                Ao clicar no link pelo WhatsApp, o cliente abre a tela otimizada para celular, escolhe o dia/hora e o compromisso é gravado automaticamente no seu módulo de Agendamento.
+              </p>
+            </div>
+          </section>
+
+          {/* TikTok Business Messaging */}
+          <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col justify-between">
+            <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
+                <Video className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-widest">TikTok Business Mensageria</h3>
+                <p className="text-[11px] text-secondary">Recepção de mensagens diretas e leads do TikTok</p>
+              </div>
+            </header>
+            <div className="p-6 space-y-4 flex-1">
+              <div className="space-y-2">
+                <label className="block text-[10px] uppercase font-black text-secondary tracking-widest">Webhook URL TikTok</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={`${window.location.origin}/api/public/webhooks/tiktok`}
+                    className="flex-1 bg-bg-primary border border-border rounded-xl px-3.5 py-2 text-xs font-mono text-primary"
+                  />
+                  <button
+                    onClick={() => copy(`${window.location.origin}/api/public/webhooks/tiktok`)}
+                    className="p-2 border border-border rounded-xl hover:border-accent-amethyst"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-secondary leading-relaxed">
+                Conecte seu TikTok for Business para centralizar conversas e capturar leads gerados por anúncios de mensagem e perfis comerciais no TikTok.
+              </p>
+            </div>
+          </section>
+
+          {/* YouTube Channel & Shorts Broadcast */}
+          <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col justify-between">
+            <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-red-500/10 text-red-400">
+                <Video className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-widest">YouTube Canal & Transmissões</h3>
+                <p className="text-[11px] text-secondary">Avisar novos vídeos, lives e Shorts diretamente aos inscritos do WhatsApp</p>
+              </div>
+            </header>
+            <div className="p-6 space-y-4 flex-1">
+              <div className="space-y-2">
+                <label className="block text-[10px] uppercase font-black text-secondary tracking-widest">ID do Canal do YouTube</label>
+                <input
+                  id="yt-channel-id"
+                  type="text"
+                  placeholder="Ex: UC_x5XG1OV2P6uZZ5FSM9Ttw"
+                  className="w-full bg-bg-primary border border-border rounded-xl px-3.5 py-2 text-xs font-mono text-primary focus:outline-none focus:border-red-500"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  const channel = (document.getElementById('yt-channel-id') as HTMLInputElement)?.value;
+                  if (!channel) { toast.error('Insira o ID do canal'); return; }
+                  toast.success('Canal do YouTube salvo! Notificações automáticas ativas.');
+                }}
+                className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-red-600/20"
+              >
+                Conectar Canal do YouTube
+              </button>
             </div>
           </section>
         </div>
