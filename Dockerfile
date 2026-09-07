@@ -2,7 +2,15 @@
 # Multi-stage build para produção otimizada
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# ── Stage 1: Dependencies ──
+# ── Stage 1: Frontend Build ──
+FROM node:20-slim AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
+# ── Stage 2: Dependencies ──
 FROM python:3.12-slim AS deps
 
 WORKDIR /app
@@ -18,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ── Stage 2: Application ──
+# ── Stage 3: Application ──
 FROM python:3.12-slim AS runtime
 
 WORKDIR /app
@@ -36,6 +44,7 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 
 # Copiar aplicação
 COPY . .
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Diretórios necessários
 RUN mkdir -p downloads scripts/reports media \
