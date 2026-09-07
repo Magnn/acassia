@@ -54,11 +54,16 @@ def _get_redis():
             return None
         try:
             import redis
-            _redis_client = redis.from_url(url, decode_responses=True, socket_timeout=5)
+            _redis_client = redis.from_url(
+                url,
+                decode_responses=True,
+                socket_connect_timeout=2.0,
+                socket_timeout=2.0,
+            )
             _redis_client.ping()
             logger.info("[DLOCK] Redis conectado para locks distribuídos")
         except Exception as exc:
-            logger.warning("[DLOCK] Falha ao conectar Redis (%s) — fallback local", exc)
+            logger.warning("[DLOCK] Falha ao conectar Redis (%s) — fallback local instantâneo", exc)
             _redis_client = None
         _redis_init_done = True
         return _redis_client

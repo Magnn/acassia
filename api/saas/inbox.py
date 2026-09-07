@@ -15,7 +15,7 @@ import logging
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from sqlalchemy import case, or_
+from sqlalchemy import case, or_, func, desc
 
 from db import models
 from db.database import SessionLocal
@@ -190,11 +190,33 @@ def list_view_data():
         q = q.order_by(urgent_first, sort_col)
 
         leads = q.limit(limit).all()
+        lead_ids = [l.id for l in leads]
+        
+        # Batch-fetch últimas mensagens para eliminar o gargalo N+1
+        last_msgs_map = {}
+        if lead_ids:
+            # Subquery buscando o max timestamp de cada lead retornado
+            subq = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    func.max(models.Mensagem.id).label("max_msg_id")
+                )
+                .filter(models.Mensagem.lead_id.in_(lead_ids))
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            # Busca mensagens completas dos IDs máximos em uma única query
+            msgs = (
+                db.query(models.Mensagem)
+                .join(subq, models.Mensagem.id == subq.c.max_msg_id)
+                .all()
+            )
+            for m in msgs:
+                last_msgs_map[m.lead_id] = m
+
         items = []
         for lead in leads:
-            last_msg = db.query(models.Mensagem).filter_by(lead_id=lead.id).order_by(
-                models.Mensagem.timestamp.desc()
-            ).first()
+            last_msg = last_msgs_map.get(lead.id)
             items.append({
                 "id": lead.id,
                 "telefone": lead.telefone,
