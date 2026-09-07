@@ -12,11 +12,7 @@ echo "🚀 [ENTRYPOINT] Starting Acássia SaaS..."
 # ── Migrations ──────────────────────────────────────────────
 if [ "${SKIP_MIGRATIONS:-0}" != "1" ] && [ -f "alembic.ini" ]; then
     echo "📦 [ENTRYPOINT] Running Alembic migrations..."
-    if alembic upgrade head 2>&1; then
-        echo "✅ [ENTRYPOINT] Migrations OK"
-    else
-        echo "⚠️ [ENTRYPOINT] Alembic falhou (sync_database() vai compensar) — continuando..."
-    fi
+    alembic upgrade head || echo "⚠️ [ENTRYPOINT] Alembic falhou (sync_database() vai compensar) — continuando..."
 else
     echo "⏩ [ENTRYPOINT] Skipping migrations (SKIP_MIGRATIONS=${SKIP_MIGRATIONS:-0})"
 fi
@@ -24,7 +20,7 @@ fi
 # ── Indexes + ANALYZE (idempotente, roda a cada boot) ───────
 if [ -f "scripts/add_missing_indexes.py" ]; then
     echo "🔧 [ENTRYPOINT] Ensuring PostgreSQL indexes..."
-    python scripts/add_missing_indexes.py 2>&1 || true
+    python scripts/add_missing_indexes.py || true
 fi
 
 # ── Gunicorn ────────────────────────────────────────────────
