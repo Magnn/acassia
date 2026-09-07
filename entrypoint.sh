@@ -25,10 +25,14 @@ fi
 PORT="${PORT:-5000}"
 export PORT
 
-if [ "${USE_GUNICORN:-0}" = "1" ]; then
-    echo "🌐 [ENTRYPOINT] Starting gunicorn on port ${PORT} (1 worker, 8 threads)..."
-    exec gunicorn app:app --bind "0.0.0.0:${PORT}" --workers 1 --threads 8 --worker-class gthread --timeout 180 --access-logfile - --error-logfile -
-else
-    echo "🌐 [ENTRYPOINT] Starting Waitress server via python app.py on port ${PORT}..."
-    exec python app.py
+# Constrói binds para garantir escuta na porta Railway ($PORT) e nas portas 8080/5000
+BINDS="-b 0.0.0.0:${PORT}"
+if [ "${PORT}" != "8080" ]; then
+    BINDS="${BINDS} -b 0.0.0.0:8080"
 fi
+if [ "${PORT}" != "5000" ]; then
+    BINDS="${BINDS} -b 0.0.0.0:5000"
+fi
+
+echo "🌐 [ENTRYPOINT] Starting server (1 worker, 8 threads) listening on: ${BINDS}..."
+exec gunicorn app:app ${BINDS} --workers 1 --threads 8 --worker-class gthread --timeout 180 --access-logfile - --error-logfile -
