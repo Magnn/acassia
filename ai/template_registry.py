@@ -176,9 +176,13 @@ Retorne APENAS o texto da mensagem final."""
                         time.sleep(1.5)
                         continue
                 logger.error("🚨 [REGISTRY] Erro na geração Gemini: %s", e)
-                return self._fallback_hardcoded(categoria)
+                fallback = self._fallback_hardcoded(categoria)
+                self._cache_memoria[chave_base] = fallback
+                return fallback
 
-        return self._fallback_hardcoded(categoria)
+        fallback = self._fallback_hardcoded(categoria)
+        self._cache_memoria[chave_base] = fallback
+        return fallback
 
     # ──────────────────────────────────────────
     # AUXILIARES E REGRAS DE NEGÓCIO

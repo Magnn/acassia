@@ -48,12 +48,24 @@ def list_view():
             q = q.filter_by(opt_out=True)
 
         leads = q.order_by(models.Lead.atualizado_em.desc()).limit(100).all()
+        lead_ids = [l.id for l in leads]
+        last_msgs_map = {}
+        if lead_ids:
+            subq = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    func.max(models.Mensagem.id).label("max_msg_id")
+                )
+                .filter(models.Mensagem.lead_id.in_(lead_ids))
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(subq, models.Mensagem.id == subq.c.max_msg_id).all():
+                last_msgs_map[m.lead_id] = m
 
         items = []
         for lead in leads:
-            last_msg = db.query(models.Mensagem).filter_by(lead_id=lead.id).order_by(
-                models.Mensagem.timestamp.desc()
-            ).first()
+            last_msg = last_msgs_map.get(lead.id)
             items.append({
                 "id": lead.id,
                 "telefone": lead.telefone,

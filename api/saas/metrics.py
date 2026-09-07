@@ -94,10 +94,13 @@ def dashboard():
     return render_template("metrics/dashboard.html", kpis=kpis)
 
 
+from reliability.api_cache import cached_api
+
 @metrics_bp.route("/data", methods=["GET"])
 @login_required
+@cached_api(ttl_s=30, key_fn=lambda: f"dashboard_kpis:{current_user.tenant_id}")
 def dashboard_data():
-    """Endpoint REST para consumo do novo React Dashboard."""
+    """Endpoint REST para consumo do novo React Dashboard (cacheados por 30s)."""
     from flask import jsonify
     tenant_id = current_user.tenant_id
     kpis = compute_kpis(tenant_id)
