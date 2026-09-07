@@ -1,37 +1,247 @@
 {% extends "base.html" %}
-{% block title %}Criar conta — Meu Mistério SaaS{% endblock %}
+{% block title %}Criar Conta — Acássia Funis & IA{% endblock %}
+
 {% block content %}
-<div class="text-center mb-8">
-  <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-purple-600/30 text-white font-black">
-    ⚡
+<div class="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/80 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-black/60 relative">
+  <!-- Cabeçalho / Logo -->
+  <div class="text-center mb-6">
+    <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 shadow-lg shadow-indigo-500/25 mb-4 ring-1 ring-white/20">
+      <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+    </div>
+    <div class="inline-block px-2.5 py-0.5 mb-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold tracking-wide uppercase">
+      14 Dias de Teste Grátis Pro
+    </div>
+    <h1 class="text-2xl font-bold tracking-tight text-white mb-1.5">Criar Conta na Acássia</h1>
+    <p class="text-zinc-400 text-xs sm:text-sm">Plataforma de Funis e IA de Vendas para WhatsApp</p>
   </div>
-  <h1 class="text-3xl font-extrabold mb-1 tracking-tight text-white">Criar Conta na Acássia</h1>
-  <p class="text-slate-400 text-sm">Plataforma de Funis e IA de Vendas para WhatsApp</p>
+
+  <!-- Benefícios Rápidos -->
+  <div class="mb-6 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/60 flex items-center justify-between text-[11px] text-zinc-400 font-medium">
+    <span class="flex items-center gap-1 text-zinc-300">
+      <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+      </svg>
+      Acesso Pro
+    </span>
+    <span class="flex items-center gap-1 text-zinc-300">
+      <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+      </svg>
+      Sem Cartão
+    </span>
+    <span class="flex items-center gap-1 text-zinc-300">
+      <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+      </svg>
+      Setup em 2 min
+    </span>
+  </div>
+
+  <!-- Formulário de Cadastro -->
+  <form id="signupForm" method="POST" action="{{ url_for('saas_auth.signup') }}" class="space-y-4">
+    <!-- Campo Nome -->
+    <div>
+      <label for="name" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+        Seu Nome ou Empresa
+      </label>
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </div>
+        <input 
+          type="text" 
+          id="name" 
+          name="name" 
+          required
+          maxlength="200" 
+          autocomplete="name" 
+          placeholder="ex: Dr. Carlos Silva"
+          class="w-full pl-10 pr-3.5 py-2.5 bg-zinc-950/70 border border-zinc-800 rounded-xl text-zinc-100 placeholder:text-zinc-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+        >
+      </div>
+    </div>
+
+    <!-- Campo Email -->
+    <div>
+      <label for="email" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+        Email de Trabalho
+      </label>
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <input 
+          type="email" 
+          id="email" 
+          name="email" 
+          required 
+          autocomplete="email" 
+          placeholder="nome@empresa.com"
+          class="w-full pl-10 pr-3.5 py-2.5 bg-zinc-950/70 border border-zinc-800 rounded-xl text-zinc-100 placeholder:text-zinc-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+        >
+      </div>
+    </div>
+
+    <!-- Campo Senha -->
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300">
+          Senha Segura
+        </label>
+        <span class="text-[11px] text-zinc-500">Mínimo 8 caracteres</span>
+      </div>
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0110 0v4"></path>
+          </svg>
+        </div>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          required 
+          minlength="8" 
+          autocomplete="new-password" 
+          placeholder="Crie uma senha forte"
+          class="w-full pl-10 pr-10 py-2.5 bg-zinc-950/70 border border-zinc-800 rounded-xl text-zinc-100 placeholder:text-zinc-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+        >
+        <button 
+          type="button" 
+          id="togglePassword" 
+          class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-500 hover:text-zinc-300 focus:outline-none"
+          tabindex="-1"
+          aria-label="Mostrar ou ocultar senha"
+        >
+          <svg id="eyeIcon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <svg id="eyeOffIcon" class="w-4 h-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Barra de Força da Senha -->
+      <div class="mt-2 flex items-center gap-1.5">
+        <div class="h-1 flex-1 bg-zinc-800 rounded-full overflow-hidden">
+          <div id="pwdStrengthBar" class="h-full w-0 bg-rose-500 transition-all duration-300"></div>
+        </div>
+        <span id="pwdStrengthText" class="text-[10px] text-zinc-500 font-medium">8+ caracteres</span>
+      </div>
+    </div>
+
+    <!-- Botão de Criar Conta -->
+    <button 
+      type="submit" 
+      id="submitBtn"
+      class="w-full mt-2 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold py-2.5 px-4 rounded-xl shadow-lg shadow-indigo-600/25 active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
+    >
+      <span id="btnText">Criar Conta & Iniciar Teste Grátis</span>
+      <svg id="btnArrow" class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+      </svg>
+      <svg id="btnSpinner" class="w-4 h-4 animate-spin hidden text-white" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </button>
+  </form>
+
+  <!-- Divisor e Link para Login -->
+  <div class="mt-6 pt-5 border-t border-zinc-800/80 text-center">
+    <p class="text-xs sm:text-sm text-zinc-400">
+      Já tem uma conta na Acássia?
+      <a href="{{ url_for('saas_auth.login') }}" class="font-semibold text-indigo-400 hover:text-indigo-300 hover:underline ml-1 transition">
+        Entrar agora &rarr;
+      </a>
+    </p>
+  </div>
 </div>
-<form method="POST" action="{{ url_for('saas_auth.signup') }}" class="space-y-4">
-  <div>
-    <label for="name" class="block mb-1 text-sm text-slate-300">Nome</label>
-    <input type="text" id="name" name="name" maxlength="200" autocomplete="name"
-           class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
-  </div>
-  <div>
-    <label for="email" class="block mb-1 text-sm text-slate-300">Email</label>
-    <input type="email" id="email" name="email" required autocomplete="email"
-           class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
-  </div>
-  <div>
-    <label for="password" class="block mb-1 text-sm text-slate-300">Senha</label>
-    <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password"
-           class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
-    <p class="mt-1 text-xs text-slate-500">Mínimo 8 caracteres</p>
-  </div>
-  <button type="submit"
-          class="w-full bg-meumisterio-purple hover:bg-purple-600 transition py-2 rounded-lg font-bold">
-    Criar conta
-  </button>
-</form>
-<p class="mt-6 text-center text-sm text-slate-400">
-  Já tem conta?
-  <a href="{{ url_for('saas_auth.login') }}" class="text-meumisterio-purple hover:underline">Entrar</a>
-</p>
+
+<!-- Rodapé com Segurança e Termos -->
+<div class="mt-6 text-center space-y-2">
+  <p class="text-[11px] text-zinc-500">
+    Ao criar sua conta, você concorda com os Termos de Serviço e Política de Privacidade da Acássia.
+  </p>
+</div>
+
+<script>
+  // Toggle Mostrar/Ocultar Senha
+  const toggleBtn = document.getElementById('togglePassword');
+  const passwordInput = document.getElementById('password');
+  const eyeIcon = document.getElementById('eyeIcon');
+  const eyeOffIcon = document.getElementById('eyeOffIcon');
+  const pwdStrengthBar = document.getElementById('pwdStrengthBar');
+  const pwdStrengthText = document.getElementById('pwdStrengthText');
+
+  if (toggleBtn && passwordInput) {
+    toggleBtn.addEventListener('click', () => {
+      const isPassword = passwordInput.type === 'password';
+      passwordInput.type = isPassword ? 'text' : 'password';
+      eyeIcon.classList.toggle('hidden', isPassword);
+      eyeOffIcon.classList.toggle('hidden', !isPassword);
+    });
+  }
+
+  // Medidor de Força de Senha
+  if (passwordInput && pwdStrengthBar && pwdStrengthText) {
+    passwordInput.addEventListener('input', () => {
+      const val = passwordInput.value;
+      if (val.length === 0) {
+        pwdStrengthBar.style.width = '0%';
+        pwdStrengthText.textContent = '8+ caracteres';
+        pwdStrengthText.className = 'text-[10px] text-zinc-500 font-medium';
+      } else if (val.length < 8) {
+        pwdStrengthBar.style.width = '33%';
+        pwdStrengthBar.className = 'h-full bg-rose-500 transition-all duration-300';
+        pwdStrengthText.textContent = 'Muito curta';
+        pwdStrengthText.className = 'text-[10px] text-rose-400 font-medium';
+      } else {
+        const hasNum = /\d/.test(val);
+        const hasUpper = /[A-Z]/.test(val);
+        const hasSpecial = /[^A-Za-z0-9]/.test(val);
+        const bonus = (hasNum ? 1 : 0) + (hasUpper ? 1 : 0) + (hasSpecial ? 1 : 0);
+
+        if (bonus >= 2 && val.length >= 10) {
+          pwdStrengthBar.style.width = '100%';
+          pwdStrengthBar.className = 'h-full bg-emerald-500 transition-all duration-300';
+          pwdStrengthText.textContent = 'Senha forte';
+          pwdStrengthText.className = 'text-[10px] text-emerald-400 font-medium';
+        } else {
+          pwdStrengthBar.style.width = '66%';
+          pwdStrengthBar.className = 'h-full bg-amber-500 transition-all duration-300';
+          pwdStrengthText.textContent = 'Senha razoável';
+          pwdStrengthText.className = 'text-[10px] text-amber-400 font-medium';
+        }
+      }
+    });
+  }
+
+  // Loading State no Submit
+  const signupForm = document.getElementById('signupForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const btnText = document.getElementById('btnText');
+  const btnArrow = document.getElementById('btnArrow');
+  const btnSpinner = document.getElementById('btnSpinner');
+
+  if (signupForm && submitBtn) {
+    signupForm.addEventListener('submit', () => {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-80', 'cursor-not-allowed');
+      btnText.textContent = 'Criando sua conta...';
+      btnArrow.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+    });
+  }
+</script>
 {% endblock %}
+

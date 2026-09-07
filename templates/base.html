@@ -1,40 +1,74 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Meu Mistério SaaS{% endblock %}</title>
+  <title>{% block title %}Acássia — Plataforma de Funis & IA de Vendas{% endblock %}</title>
+  
+  <!-- Font Inter do Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
           colors: {
-            'meumisterio-purple': '#7c3aed',
-            'meumisterio-bg': '#0f172a',
-            'meumisterio-surface': '#1e293b',
-            'meumisterio-border': '#334155',
+            'acassia-indigo': '#6366f1',
+            'acassia-purple': '#8b5cf6',
+            'meumisterio-purple': '#6366f1',
+            'meumisterio-bg': '#09090b',
+            'meumisterio-surface': '#18181b',
+            'meumisterio-border': '#27272a',
           }
         }
       }
     }
   </script>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+  </style>
 </head>
-<body class="bg-meumisterio-bg text-slate-100 min-h-screen">
-  <main class="{% block main_class %}max-w-md mx-auto py-12 px-6{% endblock %}">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="mb-4 space-y-2">
-          {% for cat, msg in messages %}
-            <div class="rounded p-3 text-sm {% if cat == 'error' %}bg-red-900/40 border border-red-800 text-red-200{% else %}bg-emerald-900/40 border border-emerald-800 text-emerald-200{% endif %}">
-              {{ msg }}
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
-    {% block content %}{% endblock %}
+<body class="bg-zinc-950 text-zinc-100 min-h-screen antialiased selection:bg-indigo-500/30 selection:text-indigo-200 relative overflow-x-hidden">
+  <!-- Efeito de Luz & Grid de Fundo no padrão Linear / ChatbotX -->
+  <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[500px] bg-gradient-to-b from-indigo-500/10 via-purple-500/5 to-transparent blur-3xl pointer-events-none -z-10"></div>
+  <div class="fixed inset-0 bg-[linear-gradient(to_right,#27272a15_1px,transparent_1px),linear-gradient(to_bottom,#27272a15_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10"></div>
+
+  <main class="{% block main_class %}min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8{% endblock %}">
+    <div class="w-full max-w-md">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-5 space-y-2.5">
+            {% for cat, msg in messages %}
+              <div class="rounded-xl px-4 py-3 text-sm flex items-center gap-3 shadow-lg backdrop-blur-md transition-all {% if cat == 'error' %}bg-rose-950/70 border border-rose-800/60 text-rose-200{% else %}bg-emerald-950/70 border border-emerald-800/60 text-emerald-200{% endif %}">
+                {% if cat == 'error' %}
+                  <svg class="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                {% else %}
+                  <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                {% endif %}
+                <span class="font-medium text-xs sm:text-sm">{{ msg }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      
+      {% block content %}{% endblock %}
+    </div>
   </main>
 </body>
 </html>
