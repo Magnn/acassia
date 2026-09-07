@@ -22,5 +22,6 @@ if [ -f "scripts/add_missing_indexes.py" ]; then
 fi
 
 # ── Gunicorn ────────────────────────────────────────────────
-echo "🌐 [ENTRYPOINT] Starting gunicorn..."
-exec gunicorn app:app -c gunicorn_conf.py
+PORT="${PORT:-5000}"
+echo "🌐 [ENTRYPOINT] Starting gunicorn on port ${PORT} with gthread workers..."
+exec gunicorn app:app --bind "0.0.0.0:${PORT}" --workers 2 --threads 4 --worker-class gthread --timeout 120
