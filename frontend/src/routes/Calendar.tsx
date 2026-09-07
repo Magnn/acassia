@@ -87,10 +87,10 @@ export default function Calendar() {
             <div className="w-10 h-10 rounded-2xl bg-accent-amethyst/10 flex items-center justify-center">
               <CalendarDays className="w-5 h-5 text-accent-amethyst" />
             </div>
-            <h1 className="text-3xl font-black tracking-tight">Calendário Espiritual</h1>
+            <h1 className="text-3xl font-black tracking-tight">Calendário de Campanhas</h1>
           </div>
           <p className="text-secondary text-sm font-medium">
-            Datas que pesam: orixás, equinócios, lua, festas. Use para criar campanhas.
+            Datas sazonais, lançamentos e campanhas ativas. Programe disparos e automações de vendas.
           </p>
         </div>
         <button
@@ -500,7 +500,7 @@ function CreateCustomDateModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
       <div className="bg-bg-surface border border-border rounded-3xl max-w-md w-full overflow-hidden">
         <div className="p-5 border-b border-border flex items-start justify-between">
-          <h2 className="text-lg font-black tracking-tight">Nova data espiritual</h2>
+          <h2 className="text-lg font-black tracking-tight">Nova data ou campanha</h2>
           <button onClick={onClose} className="text-secondary hover:text-primary">
             <X className="w-5 h-5" />
           </button>

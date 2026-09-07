@@ -168,7 +168,7 @@ def test_authenticate_args_vazios_retornam_none():
 def test_signup_endpoint_GET_renderiza(client):
     res = client.get("/saas/signup")
     assert res.status_code == 200
-    assert b"Criar conta" in res.data
+    assert b"Criar Conta" in res.data or b"Criar conta" in res.data
 
 
 def test_signup_endpoint_POST_cria_user_e_redireciona(client):

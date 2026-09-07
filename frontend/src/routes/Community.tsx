@@ -29,10 +29,10 @@ const REACTIONS = [
 ];
 
 const CATEGORIES = [
-  { id: 'signo', emoji: '♈', label: 'Signo' },
-  { id: 'pratica', emoji: '🧘', label: 'Prática' },
-  { id: 'tema', emoji: '📖', label: 'Tema' },
-  { id: 'livre', emoji: '💬', label: 'Livre' },
+  { id: 'segmento', emoji: '🏢', label: 'Segmento' },
+  { id: 'produto', emoji: '📦', label: 'Produto' },
+  { id: 'suporte', emoji: '🎧', label: 'Suporte' },
+  { id: 'geral', emoji: '💬', label: 'Geral' },
 ];
 
 export default function Community() {
@@ -104,7 +104,7 @@ export default function Community() {
         <div className="bg-bg-surface border border-dashed border-border rounded-3xl p-12 text-center">
           <Users className="w-12 h-12 mx-auto text-secondary/40 mb-4" />
           <h3 className="font-black text-lg mb-2">Nenhum grupo ainda</h3>
-          <p className="text-secondary text-sm mb-4">Crie o primeiro grupo da comunidade — por signo, prática ou tema.</p>
+          <p className="text-secondary text-sm mb-4">Crie o primeiro grupo da comunidade — por segmento, produto ou tópico.</p>
           <button onClick={() => setShowCreate(true)} className="px-5 py-3 bg-accent-amethyst text-white rounded-2xl text-xs font-black uppercase tracking-widest">Criar Grupo</button>
         </div>
       ) : (
@@ -168,8 +168,8 @@ function GroupFeed({ group, onBack }: { group: Group; onBack: () => void }) {
 
   const oracleMut = useMutation({
     mutationFn: (pid: number) => communityApi.oracle(pid),
-    onSuccess: () => { toast.success('🔮 Oráculo respondeu!'); qc.invalidateQueries({ queryKey: ['community-posts', group.id] }); },
-    onError: handleApiError('Erro ao consultar oráculo'),
+    onSuccess: () => { toast.success('🤖 Assistente IA respondeu!'); qc.invalidateQueries({ queryKey: ['community-posts', group.id] }); },
+    onError: handleApiError('Erro ao consultar assistente IA'),
   });
 
   const reactMut = useMutation({
@@ -190,7 +190,7 @@ function GroupFeed({ group, onBack }: { group: Group; onBack: () => void }) {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-3xl">{group.icon || '🔮'}</span>
+          <span className="text-3xl">{group.icon || '💬'}</span>
           <div>
             <h1 className="text-2xl font-black tracking-tight">{group.name}</h1>
             <span className="text-[11px] text-secondary">{group.member_count} membros • {group.post_count} posts</span>
@@ -205,7 +205,7 @@ function GroupFeed({ group, onBack }: { group: Group; onBack: () => void }) {
           className="inp resize-none mb-3" />
         <div className="flex justify-between items-center">
           {group.oracle_enabled && (
-            <span className="text-[10px] text-accent-amethyst font-bold">🔮 Use "?" para perguntar ao Oráculo IA</span>
+            <span className="text-[10px] text-accent-amethyst font-bold">🤖 Use "?" para perguntar ao Assistente IA</span>
           )}
           <button onClick={() => postMut.mutate()} disabled={!newPost.trim() || postMut.isPending}
             className="flex items-center gap-2 px-5 py-2.5 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-30 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all">
@@ -230,7 +230,7 @@ function GroupFeed({ group, onBack }: { group: Group; onBack: () => void }) {
               {p.is_pinned && <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 mb-2 block">📌 Fixado</span>}
               {p.is_oracle_response && (
                 <div className="flex items-center gap-1.5 text-[10px] text-accent-amethyst font-black uppercase tracking-widest mb-2">
-                  <Bot className="w-3.5 h-3.5" /> Oráculo IA
+                  <Bot className="w-3.5 h-3.5" /> Assistente IA
                 </div>
               )}
               <p className="text-sm whitespace-pre-wrap">{p.content}</p>
@@ -253,7 +253,7 @@ function GroupFeed({ group, onBack }: { group: Group; onBack: () => void }) {
                   {group.oracle_enabled && !p.is_oracle_response && (
                     <button onClick={() => oracleMut.mutate(p.id)} disabled={oracleMut.isPending}
                       className="text-[10px] text-accent-amethyst font-bold hover:underline">
-                      🔮 Oráculo
+                      🤖 IA
                     </button>
                   )}
                   <button onClick={() => delMut.mutate(p.id)} className="text-secondary hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
@@ -265,7 +265,7 @@ function GroupFeed({ group, onBack }: { group: Group; onBack: () => void }) {
                 <div className="mt-3 ml-4 border-l-2 border-border pl-4 space-y-3">
                   {p.replies.map(r => (
                     <div key={r.id} className={`text-[12px] ${r.is_oracle_response ? 'text-accent-amethyst' : 'text-secondary'}`}>
-                      {r.is_oracle_response && <span className="text-[9px] font-bold">🔮 Oráculo</span>}
+                      {r.is_oracle_response && <span className="text-[9px] font-bold">🤖 Assistente IA</span>}
                       <p className="whitespace-pre-wrap">{r.content}</p>
                       <span className="text-[9px] text-secondary">{new Date(r.created_at).toLocaleDateString('pt-BR')}</span>
                     </div>
@@ -323,7 +323,7 @@ function CreateGroupModal({ onClose, onCreated }: { onClose: () => void; onCreat
         </F>
         <label className="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" checked={form.oracle_enabled} onChange={e => set('oracle_enabled', e.target.checked)} className="accent-accent-amethyst w-4 h-4" />
-          <span className="text-sm font-bold">🔮 Ativar IA Oráculo neste grupo</span>
+          <span className="text-sm font-bold">🤖 Ativar Assistente IA neste grupo</span>
         </label>
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 px-5 py-3 bg-bg-primary border border-border rounded-2xl text-sm font-bold">Cancelar</button>

@@ -36,7 +36,7 @@ export default function Events() {
         <div className="bg-bg-surface border border-dashed border-border rounded-3xl p-12 text-center">
           <CalendarDays className="w-12 h-12 mx-auto text-secondary/40 mb-4" />
           <h3 className="font-black text-lg mb-2">Nenhum evento ainda</h3>
-          <p className="text-secondary text-sm mb-4">Crie seu primeiro retiro espiritual, workshop ou cerimônia.</p>
+          <p className="text-secondary text-sm mb-4">Crie seu primeiro workshop, webinar ou evento de lançamento.</p>
           <button onClick={() => setShowCreate(true)} className="px-5 py-3 bg-accent-amethyst text-white rounded-2xl text-xs font-black uppercase tracking-widest">Criar Evento</button>
         </div>
       ) : (

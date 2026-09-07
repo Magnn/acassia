@@ -22,7 +22,7 @@ export default function Broadcast() {
             </div>
             <h1 className="text-3xl font-black tracking-tight">Broadcast</h1>
           </div>
-          <p className="text-secondary text-sm font-medium">Envie mensagens em massa para seus contatos via WhatsApp — segmente por tags, signo, score.</p>
+          <p className="text-secondary text-sm font-medium">Envie mensagens e campanhas em massa para seus contatos via WhatsApp — segmente por tags, status e score comercial.</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all">
           <Plus className="w-4 h-4" /> Nova Campanha
@@ -133,7 +133,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
           <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} placeholder="Olá {nome}! Tenho uma novidade especial..." className="inp resize-none" />
           <div className="text-[10px] text-secondary mt-1">Use {'{nome}'} para personalizar com o nome do lead.</div>
         </F>
-        <F label="Filtro por tag (opcional)"><input value={filterTag} onChange={e => setFilterTag(e.target.value)} placeholder="vip, tarot, retiro..." className="inp" /></F>
+        <F label="Filtro por tag (opcional)"><input value={filterTag} onChange={e => setFilterTag(e.target.value)} placeholder="vip, lead_quente, clientes..." className="inp" /></F>
         <F label="Agendar para (opcional)">
           <input
             type="datetime-local"

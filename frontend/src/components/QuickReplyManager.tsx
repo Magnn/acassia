@@ -87,7 +87,7 @@ export default function QuickReplyManager({ onClose }: { onClose: () => void }) 
             <p className="text-xs text-secondary mt-1">
               Use <code className="bg-bg-primary px-1 rounded text-[10px]">{'{{nome}}'}</code>,{' '}
               <code className="bg-bg-primary px-1 rounded text-[10px]">{'{{primeiro_nome}}'}</code>,{' '}
-              <code className="bg-bg-primary px-1 rounded text-[10px]">{'{{signo}}'}</code>{' '}
+              <code className="bg-bg-primary px-1 rounded text-[10px]">{'{{empresa}}'}</code>{' '}
               para personalizar.
             </p>
           </div>

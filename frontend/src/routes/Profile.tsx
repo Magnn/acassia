@@ -9,14 +9,14 @@ import { handleApiError } from '../lib/handleApiError';
 import { toast } from '../lib/toast';
 
 const SPECIALTIES = [
-  { id: 'tarot', label: '🃏 Tarô', color: 'bg-purple-500/10 text-purple-400' },
-  { id: 'astrologia', label: '⭐ Astrologia', color: 'bg-blue-500/10 text-blue-400' },
-  { id: 'reiki', label: '✋ Reiki', color: 'bg-emerald-500/10 text-emerald-400' },
-  { id: 'terapia_floral', label: '🌸 Terapia Floral', color: 'bg-pink-500/10 text-pink-400' },
-  { id: 'constelacao', label: '🌌 Constelação', color: 'bg-indigo-500/10 text-indigo-400' },
-  { id: 'coaching', label: '🧠 Coaching', color: 'bg-amber-500/10 text-amber-400' },
-  { id: 'meditacao', label: '🧘 Meditação', color: 'bg-teal-500/10 text-teal-400' },
-  { id: 'numerologia', label: '🔢 Numerologia', color: 'bg-orange-500/10 text-orange-400' },
+  { id: 'vendas', label: '💼 Vendas & Conversão', color: 'bg-indigo-500/10 text-indigo-400' },
+  { id: 'marketing', label: '🚀 Tráfego & Marketing', color: 'bg-blue-500/10 text-blue-400' },
+  { id: 'consultoria', label: '🧠 Consultoria Comercial', color: 'bg-emerald-500/10 text-emerald-400' },
+  { id: 'saude', label: '🩺 Saúde & Clínicas', color: 'bg-pink-500/10 text-pink-400' },
+  { id: 'imobiliario', label: '🏠 Mercado Imobiliário', color: 'bg-amber-500/10 text-amber-400' },
+  { id: 'educacao', label: '🎓 Infoprodutos & Cursos', color: 'bg-teal-500/10 text-teal-400' },
+  { id: 'coaching', label: '🎯 Mentoria & Coaching', color: 'bg-orange-500/10 text-orange-400' },
+  { id: 'suporte', label: '🎧 Atendimento & SAC', color: 'bg-purple-500/10 text-purple-400' },
 ];
 
 export default function ProfilePage() {
@@ -158,11 +158,11 @@ function ProfileEditor({ profile, isLoading, onSaved }: { profile: Profile | und
           </Field>
         </div>
         <Field label="Headline">
-          <input value={form.headline} onChange={e => set('headline', e.target.value)} placeholder="Taróloga & Terapeuta Holística | 10 anos de experiência"
+          <input value={form.headline} onChange={e => set('headline', e.target.value)} placeholder="Especialista em Vendas & Atendimento WhatsApp | Alta Conversão"
             className="w-full bg-bg-primary border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent-amethyst/30" />
         </Field>
         <Field label="Bio">
-          <textarea value={form.bio} onChange={e => set('bio', e.target.value)} rows={4} placeholder="Conte sobre você, sua jornada espiritual e como ajuda seus clientes..."
+          <textarea value={form.bio} onChange={e => set('bio', e.target.value)} rows={4} placeholder="Conte sobre sua empresa, sua atuação no mercado e como seus produtos/serviços geram valor..."
             className="w-full bg-bg-primary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent-amethyst/30 resize-none" />
         </Field>
 

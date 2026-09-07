@@ -300,7 +300,7 @@ export default function Pipeline() {
                             {/* Footer with deal value + win prob */}
                             <div className="flex items-center justify-between text-[9px] text-secondary/50">
                               <div className="flex items-center gap-2">
-                                {lead.signo && <span>♈ {lead.signo}</span>}
+                                {lead.signo && <span className="bg-zinc-800/60 px-1.5 py-0.5 rounded text-[9px] text-zinc-400">🏷️ {lead.signo}</span>}
                                 <span className="flex items-center gap-0.5">
                                   <MessageSquare className="w-2.5 h-2.5" /> {lead.msg_count}
                                 </span>

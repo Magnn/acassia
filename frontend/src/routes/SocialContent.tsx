@@ -10,14 +10,17 @@ const socialApi = {
   reel: (b: any) => api.post<{ ok: boolean; content: any }>('/saas/social/generate-reel', b),
   story: (b: any) => api.post<{ ok: boolean; content: any }>('/saas/social/generate-story', b),
   newsletter: (b: any) => api.post<{ ok: boolean; content: any }>('/saas/social/generate-newsletter', b),
-  calendar: (niche?: string) => api.get<{ calendar: any }>(`/saas/social/calendar?niche=${niche || 'tarot'}`),
+  calendar: (niche?: string) => api.get<{ calendar: any }>(`/saas/social/calendar?niche=${niche || 'vendas_b2b'}`),
   history: () => api.get<{ history: any[] }>('/saas/social/history'),
 };
 
 const NICHES = [
-  { id: 'tarot', label: '🔮 Tarot' }, { id: 'astrologia', label: '⭐ Astrologia' },
-  { id: 'terapia_holistica', label: '🧘 Holístico' }, { id: 'meditacao', label: '🕯️ Meditação' },
-  { id: 'cristais', label: '💎 Cristais' }, { id: 'numerologia', label: '🔢 Numerologia' },
+  { id: 'vendas_b2b', label: '💼 Vendas & B2B' },
+  { id: 'saude_clinicas', label: '🩺 Saúde & Clínicas' },
+  { id: 'imobiliario', label: '🏢 Imobiliário' },
+  { id: 'infoprodutos', label: '🚀 Infoprodutos' },
+  { id: 'ecommerce', label: '🛍️ E-commerce' },
+  { id: 'servicos', label: '⚖️ Consultoria & Serviços' },
 ];
 
 const TYPES = [
@@ -30,7 +33,7 @@ const TYPES = [
 export default function SocialContent() {
   const [tab, setTab] = useState<'generate' | 'calendar' | 'history'>('generate');
   const [contentType, setContentType] = useState('post');
-  const [niche, setNiche] = useState('tarot');
+  const [niche, setNiche] = useState('vendas_b2b');
   const [topic, setTopic] = useState('');
   const [result, setResult] = useState<any>(null);
 
@@ -96,7 +99,7 @@ export default function SocialContent() {
                 </div>
               </F>
               <F label="Tema (opcional)">
-                <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: carta da semana, lua cheia, dica de cristal..." className="inp" />
+                <input value={topic} onChange={e => setTopic(e.target.value)} placeholder="Ex: quebra de objeções de preço, pitch de demonstração, follow-up no WhatsApp..." className="inp" />
               </F>
               <button onClick={() => genMut.mutate()} disabled={genMut.isPending}
                 className="w-full py-4 bg-gradient-to-r from-pink-500 to-orange-500 hover:opacity-90 disabled:opacity-30 text-white rounded-2xl font-black uppercase tracking-widest text-sm">

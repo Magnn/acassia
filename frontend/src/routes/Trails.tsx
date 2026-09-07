@@ -6,12 +6,12 @@ import { handleApiError } from '../lib/handleApiError';
 import { toast } from '../lib/toast';
 
 const CATEGORIES = [
-  { id: 'tarot', label: '🃏 Tarô' },
-  { id: 'meditation', label: '🧘 Meditação' },
-  { id: 'astrology', label: '⭐ Astrologia' },
-  { id: 'reiki', label: '✋ Reiki' },
-  { id: 'spiritual', label: '🔮 Espiritual' },
-  { id: 'wellbeing', label: '💚 Bem-estar' },
+  { id: 'vendas', label: '💼 Vendas & Conversão' },
+  { id: 'onboarding', label: '🚀 Onboarding de Clientes' },
+  { id: 'treinamento', label: '🎓 Treinamento de Equipe' },
+  { id: 'suporte', label: '🎧 Suporte & SAC' },
+  { id: 'reativacao', label: '🔥 Reativação de Leads' },
+  { id: 'fidelizacao', label: '⭐ Retenção & CS' },
 ];
 
 const DIFFICULTIES = [
@@ -67,7 +67,7 @@ export default function Trails() {
           <div className="bg-bg-surface border border-dashed border-border rounded-3xl p-12 text-center">
             <GraduationCap className="w-12 h-12 mx-auto text-secondary/40 mb-4" />
             <h3 className="font-black text-lg mb-2">Nenhuma trilha criada</h3>
-            <p className="text-secondary text-sm mb-4">Crie sua primeira trilha — ex: "21 Dias de Tarot" com lições diárias e badges.</p>
+            <p className="text-secondary text-sm mb-4">Crie sua primeira trilha — ex: "Onboarding Comercial de Clientes" com lições diárias e badges.</p>
             <button onClick={() => setShowCreate(true)} className="px-5 py-3 bg-accent-amethyst text-white rounded-2xl text-xs font-black uppercase tracking-widest">Criar Trilha</button>
           </div>
         ) : (
@@ -157,7 +157,7 @@ function TrailCard({ trail: t, onRefresh, readonly }: { trail: Trail; onRefresh?
 }
 
 function CreateTrailModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ title: '', description: '', category: 'tarot', difficulty: 'beginner', duration_days: 21, xp_reward: 500, badge_name: '', badge_icon: '🏆' });
+  const [form, setForm] = useState({ title: '', description: '', category: 'vendas', difficulty: 'beginner', duration_days: 21, xp_reward: 500, badge_name: '', badge_icon: '🏆' });
   const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
 
   const createMut = useMutation({
@@ -170,7 +170,7 @@ function CreateTrailModal({ onClose, onCreated }: { onClose: () => void; onCreat
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
       <div className="bg-bg-surface border border-border rounded-3xl p-8 max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-black tracking-tight">Nova Trilha</h2>
-        <F label="Título"><input value={form.title} onChange={e => set('title', e.target.value)} placeholder="21 Dias de Meditação Guiada" className="inp" /></F>
+        <F label="Título"><input value={form.title} onChange={e => set('title', e.target.value)} placeholder="Onboarding Comercial de Clientes" className="inp" /></F>
         <F label="Descrição"><textarea value={form.description} onChange={e => set('description', e.target.value)} rows={3} className="inp resize-none" /></F>
         <F label="Categoria">
           <div className="flex flex-wrap gap-2">{CATEGORIES.map(c => (
@@ -191,7 +191,7 @@ function CreateTrailModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <F label="XP de recompensa"><input type="number" value={form.xp_reward} onChange={e => set('xp_reward', +e.target.value)} className="inp" /></F>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <F label="Badge (nome)"><input value={form.badge_name} onChange={e => set('badge_name', e.target.value)} placeholder="Mestre do Tarô" className="inp" /></F>
+          <F label="Badge (nome)"><input value={form.badge_name} onChange={e => set('badge_name', e.target.value)} placeholder="Closer Especialista" className="inp" /></F>
           <F label="Badge (emoji)"><input value={form.badge_icon} onChange={e => set('badge_icon', e.target.value)} placeholder="🏆" className="inp text-2xl text-center" /></F>
         </div>
         <div className="flex gap-3 pt-2">

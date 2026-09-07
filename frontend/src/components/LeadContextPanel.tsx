@@ -326,7 +326,7 @@ function EditableLeadCard({
           <KV k="Nome" v={lead.nome || '—'} />
           <KV k="Telefone" v={lead.telefone} icon={Phone} />
           {lead.email && <KV k="Email" v={lead.email} />}
-          {lead.signo && <KV k="Signo" v={lead.signo} icon={Star} />}
+          {lead.signo && <KV k="Segmento" v={lead.signo} icon={Tag} />}
           {lead.idade != null && <KV k="Idade" v={`${lead.idade} anos`} icon={Calendar} />}
           {lead.cidade && <KV k="Cidade" v={lead.cidade} icon={MapPin} />}
           {lead.criado_em && (
@@ -339,7 +339,7 @@ function EditableLeadCard({
         <div className="space-y-2">
           <FieldEdit label="Nome" value={draft.nome} onChange={(v) => setDraft({ ...draft, nome: v })} />
           <FieldEdit label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} />
-          <FieldEdit label="Signo" value={draft.signo} onChange={(v) => setDraft({ ...draft, signo: v })} />
+          <FieldEdit label="Segmento / Nicho" value={draft.signo} onChange={(v) => setDraft({ ...draft, signo: v })} />
           <div className="grid grid-cols-2 gap-2">
             <FieldEdit label="Idade" value={draft.idade} onChange={(v) => setDraft({ ...draft, idade: v.replace(/[^0-9]/g, '') })} />
             <FieldEdit label="Cidade" value={draft.cidade} onChange={(v) => setDraft({ ...draft, cidade: v })} />
@@ -661,7 +661,7 @@ function SpiritualIntentCard({
       return data;
     }),
     onSuccess: () => {
-      toast.success('Intent espiritual recomputado');
+      toast.success('Intenção / Perfil do lead recomputado');
       qc.invalidateQueries({ queryKey: ['lead-context', leadId] });
       qc.invalidateQueries({ queryKey: ['leads-list'] });
     },
@@ -681,7 +681,7 @@ function SpiritualIntentCard({
         <div className="flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5 text-accent-amethyst" />
           <span className="text-[10px] font-black uppercase tracking-widest text-secondary">
-            Tema espiritual
+            Intenção do Lead (IA)
           </span>
         </div>
         <button

@@ -39,22 +39,22 @@ export default function ClientProgress() {
       <div className="flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="w-10 h-10 rounded-xl bg-bg-surface border border-border flex items-center justify-center hover:bg-bg-primary"><ArrowLeft className="w-4 h-4" /></button>
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Progresso Espiritual</h1>
-          <p className="text-secondary text-sm">{report.lead.name} {report.lead.sign ? `• ${report.lead.sign}` : ''}</p>
+          <h1 className="text-3xl font-black tracking-tight">Evolução do Cliente</h1>
+          <p className="text-secondary text-sm">{report.lead.name}</p>
         </div>
       </div>
 
       {/* KPI Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { icon: '🔮', label: 'Leituras', value: s.readings, color: 'text-accent-amethyst' },
-          { icon: '📔', label: 'Diário', value: s.journal_entries, color: 'text-blue-400' },
-          { icon: '🔥', label: 'Rituais', value: s.rituals, color: 'text-orange-400' },
-          { icon: '🌙', label: 'Sonhos', value: s.dreams, color: 'text-purple-400' },
-          { icon: '🎯', label: 'Manifestados', value: `${s.manifested}/${s.vision_board_items}`, color: 'text-emerald-400' },
+          { icon: '💬', label: 'Interações', value: s.readings, color: 'text-accent-amethyst' },
+          { icon: '📝', label: 'Anotações', value: s.journal_entries, color: 'text-blue-400' },
+          { icon: '🎯', label: 'Metas Concluídas', value: s.rituals, color: 'text-orange-400' },
+          { icon: '📊', label: 'Marcos', value: s.dreams, color: 'text-purple-400' },
+          { icon: '✅', label: 'Entregas', value: `${s.manifested}/${s.vision_board_items}`, color: 'text-emerald-400' },
           { icon: '🏆', label: 'Badges', value: s.badges_count, color: 'text-amber-400' },
-          { icon: '⚡', label: 'XP Total', value: s.total_xp, color: 'text-cyan-400' },
-          { icon: '🔥', label: 'Streak', value: `${s.ritual_streak}d`, color: 'text-red-400' },
+          { icon: '⚡', label: 'Pontos / XP', value: s.total_xp, color: 'text-cyan-400' },
+          { icon: '🔥', label: 'Streak Ativo', value: `${s.ritual_streak}d`, color: 'text-red-400' },
         ].map(k => (
           <div key={k.label} className="bg-bg-surface border border-border rounded-2xl p-4 text-center">
             <div className="text-2xl mb-1">{k.icon}</div>
