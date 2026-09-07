@@ -35,6 +35,7 @@ import TypingIndicator from '../components/inbox/TypingIndicator';
 import UnreadBadge from '../components/inbox/UnreadBadge';
 import ScrollToBottom from '../components/inbox/ScrollToBottom';
 import ConnectionStatus from '../components/inbox/ConnectionStatus';
+import WhatsAppChatView from '../components/inbox/WhatsAppChatView';
 
 type ViewMode = 'chat' | 'table';
 type ScoreFilter = null | 'hot' | 'warm' | 'cold';
@@ -122,6 +123,7 @@ export default function Leads() {
   const [voiceOnlyMode, setVoiceOnlyMode] = useState<boolean>(() => {
     return localStorage.getItem(VOICE_ONLY_KEY) === '1';
   });
+  const [showLeadDrawer, setShowLeadDrawer] = useState(true);
   const lastReadMsgIdRef = useRef<number | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -443,89 +445,111 @@ export default function Leads() {
               const isCompact = density === 'compact';
               const isInbound = l.ultima_remetente === 'lead';
               const previewIcon = isInbound ? '📩' : '📤';
+              const initials = (l.nome || l.telefone || 'WA').slice(0, 2).toUpperCase();
+              const isSelected = selectedLeadId === l.id;
+              const unreadCount = unreadMap.get(l.id) || 0;
+
               return (
                 <div
                   key={l.id}
                   onClick={() => setSelectedLeadId(l.id)}
-                  className={`${isCompact ? 'p-2.5' : 'p-4'} rounded-2xl cursor-pointer transition-all border relative group mb-1 ${
+                  className={`${isCompact ? 'p-2' : 'p-3'} rounded-2xl cursor-pointer transition-all border relative group mb-1.5 ${
                     l.is_urgent
-                      ? 'border-red-500/60 ring-2 ring-red-500/30 animate-pulse-subtle bg-red-500/5'
-                      : selectedLeadId === l.id ? 'bg-bg-surface border-border shadow-md' : 'border-transparent hover:bg-bg-surface/40'
-                  } ${(unreadMap.get(l.id) || 0) > 0 && !l.is_urgent ? 'ring-1 ring-accent-amethyst/30' : ''}`}
+                      ? 'border-red-500/60 ring-1 ring-red-500/30 bg-red-500/5'
+                      : isSelected
+                      ? 'bg-[#2a3942]/70 border-[#00a884]/40 shadow-sm'
+                      : 'border-transparent hover:bg-[#202c33]/70'
+                  } ${unreadCount > 0 && !l.is_urgent ? 'ring-1 ring-[#00a884]/40' : ''}`}
                 >
-                  {selectedLeadId === l.id && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-amethyst rounded-r-full shadow-[0_0_15px_rgba(var(--accent-amethyst-rgb),0.5)]" />
+                  {isSelected && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#00a884] rounded-r-full shadow-[0_0_12px_rgba(0,168,132,0.6)]" />
                   )}
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {l.score_band && l.score_band !== 'cold' && (
-                        <ScoreBadge band={l.score_band} value={l.score_value} />
-                      )}
-                      <div className={`font-black truncate tracking-tight group-hover:text-accent-amethyst transition-colors ${isCompact ? 'text-xs' : 'text-sm'}`}>
-                        {l.nome || l.telefone}
-                      </div>
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5 shadow-sm transition-colors ${
+                        isSelected
+                          ? 'bg-[#00a884] text-white'
+                          : 'bg-[#202c33] border border-[#2a3942] text-[#00a884] group-hover:bg-[#2a3942]'
+                      }`}
+                    >
+                      {initials}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {(unreadMap.get(l.id) || 0) > 0 && (
-                        <UnreadBadge count={unreadMap.get(l.id)!} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center gap-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {l.score_band && l.score_band !== 'cold' && (
+                            <ScoreBadge band={l.score_band} value={l.score_value} />
+                          )}
+                          <div className={`font-bold truncate text-[#e9edef] group-hover:text-[#00a884] transition-colors ${isCompact ? 'text-xs' : 'text-sm'}`}>
+                            {l.nome || l.telefone}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {unreadCount > 0 && (
+                            <span className="bg-[#00a884] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shadow-sm">
+                              {unreadCount}
+                            </span>
+                          )}
+                          {l.ultima_em && (
+                            <div className="text-[10px] text-[#8696a0] tabular-nums font-mono">
+                              {formatRelativeTime(l.ultima_em)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {!isCompact && (
+                        <div className="text-xs text-[#8696a0] truncate mt-1">
+                          <span className="opacity-70 mr-1">{previewIcon}</span>
+                          {l.ultima_msg || '(Sem mensagens)'}
+                        </div>
                       )}
-                      {l.ultima_em && (
-                        <div className="text-[9px] text-secondary font-black tabular-nums">
-                          {formatRelativeTime(l.ultima_em)}
+
+                      {!isCompact && (
+                        <div className="flex gap-1.5 mt-2 flex-wrap">
+                          {l.spiritual_category && (
+                            <span
+                              className={`text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-bold border flex items-center gap-1 ${
+                                l.spiritual_urgency === 'high'
+                                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              }`}
+                            >
+                              {INTENT_EMOJI[l.spiritual_category] || '✦'}
+                              {l.spiritual_category}
+                            </span>
+                          )}
+                          {l.bot_pausado && (
+                            <span className="bg-amber-500/10 text-amber-400 text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-bold border border-amber-500/30">
+                              Atendente
+                            </span>
+                          )}
+                          {l.is_urgent && (
+                            <span
+                              className="bg-red-500/15 text-red-400 text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-bold border border-red-500/30 flex items-center gap-1 animate-pulse"
+                              title={l.urgent_reason || 'Lead em crise detectada pela IA'}
+                            >
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                              Urgente
+                            </span>
+                          )}
+                          {l.convertido && (
+                            <span className="bg-[#00a884]/15 text-[#00a884] text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-bold border border-[#00a884]/30">
+                              Convertido
+                            </span>
+                          )}
+                          {(l.tags || []).slice(0, 2).map((tag) => (
+                            <span
+                              key={tag}
+                              className="bg-[#202c33] text-[#8696a0] text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-md font-bold border border-[#2a3942]"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>
                   </div>
-                  {!isCompact && (
-                    <div className="text-[11px] text-secondary/80 font-medium line-clamp-1 mt-1.5">
-                      <span className="opacity-60 mr-1">{previewIcon}</span>
-                      {l.ultima_msg || '(Sem mensagens)'}
-                    </div>
-                  )}
-                  {!isCompact && (
-                    <div className="flex gap-1.5 mt-2 flex-wrap">
-                      {l.spiritual_category && (
-                        <span
-                          className={`text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border flex items-center gap-1 ${
-                            l.spiritual_urgency === 'high'
-                              ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                              : 'bg-accent-amethyst/10 text-accent-amethyst border-accent-amethyst/30'
-                          }`}
-                          title={`Tema: ${l.spiritual_category}${l.spiritual_urgency ? ` · urgência ${l.spiritual_urgency}` : ''}`}
-                        >
-                          {INTENT_EMOJI[l.spiritual_category] || '✦'}
-                          {l.spiritual_category}
-                        </span>
-                      )}
-                      {l.bot_pausado && (
-                        <span className="bg-amber-500/10 text-amber-500 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-amber-500/20">
-                          Pausado
-                        </span>
-                      )}
-                      {l.is_urgent && (
-                        <span
-                          className="bg-red-500/15 text-red-400 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-red-500/30 flex items-center gap-1 animate-pulse"
-                          title={l.urgent_reason || 'Lead em crise detectada pela IA'}
-                        >
-                          <AlertTriangle className="w-2.5 h-2.5" />
-                          Urgente
-                        </span>
-                      )}
-                      {l.convertido && (
-                        <span className="bg-emerald-500/10 text-emerald-500 text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-emerald-500/20">
-                          Venda
-                        </span>
-                      )}
-                      {(l.tags || []).slice(0, 2).map((tag) => (
-                        <span
-                          key={tag}
-                          className="bg-bg-primary text-secondary text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-md font-black border border-border/50"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               );
             })
@@ -664,201 +688,70 @@ export default function Leads() {
             </div>
           </div>
         ) : (
-          /* Visualização de Chat Unificada */
-          <div className="flex-1 flex flex-col h-full bg-bg-primary animate-in slide-in-from-right-4 duration-300">
+          /* Visualização de Chat Unificada Estilo WhatsApp Web Pro */
+          <div className="flex-1 flex flex-col h-full bg-[#0b141a] animate-in slide-in-from-right-4 duration-300">
             {!selectedLeadId ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-secondary bg-bg-primary/30 backdrop-blur-sm">
-                <div className="w-24 h-24 rounded-[40px] bg-bg-surface border border-border shadow-premium flex items-center justify-center mb-8 group transition-all hover:scale-110">
-                   <MessageSquare className="w-10 h-10 opacity-20 text-accent-amethyst group-hover:opacity-100 transition-opacity" />
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#0b141a] bg-[radial-gradient(#1f2c34_1px,transparent_1px)] [background-size:20px_20px]">
+                <div className="w-20 h-20 rounded-3xl bg-[#202c33] border border-[#2a3942] flex items-center justify-center mb-6 shadow-2xl ring-1 ring-white/5">
+                  <MessageSquare className="w-10 h-10 text-[#00a884]" />
                 </div>
-                <h3 className="text-xl font-black tracking-tight text-primary mb-2">Central de Atendimento</h3>
-                <p className="text-xs font-bold uppercase tracking-widest opacity-40">Selecione uma conversa para começar</p>
-                <div className="mt-4 flex items-center gap-3 text-[9px] font-black uppercase tracking-widest opacity-40">
-                  <span><kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border">/</kbd> buscar</span>
-                  <span><kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border">j/k</kbd> navegar</span>
-                  <span><kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border">Esc</kbd> sair</span>
+                <h3 className="text-2xl font-bold text-[#e9edef] mb-2 tracking-tight">Acássia · Central de Conversas</h3>
+                <p className="text-sm text-[#8696a0] max-w-md mb-6 leading-relaxed">
+                  Selecione uma conversa na lista à esquerda para interagir, monitorar a IA em tempo real ou assumir o atendimento humano.
+                </p>
+                <div className="flex items-center gap-4 text-xs text-[#8696a0]">
+                  <span className="flex items-center gap-1.5"><kbd className="px-2 py-1 rounded-md bg-[#202c33] border border-[#2a3942] text-[#e9edef] font-mono text-[11px]">/</kbd> buscar</span>
+                  <span className="flex items-center gap-1.5"><kbd className="px-2 py-1 rounded-md bg-[#202c33] border border-[#2a3942] text-[#e9edef] font-mono text-[11px]">j/k</kbd> navegar</span>
+                  <span className="flex items-center gap-1.5"><kbd className="px-2 py-1 rounded-md bg-[#202c33] border border-[#2a3942] text-[#e9edef] font-mono text-[11px]">Esc</kbd> fechar</span>
                 </div>
-                
                 <button 
                   onClick={() => setViewMode('table')}
-                  className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-accent-amethyst hover:underline"
+                  className="mt-8 flex items-center gap-2 text-xs font-bold text-[#00a884] hover:text-[#06cf9c] px-4 py-2 rounded-xl bg-[#202c33] border border-[#2a3942] hover:border-[#00a884]/40 transition-all shadow-sm"
                 >
-                  <LayoutList className="w-3.5 h-3.5" />
-                  Ver todos os contatos em lista
+                  <LayoutList className="w-4 h-4" />
+                  Visualizar todos os contatos em tabela
                 </button>
               </div>
             ) : (
-              <>
-                {/* Header Unificado */}
-                <div className="h-[80px] px-8 bg-bg-header/50 backdrop-blur-md border-b border-border flex items-center justify-between z-10 flex-shrink-0">
-                   <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-bg-primary border border-border text-accent-amethyst flex items-center justify-center font-bold shadow-sm group cursor-pointer hover:rotate-3 transition-transform">
-                        <User className="w-6 h-6" />
-                      </div>
-                      <div className="min-w-0">
-                         <h3 className="font-black text-primary leading-tight text-xl tracking-tight truncate">{selectedLead?.nome || selectedLead?.telefone}</h3>
-                         <div className="flex items-center gap-2 text-[10px] text-secondary font-black uppercase tracking-widest opacity-70">
-                            <span>{selectedLead?.telefone}</span>
-                            <span className="w-1 h-1 rounded-full bg-border" />
-                            <span className="text-accent-amethyst">{selectedLead?.node_atual}</span>
-                         </div>
-                      </div>
-                   </div>
-                   <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => takeoverMutation.mutate(selectedLeadId)}
-                        disabled={takeoverMutation.isPending}
-                        className={`flex items-center gap-2.5 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg border ${
-                          selectedLead?.bot_pausado
-                            ? 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/20'
-                            : 'bg-amber-500 text-white border-amber-400 shadow-amber-500/20'
-                        }`}
-                      >
-                        {selectedLead?.bot_pausado ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
-                        {selectedLead?.bot_pausado ? 'Liberar Robô' : 'Assumir Controle'}
-                      </button>
-                      <button
-                        onClick={() => setVoiceOnlyMode(v => !v)}
-                        title={voiceOnlyMode ? 'Sair do modo áudio' : 'Modo áudio (sem texto)'}
-                        className={`p-2.5 rounded-2xl border transition-all ${
-                          voiceOnlyMode
-                            ? 'bg-accent-amethyst text-white border-accent-amethyst shadow-lg shadow-accent-amethyst/30'
-                            : 'border-border bg-bg-surface hover:bg-bg-primary text-secondary'
-                        }`}
-                      >
-                        {voiceOnlyMode ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                      </button>
-                      <button className="p-2.5 rounded-2xl border border-border bg-bg-surface hover:bg-bg-primary text-secondary transition-all">
-                         <MoreVertical className="w-5 h-5" />
-                      </button>
-                   </div>
-                </div>
-
-                {/* Mensagens */}
-                <div
-                  ref={chatContainerRef}
-                  onScroll={handleChatScroll}
-                  className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide bg-gradient-to-b from-transparent to-bg-primary/30 relative"
-                >
-                  {messages.map((m) => {
-                    const isUser = m.origem === 'lead';
-                    const isSystem = m.origem === 'system';
-                    
-                    if (isSystem) {
-                      return (
-                        <div key={m.id} className="flex justify-center py-2">
-                          <div className="bg-bg-surface border border-border text-primary text-[11px] font-bold italic px-4 py-2 rounded-2xl shadow-sm opacity-60">
-                            {m.texto}
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div key={m.id} className={`flex ${isUser ? 'justify-start' : 'justify-end'}`}>
-                        <div className={`flex flex-col max-w-[75%] ${isUser ? 'items-start' : 'items-end'}`}>
-                          <div
-                            className={`px-5 py-3 text-sm shadow-premium relative transition-all hover:scale-[1.02] ${
-                              isUser
-                                ? 'bg-bg-surface border border-border text-primary rounded-[28px] rounded-tl-sm'
-                                : 'bg-accent-amethyst text-white border border-accent-amethyst/20 rounded-[28px] rounded-tr-sm shadow-accent-amethyst/10'
-                            }`}
-                          >
-                            <div className="whitespace-pre-wrap break-words leading-relaxed font-medium">{m.texto || '(Mídia)'}</div>
-                            <div className={`text-[9px] font-black mt-2 flex items-center justify-end gap-1.5 opacity-40`}>
-                              {m.timestamp && new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              {!isUser && <DeliveryStatus status={m.delivery_status ?? null} />}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {/* Typing Indicator */}
-                  {selectedLeadId && typingLeadIds.has(selectedLeadId) && (
-                    <TypingIndicator name={selectedLead?.nome || undefined} />
-                  )}
-                  <div ref={messagesEndRef} />
-                  {/* Scroll-to-Bottom */}
-                  <ScrollToBottom visible={showScrollBtn} onClick={scrollToBottom} />
-                </div>
-
-                {/* Input Unificado */}
-                {voiceOnlyMode ? (
-                  <VoiceOnlyCompose
-                    leadId={selectedLeadId}
-                    onSent={() => {
+              <WhatsAppChatView
+                selectedLeadId={selectedLeadId}
+                selectedLead={selectedLead}
+                messages={messages}
+                draft={draft}
+                setDraft={setDraft}
+                handleSend={handleSend}
+                isSending={sendMutation.isPending}
+                onToggleTakeover={() => takeoverMutation.mutate(selectedLeadId)}
+                isTogglingTakeover={takeoverMutation.isPending}
+                voiceOnlyMode={voiceOnlyMode}
+                setVoiceOnlyMode={setVoiceOnlyMode}
+                typingLeadIds={typingLeadIds}
+                quickReplies={quickReplies?.quick_replies}
+                onInsertQuickReply={insertAtCursor}
+                onOpenQuickReplyManager={() => setShowQuickReplyManager(true)}
+                onOpenAudioCompose={() => setShowAudioCompose(true)}
+                chatContainerRef={chatContainerRef}
+                handleChatScroll={handleChatScroll}
+                messagesEndRef={messagesEndRef}
+                showScrollBtn={showScrollBtn}
+                scrollToBottom={scrollToBottom}
+                onReprocessLast={() => {
+                  if (selectedLeadId) {
+                    inboxApi.resumeLastUser(selectedLeadId).then(() => {
                       queryClient.invalidateQueries({ queryKey: ['leads-conversation', selectedLeadId] });
-                      queryClient.invalidateQueries({ queryKey: ['leads-list'] });
-                    }}
-                  />
-                ) : (
-                <div className="bg-bg-surface/80 backdrop-blur-xl border-t border-border p-6 flex-shrink-0 z-10">
-                   <div className="max-w-5xl mx-auto">
-                     <div className="relative">
-                       <ComposeToolbar
-                         leadId={selectedLeadId}
-                         onInsert={insertAtCursor}
-                         onOpenManager={() => setShowQuickReplyManager(true)}
-                         onOpenAudio={() => setShowAudioCompose(true)}
-                       />
-                     </div>
-                     <div className="flex items-end gap-4">
-                       <div className="flex-1 relative group">
-                         <textarea
-                           ref={composeRef}
-                           value={draft}
-                           onChange={(e) => setDraft(e.target.value)}
-                           onKeyDown={(e) => {
-                             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                               e.preventDefault();
-                               handleSend();
-                             }
-                           }}
-                           placeholder={
-                             selectedLead?.bot_pausado
-                               ? "Sua mensagem manual… (Ctrl+Enter envia · Alt+1-9 templates)"
-                               : "Pause o robô para responder manualmente…"
-                           }
-                           rows={Math.min(6, Math.max(2, draft.split('\n').length))}
-                           className="w-full bg-bg-primary/50 border-2 border-border/50 rounded-2xl px-6 py-3 text-sm text-primary outline-none focus:border-accent-amethyst/50 focus:bg-bg-primary transition-all shadow-inner resize-none"
-                         />
-                         {draft.length > 800 && (
-                           <div className={`absolute -top-1 right-4 text-[10px] font-black tabular-nums ${
-                             draft.length > 1000 ? 'text-rose-400' : 'text-amber-400'
-                           }`}>
-                             {draft.length}/1000
-                           </div>
-                         )}
-                       </div>
-                       <button
-                         onClick={handleSend}
-                         disabled={!draft.trim() || sendMutation.isPending}
-                         className="w-[56px] h-[56px] bg-accent-amethyst text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-accent-amethyst/20 disabled:opacity-30 disabled:scale-100"
-                       >
-                          <Send className="w-5 h-5" />
-                       </button>
-                     </div>
-                   </div>
-                   
-                   <div className="mt-4 flex items-center justify-center gap-6 opacity-60">
-                      <button 
-                        onClick={() => inboxApi.resumeLastUser(selectedLeadId!).then(() => queryClient.invalidateQueries({ queryKey: ['leads-conversation', selectedLeadId] }))}
-                        className="text-[9px] font-black uppercase tracking-widest hover:text-accent-amethyst transition-colors"
-                      >
-                        ↻ Reprocessar Última
-                      </button>
-                      <div className="w-1 h-1 rounded-full bg-border" />
-                      <button
-                        onClick={() => inboxApi.resendCurrentBlock(selectedLeadId!).then(() => queryClient.invalidateQueries({ queryKey: ['leads-conversation', selectedLeadId] }))}
-                        className="text-[9px] font-black uppercase tracking-widest hover:text-accent-amethyst transition-colors"
-                      >
-                        ⟳ Reenviar Bloco Atual
-                      </button>
-                   </div>
-                </div>
-                )}
-              </>
+                    });
+                  }
+                }}
+                onResendCurrentBlock={() => {
+                  if (selectedLeadId) {
+                    inboxApi.resendCurrentBlock(selectedLeadId).then(() => {
+                      queryClient.invalidateQueries({ queryKey: ['leads-conversation', selectedLeadId] });
+                    });
+                  }
+                }}
+                onToggleContextPanel={() => setShowLeadDrawer((v) => !v)}
+                showContextPanel={showLeadDrawer}
+              />
             )}
           </div>
         )}
@@ -881,12 +774,19 @@ export default function Leads() {
       )}
 
       {/* 3ª coluna: Contexto do lead — só no chat mode com lead selecionado */}
-      {viewMode === 'chat' && selectedLeadId !== null && (
-        <div className="hidden lg:block w-[320px] flex-shrink-0 border-l border-border bg-bg-sidebar/30 overflow-y-auto">
-          <div className="p-3 border-b border-border bg-bg-sidebar/50">
-            <h3 className="text-xs font-black uppercase tracking-widest text-secondary">
-              Contexto
+      {viewMode === 'chat' && selectedLeadId !== null && showLeadDrawer && (
+        <div className="hidden lg:block w-[340px] flex-shrink-0 border-l border-[#2a3942] bg-[#111b21] overflow-y-auto">
+          <div className="p-3 border-b border-[#2a3942] bg-[#202c33]/70 flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#8696a0]">
+              Detalhes do Lead
             </h3>
+            <button
+              onClick={() => setShowLeadDrawer(false)}
+              className="p-1 hover:bg-[#2a3942] rounded-lg text-[#8696a0] hover:text-[#e9edef] transition-colors"
+              title="Fechar painel"
+            >
+              ✕
+            </button>
           </div>
           <LeadContextPanel leadId={selectedLeadId} />
         </div>
