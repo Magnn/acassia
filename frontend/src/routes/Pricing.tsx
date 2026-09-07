@@ -141,14 +141,14 @@ export default function Pricing() {
                   ))}
                 </ul>
 
-                <button onClick={() => navigate('/saas/register')}
+                <a href="/saas/signup"
                   className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition-all ${
                     plan.popular
-                      ? 'bg-gradient-to-r from-accent-amethyst to-pink-500 text-white hover:opacity-90 shadow-lg shadow-accent-amethyst/20'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 shadow-lg shadow-purple-600/20'
                       : 'bg-zinc-900 border border-zinc-800 text-white hover:border-zinc-700'
                   }`}>
                   {plan.cta} <ArrowRight className="w-4 h-4" />
-                </button>
+                </a>
                 <div className="text-center text-[10px] text-zinc-600 mt-2">{plan.ctaSub}</div>
               </div>
             );

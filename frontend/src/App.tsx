@@ -145,15 +145,15 @@ export default function App() {
             <Route path="/analytics/funnel" element={<Funnel />} />
             <Route path="/analytics/recovery" element={<Recovery />} />
             <Route path="/templates" element={<Templates />} />
-            <Route path="/tarot" element={<Tarot />} />
+            <Route path="/tarot" element={<Navigate to="/blueprints" replace />} />
             <Route path="/pix" element={<Pix />} />
             <Route path="/voice" element={<Voice />} />
             <Route path="/coach" element={<Coach />} />
             <Route path="/affiliate" element={<Affiliate />} />
-            <Route path="/lunar" element={<Lunar />} />
+            <Route path="/lunar" element={<Navigate to="/blueprints" replace />} />
             <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/horoscope" element={<Horoscope />} />
-            <Route path="/spiritual" element={<Spiritual />} />
+            <Route path="/horoscope" element={<Navigate to="/agents" replace />} />
+            <Route path="/spiritual" element={<Navigate to="/agents" replace />} />
             <Route path="/calendar" element={<CalendarRoute />} />
             <Route path="/audio-library" element={<AudioLibraryRoute />} />
             <Route path="/integrations" element={<Integrations />} />
@@ -166,13 +166,13 @@ export default function App() {
             <Route path="/content" element={<ContentPage />} />
             <Route path="/broadcast" element={<Broadcast />} />
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
-            <Route path="/journal" element={<JournalPage />} />
+            <Route path="/journal" element={<Navigate to="/leads" replace />} />
             <Route path="/trails" element={<TrailsPage />} />
-            <Route path="/rituals" element={<RitualsPage />} />
-            <Route path="/dreams" element={<DreamsPage />} />
-            <Route path="/vision-board" element={<VisionBoardPage />} />
+            <Route path="/rituals" element={<Navigate to="/blueprints" replace />} />
+            <Route path="/dreams" element={<Navigate to="/blueprints" replace />} />
+            <Route path="/vision-board" element={<Navigate to="/pipeline" replace />} />
             <Route path="/community" element={<CommunityPage />} />
-            <Route path="/reading" element={<UnifiedReadingPage />} />
+            <Route path="/reading" element={<Navigate to="/agents" replace />} />
             <Route path="/social-content" element={<SocialContentPage />} />
             <Route path="/client-progress/:leadId" element={<ClientProgressPage />} />
             <Route path="/launches" element={<LaunchManagerPage />} />

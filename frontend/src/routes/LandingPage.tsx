@@ -26,8 +26,8 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <button onClick={() => navigate('/pricing')} className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">Preços</button>
-            <button onClick={() => navigate('/saas/login')} className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">Login</button>
-            <button onClick={() => navigate('/saas/register')} className="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-sm font-black hover:opacity-95 shadow-md shadow-purple-600/20 transition-all">Começar Grátis</button>
+            <a href="/saas/login" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">Login</a>
+            <a href="/saas/signup" className="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-sm font-black hover:opacity-95 shadow-md shadow-purple-600/20 transition-all">Começar Grátis</a>
           </div>
         </div>
       </nav>
@@ -50,9 +50,9 @@ export default function LandingPage() {
             recuperar carrinhos abandonados e vender 24 horas por dia no piloto automático.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
-            <button onClick={() => navigate('/saas/register')} className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-base sm:text-lg hover:opacity-90 shadow-xl shadow-purple-600/25 flex items-center justify-center gap-2 transition-all">
+            <a href="/saas/signup" className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-base sm:text-lg hover:opacity-90 shadow-xl shadow-purple-600/25 flex items-center justify-center gap-2 transition-all">
               Criar Conta Gratuita <ArrowRight className="w-5 h-5" />
-            </button>
+            </a>
             <button onClick={() => navigate('/pricing')} className="px-8 py-4 bg-zinc-900/80 border border-zinc-800 hover:border-zinc-700 text-white rounded-2xl font-bold text-base sm:text-lg transition-all">
               Conhecer Planos
             </button>
@@ -117,9 +117,9 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto space-y-8">
           <h2 className="text-4xl sm:text-5xl font-black tracking-tight">Pronto para transformar seu WhatsApp em uma máquina de vendas?</h2>
           <p className="text-zinc-400 text-base sm:text-lg max-w-xl mx-auto">Junte-se a milhares de negócios que escalam vendas com funis inteligentes e IA 24/7.</p>
-          <button onClick={() => navigate('/saas/register')} className="px-10 py-5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-lg hover:opacity-90 shadow-xl shadow-purple-600/25 flex items-center justify-center gap-2 mx-auto transition-all">
+          <a href="/saas/signup" className="inline-flex px-10 py-5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl font-black text-lg hover:opacity-90 shadow-xl shadow-purple-600/25 items-center justify-center gap-2 mx-auto transition-all">
             <Zap className="w-5 h-5" /> Começar Agora Gratuitamente
-          </button>
+          </a>
         </div>
       </section>
 
