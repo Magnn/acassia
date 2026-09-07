@@ -1,21 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Conta criada — Meu Mistério SaaS{% endblock %}
+{% block title %}Conta criada — Acássia Funis & IA{% endblock %}
 {% block content %}
 <div class="text-center mb-8">
-  <h1 class="text-3xl font-bold mb-2">🔮</h1>
+  <h1 class="text-3xl font-bold mb-2">⚡</h1>
   <p class="text-emerald-400">Bem-vindo(a), {{ current_user.email }}</p>
 </div>
 
 <div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-6 space-y-3">
   <h2 class="font-bold text-lg">Próximo passo</h2>
   <p class="text-sm text-slate-300">
-    Tua conta foi criada. Em breve abrimos o wizard de onboarding em 4 passos:
+    Sua conta foi criada com sucesso! O assistente de configuração guiada possui 4 etapas:
   </p>
   <ol class="text-sm text-slate-400 list-decimal list-inside space-y-1">
-    <li>Persona do Meu Mistério (nome, tom, restrições)</li>
-    <li>Oferta + pagamento (Stripe Connect)</li>
-    <li>Escolha do template (Tarot Express / Quiromancia Premium)</li>
-    <li>Conectar WhatsApp</li>
+    <li>Configuração do Agente IA (nome, tom, instruções comerciais)</li>
+    <li>Oferta + Gateway de Pagamento (Stripe / Pix)</li>
+    <li>Escolha do template de automação (Funil de Vendas / Qualificação)</li>
+    <li>Conectar WhatsApp Business</li>
   </ol>
   <p class="text-xs text-slate-500 pt-2 border-t border-meumisterio-border">
     tenant_id: <code class="text-meumisterio-purple">{{ current_user.tenant_id }}</code>

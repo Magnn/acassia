@@ -38,12 +38,12 @@ import ConnectionStatus from '../components/inbox/ConnectionStatus';
 
 type ViewMode = 'chat' | 'table';
 type ScoreFilter = null | 'hot' | 'warm' | 'cold';
-type SpiritualFilter = null | 'amor' | 'dinheiro' | 'saude' | 'carreira' | 'familia' | 'espiritual' | 'decisao' | 'luto';
+type IntentFilter = null | 'amor' | 'dinheiro' | 'saude' | 'carreira' | 'familia' | 'consultoria' | 'decisao' | 'luto';
 type Density = 'comfy' | 'compact';
 
-const SPIRITUAL_EMOJI: Record<string, string> = {
+const INTENT_EMOJI: Record<string, string> = {
   amor: '❤️', dinheiro: '💰', saude: '🌿', carreira: '💼',
-  familia: '🏠', espiritual: '🙏', decisao: '🔀', luto: '🕊️',
+  familia: '🏠', consultoria: '💡', decisao: '🔀', luto: '🕊️',
 };
 
 const DENSITY_KEY = 'acassia.inbox.density';
@@ -109,7 +109,7 @@ export default function Leads() {
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const [filtro, setFiltro] = useState('todos');
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>(null);
-  const [spiritualFilter, setSpiritualFilter] = useState<SpiritualFilter>(null);
+  const [intentFilter, setIntentFilter] = useState<IntentFilter>(null);
   const [search, setSearch] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
@@ -169,11 +169,11 @@ export default function Leads() {
   }, [density]);
 
   const { data: leadsData, isLoading: isLoadingLeads } = useQuery({
-    queryKey: ['leads-list', filtro, scoreFilter, spiritualFilter],
+    queryKey: ['leads-list', filtro, scoreFilter, intentFilter],
     queryFn: () => inboxApi.getLeads({
       filtro,
       score_band: scoreFilter || undefined,
-      spiritual_category: spiritualFilter || undefined,
+      spiritual_category: intentFilter || undefined,
       sort: 'score',
       limit: 200,
     }),
@@ -493,7 +493,7 @@ export default function Leads() {
                           }`}
                           title={`Tema: ${l.spiritual_category}${l.spiritual_urgency ? ` · urgência ${l.spiritual_urgency}` : ''}`}
                         >
-                          {SPIRITUAL_EMOJI[l.spiritual_category] || '✦'}
+                          {INTENT_EMOJI[l.spiritual_category] || '✦'}
                           {l.spiritual_category}
                         </span>
                       )}

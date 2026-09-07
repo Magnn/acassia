@@ -34,9 +34,9 @@ export default function Journal() {
             <div className="w-10 h-10 rounded-2xl bg-accent-amethyst/10 flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-accent-amethyst" />
             </div>
-            <h1 className="text-3xl font-black tracking-tight">Diário Espiritual</h1>
+            <h1 className="text-3xl font-black tracking-tight">Diário de Notas</h1>
           </div>
-          <p className="text-secondary text-sm font-medium">Registre pensamentos, rituais e insights — IA gera reflexões personalizadas.</p>
+          <p className="text-secondary text-sm font-medium">Registre insights, anotações comerciais e aprendizados — IA gera sínteses inteligentes.</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all">
           <Plus className="w-4 h-4" /> Nova Entrada

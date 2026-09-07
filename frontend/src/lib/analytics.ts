@@ -10,6 +10,8 @@ type EventName =
   | 'page_viewed'
   | 'feature_used'
   | 'reading_generated'
+  | 'goal_completed'
+  | 'milestone_logged'
   | 'ritual_completed'
   | 'dream_logged'
   | 'journal_entry'

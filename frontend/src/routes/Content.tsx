@@ -7,10 +7,10 @@ import { toast } from '../lib/toast';
 
 const ASSET_TYPES = [
   { id: 'ebook', label: '📕 E-book', icon: BookOpen },
-  { id: 'meditation', label: '🧘 Meditação', icon: Headphones },
+  { id: 'audio_guide', label: '🎧 Áudio / Podcast', icon: Headphones },
   { id: 'course', label: '🎓 Curso', icon: Video },
   { id: 'guide', label: '📄 Guia', icon: FileText },
-  { id: 'audio', label: '🎵 Áudio', icon: Headphones },
+  { id: 'audio', label: '🎵 Áudio Avulso', icon: Headphones },
 ];
 
 export default function Content() {

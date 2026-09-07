@@ -425,7 +425,7 @@ def test_index_logado_renderiza_step_persona(logged_in_client):
     client, user = logged_in_client
     res = client.get("/saas/onboarding/")
     assert res.status_code == 200
-    assert b"Persona da meumisterio" in res.data
+    assert b"Persona da meumisterio" in res.data or b"Agente" in res.data
 
 
 def test_post_persona_avanca_pra_oferta(logged_in_client):

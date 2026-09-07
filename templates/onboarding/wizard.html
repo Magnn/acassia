@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Onboarding — Meu Mistério SaaS{% endblock %}
+{% block title %}Onboarding — Acássia Funis & IA{% endblock %}
 {% block main_class %}max-w-2xl mx-auto py-12 px-6{% endblock %}
 {% block content %}
 
 <div class="mb-8">
-  <h1 class="text-3xl font-bold mb-2">🔮 Configurar tua meumisterio</h1>
+  <h1 class="text-3xl font-bold mb-2">⚡ Configurar seu Agente & Funil</h1>
   <p class="text-slate-400 text-sm">Passo {{ {'persona': 1, 'oferta': 2, 'template': 3, 'whatsapp': 4}[current_step] }} de 4</p>
 
   {# Progress bar #}
@@ -19,29 +19,29 @@
 
 {% if current_step == 'persona' %}
   {# ─── Step 1: Persona ─── #}
-  <h2 class="text-xl font-bold mb-1">Persona da meumisterio</h2>
-  <p class="text-sm text-slate-400 mb-6">Quem é tua meumisterio? Define o tom de voz e as regras dela.</p>
+  <h2 class="text-xl font-bold mb-1">Configuração do Agente IA</h2>
+  <p class="text-sm text-slate-400 mb-6">Quem é o seu assistente de vendas? Defina o tom de voz e as regras dele.</p>
   <form method="POST" action="{{ url_for('saas_onboarding.persona') }}" class="space-y-5">
     <div>
       <label class="block mb-1 text-sm">Nome</label>
       <input type="text" name="name" required maxlength="200"
-             placeholder="Ex: Madame Eros"
+             placeholder="Ex: Assistente Comercial Acássia"
              class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
     </div>
     <div>
       <label class="block mb-1 text-sm">Tom de voz</label>
       <select name="tone" required
               class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
-        <option value="acolhedor">Acolhedora — calorosa, acolhe a dor</option>
-        <option value="direto">Direta — vai ao ponto, sem rodeio</option>
-        <option value="mistico">Mística — dramática, etérea</option>
-        <option value="sedutor">Sedutora — envolvente, magnética</option>
+        <option value="acolhedor">Acolhedor — consultivo, empático e prestativo</option>
+        <option value="direto">Direto — objetivo, focado em conversão e fechamento</option>
+        <option value="persuasivo">Persuasivo — especialista em benefícios e quebra de objeções</option>
+        <option value="tecnico">Técnico — autoridade, detalhista com respostas seguras</option>
       </select>
     </div>
     <div>
-      <label class="block mb-1 text-sm">História de origem (mínimo 20 chars)</label>
+      <label class="block mb-1 text-sm">História e Instruções do Agente (mínimo 20 chars)</label>
       <textarea name="backstory" required minlength="20" maxlength="2000" rows="4"
-                placeholder="Sou uma meumisterio ancestral com dom de leitura espiritual. Aprendi as cartas com minha avó..."
+                placeholder="Sou o assistente de atendimento e vendas da empresa. Meu objetivo é qualificar leads no WhatsApp, tirar dúvidas frequentes e direcionar para o fechamento..."
                 class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none"></textarea>
     </div>
     <div>
@@ -59,12 +59,12 @@
 {% elif current_step == 'oferta' %}
   {# ─── Step 2: Oferta ─── #}
   <h2 class="text-xl font-bold mb-1">Oferta principal</h2>
-  <p class="text-sm text-slate-400 mb-6">Qual produto a meumisterio vai vender? Você pode mudar depois.</p>
+  <p class="text-sm text-slate-400 mb-6">Qual produto ou serviço a automação vai ofertar? Você pode alterar a qualquer momento.</p>
   <form method="POST" action="{{ url_for('saas_onboarding.oferta') }}" class="space-y-5">
     <div>
       <label class="block mb-1 text-sm">Nome do produto</label>
       <input type="text" name="nome" required maxlength="300"
-             placeholder="Ex: Tiragem de Emergência"
+             placeholder="Ex: Consultoria Express / Produto Principal"
              class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none">
     </div>
     <div>
@@ -76,7 +76,7 @@
     <div>
       <label class="block mb-1 text-sm">Descrição (opcional)</label>
       <textarea name="descricao" maxlength="1000" rows="3"
-                placeholder="3 cartas reveladas em até 5 minutos"
+                placeholder="Diagnóstico inicial ou demonstração com agendamento imediato"
                 class="w-full px-3 py-2 rounded-lg bg-meumisterio-surface border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none"></textarea>
     </div>
     <div>
@@ -109,15 +109,15 @@
     <label class="block cursor-pointer">
       <input type="radio" name="template" value="tarot_express" checked class="sr-only peer">
       <div class="p-5 rounded-lg bg-meumisterio-surface border-2 border-meumisterio-border peer-checked:border-meumisterio-purple transition">
-        <div class="font-bold mb-1">🔮 Tarot Express</div>
-        <div class="text-xs text-slate-400">78 cartas Marselha · ticket R$19-49 · alto volume + recorrência</div>
+        <div class="font-bold mb-1">⚡ Funil de Vendas Express</div>
+        <div class="text-xs text-slate-400">Qualificação rápida · ticket direto · alto volume + conversão imediata</div>
       </div>
     </label>
     <label class="block cursor-pointer">
       <input type="radio" name="template" value="quiromancia_premium" class="sr-only peer">
       <div class="p-5 rounded-lg bg-meumisterio-surface border-2 border-meumisterio-border peer-checked:border-meumisterio-purple transition">
-        <div class="font-bold mb-1">✋ Quiromancia Premium</div>
-        <div class="text-xs text-slate-400">Linhas da mão · ticket R$197+ · funil longo + LTV</div>
+        <div class="font-bold mb-1">🎯 Qualificação Consultiva & High-Ticket</div>
+        <div class="text-xs text-slate-400">Perguntas aprofundadas · agendamento de reunião · foco em LTV</div>
       </div>
     </label>
     <label class="block cursor-pointer">

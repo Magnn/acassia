@@ -46,7 +46,7 @@ STEP_TEMPLATE = "template"
 STEP_WHATSAPP = "whatsapp"
 STEP_DONE = "done"
 
-ALLOWED_TONES = ("acolhedor", "direto", "mistico", "sedutor")
+ALLOWED_TONES = ("acolhedor", "direto", "mistico", "sedutor", "consultivo", "persuasivo", "tecnico")
 ALLOWED_GATEWAYS = ("stripe", "cakto")
 ALLOWED_TEMPLATES = ("tarot_express", "quiromancia_premium", "em_branco")
 ALLOWED_RESTRICTIONS = (
