@@ -113,6 +113,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
           simActive: simCurrent === n.id || undefined,
           onEdit: () => setEditingNodeId(n.id),
           onDuplicate: () => fs.duplicateNode(n.id),
+          onDelete: () => fs.deleteNode(n.id),
         };
         // Inject AB stats into ab_split nodes
         if (n.data.meumisterioType === 'ab_split' && abData?.nodes?.[n.id]) {
@@ -318,95 +319,136 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
 
   return (
     <div className="h-full flex flex-col bg-bg-primary">
-      {/* Barra de ferramentas */}
-      {/* Barra de ferramentas LAILLA Style */}
-      <div className="h-[64px] bg-white border-b border-slate-200 px-4 flex items-center justify-between flex-shrink-0 z-20">
+      {/* Modern ChatbotX / Linear Glass Navbar */}
+      <div className="h-14 bg-white/95 dark:bg-zinc-950/95 border-b border-zinc-200 dark:border-zinc-800/80 px-4 flex items-center justify-between flex-shrink-0 z-20 backdrop-blur-md">
         
-        {/* Left Actions */}
-        <div className="flex items-center gap-2">
+        {/* Left: Back + Title + Status Badges */}
+        <div className="flex items-center gap-3">
           <Link
-            to="/flows"
-            className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
-            title="Voltar"
+            to="/blueprints"
+            className="w-8 h-8 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition-all shadow-xs"
+            title="Voltar aos Funis"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </Link>
-          <button
-            onClick={() => {}}
-            className="w-[38px] h-[38px] rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white flex items-center justify-center transition-colors shadow-sm"
-            title="Cancelar"
-          >
-            <XCircle className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => {
-               if (confirm(isPublished ? `Desativar fluxo?` : `Ativar fluxo?`)) {
-                  publishMutation.mutate();
-               }
-            }}
-            disabled={publishMutation.isPending}
-            className={`w-[38px] h-[38px] rounded-lg flex items-center justify-center transition-colors shadow-sm ${isPublished ? 'bg-[#10b981] hover:bg-[#059669] text-white' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}
-            title={isPublished ? "Fluxo Ativo (Clique para desativar)" : "Ativar Fluxo"}
-          >
-            <Zap className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Center Tabs */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
-           <div className="flex items-center gap-2 text-[13px] font-bold text-slate-800">
-              <Bot className="w-4 h-4 text-blue-600" />
+          <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate max-w-[200px]">
               {blueprint.title}
-              <span className="bg-[#10b981] text-white text-[9px] px-1.5 py-0.5 rounded tracking-widest uppercase">
-                 {fs.status === 'saving' ? 'Salvando...' : fs.error ? 'Erro' : 'Salvo'}
+            </span>
+
+            {isPublished ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Publicado
               </span>
-           </div>
-           
-           <div className="flex items-center bg-slate-100 p-1 rounded-full text-[11px] font-bold text-slate-500">
-              <button className="px-4 py-1.5 rounded-full hover:text-slate-700 transition-colors">Logs</button>
-              <button className="px-4 py-1.5 rounded-full bg-[#9333ea] text-white shadow-sm transition-colors">Automação</button>
-              <button className="px-4 py-1.5 rounded-full hover:text-slate-700 transition-colors">Relatórios</button>
-           </div>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                Rascunho
+              </span>
+            )}
+
+            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-medium ml-1">
+              {fs.status === 'saving' ? (
+                <span className="text-amber-500 animate-pulse">Salvando…</span>
+              ) : fs.error ? (
+                <span className="text-rose-500">Erro ao salvar</span>
+              ) : (
+                <span className="text-zinc-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Salvo
+                </span>
+              )}
+            </span>
+          </div>
         </div>
 
-        {/* Right Actions */}
-        <div className="flex items-center gap-2">
+        {/* Center: Canvas / Simulator / Versions Switcher */}
+        <div className="hidden md:flex items-center bg-zinc-100 dark:bg-zinc-900/90 p-0.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 text-xs font-semibold">
           <button
-             onClick={() => setRightPanel((p) => (p === 'simulator' ? null : 'simulator'))}
-             className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
-             title="Simulador"
+            onClick={() => setRightPanel(null)}
+            className={`px-3 py-1.5 rounded-lg transition-all ${
+              rightPanel === null
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+            }`}
           >
-             <Play className="w-5 h-5" />
+            Canvas do Funil
           </button>
-          
+          <button
+            onClick={() => setRightPanel((p) => (p === 'simulator' ? null : 'simulator'))}
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+              rightPanel === 'simulator'
+                ? 'bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+            }`}
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+            Simulador Zap
+          </button>
           <button
             onClick={() => setRightPanel((p) => (p === 'versions' ? null : 'versions'))}
-            className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
-            title="Versões"
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+              rightPanel === 'versions'
+                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+            }`}
           >
-            <HistoryIcon className="w-5 h-5" />
+            <HistoryIcon className="w-3.5 h-3.5" />
+            Versões
           </button>
+        </div>
 
-          <button
-            className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
-            title="Inteligência Artificial"
-          >
-            <BrainCircuit className="w-5 h-5" />
-          </button>
-          
-          <button
-            className="w-[38px] h-[38px] rounded-lg bg-[#9333ea] hover:bg-[#7e22ce] text-white flex items-center justify-center transition-colors shadow-sm"
-            title="Configurações"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+        {/* Right: Undo/Redo + Validate + Publish Action */}
+        <div className="flex items-center gap-2">
+          {/* Undo / Redo */}
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-xl p-0.5 border border-zinc-200/80 dark:border-zinc-800/80">
+            <button
+              onClick={() => fs.undo()}
+              disabled={!fs.canUndo}
+              className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:text-zinc-500 rounded-lg transition-colors"
+              title="Desfazer (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => fs.redo()}
+              disabled={!fs.canRedo}
+              className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 disabled:opacity-30 disabled:hover:text-zinc-500 rounded-lg transition-colors"
+              title="Refazer (Ctrl+Y)"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
+          {/* Validar */}
           <button
             onClick={() => validateMutation.mutate()}
-            className="w-[38px] h-[38px] rounded-lg bg-[#84cc16] hover:bg-[#65a30d] text-white flex items-center justify-center transition-colors shadow-sm"
-            title="Salvar e Validar"
+            disabled={validateMutation.isPending}
+            className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 shadow-xs"
+            title="Validar Consistência do Grafo"
           >
-            <CheckCircle2 className="w-5 h-5" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            Validar
+          </button>
+
+          {/* Ativar / Publicar */}
+          <button
+            onClick={() => {
+              if (confirm(isPublished ? 'Deseja desativar este funil?' : 'Deseja publicar e ativar este funil?')) {
+                publishMutation.mutate();
+              }
+            }}
+            disabled={publishMutation.isPending}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shadow-xs ${
+              isPublished
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            {isPublished ? 'Ativo no Zap' : 'Publicar Fluxo'}
           </button>
         </div>
       </div>

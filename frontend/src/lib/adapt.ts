@@ -13,6 +13,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   onEdit?: () => void;
   /** callback para duplicar o nó — injetado em runtime pelo Builder. */
   onDuplicate?: () => void;
+  /** callback para excluir o nó — injetado em runtime pelo Builder. */
+  onDelete?: () => void;
 }
 
 /** Converte um documento meumisterio-flow para os arrays que React Flow consome. */
@@ -56,8 +58,8 @@ function meumisterioEdgeToReactFlow(e: MeuMisterioEdge): Edge {
     label: e.label,
     animated: false,
     style: {
-      strokeWidth: 3,
-      stroke: '#7c3aed',
+      strokeWidth: 2.5,
+      stroke: '#6366f1',
     },
   };
 }

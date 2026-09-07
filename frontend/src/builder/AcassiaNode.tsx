@@ -1,540 +1,768 @@
-﻿import { Handle, Position, useReactFlow, type Node, type NodeProps } from '@xyflow/react';
-import { 
-  AlertCircle, AlertTriangle, MoreHorizontal, MessageSquare, 
-  HelpCircle, PlayCircle, Clock, Image as ImageIcon, Video, Mic, FileText, Type,
-  Copy, SquarePen
+import { memo, useState } from 'react';
+import {
+  Handle,
+  Position,
+  NodeToolbar,
+  useReactFlow,
+  type Node,
+  type NodeProps,
+} from '@xyflow/react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  Bot,
+  BrainCircuit,
+  Check,
+  Clock,
+  Copy,
+  CornerDownRight,
+  FileText,
+  GitBranch,
+  Globe,
+  Hash,
+  HelpCircle,
+  Image as ImageIcon,
+  Layers,
+  MessageSquare,
+  Mic,
+  MoreVertical,
+  Play,
+  PlayCircle,
+  Sparkles,
+  SquarePen,
+  Tag,
+  Trash2,
+  Type,
+  UserCheck,
+  Video,
+  Volume2,
+  Zap,
 } from 'lucide-react';
 import type { FlowNodeData } from '../lib/adapt';
 import { visualForType } from './nodeStyles';
+import { toast } from '../lib/toast';
 
-export type MeuMisterioFlowNode = Node<FlowNodeData, 'meumisterio'>;
+export type AcassiaFlowNode = Node<FlowNodeData, 'meumisterio'>;
 
-export default function MeuMisterioNode({ id, data, selected }: NodeProps<MeuMisterioFlowNode>) {
-  const { setNodes } = useReactFlow();
+export const AcassiaNode = memo(function AcassiaNode({
+  id,
+  data,
+  selected,
+}: NodeProps<AcassiaFlowNode>) {
   const d = data;
-  const v = visualForType(d.meumisterioType);
-
   const type = d.meumisterioType;
+  const v = visualForType(type);
+  const cfg = d.config || {};
   const isTrigger = type === 'trigger';
   const isEnd = type === 'end';
 
-  // --- TRIGGER NODE ---
-  if (isTrigger) {
-    return (
-      <div className="flex flex-col gap-0 items-center font-sans w-[176px] relative transition-all">
-        {d.lintLevel && (
-          <span
-            className={[
-              'absolute -top-2 -right-2 rounded-full w-6 h-6 flex items-center justify-center border-[1.5px] border-white shadow-sm z-20',
-              d.lintLevel === 'error' ? 'bg-red-500 text-white' : 'bg-amber-400 text-slate-900',
-            ].join(' ')}
-          >
-            {d.lintLevel === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
-          </span>
-        )}
+  const [copiedId, setCopiedId] = useState(false);
 
-        {/* Trigger Main Card */}
-        <div className={[
-          "border rounded-[10px] bg-white w-full overflow-hidden flex flex-col",
-          selected ? "border-green-500 shadow-md ring-1 ring-green-500/30" : "border-slate-300 shadow-sm",
-          d.simActive ? "ring-2 ring-emerald-500 animate-pulse" : "",
-        ].join(' ')}>
-          <div className="grid grid-cols-[42px_1fr] items-center min-h-[39px]">
-            <div className="bg-white border-r border-slate-100 flex items-center justify-center h-full">
-              <div className="w-[27px] h-[27px] rounded-full bg-[#10b981] flex items-center justify-center">
-                <v.Icon className="w-3.5 h-3.5 text-white" />
-              </div>
-            </div>
-            <div className="text-[12.4px] font-semibold text-slate-900 text-center px-2 tracking-tight">
-              {d.label || 'WhatsApp'}
-            </div>
-          </div>
-          <div className="min-h-[28px] border-t border-slate-100 bg-slate-50 text-[9px] font-medium text-slate-500 flex items-center justify-center text-center px-1.5 py-1 leading-tight">
-            Enviou palavra chave
-          </div>
-        </div>
+  const handleCopyId = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(id);
+    setCopiedId(true);
+    toast.success(`ID do nó copiado: ${id}`);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
 
-        {/* Arrow Down */}
-        <div className="flex flex-col items-center justify-center text-emerald-500 -mt-px mb-0.5">
-          <div className="w-[10px] h-px bg-white -mt-px block relative z-10" />
-          <div className="w-4 h-[18px] bg-emerald-500 flex flex-col items-center justify-center">
-             <svg width="8" height="6" viewBox="0 0 8 6" fill="currentColor"><path d="M4 6L0 0H8L4 6Z" /></svg>
-          </div>
-        </div>
+  // Node Category Badges & Color Palette
+  const CATEGORY_STYLES: Record<
+    string,
+    { badgeBg: string; badgeText: string; iconBg: string; iconColor: string; accentBorder: string }
+  > = {
+    trigger: {
+      badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      badgeText: 'Gatilho Inicial',
+      iconBg: 'bg-emerald-500 text-white',
+      iconColor: 'text-emerald-600',
+      accentBorder: 'hover:border-emerald-500/60',
+    },
+    conteudo: {
+      badgeBg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+      badgeText: 'Mensagem WhatsApp',
+      iconBg: 'bg-indigo-600 text-white',
+      iconColor: 'text-indigo-600',
+      accentBorder: 'hover:border-indigo-500/60',
+    },
+    agente_ia: {
+      badgeBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+      badgeText: 'Agente de IA',
+      iconBg: 'bg-purple-600 text-white',
+      iconColor: 'text-purple-600',
+      accentBorder: 'hover:border-purple-500/60',
+    },
+    gpt: {
+      badgeBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+      badgeText: 'IA Generativa',
+      iconBg: 'bg-purple-600 text-white',
+      iconColor: 'text-purple-600',
+      accentBorder: 'hover:border-purple-500/60',
+    },
+    pergunta: {
+      badgeBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      badgeText: 'Pergunta & Opções',
+      iconBg: 'bg-amber-500 text-white',
+      iconColor: 'text-amber-600',
+      accentBorder: 'hover:border-amber-500/60',
+    },
+    condicao: {
+      badgeBg: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+      badgeText: 'Decisão Lógica',
+      iconBg: 'bg-sky-500 text-white',
+      iconColor: 'text-sky-600',
+      accentBorder: 'hover:border-sky-500/60',
+    },
+    ab_split: {
+      badgeBg: 'bg-pink-500/10 text-pink-600 dark:text-pink-400',
+      badgeText: 'Teste A/B',
+      iconBg: 'bg-pink-500 text-white',
+      iconColor: 'text-pink-600',
+      accentBorder: 'hover:border-pink-500/60',
+    },
+    acao: {
+      badgeBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      badgeText: 'Ação de CRM',
+      iconBg: 'bg-blue-600 text-white',
+      iconColor: 'text-blue-600',
+      accentBorder: 'hover:border-blue-500/60',
+    },
+    delay: {
+      badgeBg: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+      badgeText: 'Delay Inteligente',
+      iconBg: 'bg-orange-500 text-white',
+      iconColor: 'text-orange-600',
+      accentBorder: 'hover:border-orange-500/60',
+    },
+    voice_studio: {
+      badgeBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+      badgeText: 'Voz & Áudio IA',
+      iconBg: 'bg-rose-500 text-white',
+      iconColor: 'text-rose-600',
+      accentBorder: 'hover:border-rose-500/60',
+    },
+    notificar_atendente: {
+      badgeBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      badgeText: 'Notificar Atendente',
+      iconBg: 'bg-blue-600 text-white',
+      iconColor: 'text-blue-600',
+      accentBorder: 'hover:border-blue-500/60',
+    },
+    end: {
+      badgeBg: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400',
+      badgeText: 'Fim do Funil',
+      iconBg: 'bg-zinc-700 text-white',
+      iconColor: 'text-zinc-600',
+      accentBorder: 'hover:border-zinc-500/60',
+    },
+  };
 
-        {/* Keyword Block */}
-        <div className="border-[1.3px] border-emerald-500 rounded-lg text-[9.2px] font-semibold text-slate-900 bg-white shadow-sm px-2 py-1.5 text-center w-full max-w-[162px] break-words flex items-center justify-center min-h-[47px] leading-[1.14]">
-          {stringField(d.config, 'keyword') || 'Qualquer mensagem'}
-        </div>
-        
-        <Handle type="source" position={Position.Right} className="!w-5 !h-5 !bg-white !border-2 !border-blue-500 !shadow-sm !rounded-full after:content-[''] after:absolute after:left-1/2 after:top-1/2 after:w-0 after:h-0 after:border-solid after:border-[4px_0_4px_7px] after:border-[transparent_transparent_transparent_#fff] after:-translate-x-1/2 after:-translate-y-1/2" />
-      </div>
-    );
-  }
-
-  // --- STANDARD NODES (Conteudo, Pergunta, Acao, etc) ---
-    // Define colors based on Meu Mistério Type or fallback to visualForType
-  let headerBg = 'bg-[#f8fafc]';
-  let headerText = 'text-slate-900';
-  let iconColor = v.accent;
-  let iconBg = 'bg-white border border-slate-200';
-  let bodyBg = 'bg-white';
-  let borderColor = 'border-slate-200';
-  let headerActionColor = 'text-slate-400 hover:text-slate-600 bg-transparent';
-  
-  if (type === 'conteudo') {
-    headerBg = 'bg-[#7c3aed]';
-    headerText = 'text-white';
-    iconColor = 'text-[#7c3aed]';
-    iconBg = 'bg-white/95';
-    borderColor = 'border-[#7c3aed]';
-    headerActionColor = 'text-white/90 bg-white/18 hover:bg-white/30';
-  } else if (type === 'pergunta') {
-    headerBg = 'bg-[#ff5722]';
-    headerText = 'text-white';
-    iconColor = 'text-[#ff5722]';
-    iconBg = 'bg-white';
-    borderColor = 'border-[#e8ddd4]';
-    headerActionColor = 'text-white/90 bg-black/20 hover:bg-black/30';
-  } else if (type === 'acao') {
-    headerBg = 'bg-[#3730a3]'; // indigo-800
-    headerText = 'text-white';
-    iconColor = 'text-[#3730a3]';
-    iconBg = 'bg-white';
-    borderColor = 'border-[#3730a3]';
-    bodyBg = 'bg-white';
-    headerActionColor = 'text-white/90 bg-black/20 hover:bg-black/30';
-  } else if (type === 'condicao') {
-    headerBg = 'bg-[#ef4444]'; // red-500
-    headerText = 'text-white';
-    iconColor = 'text-[#ef4444]';
-    iconBg = 'bg-white';
-    borderColor = 'border-[#ef4444]';
-    headerActionColor = 'text-white/90 bg-black/20 hover:bg-black/30';
-  } else if (type === 'ab_split') {
-    headerBg = 'bg-[#ec4899]'; // pink-500
-    headerText = 'text-white';
-    iconColor = 'text-[#ec4899]';
-    iconBg = 'bg-white';
-    borderColor = 'border-[#ec4899]';
-    headerActionColor = 'text-white/90 bg-black/20 hover:bg-black/30';
-  }
-
-  // Simulate a random traffic count for visual parity with the screenshot
-  const trafficCount = numberField(d.config, 'stats_count') ?? Math.abs(parseInt(d.label || '0', 36)) % 500;
+  const cat = CATEGORY_STYLES[type] || {
+    badgeBg: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400',
+    badgeText: v.label || type,
+    iconBg: 'bg-zinc-800 text-white',
+    iconColor: 'text-zinc-600',
+    accentBorder: 'hover:border-zinc-500/60',
+  };
 
   return (
-    <div
-      className={[
-        `rounded-[10px] border-2 min-w-[280px] max-w-[320px] shadow-sm relative font-sans transition-all duration-300`,
-        borderColor,
-        bodyBg,
-        d.simActive ? 'ring-2 ring-emerald-500 shadow-glow-emerald animate-pulse' : '',
-        !d.simActive && selected ? `ring-2 ring-accent-amethyst shadow-glow-amethyst` : '',
-        !d.simActive && d.lintLevel === 'error' ? 'ring-2 ring-red-500' : '',
-      ].join(' ')}
-    >
-      {/* Traffic Stats Pill */}
-      <div className="absolute -top-[10px] left-1/2 -translate-x-1/2 z-30">
-        <div className="bg-[#9333ea] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm leading-none border border-[#7e22ce]">
-          {trafficCount}
+    <>
+      {/* Start Node Badge (ChatbotX Style) */}
+      {isTrigger && (
+        <div className="absolute -top-7 left-3 z-20 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold shadow-sm tracking-wide">
+          <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+          <Play className="w-3 h-3 fill-current" />
+          Início do Funil
         </div>
-      </div>
-
-      {/* Validation Badge */}
-      {d.lintLevel && (
-        <span
-          className={[
-            'absolute -top-2.5 -right-2.5 rounded-full w-6 h-6 flex items-center justify-center border-[1.5px] border-white shadow-sm z-20',
-            d.lintLevel === 'error' ? 'bg-red-500 text-white' : 'bg-amber-400 text-slate-900',
-          ].join(' ')}
-        >
-          {d.lintLevel === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
-        </span>
       )}
 
-      {/* Header — icon + label + Copy + Edit buttons */}
-      <div className={[`px-3 py-2.5 rounded-t-[8px] flex items-center justify-between`, headerBg].join(' ')}>
-        <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className={[`w-[24px] h-[24px] rounded-[6px] flex items-center justify-center shrink-0`, iconBg].join(' ')}>
-            <v.Icon className={[`w-4 h-4`, iconColor].join(' ')} strokeWidth={2.5} />
-          </div>
-          <span className={[`text-[13px] font-bold tracking-tight truncate`, headerText].join(' ')}>
-            {d.label || v.label}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div
-            className={[`flex items-center justify-center rounded-[6px] w-[28px] h-[28px] shrink-0 transition-colors cursor-pointer`, headerActionColor].join(' ')}
-            title="Duplicar"
+      {/* Floating Node Toolbar (ChatbotX Style) */}
+      <NodeToolbar
+        isVisible={selected}
+        position={Position.Top}
+        offset={12}
+        className="flex items-center gap-1 bg-zinc-900 text-zinc-100 p-1 rounded-xl shadow-2xl border border-zinc-700/80 backdrop-blur-md z-50 animate-in fade-in zoom-in-95 duration-150"
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            d.onEdit?.();
+          }}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium hover:bg-zinc-800 rounded-lg transition-colors text-zinc-200 hover:text-white"
+          title="Editar Configurações"
+        >
+          <SquarePen className="w-3.5 h-3.5 text-indigo-400" />
+          Editar
+        </button>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            d.onDuplicate?.();
+          }}
+          className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-300 hover:text-white"
+          title="Duplicar Nó"
+        >
+          <Copy className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleCopyId}
+          className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-300 hover:text-white"
+          title="Copiar ID do Nó"
+        >
+          {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Hash className="w-3.5 h-3.5" />}
+        </button>
+
+        {!isTrigger && (
+          <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
-              d.onDuplicate?.();
+              d.onDelete?.();
             }}
+            className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors text-zinc-300 hover:text-red-400"
+            title="Excluir Nó"
           >
-            <Copy className="w-3.5 h-3.5" />
-          </div>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </NodeToolbar>
+
+      {/* Main Node Card */}
+      <div
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          d.onEdit?.();
+        }}
+        className={[
+          'group relative w-[310px] rounded-2xl bg-white dark:bg-zinc-900 border transition-all duration-200 shadow-sm font-sans select-none',
+          selected
+            ? 'border-indigo-500 dark:border-indigo-500 ring-2 ring-indigo-500/20 shadow-lg'
+            : 'border-zinc-200 dark:border-zinc-800 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700',
+          d.simActive ? 'ring-2 ring-emerald-500 shadow-lg shadow-emerald-500/20 animate-pulse' : '',
+          d.lintLevel === 'error' ? 'ring-2 ring-rose-500 border-rose-500' : '',
+        ].join(' ')}
+      >
+        {/* Lint Warning/Error Badge */}
+        {d.lintLevel && (
           <div
-            className={[`flex items-center justify-center rounded-[6px] w-[28px] h-[28px] shrink-0 transition-colors cursor-pointer`, headerActionColor].join(' ')}
-            title="Editar"
+            className={[
+              'absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-white z-30 shadow-md',
+              d.lintLevel === 'error' ? 'bg-rose-500' : 'bg-amber-500',
+            ].join(' ')}
+            title={d.lintLevel === 'error' ? 'Erro de validação' : 'Aviso de consistência'}
+          >
+            {d.lintLevel === 'error' ? (
+              <AlertCircle className="w-3 h-3" />
+            ) : (
+              <AlertTriangle className="w-3 h-3" />
+            )}
+          </div>
+        )}
+
+        {/* Input Handle (Left) */}
+        {!isTrigger && (
+          <Handle
+            type="target"
+            position={Position.Left}
+            className="!w-3.5 !h-3.5 !-left-[7px] !bg-white dark:!bg-zinc-900 !border-2 !border-zinc-400 dark:!border-zinc-600 hover:!border-indigo-500 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+          />
+        )}
+
+        {/* Node Header */}
+        <div className="flex items-center justify-between p-3.5 pb-2.5 border-b border-zinc-100 dark:border-zinc-800/80">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${cat.iconBg} shadow-sm`}>
+              <v.Icon className="w-4 h-4" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-tight">
+                {d.label || v.label}
+              </span>
+              <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-0.5">
+                {cat.badgeText}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               d.onEdit?.();
             }}
+            className="w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors shrink-0"
+            title="Editar Parâmetros"
           >
             <SquarePen className="w-3.5 h-3.5" />
-          </div>
+          </button>
         </div>
+
+        {/* Node Body / Step Viewers */}
+        <div className="p-3.5 flex flex-col gap-2.5">
+          {renderNodeContent(type, d, id)}
+        </div>
+
+        {/* Node Footer / Default Output Handle */}
+        {!isEnd && shouldRenderDefaultContinue(type, d) && (
+          <div className="relative px-3.5 py-2.5 border-t border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-b-2xl flex items-center justify-end">
+            <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 mr-3.5 flex items-center gap-1">
+              Continuar
+              <ArrowRight className="w-3 h-3" />
+            </span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[7px] !bg-indigo-600 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
+          </div>
+        )}
       </div>
-
-      {/* Body */}
-      <div className="p-3 flex flex-col gap-2 rounded-b-[8px]">
-         {renderPreview(d)}
-         {renderConfigHint(d)}
-      </div>
-
-      {/* Input Handle — white circle with blue border + ▶ play arrow */}
-      {!isTrigger && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="!w-[22px] !h-[22px] !bg-white !border-2 !border-blue-500 !shadow-sm !rounded-full"
-        >
-          <svg className="absolute left-1/2 top-1/2 -translate-x-[45%] -translate-y-1/2 pointer-events-none" width="8" height="10" viewBox="0 0 8 10" fill="none">
-            <path d="M8 5L0 10V0L8 5Z" fill="#3b82f6" />
-          </svg>
-        </Handle>
-      )}
-
-      {/* Output Handles — filled circle with white ▶ play arrow */}
-      {!isEnd && (
-        <>
-          {type === 'condicao' ? (
-            <>
-              <Handle type="source" id="true" position={Position.Right} className="!w-[22px] !h-[22px] !bg-blue-500 !border-2 !border-white !shadow-sm !rounded-full !top-[30%]">
-                <svg className="absolute left-1/2 top-1/2 -translate-x-[45%] -translate-y-1/2 pointer-events-none" width="8" height="10" viewBox="0 0 8 10" fill="none"><path d="M8 5L0 10V0L8 5Z" fill="white" /></svg>
-              </Handle>
-              <Handle type="source" id="false" position={Position.Right} className="!w-[22px] !h-[22px] !bg-red-500 !border-2 !border-white !shadow-sm !rounded-full !top-[85%]">
-                <svg className="absolute left-1/2 top-1/2 -translate-x-[45%] -translate-y-1/2 pointer-events-none" width="8" height="10" viewBox="0 0 8 10" fill="none"><path d="M8 5L0 10V0L8 5Z" fill="white" /></svg>
-              </Handle>
-            </>
-          ) : type === 'pergunta' ? (
-            <>
-              <Handle type="source" id="resposta" position={Position.Right} className="!w-[22px] !h-[22px] !bg-blue-500 !border-2 !border-white !shadow-sm !rounded-full !top-[40%]">
-                <svg className="absolute left-1/2 top-1/2 -translate-x-[45%] -translate-y-1/2 pointer-events-none" width="8" height="10" viewBox="0 0 8 10" fill="none"><path d="M8 5L0 10V0L8 5Z" fill="white" /></svg>
-              </Handle>
-              <Handle type="source" id="timeout" position={Position.Right} className="!w-[22px] !h-[22px] !bg-red-500 !border-2 !border-white !shadow-sm !rounded-full !top-[85%]">
-                <svg className="absolute left-1/2 top-1/2 -translate-x-[45%] -translate-y-1/2 pointer-events-none" width="8" height="10" viewBox="0 0 8 10" fill="none"><path d="M8 5L0 10V0L8 5Z" fill="white" /></svg>
-              </Handle>
-            </>
-          ) : type === 'ab_split' ? (
-            <>
-              <Handle type="source" id="a" position={Position.Right} className="!w-[22px] !h-[22px] !bg-[#ec4899] !border-2 !border-white !shadow-sm !rounded-full !top-[30%]">
-                <svg className="absolute left-1/2 top-1/2 -translate-x-[45%] -translate-y-1/2 pointer-events-none" width="8" height="10" viewBox="0 0 8 10" fill="none"><path d="M8 5L0 10V0L8 5Z" fill="white" /></svg>
-              </Handle>
-              <Handle type="source" id="b" position={Position.Right} className="!w-[22px] !h-[22px] !bg-[#ec4899] !border-2 !border-white !shadow-sm !rounded-full !top-[70%]">
-                <svg className="absolute left-1/2 top-1/2 -translate-x-[45%] -translate-y-1/2 pointer-events-none" width="8" height="10" viewBox="0 0 8 10" fill="none"><path d="M8 5L0 10V0L8 5Z" fill="white" /></svg>
-              </Handle>
-            </>
-          ) : (
-            <Handle type="source" position={Position.Right} className="!w-[22px] !h-[22px] !bg-blue-500 !border-2 !border-white !shadow-sm !rounded-full">
-              <svg className="absolute left-1/2 top-1/2 -translate-x-[45%] -translate-y-1/2 pointer-events-none" width="8" height="10" viewBox="0 0 8 10" fill="none"><path d="M8 5L0 10V0L8 5Z" fill="white" /></svg>
-            </Handle>
-          )}
-        </>
-      )}
-    </div>
+    </>
   );
+});
+
+export default AcassiaNode;
+
+/** Decide se exibe o handle padrão "Continuar" no rodapé */
+function shouldRenderDefaultContinue(type: string, d: FlowNodeData): boolean {
+  if (type === 'condicao' || type === 'ab_split') return false;
+  if (type === 'pergunta') return false;
+  if (type === 'agente_ia') return false;
+  if (type === 'voice_studio') return false;
+  if (type === 'menu' || type === 'expediente') return false;
+
+  // Se conteudo tiver botões interativos, cada botão tem seu próprio handle
+  if (type === 'conteudo') {
+    const config = d.config || {};
+    const hasButtons =
+      Array.isArray(config.buttons) && config.buttons.length > 0;
+    const hasQuickReplies =
+      Array.isArray(config.quick_replies) && config.quick_replies.length > 0;
+    if (hasButtons || hasQuickReplies) return false;
+  }
+
+  return true;
 }
 
-function renderPreview(d: FlowNodeData) {
-  const type = d.meumisterioType;
-  const config = d.config;
+/** Renderiza o preview visual de acordo com o tipo de nó */
+function renderNodeContent(type: string, d: FlowNodeData, nodeId: string) {
+  const cfg = d.config || {};
 
+  // 1. GATILHO DE ENTRADA (TRIGGER)
+  if (type === 'trigger') {
+    const triggerEvent = (cfg.event as string) || 'keyword';
+    const keyword = (cfg.keyword as string) || '';
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+          <span className="flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-emerald-500" />
+            Origem: WhatsApp API
+          </span>
+          <span className="text-[10px] bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full font-semibold">
+            Ativo
+          </span>
+        </div>
+        <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/60 flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate">
+            {triggerEvent === 'purchase'
+              ? '🛒 Compra aprovada'
+              : triggerEvent === 'abandon'
+              ? '⏰ Carrinho abandonado'
+              : keyword
+              ? `Palavra-chave: "${keyword}"`
+              : 'Qualquer mensagem recebida'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. MENSAGEM WHATSAPP (CONTEUDO)
   if (type === 'conteudo') {
-    const rawCards = config.contents;
-    let cards = [];
+    const rawCards = cfg.contents;
+    let cards: any[] = [];
     if (Array.isArray(rawCards) && rawCards.length > 0) {
       cards = rawCards;
     } else {
-      const text = config.text || config.message;
+      const text = cfg.text || cfg.message;
       if (typeof text === 'string' && text) {
         cards = [{ type: 'text', value: text }];
       }
     }
 
-    if (cards.length > 0) {
-      /* Color map — filled backgrounds matching original Meu Mistério screenshots */
-      const CARD_STYLES: Record<string, { border: string; bg: string; text: string }> = {
-        text:     { border: '#93c5fd', bg: 'rgba(219,234,254,0.85)', text: '#1e3a8a' },
-        delay:    { border: '#f9a8d4', bg: 'rgba(252,231,243,0.85)', text: '#9d174d' },
-        image:    { border: '#7dd3fc', bg: 'rgba(224,242,254,0.85)', text: '#0369a1' },
-        video:    { border: '#86efac', bg: 'rgba(220,252,231,0.85)', text: '#166534' },
-        audio:    { border: '#c4b5fd', bg: 'rgba(237,233,254,0.85)', text: '#5b21b6' },
-        document: { border: '#fdba74', bg: 'rgba(255,237,213,0.85)', text: '#c2410c' },
-      };
+    const buttons = Array.isArray(cfg.buttons) ? cfg.buttons : [];
+    const quickReplies = Array.isArray(cfg.quick_replies) ? cfg.quick_replies : [];
+    const allButtons = [...buttons, ...quickReplies];
 
-      return (
-        <div className="flex flex-col gap-2 w-full">
-          {cards.map((c: any, i: number) => {
-            const cs = CARD_STYLES[c.type] || CARD_STYLES.text;
-            const iconClass = "w-4 h-4 shrink-0 mt-[1px] opacity-95";
-
-            const cardStyle = {
-              display: 'flex', alignItems: 'flex-start', gap: '8px',
-              padding: '8px 10px', borderRadius: '10px',
-              border: `2px dashed ${cs.border}`, background: cs.bg,
-              color: cs.text, fontSize: '11px', fontWeight: 600, lineHeight: '1.4',
-            };
-
-            if (c.type === 'text') {
-              const parts = (c.value || '').split(/(\{\{[^{}]+\}\})/g);
-              return (
-                <div key={i} style={{ ...cardStyle, fontWeight: 500 }}>
-                  <Type className={iconClass} />
-                  <div className="flex-1 min-w-0" style={{ display: '-webkit-box', WebkitLineClamp: 14, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden', wordBreak: 'break-word' }}>
+    return (
+      <div className="flex flex-col gap-2.5">
+        {/* WhatsApp Chat Bubble Mock */}
+        <div className="p-3 rounded-2xl rounded-tl-sm bg-[#f0f2f5] dark:bg-zinc-800/80 border border-zinc-200/70 dark:border-zinc-700/60 shadow-inner flex flex-col gap-2">
+          {cards.length > 0 ? (
+            cards.map((c: any, i: number) => {
+              if (c.type === 'text') {
+                const parts = (c.value || '').split(/(\{\{[^{}]+\}\})/g);
+                return (
+                  <div key={i} className="text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed break-words">
                     {parts.map((part: string, idx: number) => {
-                       if (part.startsWith('{{') && part.endsWith('}}')) {
-                          return (
-                            <span key={idx} className="inline-block bg-[#10b981] text-white px-1.5 py-0 rounded font-bold text-[9px] tracking-wide align-middle leading-tight mt-[1px]">
-                               {part}
-                            </span>
-                          );
-                       }
-                       return <span key={idx}>{part}</span>;
+                      if (part.startsWith('{{') && part.endsWith('}}')) {
+                        return (
+                          <span
+                            key={idx}
+                            className="inline-block mx-0.5 px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono text-[10px] rounded-md font-semibold"
+                          >
+                            {part}
+                          </span>
+                        );
+                      }
+                      return <span key={idx}>{part}</span>;
                     })}
                   </div>
-                </div>
-              );
-            }
-            if (c.type === 'delay') {
-              return (
-                <div key={i} style={cardStyle}>
-                  <Clock className={iconClass} />
-                  <div>Delay de {c.value || 0} Segundos</div>
-                </div>
-              );
-            }
-            if (c.type === 'image') {
-              return (
-                <div key={i} style={cardStyle}>
-                  <ImageIcon className={iconClass} />
-                  <div>Enviando uma imagem</div>
-                </div>
-              );
-            }
-            if (c.type === 'video') {
-              return (
-                <div key={i} style={cardStyle}>
-                  <Video className={iconClass} />
-                  <div>Enviando um vídeo</div>
-                </div>
-              );
-            }
-            if (c.type === 'audio') {
-              return (
-                <div key={i} style={cardStyle}>
-                  <Mic className={iconClass} />
-                  <div>Enviando um arquivo de áudio</div>
-                </div>
-              );
-            }
-            if (c.type === 'document') {
-              return (
-                <div key={i} style={cardStyle}>
-                  <FileText className={iconClass} />
-                  <div>Enviando um documento</div>
-                </div>
-              );
-            }
-            return null;
-          })}
-        </div>
-      );
-    }
-    return (
-       <div className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-[10px] text-center" style={{ border: '2px dashed #e2e8f0', background: '#f8fafc' }}>
-          <span className="text-2xl">😊</span>
-          <span className="text-[11px] font-medium text-[#94a3b8]">Aguardando Configuração...</span>
-       </div>
-    );
-  }
-
-  if (type === 'pergunta') {
-    const qText = stringField(config, 'question') || stringField(config, 'body') || stringField(config, 'question_text') || '';
-    const saveRaw = stringField(config, 'save_to_flow_field') || stringField(config, 'output_var') || '';
-    const saveKey = saveRaw.replace(/^\{\{|\}\}$/g, '').trim();
-    const tSec = numberField(config, 'question_timeout_seconds');
-    const sec = typeof tSec === 'number' && tSec > 0 ? tSec : 3600;
-    const exLabel = sec < 3600 ? `${Math.round(sec / 60)} min` : sec < 86400 ? `${Math.round(sec / 3600)}h` : `${Math.round(sec / 86400)} dia${Math.round(sec / 86400) > 1 ? 's' : ''}`;
-    
-    const replyMode = stringField(config, 'reply_mode') || 'texto_livre';
-    const quickReplies = Array.isArray(config.quick_replies) ? config.quick_replies as string[] : [];
-
-    if (!qText.trim()) {
-      return (
-        <div className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-[10px] text-center" style={{ border: '2px dashed #ff5722', background: '#fff8f5' }}>
-          <HelpCircle className="w-5 h-5 text-[#ff5722] opacity-50" />
-          <span className="text-[11px] font-medium text-[#94a3b8]">Aguardando Configuração...</span>
-        </div>
-      );
-    }
-
-    // Highlight {{variables}} in question text
-    const parts = qText.split(/(\{\{[^}]+\}\})/g);
-
-    return (
-      <div className="flex flex-col gap-1 w-full">
-         <div className="border border-dashed border-[#ff5722]/40 bg-[#fff8f5] rounded-lg p-2 flex flex-col gap-2 min-h-[30px]">
-            <div className="flex items-start gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5 text-[#ff5722] shrink-0 mt-[1px]" />
-              <div className="text-[10px] font-medium text-slate-600 leading-tight break-words line-clamp-3">
-                 {parts.map((p, i) =>
-                   /^\{\{.+\}\}$/.test(p)
-                     ? <span key={i} className="bg-[#2563eb] text-white px-1 py-0.5 rounded text-[9px] font-mono mx-0.5">{p}</span>
-                     : <span key={i}>{p}</span>
-                 )}
-              </div>
-            </div>
-            {replyMode === 'botoes' && quickReplies.length > 0 && (
-              <div className="flex flex-col gap-1 mt-1">
-                {quickReplies.map((r, i) => (
-                  <div key={i} className="text-[9px] font-semibold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/20 rounded py-1 px-2 text-center w-full truncate">
-                    {r || `Opção ${i + 1} vazia`}
+                );
+              }
+              if (c.type === 'audio') {
+                return (
+                  <div key={i} className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-700/60">
+                    <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                      <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 h-3">
+                        <span className="w-1 h-2 bg-indigo-400 rounded-full" />
+                        <span className="w-1 h-3 bg-indigo-500 rounded-full" />
+                        <span className="w-1 h-2 bg-indigo-400 rounded-full" />
+                        <span className="w-1 h-3.5 bg-indigo-600 rounded-full" />
+                        <span className="w-1 h-2.5 bg-indigo-500 rounded-full" />
+                        <span className="w-1 h-1.5 bg-indigo-300 rounded-full" />
+                      </div>
+                      <span className="text-[10px] text-zinc-400 font-medium">Áudio gravado · 0:15</span>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-         </div>
-         {saveKey && (
-           <div className="flex items-center gap-1 text-[9px] text-[#2563eb] font-medium">
-              <span className="opacity-60">📦</span> Salvar em: <span className="bg-[#2563eb] text-white px-1 py-0.5 rounded text-[9px] font-mono">{`{{${saveKey}}}`}</span>
-           </div>
-         )}
-         <div className="flex items-center gap-1 mt-0.5 text-red-500 text-[9px] font-semibold">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-500" /> Se não responder em {exLabel}
-         </div>
+                );
+              }
+              if (c.type === 'image') {
+                return (
+                  <div key={i} className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-700/60 text-xs text-zinc-600 dark:text-zinc-300 font-medium">
+                    <ImageIcon className="w-4 h-4 text-sky-500 shrink-0" />
+                    <span className="truncate">Imagem anexada</span>
+                  </div>
+                );
+              }
+              if (c.type === 'document') {
+                return (
+                  <div key={i} className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-700/60 text-xs text-zinc-600 dark:text-zinc-300 font-medium">
+                    <FileText className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span className="truncate">Documento PDF</span>
+                  </div>
+                );
+              }
+              return null;
+            })
+          ) : (
+            <span className="text-xs text-zinc-400 italic">Nenhum texto configurado.</span>
+          )}
+        </div>
+
+        {/* Botões Interativos com seus próprios Handles */}
+        {allButtons.length > 0 && (
+          <div className="flex flex-col gap-1.5 mt-1">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 px-1">
+              Botões de Resposta
+            </span>
+            {allButtons.map((btn: any, idx: number) => {
+              const label = typeof btn === 'string' ? btn : btn.label || btn.text || `Opção ${idx + 1}`;
+              const handleId = typeof btn === 'object' && btn.id ? btn.id : `btn_${idx}`;
+              return (
+                <div
+                  key={idx}
+                  className="relative flex items-center justify-between px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:border-indigo-400 transition-colors"
+                >
+                  <span className="truncate pr-4">{label}</span>
+                  <Handle
+                    type="source"
+                    id={handleId}
+                    position={Position.Right}
+                    className="!w-3.5 !h-3.5 !-right-[18px] !bg-indigo-600 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
 
+  // 3. AGENTE DE IA (AGENTE_IA / GPT)
+  if (type === 'agente_ia' || type === 'gpt') {
+    const model = (cfg.model as string) || 'gemini-2.5-flash';
+    const prompt = (cfg.system_prompt as string) || (cfg.prompt as string) || '';
+    const delay = (cfg.human_delay_seconds as number) || 3;
+
+    return (
+      <div className="flex flex-col gap-2.5">
+        {/* Model Badge */}
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-[11px] font-semibold border border-purple-200/60 dark:border-purple-800/40">
+            <Sparkles className="w-3 h-3 text-purple-500" />
+            {model}
+          </span>
+          <span className="text-[10px] text-zinc-400 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Delay: {delay}s
+          </span>
+        </div>
+
+        {/* Prompt Preview */}
+        <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/60 text-[11px] text-zinc-600 dark:text-zinc-400 line-clamp-3 font-mono leading-relaxed break-words">
+          {prompt ? prompt : 'Nenhum prompt configurado. O agente usará a persona padrão da empresa.'}
+        </div>
+
+        {/* AI Handles */}
+        <div className="flex flex-col gap-1.5 mt-1 border-t border-zinc-100 dark:border-zinc-800/80 pt-2">
+          <div className="relative flex items-center justify-between text-xs py-1">
+            <span className="text-zinc-700 dark:text-zinc-300 font-medium">Sucesso / Conversa</span>
+            <Handle
+              type="source"
+              id="sucesso"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-purple-600 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
+          </div>
+          <div className="relative flex items-center justify-between text-xs py-1">
+            <span className="text-rose-600 dark:text-rose-400 font-medium">Transbordo / Erro</span>
+            <Handle
+              type="source"
+              id="erro"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-rose-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. PERGUNTA & OPÇÕES (PERGUNTA)
+  if (type === 'pergunta') {
+    const question = (cfg.question || cfg.body || cfg.question_text) as string;
+    const quickReplies = Array.isArray(cfg.quick_replies) ? (cfg.quick_replies as string[]) : [];
+
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="p-2.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 text-xs text-zinc-800 dark:text-zinc-200 font-medium break-words">
+          {question || 'Pergunta não configurada'}
+        </div>
+
+        {/* Options list */}
+        <div className="flex flex-col gap-1.5 mt-1">
+          {quickReplies.length > 0 ? (
+            quickReplies.map((qr, idx) => (
+              <div
+                key={idx}
+                className="relative flex items-center justify-between px-3 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 text-xs font-semibold text-zinc-800 dark:text-zinc-200"
+              >
+                <span className="truncate pr-4">{qr}</span>
+                <Handle
+                  type="source"
+                  id={`option-${idx}`}
+                  position={Position.Right}
+                  className="!w-3.5 !h-3.5 !-right-[18px] !bg-amber-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+                />
+              </div>
+            ))
+          ) : (
+            <div className="relative flex items-center justify-between px-3 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+              <span>Resposta livre do usuário</span>
+              <Handle
+                type="source"
+                id="resposta"
+                position={Position.Right}
+                className="!w-3.5 !h-3.5 !-right-[18px] !bg-amber-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+              />
+            </div>
+          )}
+
+          {/* Timeout Fallback */}
+          <div className="relative flex items-center justify-between text-xs py-1 border-t border-zinc-100 dark:border-zinc-800/80 pt-2 mt-1">
+            <span className="text-zinc-400">Timeout / Sem resposta</span>
+            <Handle
+              type="source"
+              id="timeout"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-rose-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. CONDIÇÃO & ROTEAMENTO (CONDICAO / AB_SPLIT)
+  if (type === 'condicao' || type === 'ab_split') {
+    const rules = (cfg.rules as any[]) || [];
+    const conditionText = (cfg.condition as string) || (rules[0]?.field ? `${rules[0].field} ${rules[0].operator || '=='} ${rules[0].value || ''}` : 'Verificar condição');
+
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="p-2.5 rounded-xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200/60 dark:border-sky-900/40 text-xs text-zinc-700 dark:text-zinc-300 font-mono break-words">
+          {conditionText}
+        </div>
+
+        {/* True / False branches */}
+        <div className="flex flex-col gap-1.5 mt-1">
+          <div className="relative flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            <span>Sim / Condição Verdadeira</span>
+            <Handle
+              type="source"
+              id="true"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-emerald-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
+          </div>
+
+          <div className="relative flex items-center justify-between px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+            <span>Não / Senão</span>
+            <Handle
+              type="source"
+              id="false"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-zinc-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 6. AÇÕES & CRM (ACAO)
   if (type === 'acao') {
-     const actionKind = stringField(config, 'action_type') || 'tag_add';
-     const payload = stringField(config, 'action_payload');
-     
-     let actionText = 'Executar lógica';
-     if (actionKind === 'tag_add') actionText = `Etiqueta ${payload || ''}`;
-     else if (actionKind === 'close_chat') actionText = `Finalizar conversa com o contato`;
-     else if (actionKind === 'assign_user') actionText = `Atribuir atendente ${payload || ''}`;
-     
-     return (
-        <div className="p-1.5 rounded border border-[#2d336b]/20 text-center flex items-center justify-center min-h-[25px]">
-           <div className="flex items-center gap-1 bg-[#10b981] text-white px-2 py-0.5 rounded-full text-[9px] font-bold">
-              <PlayCircle className="w-2.5 h-2.5" />
-              {actionText}
-           </div>
+    const actionType = (cfg.action as string) || (cfg.action_type as string) || 'add_tag';
+    const tag = (cfg.tag as string) || '';
+
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 p-2 rounded-xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 text-xs text-blue-700 dark:text-blue-300 font-medium">
+          <Tag className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">
+            {actionType === 'add_tag' && tag
+              ? `Adicionar Tag: ${tag}`
+              : actionType === 'remove_tag'
+              ? `Remover Tag: ${tag}`
+              : 'Executar Ação CRM'}
+          </span>
         </div>
-     );
+      </div>
+    );
   }
 
-  if (type === 'condicao') {
-    const rules = Array.isArray(config.rules) ? config.rules : [];
-    const logic = config.logic || 'AND';
-    const logicText = logic === 'OR' ? 'Pelo menos uma das condições é verdadeira' : 'Todas as condições são verdadeiras';
-    
+  // 7. SMART DELAY (DELAY)
+  if (type === 'delay') {
+    const seconds = (cfg.seconds as number) || (cfg.duration as number) || 60;
+    const minutes = Math.round(seconds / 60);
+
     return (
-      <div className="flex flex-col gap-1 w-full">
-        <div className="border border-dashed border-green-500 rounded p-1.5 flex flex-col items-center text-center gap-1.5 min-h-[40px] bg-white">
-          <div className="text-[9px] font-semibold text-slate-500 leading-tight">
-            {logicText}
+      <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-orange-50/50 dark:bg-orange-950/30 border border-orange-200/60 dark:border-orange-900/40">
+        <Clock className="w-4 h-4 text-orange-500 shrink-0" />
+        <span className="text-xs font-semibold text-orange-700 dark:text-orange-300">
+          Aguardar {minutes > 0 ? `${minutes} minuto(s)` : `${seconds} segundo(s)`}
+        </span>
+      </div>
+    );
+  }
+
+  // 8. VOZ E ÁUDIO IA (VOICE_STUDIO)
+  if (type === 'voice_studio') {
+    const voice = (cfg.voice as string) || 'Alloy';
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-300">
+            <Volume2 className="w-3.5 h-3.5 text-rose-500" />
+            Voz IA: {voice}
+          </span>
+          <span className="text-[10px] bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 px-2 py-0.5 rounded-full font-semibold">
+            Humanizada
+          </span>
+        </div>
+        <div className="flex flex-col gap-1.5 mt-1 border-t border-zinc-100 dark:border-zinc-800/80 pt-2">
+          <div className="relative flex items-center justify-between text-xs py-1">
+            <span className="text-zinc-700 dark:text-zinc-300 font-medium">Continuar</span>
+            <Handle
+              type="source"
+              id="sucesso"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-rose-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
           </div>
-          <div className="w-full flex flex-col gap-1">
-            {rules.length > 0 ? rules.slice(0, 2).map((r, i) => (
-              <div key={i} className="text-[8.5px] font-medium text-green-700 bg-green-50 border border-green-200 border-dotted rounded px-1 py-0.5 break-words line-clamp-2">
-                 O contato {r.op === 'not_equals' ? 'não' : ''} possui a etiqueta <span className="bg-green-600 text-white px-1 py-0.5 rounded font-bold">{r.value || 'vazio'}</span>
-              </div>
-            )) : (
-              <div className="text-[8.5px] text-slate-400 border border-dotted rounded px-1 py-0.5">Sem regras</div>
-            )}
+          <div className="relative flex items-center justify-between text-xs py-1">
+            <span className="text-zinc-400 font-medium">Erro / Falha</span>
+            <Handle
+              type="source"
+              id="erro"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-zinc-400 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
           </div>
         </div>
-        <div className="flex items-center gap-1 mt-1 text-red-500 text-[9px] font-semibold">
-           <div className="w-1.5 h-1.5 rounded-full bg-red-500" /> Condições não foram cumpridas
+      </div>
+    );
+  }
+
+  // 9. API / WEBHOOK (API / INTEGRATION)
+  if (type === 'api' || type === 'integration') {
+    const url = (cfg.url as string) || (cfg.endpoint as string) || 'https://api.crm.com/webhook';
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-300 font-mono truncate p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/60">
+          <Globe className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+          <span className="truncate">{url}</span>
+        </div>
+        <div className="flex flex-col gap-1.5 mt-1 border-t border-zinc-100 dark:border-zinc-800/80 pt-2">
+          <div className="relative flex items-center justify-between text-xs py-1">
+            <span className="text-zinc-700 dark:text-zinc-300 font-medium">Sucesso</span>
+            <Handle
+              type="source"
+              id="sucesso"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-cyan-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
+          </div>
+          <div className="relative flex items-center justify-between text-xs py-1">
+            <span className="text-rose-500 font-medium">Erro HTTP</span>
+            <Handle
+              type="source"
+              id="erro"
+              position={Position.Right}
+              className="!w-3.5 !h-3.5 !-right-[18px] !bg-rose-500 !border-2 !border-white dark:!border-zinc-900 hover:!scale-125 !transition-all !shadow-sm !rounded-full"
+            />
+          </div>
         </div>
       </div>
     );
   }
 
-  if (type === 'ab_split') {
-    const wa = numberField(config, 'weight_a') ?? 50;
-    const wb = numberField(config, 'weight_b') ?? 50;
+  // 10. FIM (END)
+  if (type === 'end') {
     return (
-      <div className="flex items-center w-full h-6 rounded overflow-hidden text-[10px] font-bold text-white shadow-inner">
-        <div className="bg-fuchsia-500 h-full flex items-center justify-center transition-all" style={{ width: `${wa}%` }}>A: {wa}%</div>
-        <div className="bg-fuchsia-300 text-fuchsia-900 h-full flex items-center justify-center transition-all" style={{ width: `${wb}%` }}>B: {wb}%</div>
+      <div className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-center text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+        🏁 Encerramento da Conversa
       </div>
     );
   }
 
-  if (type === 'api') {
-    const method = stringField(config, 'method') || 'GET';
-    const url = stringField(config, 'url') || 'URL não configurada';
-    return (
-      <div className="flex flex-col gap-1 bg-cyan-50 border border-cyan-200 rounded-lg p-2 text-[10px]">
-        <div className="font-bold text-cyan-700">{method}</div>
-        <div className="text-cyan-600 font-mono truncate">{url}</div>
-      </div>
-    );
-  }
-
-  if (type === 'gpt') {
-    const prompt = config.prompt || config.system_prompt;
-    if (typeof prompt === 'string' && prompt) {
-      return (
-        <div className="text-[10px] text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200 line-clamp-3 leading-relaxed">
-          <span className="opacity-60 font-bold uppercase mr-1">IA:</span>
-          {prompt}
-        </div>
-      );
-    }
-  }
-
-  if (type === 'motor_ref') {
-    const mod = stringField(config, 'module_hint') || '???';
-    return (
-      <div className="bg-rose-50 border border-rose-200 rounded p-2 text-[10px] font-mono text-rose-700 flex flex-col gap-1">
-         <span className="font-bold uppercase text-[9px] opacity-70">Executar Módulo:</span>
-         <span className="truncate">{mod}</span>
-      </div>
-    );
-  }
-
-  if (type === 'anotacao') {
-    const note = stringField(config, 'note');
-    return (
-      <div className="bg-yellow-50 text-yellow-800 p-2 rounded-lg text-[11px] font-medium italic border border-yellow-200 line-clamp-4 leading-relaxed whitespace-pre-wrap">
-        {note || 'Clique para adicionar nota...'}
-      </div>
-    );
-  }
-
-  return null;
-}
-
-function renderConfigHint(d: FlowNodeData) {
-  // Ignora hint visual de delay/module_hint pois já temos previews completos acima para motor_ref e delay (dentro de conteudo).
-  // Mostramos apenas hints pequenos genéricos se precisar.
-  return null;
-}
-
-function stringField(o: Record<string, unknown>, k: string): string | null {
-  const v = o[k];
-  if (typeof v === 'string' && v.trim()) return v;
-  return null;
-}
-
-function numberField(o: Record<string, unknown>, k: string): number | null {
-  const v = o[k];
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  return null;
+  // DEFAULT FALLBACK
+  return (
+    <div className="p-2 text-xs text-zinc-500 dark:text-zinc-400 italic">
+      Clique duas vezes para configurar este nó.
+    </div>
+  );
 }

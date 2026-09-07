@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addEdge,
   applyEdgeChanges,
@@ -225,6 +225,15 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     return doc;
   }, [edges, mutation, nodes]);
 
+  const deleteNode = useCallback(
+    (id: string) => {
+      setNodes((curr) => curr.filter((n) => n.id !== id));
+      setEdges((curr) => curr.filter((e) => e.source !== id && e.target !== id));
+      markDirty();
+    },
+    [markDirty],
+  );
+
   const selectedNode = useMemo(
     () => nodes.find((n) => n.selected) ?? null,
     [nodes],
@@ -243,6 +252,7 @@ export function useFlowState({ blueprintId, initialDoc }: UseFlowStateOpts) {
     onConnect,
     addNode,
     duplicateNode,
+    deleteNode,
     updateNode,
     saveNow,
     undo,

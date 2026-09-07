@@ -13,7 +13,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import MeuMisterioNode from './MeuMisterioNode';
+import AcassiaNode from './AcassiaNode';
 import { DRAG_MIME } from './Palette';
 import type { FlowNodeData } from '../lib/adapt';
 import type { MeuMisterioNodeType } from '../lib/types';
@@ -33,7 +33,7 @@ interface CanvasProps {
   ) => void;
 }
 
-const nodeTypes = { meumisterio: MeuMisterioNode } as const;
+const nodeTypes = { meumisterio: AcassiaNode } as const;
 
 export default function Canvas(props: CanvasProps) {
   return (
@@ -108,8 +108,7 @@ function CanvasInner({
 
   return (
     <div
-      className="h-full w-full transition-colors duration-500"
-      style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #eef2f7 100%)' }}
+      className="h-full w-full bg-[#f8fafc] dark:bg-zinc-950 transition-colors duration-300"
       onDragOver={editable ? handleDragOver : undefined}
       onDrop={editable ? handleDrop : undefined}
     >
@@ -129,15 +128,15 @@ function CanvasInner({
         proOptions={{ hideAttribution: true }}
       >
         <Background 
-          variant={BackgroundVariant.Lines} 
-          gap={24} 
-          size={1} 
-          color="#e2e8f0" 
+          variant={BackgroundVariant.Dots} 
+          gap={20} 
+          size={1.5} 
+          color="#cbd5e1" 
         />
         <Controls 
           position="top-right" 
           showInteractive={false} 
-          className="!mt-4 !mr-4 !bg-white !border-slate-200 !shadow-sm rounded-lg overflow-hidden [&>button]:!border-b [&>button]:!border-slate-100 hover:[&>button]:!bg-slate-50 [&>button]:!text-slate-600" 
+          className="!mt-4 !mr-4 !bg-white dark:!bg-zinc-900 !border-zinc-200 dark:!border-zinc-800 !shadow-md rounded-xl overflow-hidden [&>button]:!border-b [&>button]:!border-zinc-100 dark:[&>button]:!border-zinc-800 hover:[&>button]:!bg-zinc-50 dark:hover:[&>button]:!bg-zinc-800 [&>button]:!text-zinc-600 dark:[&>button]:!text-zinc-300" 
         />
       </ReactFlow>
     </div>
