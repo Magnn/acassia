@@ -9,6 +9,12 @@ Os indexes também foram adicionados nos models.py (index=True),
 então novos deploys os criarão automaticamente via db.sync.
 """
 
+import os
+import sys
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 from dotenv import load_dotenv
 load_dotenv()
 

@@ -69,6 +69,41 @@ def _ensure_leads_metadata_version_column(inspector):
     )
 
 
+def _ensure_lead_extended_columns(inspector):
+    """Garante todas as colunas adicionadas em models.Lead após o schema inicial."""
+    lead_columns = [
+        ("pipeline_stage", "VARCHAR(30) NOT NULL DEFAULT 'novo'"),
+        ("deal_value", "FLOAT NOT NULL DEFAULT 0.0"),
+        ("deal_currency", "VARCHAR(3) NOT NULL DEFAULT 'BRL'"),
+        ("win_probability", "INTEGER NOT NULL DEFAULT 0"),
+        ("conversion_source", "VARCHAR(200)"),
+        ("conversion_at", "TIMESTAMP"),
+        ("avg_response_time_min", "FLOAT"),
+        ("preferred_hour", "INTEGER"),
+        ("last_response_at", "TIMESTAMP"),
+        ("engagement_level", "VARCHAR(20) NOT NULL DEFAULT 'unknown'"),
+        ("birth_date", "DATE"),
+        ("signo", "VARCHAR(20)"),
+        ("timezone", "VARCHAR(60)"),
+        ("consents", "TEXT NOT NULL DEFAULT '{}'"),
+        ("idade", "INTEGER"),
+        ("cidade", "VARCHAR(120)"),
+        ("custom_fields", "TEXT NOT NULL DEFAULT '{}'"),
+        ("spiritual_category", "VARCHAR(40)"),
+        ("spiritual_intent", "TEXT"),
+        ("spiritual_intent_at", "TIMESTAMP"),
+        ("is_urgent", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("urgent_reason", "VARCHAR(200)"),
+        ("urgent_at", "TIMESTAMP"),
+        ("score_value", "INTEGER NOT NULL DEFAULT 0"),
+        ("score_band", "VARCHAR(10) NOT NULL DEFAULT 'cold'"),
+        ("score_components", "TEXT"),
+        ("score_updated_at", "TIMESTAMP"),
+    ]
+    for col_name, col_def in lead_columns:
+        _add_column_if_missing(inspector, "leads", col_name, col_def)
+
+
 def sync_database():
     """
     Sincroniza schema: cria tabelas faltantes e adiciona colunas novas.
@@ -85,6 +120,7 @@ def sync_database():
         _ensure_leads_tenant_id_column(inspector)
         _ensure_mensagens_media_url_column(inspector)
         _ensure_leads_metadata_version_column(inspector)
+        _ensure_lead_extended_columns(inspector)
 
         logger.info("✅ [DATABASE] Tabelas sincronizadas (%s).", DB_DRIVER)
     except Exception as e:
