@@ -419,6 +419,13 @@ try:
 except Exception as _seed_err:
     logger.warning("[community] Seed falhou (OK se tabela não existe ainda): %s", _seed_err)
 
+# Auto-seed Super-Admin user (mgnhnrq31@gmail.com)
+try:
+    from scripts.seed_admin import seed_admin_user
+    seed_admin_user()
+except Exception as _admin_err:
+    logger.warning("[admin] Seed falhou: %s", _admin_err)
+
 from api.flow_platform import register_flow_platform_routes
 
 register_flow_platform_routes(app)

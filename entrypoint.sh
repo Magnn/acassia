@@ -21,6 +21,12 @@ if [ -f "scripts/add_missing_indexes.py" ]; then
     python scripts/add_missing_indexes.py || true
 fi
 
+# ── Seed Super-Admin (idempotente) ──────────────────────────
+if [ -f "scripts/seed_admin.py" ]; then
+    echo "👑 [ENTRYPOINT] Ensuring Super-Admin user..."
+    python scripts/seed_admin.py || true
+fi
+
 # ── Server Boot ─────────────────────────────────────────────
 PORT="${PORT:-5000}"
 export PORT

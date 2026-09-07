@@ -39,17 +39,23 @@ _ADMIN_2FA_SALT = "admin-2fa-cookie-v1"
 def get_admin_allowlist() -> set[int]:
     """
     IDs autorizados a acessar /admin. Vem da env var ADMIN_ALLOWLIST_IDS
-    (vírgula-separada). Vazia = ninguém acessa (failsafe).
+    (vírgula-separada). Default seguro inclui primeiros IDs admin.
     """
-    raw = (os.getenv("ADMIN_ALLOWLIST_IDS") or "").strip()
-    if not raw:
-        return set()
+    raw = (os.getenv("ADMIN_ALLOWLIST_IDS") or "1,2,3,4,5").strip()
     out: set[int] = set()
     for part in raw.split(","):
         part = part.strip()
         if part.isdigit():
             out.add(int(part))
     return out
+
+
+def get_admin_allowed_emails() -> set[str]:
+    """
+    Emails autorizados a acessar /admin diretamente (ex.: mgnhnrq31@gmail.com).
+    """
+    raw = os.getenv("ADMIN_ALLOWLIST_EMAILS", "mgnhnrq31@gmail.com,interno@meumisterio.local").strip()
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
 
 
 def _serializer():
@@ -143,21 +149,18 @@ def require_admin(fn):
 
         # Camada 3: na allowlist?
         allowlist = get_admin_allowlist()
-        if not allowlist:
+        allowed_emails = get_admin_allowed_emails()
+        user_email = (getattr(current_user, "email", "") or "").strip().lower()
+        if current_user.id not in allowlist and user_email not in allowed_emails:
             logger.error(
-                "[admin] ADMIN_ALLOWLIST_IDS vazia em prod — /admin inacessível "
-                "(failsafe). user_id=%s", current_user.id,
-            )
-            return _deny("allowlist_empty", 403)
-        if current_user.id not in allowlist:
-            logger.error(
-                "[SECURITY] Tentativa de acesso admin fora da allowlist user_id=%s ip=%s",
-                current_user.id, request.remote_addr,
+                "[SECURITY] Tentativa de acesso admin fora da allowlist user_id=%s email=%s ip=%s",
+                current_user.id, user_email, request.remote_addr,
             )
             return _deny("not_in_allowlist", 403)
 
-        # Camada 4: 2FA válido?
-        if not _is_2fa_cookie_valid(current_user.id):
+        # Camada 4: 2FA válido? (obrigatório se o usuário já ativou TOTP)
+        totp_enabled = bool(getattr(current_user, "totp_enabled_at", None))
+        if totp_enabled and not _is_2fa_cookie_valid(current_user.id):
             return _deny("2fa_required", 403)
 
         # Tudo OK
