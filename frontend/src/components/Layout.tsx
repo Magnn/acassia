@@ -46,7 +46,7 @@ const NAVIGATION_SECTIONS: NavSection[] = [
     title: 'Principal',
     items: [
       { to: '/blueprints', icon: Workflow, label: 'Funis & Automações' },
-      { to: '/coach', icon: Bot, label: 'Agente de Vendas IA' },
+      { to: '/agents', icon: Bot, label: 'Agentes de IA (WhatsApp)' },
       { to: '/leads', icon: MessageSquare, label: 'Conversas & Inbox' },
       { to: '/dashboard', icon: LayoutDashboard, label: 'Visão Geral' },
       { to: '/pipeline', icon: Kanban, label: 'Pipeline & CRM' },
@@ -58,6 +58,7 @@ const NAVIGATION_SECTIONS: NavSection[] = [
     title: 'Modelos & Recursos',
     items: [
       { to: '/templates', icon: FolderTree, label: 'Templates de Funil' },
+      { to: '/coach', icon: Sparkles, label: 'Copilot Estratégico' },
       { to: '/marketplace', icon: Store, label: 'Marketplace de Fluxos' },
       { to: '/voice', icon: Mic, label: 'Voz & Áudios IA' },
       { to: '/audio-library', icon: Library, label: 'Biblioteca de Mídia' },
