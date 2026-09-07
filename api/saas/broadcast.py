@@ -471,11 +471,18 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
         sent = 0
         failed = 0
 
+        # Pre-fetch leads em lote (elimina N+1 queries de banco no loop)
+        lead_ids = [r.lead_id for r in recipients]
+        leads_cache = {}
+        if lead_ids:
+            for l in db.query(models.Lead).filter(models.Lead.id.in_(lead_ids)).all():
+                leads_cache[l.id] = l
+
         for rec in recipients:
             if campaign.status == "cancelled":
                 break
 
-            lead = db.query(models.Lead).filter_by(id=rec.lead_id).first()
+            lead = leads_cache.get(rec.lead_id)
             if not lead or not lead.telefone:
                 rec.status = "failed"
                 rec.error_reason = "no_phone"

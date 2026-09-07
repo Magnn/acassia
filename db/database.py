@@ -52,8 +52,9 @@ def _int_env(key: str, default: int) -> int:
 
 # ── POOL SETTINGS (ajustados por driver) ──
 if DB_DRIVER == "postgresql":
-    DB_POOL_SIZE = max(5, _int_env("DB_POOL_SIZE", 20))
-    DB_MAX_OVERFLOW = max(0, _int_env("DB_MAX_OVERFLOW", 40))
+    # Tuning conservador seguro: evita 'FATAL: too many connections' em planos compartilhados
+    DB_POOL_SIZE = max(5, _int_env("DB_POOL_SIZE", 15))
+    DB_MAX_OVERFLOW = max(0, _int_env("DB_MAX_OVERFLOW", 20))
     DB_POOL_TIMEOUT = max(3, _int_env("DB_POOL_TIMEOUT", 30))
     DB_POOL_RECYCLE = max(60, _int_env("DB_POOL_RECYCLE", 1800))
 
