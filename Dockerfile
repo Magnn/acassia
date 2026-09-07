@@ -55,12 +55,5 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     FLASK_ENV=production
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
-
-EXPOSE ${PORT}
-
 # Entrypoint: migrations + gunicorn
-# Config em gunicorn_conf.py: monkey-patch gevent + pool dispose on fork
 CMD ["./entrypoint.sh"]
