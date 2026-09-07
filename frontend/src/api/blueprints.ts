@@ -79,6 +79,9 @@ export const blueprintsApi = {
     );
     return data.blueprint;
   },
+  delete: async (id: number): Promise<{ ok: boolean }> => {
+    return api.del<{ ok: boolean }>(`/api/flows/blueprints/${id}`);
+  },
 
   // ── Validação / compilação no servidor ──────────────────────────────
   validate: (doc: Record<string, unknown>) =>

@@ -2,603 +2,463 @@ import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  BarChart2,
-  ChevronDown,
-  ChevronLeft,
-  Folder,
-  FolderOpen,
-  FolderPlus,
-  Home,
-  Link2,
-  MessageCircle,
-  MoreHorizontal,
-  PauseCircle,
-  Pencil,
-  Play,
+  Workflow,
   Plus,
   Search,
-  Trash2,
   Upload,
-  Workflow,
+  Sparkles,
+  ArrowRight,
+  MoreVertical,
+  CheckCircle2,
+  Clock,
+  Trash2,
+  Copy,
+  Download,
+  Calendar,
+  Layers,
+  MessageSquare,
+  HelpCircle,
   X,
 } from 'lucide-react';
 import { blueprintsApi, type BlueprintSummary } from '../api/blueprints';
 import { importBlueprintFromFile } from '../lib/exportImport';
-import {
-  addFolder,
-  deleteFolder,
-  folderOf,
-  readFolders,
-  renameFolder,
-  setFolderOf,
-  writeFolders,
-  type FoldersState,
-} from '../lib/blueprintFolders';
 import { toast } from '../lib/toast';
 
-const INTEGRATIONS = [
-  { id: 'whatsapp', icon: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg', name: 'WhatsApp' },
-  { id: 'kiwify', icon: null, text: 'Ki', name: 'Kiwify' },
-  { id: 'hotmart', icon: null, text: '🔥', name: 'Hotmart' },
-  { id: 'asaas', icon: null, text: 'Asaas', name: 'Asaas' },
-  { id: 'stripe', icon: null, text: 'S', name: 'Stripe' },
+// Modelos pré-definidos de inicialização rápida
+const STARTER_TEMPLATES = [
+  {
+    id: 'comercial',
+    title: 'Funil Comercial & Vendas',
+    desc: 'Apresentação de produtos, qualificação de interesse e direcionamento para fechamento.',
+    badge: 'Mais Popular',
+    color: 'from-indigo-500/20 to-purple-500/20 border-indigo-500/30',
+  },
+  {
+    id: 'agendamento',
+    title: 'Agendamento & Triagem',
+    desc: 'Coleta dados do cliente, tira dúvidas básicas e agenda horários de atendimento.',
+    badge: 'Serviços & Clínicas',
+    color: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30',
+  },
+  {
+    id: 'atendente_ia',
+    title: 'Assistente IA com Transbordo',
+    desc: 'Atendimento 24/7 com IA personalizada e repasse para atendente humano quando necessário.',
+    badge: 'Inteligência Artificial',
+    color: 'from-blue-500/20 to-cyan-500/20 border-blue-500/30',
+  },
 ];
 
 export default function BlueprintsList() {
-  const { data, isLoading, error } = useQuery({
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newFlowTitle, setNewFlowTitle] = useState('');
+  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+
+  // Consulta de Blueprints do Tenant
+  const { data: blueprints = [], isLoading, error } = useQuery({
     queryKey: ['blueprints'],
     queryFn: blueprintsApi.list,
   });
-  const qc = useQueryClient();
-  const navigate = useNavigate();
 
+  // Consulta do status de publicação
+  const { data: publishStatus } = useQuery({
+    queryKey: ['publishStatus'],
+    queryFn: blueprintsApi.publishStatus,
+  });
+
+  const publishedId = publishStatus?.published?.blueprint_id ?? null;
+
+  // Mutação para criar novo fluxo
   const { mutate: createBlueprint, isPending: isCreating } = useMutation({
     mutationFn: blueprintsApi.create,
     onSuccess: (bp: BlueprintSummary) => {
       qc.invalidateQueries({ queryKey: ['blueprints'] });
-      if (activeFolderId && activeFolderId !== 'principal') {
-        const next = setFolderOf(folders, bp.id, activeFolderId);
-        updateFolders(next);
-      }
+      toast.success('Fluxo criado com sucesso!');
       navigate(`/flows/${bp.id}`);
     },
     onError: (err: Error) => {
       toast.error(err.message || 'Erro ao criar fluxo');
     },
   });
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const [folders, setFolders] = useState<FoldersState>(() => readFolders());
-  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const [modalType, setModalType] = useState<
-    'createFlow' | 'createFolder' | 'renameFolder' | 'deleteFolder' | null
-  >(null);
-  const [modalInput, setModalInput] = useState('');
-  const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
-
-  const [selectedIntegration, setSelectedIntegration] = useState('whatsapp');
-  const [selectedEvent, setSelectedEvent] = useState('');
-
-  const updateFolders = (next: FoldersState) => {
-    setFolders(next);
-    writeFolders(next);
-  };
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, BlueprintSummary[]>();
-    for (const f of folders.folders) map.set(f.id, []);
-    for (const bp of data ?? []) {
-      const fid = folderOf(folders, bp.id);
-      const arr = map.get(fid) ?? map.get('principal')!;
-      arr.push(bp);
-    }
-    return map;
-  }, [data, folders]);
-
+  // Importar arquivo JSON
   const onPickFile = async (file: File) => {
-    const newId = await importBlueprintFromFile(file);
-    if (newId) {
-      qc.invalidateQueries({ queryKey: ['blueprints'] });
-      if (activeFolderId && activeFolderId !== 'principal') {
-        updateFolders(setFolderOf(folders, newId, activeFolderId));
+    try {
+      const newId = await importBlueprintFromFile(file);
+      if (newId) {
+        qc.invalidateQueries({ queryKey: ['blueprints'] });
+        toast.success('Fluxo importado com sucesso!');
+        navigate(`/flows/${newId}`);
       }
-      navigate(`/flows/${newId}`);
+    } catch {
+      toast.error('Arquivo de fluxo inválido.');
     }
   };
 
-  const handleModalSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = modalInput.trim();
+  // Filtragem por busca
+  const filteredBlueprints = useMemo(() => {
+    if (!searchQuery.trim()) return blueprints;
+    const q = searchQuery.toLowerCase();
+    return blueprints.filter(
+      (b) => b.title.toLowerCase().includes(q) || b.slug.toLowerCase().includes(q)
+    );
+  }, [blueprints, searchQuery]);
 
-    if (modalType === 'createFlow' && val) {
-      createBlueprint({
-        title: val,
-        integration: selectedIntegration,
-        event: selectedEvent,
-      });
-    } else if (modalType === 'createFolder' && val) {
-      updateFolders(addFolder(folders, val));
-      toast.success('Pasta criada.');
-    } else if (modalType === 'renameFolder' && val && targetFolderId) {
-      updateFolders(renameFolder(folders, targetFolderId, val));
-    } else if (modalType === 'deleteFolder' && targetFolderId) {
-      updateFolders(deleteFolder(folders, targetFolderId));
-      if (activeFolderId === targetFolderId) {
-        setActiveFolderId(null);
-      }
-      toast.success('Pasta removida.');
-    }
-    closeModal();
+  // Criar a partir de modelo starter
+  const handleUseTemplate = (tmpl: typeof STARTER_TEMPLATES[0]) => {
+    createBlueprint({
+      title: tmpl.title,
+      integration: 'whatsapp',
+      event: 'message',
+    });
   };
-
-  const closeModal = () => {
-    setModalType(null);
-    setModalInput('');
-    setTargetFolderId(null);
-    setSelectedIntegration('whatsapp');
-    setSelectedEvent('');
-  };
-
-  const flowsInActiveFolder = activeFolderId ? (grouped.get(activeFolderId) ?? []) : [];
-  const filteredFlows = flowsInActiveFolder.filter((bp) =>
-    bp.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
-    <section className="flex-1 overflow-y-auto bg-bg-primary text-primary flex flex-col">
-      <div className="max-w-6xl w-full mx-auto px-6 py-10">
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <Workflow className="w-7 h-7 text-accent-amethyst" />
-              <h1 className="text-2xl font-bold text-primary tracking-tight">Fluxos de conversa</h1>
-            </div>
-            <p className="text-sm text-secondary mt-1 ml-10">
-              {data ? data.length : 0} fluxos cadastrados
-            </p>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* ═══ HEADER DA PÁGINA ═══ */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold text-white tracking-tight">Fluxos de Conversa</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+              {blueprints.length} {blueprints.length === 1 ? 'fluxo' : 'fluxos'}
+            </span>
           </div>
-          <div className="flex items-center gap-3 self-start md:self-auto ml-10 md:ml-0">
-            <div className="bg-bg-surface border border-border rounded-xl px-3 py-2 flex items-center shadow-sm">
-              <span className="text-sm text-secondary mr-2">Selecione uma int...</span>
-              <ChevronDown className="w-4 h-4 text-secondary" />
-            </div>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+            Construa, simule e publique automações visuais com IA conectadas ao WhatsApp Meta.
+          </p>
+        </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setModalType('createFlow');
-                setModalInput('');
-              }}
-              disabled={isCreating}
-              className="text-sm bg-[#10b981] text-white hover:bg-[#059669] flex items-center gap-2 px-5 py-2.5 rounded-xl shadow-md transition-all font-semibold disabled:opacity-50"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{isCreating ? 'Criando...' : 'Novo fluxo'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setModalType('createFolder');
-                setModalInput('');
-              }}
-              className="text-sm bg-bg-surface border border-border text-primary hover:bg-bg-primary flex items-center gap-2 px-5 py-2.5 rounded-xl shadow-sm transition-all font-semibold"
-            >
-              <FolderPlus className="w-4 h-4" />
-              <span>Nova Pasta</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="text-sm bg-[#ec4899] text-white hover:bg-[#db2777] flex items-center gap-2 px-5 py-2.5 rounded-xl shadow-md transition-all font-semibold"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Importar Fluxo</span>
-            </button>
+        {/* Botões de Ação no padrão ChatbotX/Linear */}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-900 border border-zinc-800 text-zinc-200 hover:bg-zinc-800 hover:text-white transition-all shadow-sm"
+          >
+            <Upload className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Importar JSON</span>
+          </button>
 
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onPickFile(f);
+              e.target.value = '';
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => {
+              setNewFlowTitle('');
+              setIsModalOpen(true);
+            }}
+            disabled={isCreating}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white transition-all shadow-md shadow-indigo-600/20 active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Novo Fluxo</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ BARRA DE BUSCA & FILTRO ═══ */}
+      {blueprints.length > 0 && (
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
-              ref={fileRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onPickFile(f);
-                e.target.value = '';
-              }}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar fluxos por nome ou slug..."
+              className="w-full pl-10 pr-4 py-2 bg-zinc-900/70 border border-zinc-800/80 rounded-xl text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
           </div>
         </div>
+      )}
 
-        {isLoading && <p className="text-secondary ml-10">Carregando fluxos…</p>}
-        {error && <p className="text-red-400 ml-10">Erro: {(error as Error).message}</p>}
+      {/* ═══ ESTADO DE CARREGAMENTO / ERRO ═══ */}
+      {isLoading && (
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          Carregando fluxos do seu workspace...
+        </div>
+      )}
 
-        {!activeFolderId && data && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="mb-6 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-primary font-semibold text-lg ml-2">
-                <Home className="w-5 h-5 text-secondary" />
-                Minhas pastas
-              </div>
+      {error && (
+        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-sm mb-6">
+          Erro ao carregar fluxos: {(error as Error).message}
+        </div>
+      )}
+
+      {/* ═══ LISTAGEM MODERNA DOS FLUXOS (PADRÃO CHATBOTX) ═══ */}
+      {!isLoading && blueprints.length > 0 && (
+        <div className="grid grid-cols-1 gap-3">
+          {filteredBlueprints.length === 0 ? (
+            <div className="py-12 text-center text-zinc-500 text-sm bg-zinc-900/30 border border-zinc-800/50 rounded-2xl">
+              Nenhum fluxo encontrado com o termo "{searchQuery}".
             </div>
+          ) : (
+            filteredBlueprints.map((bp) => {
+              const isPublished = bp.id === publishedId;
+              const formattedDate = bp.updated_at
+                ? new Date(bp.updated_at).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'Recentemente';
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {folders.folders.map((folder) => {
-                const count = (grouped.get(folder.id) ?? []).length;
-                return (
-                  <div
-                    key={folder.id}
-                    onClick={() => setActiveFolderId(folder.id)}
-                    className="group relative cursor-pointer flex flex-col bg-bg-surface border border-border hover:border-accent-amethyst transition-all rounded-2xl p-6 shadow-sm hover:shadow-md"
-                  >
-                    <div className="flex items-start justify-between mb-8">
-                      <Folder className="w-10 h-10 text-accent-amethyst fill-accent-amethyst/20" />
-                      {!folder.system && (
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-bg-primary rounded-lg border border-border p-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setModalType('renameFolder');
-                              setModalInput(folder.name);
-                              setTargetFolderId(folder.id);
-                            }}
-                            className="text-secondary hover:text-primary p-1.5 rounded hover:bg-bg-surface"
-                            title="Renomear"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setModalType('deleteFolder');
-                              setModalInput(folder.name);
-                              setTargetFolderId(folder.id);
-                            }}
-                            className="text-secondary hover:text-red-400 p-1.5 rounded hover:bg-bg-surface"
-                            title="Apagar"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+              return (
+                <div
+                  key={bp.id}
+                  className="group relative flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 rounded-2xl bg-zinc-900/60 hover:bg-zinc-900/90 border border-zinc-800/80 hover:border-zinc-700 transition-all shadow-sm gap-4"
+                >
+                  {/* Informações Principais do Fluxo */}
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                      <Workflow className="w-5 h-5" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/flows/${bp.id}`}
+                          className="font-semibold text-sm sm:text-base text-zinc-100 hover:text-indigo-400 transition-colors truncate"
+                        >
+                          {bp.title}
+                        </Link>
+                        {isPublished ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Publicado no WhatsApp
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-800 text-zinc-400 shrink-0">
+                            Rascunho
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-zinc-300 mt-1">
+                        <span>slug: <code className="text-zinc-200">{bp.slug}</code></span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1 text-zinc-300">
+                          <Clock className="w-3 h-3 text-zinc-400" />
+                          Atualizado em {formattedDate}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ações Rápidas */}
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <Link
+                      to={`/flows/${bp.id}`}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-zinc-800/80 hover:bg-indigo-600 hover:text-white text-zinc-200 transition-all border border-zinc-700/60"
+                    >
+                      <span>Abrir Construtor</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+
+                    {/* Menu de Opções */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setActiveMenuId(activeMenuId === bp.id ? null : bp.id)}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {activeMenuId === bp.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-20"
+                            onClick={() => setActiveMenuId(null)}
+                          />
+                          <div className="absolute right-0 top-full mt-1 w-44 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl py-1.5 z-30 text-xs">
+                            <button
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                window.open(`/api/flows/blueprints/${bp.id}/export`, '_blank');
+                              }}
+                              className="w-full text-left px-3 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center gap-2"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Exportar JSON
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setActiveMenuId(null);
+                                if (confirm(`Deseja excluir o fluxo "${bp.title}"?`)) {
+                                  await blueprintsApi.delete(bp.id);
+                                  qc.invalidateQueries({ queryKey: ['blueprints'] });
+                                  toast.success('Fluxo excluído.');
+                                }
+                              }}
+                              className="w-full text-left px-3 py-2 text-rose-400 hover:bg-rose-950/50 flex items-center gap-2"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Excluir Fluxo
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-primary mb-1">{folder.name}</h3>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-secondary">
-                          {folder.name === 'Pasta Principal' ? 'Todos os fluxos sem pasta' : `${count} fluxo${count !== 1 ? 's' : ''}`}
-                        </span>
-                        <span className="text-[10px] font-bold text-primary">
-                          {folder.system ? 'Pasta principal' : ''}
-                        </span>
-                      </div>
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
-        {activeFolderId && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            <div className="flex items-center justify-between mb-8 border-b border-border pb-4">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setActiveFolderId(null)}
-                  className="p-2.5 rounded-xl border border-border bg-bg-surface hover:bg-bg-primary transition-all text-secondary hover:text-primary shadow-sm"
-                  title="Voltar para pastas"
+      {/* ═══ EMPTY STATE COM MODELOS PRONTOS (QUANDO 0 FLUXOS) ═══ */}
+      {!isLoading && blueprints.length === 0 && (
+        <div className="mt-4">
+          <div className="p-8 sm:p-10 rounded-3xl bg-zinc-900/40 border border-zinc-800/80 text-center mb-8 relative overflow-hidden">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mb-4 shadow-inner">
+              <Sparkles className="w-7 h-7" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Crie seu primeiro fluxo de WhatsApp</h2>
+            <p className="text-sm text-zinc-400 max-w-lg mx-auto mb-6">
+              Automações visuais permitem captar clientes, tirar dúvidas com inteligência artificial e fechar vendas no piloto automático.
+            </p>
+            <button
+              onClick={() => {
+                setNewFlowTitle('');
+                setIsModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-600/25 active:scale-[0.98] transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Criar Fluxo em Branco</span>
+            </button>
+          </div>
+
+          {/* Modelos Recomendados */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Layers className="w-4 h-4 text-indigo-400" />
+              <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-300">
+                Ou comece com um modelo profissional pronto
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {STARTER_TEMPLATES.map((tmpl) => (
+                <div
+                  key={tmpl.id}
+                  className="p-5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700 flex flex-col justify-between transition-all group"
                 >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-semibold text-primary">
-                    <Home className="w-4 h-4 inline-block mr-2 text-secondary mb-1" />
-                    Minhas pastas / {folders.folders.find((f) => f.id === activeFolderId)?.name || 'Pasta'}
-                  </h2>
-                </div>
-              </div>
-
-              <div className="relative w-full max-w-lg">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-secondary" />
-                </div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-border rounded-xl leading-5 bg-bg-surface text-primary placeholder-secondary focus:outline-none focus:bg-bg-primary focus:ring-1 focus:ring-accent-amethyst focus:border-accent-amethyst sm:text-sm transition-colors shadow-sm"
-                  placeholder="Pesquisar..."
-                />
-              </div>
-            </div>
-
-            {filteredFlows.length === 0 ? (
-              <div className="bg-bg-surface border border-border border-dashed rounded-2xl p-12 text-center">
-                <Workflow className="w-10 h-10 text-secondary/40 mx-auto mb-3" />
-                <h3 className="text-primary font-medium mb-1">Nenhum fluxo encontrado</h3>
-                <p className="text-sm text-secondary">
-                  {searchQuery ? 'Tente outro termo de busca.' : 'Crie um novo fluxo nesta pasta para começar.'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredFlows.map((bp) => (
-                  <BlueprintCard
-                    key={bp.id}
-                    bp={bp}
-                    folders={folders}
-                    onMoveTo={(fid) => updateFolders(setFolderOf(folders, bp.id, fid))}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {modalType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className={`${modalType === 'createFlow' ? 'max-w-2xl' : 'max-w-md'} bg-bg-surface w-full rounded-2xl shadow-2xl border border-border relative animate-in fade-in zoom-in-95 duration-200 overflow-hidden`}>
-            
-            {modalType === 'createFlow' ? (
-              <>
-                <div className="bg-accent-amethyst px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-white">
-                    <Workflow className="w-5 h-5" />
-                    <h2 className="text-lg font-bold">Criar um novo fluxo</h2>
+                  <div>
+                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300 mb-3">
+                      {tmpl.badge}
+                    </span>
+                    <h4 className="font-bold text-sm text-zinc-100 group-hover:text-indigo-400 transition-colors mb-1.5">
+                      {tmpl.title}
+                    </h4>
+                    <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                      {tmpl.desc}
+                    </p>
                   </div>
-                  <button onClick={closeModal} className="text-white/80 hover:text-white transition-colors bg-white/20 hover:bg-white/30 rounded-full p-1">
-                    <X className="w-5 h-5" />
+
+                  <button
+                    onClick={() => handleUseTemplate(tmpl)}
+                    disabled={isCreating}
+                    className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-indigo-600 text-zinc-200 hover:text-white transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <span>Usar este modelo</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
-
-                <div className="p-8">
-                  <form onSubmit={handleModalSubmit}>
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-primary mb-1">
-                        Título do fluxo <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        autoFocus
-                        required
-                        value={modalInput}
-                        onChange={(e) => setModalInput(e.target.value)}
-                        className="w-full bg-bg-primary border border-border rounded-xl px-4 py-3 text-primary text-sm focus:outline-none focus:border-accent-amethyst focus:ring-1 focus:ring-accent-amethyst transition-all shadow-sm"
-                        placeholder="Crie um nome de fácil memorização"
-                      />
-                      <p className="text-[11px] text-secondary/60 mt-1">O nome deve conter no mínimo 4 caracteres</p>
-                    </div>
-
-                    <div className="grid grid-cols-5 gap-3 mb-8">
-                      {INTEGRATIONS.map(int => (
-                        <button
-                          key={int.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedIntegration(int.id);
-                            setSelectedEvent('');
-                          }}
-                          className={`aspect-square rounded-xl border flex items-center justify-center transition-all bg-bg-primary ${
-                            selectedIntegration === int.id 
-                              ? 'border-accent-amethyst shadow-[0_0_0_1px_#8b5cf6]' 
-                              : 'border-border hover:border-secondary grayscale hover:grayscale-0'
-                          }`}
-                          title={int.name}
-                        >
-                          {int.icon ? (
-                            <img src={int.icon} alt={int.name} className="w-8 h-8 object-contain" />
-                          ) : (
-                            <span className="font-bold text-secondary text-lg">{int.text}</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="relative mb-6">
-                      <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                        <div className="w-full border-t border-border"></div>
-                      </div>
-                      <div className="relative flex justify-center">
-                        <span className="px-3 bg-bg-surface text-xs font-medium text-secondary">
-                          Evento de gatilho <span className="text-primary font-bold">{INTEGRATIONS.find(i => i.id === selectedIntegration)?.name || 'WhatsApp'}</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mb-8">
-                      <label className="block text-sm font-medium text-primary mb-1">
-                        Evento <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        required
-                        value={selectedEvent}
-                        onChange={(e) => setSelectedEvent(e.target.value)}
-                        className="w-full bg-bg-primary border border-border rounded-xl px-4 py-3 text-primary text-sm focus:outline-none focus:border-accent-amethyst focus:ring-1 focus:ring-accent-amethyst transition-all shadow-sm appearance-none"
-                      >
-                        <option value="" disabled>Selecione um evento</option>
-                        {selectedIntegration === 'whatsapp' ? (
-                          <>
-                            <option value="keyword">Mensagem de palavra-chave</option>
-                            <option value="message_received">Qualquer mensagem recebida</option>
-                            <option value="inicio_conversa">Início de conversa</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="purchase">Compra aprovada</option>
-                            <option value="abandon">Carrinho abandonado</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isCreating}
-                      className="w-full bg-[#d8b4fe] hover:bg-[#c084fc] text-purple-900 font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center"
-                    >
-                      {isCreating ? 'Salvando...' : 'Salvar Fluxo'}
-                    </button>
-                    <p className="text-xs text-secondary text-center mt-3 leading-relaxed">
-                      Você pode utilizar palavras ou frases como palavra-chave. O fluxo será acionado quando o cliente enviar uma mensagem exatamente igual à palavra-chave. Uma dica é copiar o texto pronto que está configurado na sua campanha de mensagem.
-                    </p>
-                  </form>
-                </div>
-              </>
-            ) : (
-              <div className="p-6">
-                <button
-                  onClick={closeModal}
-                  className="absolute right-4 top-4 text-secondary hover:text-primary transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <h2 className="text-lg font-bold text-primary mb-1">
-                  {modalType === 'createFolder' && 'Nova pasta'}
-                  {modalType === 'renameFolder' && 'Renomear pasta'}
-                  {modalType === 'deleteFolder' && 'Apagar pasta'}
-                </h2>
-                <p className="text-sm text-secondary mb-4">
-                  {modalType === 'deleteFolder'
-                    ? `Tem certeza que deseja apagar a pasta "${modalInput}"? Os fluxos voltarão para a Pasta Principal.`
-                    : 'Insira o nome desejado abaixo.'}
-                </p>
-                <form onSubmit={handleModalSubmit}>
-                  {modalType !== 'deleteFolder' && (
-                    <input
-                      type="text"
-                      autoFocus
-                      required
-                      value={modalInput}
-                      onChange={(e) => setModalInput(e.target.value)}
-                      className="w-full bg-bg-primary border border-border rounded-xl px-4 py-3 text-primary text-sm focus:outline-none focus:border-accent-amethyst focus:ring-1 focus:ring-accent-amethyst transition-all mb-6 shadow-sm"
-                      placeholder="Nome da pasta"
-                    />
-                  )}
-                  <div className="flex justify-end gap-3 mt-4">
-                    <button
-                      type="button"
-                      onClick={closeModal}
-                      className="px-5 py-2.5 rounded-xl text-sm font-bold text-secondary hover:bg-bg-primary hover:text-primary transition-all border border-transparent hover:border-border"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-md transition-all ${
-                        modalType === 'deleteFolder'
-                          ? 'bg-red-500 hover:bg-red-600'
-                          : 'bg-accent-amethyst hover:bg-accent-amethyst/90'
-                      }`}
-                    >
-                      {modalType === 'deleteFolder' ? 'Apagar' : 'Confirmar'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         </div>
       )}
-    </section>
-  );
-}
 
-function BlueprintCard({
-  bp,
-  folders,
-  onMoveTo,
-}: {
-  bp: BlueprintSummary;
-  folders: FoldersState;
-  onMoveTo: (folderId: string) => void;
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const isPaused = bp.slug?.includes('esmeralda');
+      {/* ═══ MODAL MODERNO DE CRIAÇÃO DE FLUXO ═══ */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="absolute right-4 top-4 text-zinc-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-  return (
-    <div className="relative flex flex-col bg-bg-surface border border-border rounded-2xl shadow-sm hover:shadow-md transition-all bg-white">
-      <div className="p-4 flex items-start justify-between">
-        <div className="flex items-start gap-3">
-          <div className="bg-[#25D366]/10 p-2 rounded-full">
-            <MessageCircle className="w-5 h-5 text-[#25D366] fill-[#25D366]" />
-          </div>
-          <div>
-            <Link to={`/flows/${bp.id}`} className="font-bold text-primary hover:text-accent-amethyst transition-colors block text-base leading-none mb-1.5">
-              {bp.title}
-            </Link>
-            <div className="flex items-center text-xs text-[#3b82f6] font-medium">
-              <span>Enviou palavra chave</span>
-              <Link2 className="w-3.5 h-3.5 ml-1" />
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <Workflow className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Criar Novo Fluxo</h3>
+                <p className="text-xs text-zinc-400">Dê um nome para o seu funil de atendimento</p>
+              </div>
             </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newFlowTitle.trim()) {
+                  createBlueprint({
+                    title: newFlowTitle.trim(),
+                    integration: 'whatsapp',
+                    event: 'message',
+                  });
+                  setIsModalOpen(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Nome do Fluxo
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  value={newFlowTitle}
+                  onChange={(e) => setNewFlowTitle(e.target.value)}
+                  placeholder="ex: Funil de Boas-Vindas & Vendas"
+                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-zinc-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newFlowTitle.trim() || isCreating}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                >
+                  {isCreating ? 'Criando...' : 'Criar e Abrir Construtor'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-xs font-bold text-primary">Automação Id:</div>
-          <div className="text-xs text-secondary">#{bp.id + 75600}</div>
-        </div>
-      </div>
-      
-      <div className="h-px w-full bg-border" />
-
-      <div className="p-3 px-4 flex items-center justify-between bg-bg-primary/50 rounded-b-2xl">
-        <div className="text-xs text-secondary font-medium">
-          Última execução: {isPaused ? <span className="font-bold text-primary">há 17 dias</span> : '---'}
-        </div>
-        
-        <div className="flex items-center gap-1.5 relative">
-          <button className="p-1.5 rounded-full hover:bg-bg-primary transition-colors text-accent-amethyst">
-            {isPaused ? <PauseCircle className="w-5 h-5 text-red-500" /> : <Play className="w-4 h-4 fill-accent-amethyst" />}
-          </button>
-          <button className="p-1.5 rounded hover:bg-bg-primary transition-colors text-[#10b981]">
-            <BarChart2 className="w-4 h-4" />
-          </button>
-          
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              setMenuOpen((v) => !v);
-            }}
-            className="p-1.5 rounded hover:bg-bg-primary transition-colors text-secondary border border-transparent hover:border-border"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
-
-          {menuOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen(false);
-                }}
-              />
-              <ul className="absolute right-0 bottom-full mb-1 z-20 w-48 bg-bg-surface border border-border rounded-xl shadow-xl py-1 overflow-hidden">
-                <li className="px-4 py-2 text-[10px] uppercase font-bold tracking-widest text-secondary/60 bg-bg-primary border-b border-border">
-                  Mover para pasta
-                </li>
-                {folders.folders.map((f) => (
-                  <li key={f.id}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMoveTo(f.id);
-                        setMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-secondary hover:text-primary hover:bg-bg-primary transition-colors"
-                    >
-                      {f.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
