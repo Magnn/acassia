@@ -2,8 +2,11 @@
 {% block title %}Entrar — Meu Mistério SaaS{% endblock %}
 {% block content %}
 <div class="text-center mb-8">
-  <h1 class="text-3xl font-bold mb-2">🔮 Meu Mistério</h1>
-  <p class="text-slate-400 text-sm">Entrar na plataforma</p>
+  <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-purple-600/30 text-white font-black">
+    ⚡
+  </div>
+  <h1 class="text-3xl font-extrabold mb-1 tracking-tight text-white">Entrar na Acássia</h1>
+  <p class="text-slate-400 text-sm">Acesse seu painel de funis e atendimento</p>
 </div>
 <form method="POST" action="{{ url_for('saas_auth.login') }}" class="space-y-4">
   <div>

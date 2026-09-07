@@ -75,11 +75,25 @@ def tenant_override_ctx(tenant_id: Optional[str]) -> Iterator[Optional[str]]:
 
 
 def get_request_tenant_id() -> str:
-    """Rotas Flask: header ou query; fallback env; default default."""
+    """Rotas Flask: session current_user; header ou query; fallback env; default default."""
     try:
         from flask import has_request_context, request
 
         if has_request_context():
+            # 1. Se autenticado via flask-login, tenant_id do usuário é prioridade natural
+            from flask_login import current_user
+            if getattr(current_user, "is_authenticated", False):
+                user_tid = getattr(current_user, "tenant_id", None)
+                # Super-admin pode inspecionar outro tenant via header explícito
+                h = (request.headers.get("X-Meu Mistério-Tenant") or "").strip()
+                if h and getattr(current_user, "role", "") == "admin":
+                    return normalize_tenant_id(h)
+                q = (request.args.get("tenant") or "").strip()
+                if q and getattr(current_user, "role", "") == "admin":
+                    return normalize_tenant_id(q)
+                if user_tid:
+                    return normalize_tenant_id(user_tid)
+
             h = (request.headers.get("X-Meu Mistério-Tenant") or "").strip()
             if h:
                 return normalize_tenant_id(h)
