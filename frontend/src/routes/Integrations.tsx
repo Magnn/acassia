@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -8,9 +9,13 @@ import {
   Webhook,
   MessageSquare,
   Code,
+  Send,
+  FileJson,
+  BookOpen,
 } from 'lucide-react';
 import { integrationsApi } from '../api/integrations';
 import { toast } from '../lib/toast';
+import { api } from '../api/client';
 import WhatsAppConnect from '../components/WhatsAppConnect';
 
 export default function Integrations() {
@@ -122,6 +127,139 @@ export default function Integrations() {
             </div>
           </div>
         </section>
+
+        {/* Telegram Bot Channel */}
+        <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
+          <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400">
+                <Send className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-widest">Canal Telegram Bot</h3>
+                <p className="text-[11px] text-secondary">Conecte seu bot do Telegram ao motor inteligente e atenda pelo mesmo Inbox</p>
+              </div>
+            </div>
+            <a
+              href="https://t.me/BotFather"
+              target="_blank"
+              rel="noopener"
+              className="text-xs px-3.5 py-1.5 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 border border-sky-500/30 rounded-xl font-bold transition-all flex items-center gap-1.5"
+            >
+              Criar Bot no @BotFather <ExternalLink className="w-3 h-3" />
+            </a>
+          </header>
+          <div className="px-6 py-5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="md:col-span-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-secondary block mb-1.5">
+                  Token do Bot Telegram (fornecido pelo @BotFather)
+                </label>
+                <input
+                  type="password"
+                  id="telegram-token-input"
+                  placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                  className="w-full bg-bg-primary border border-border rounded-xl px-3.5 py-2.5 text-xs font-mono text-primary focus:outline-none focus:border-sky-500"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const el = document.getElementById('telegram-token-input') as HTMLInputElement;
+                    const token = el ? el.value.trim() : '';
+                    if (!token) {
+                      toast.error('Insira o token do bot.');
+                      return;
+                    }
+                    try {
+                      const res = await fetch('/api/webhooks/telegram/setup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          bot_token: token,
+                          tenant_id: 'default',
+                          server_url: window.location.origin,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (data.ok) {
+                        toast.success('Webhook do Telegram ativado com sucesso!');
+                      } else {
+                        toast.error(data.telegram_response?.description || 'Falha ao registrar webhook.');
+                      }
+                    } catch (err: any) {
+                      toast.error(err?.message || 'Erro de conexão.');
+                    }
+                  }}
+                  className="w-full py-2.5 px-4 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-sky-500/20"
+                >
+                  Ativar Webhook
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] text-secondary">
+              <span className="flex items-center gap-1.5">✓ Mensagens chegam com tag <code className="text-sky-400">telegram</code></span>
+              <span className="flex items-center gap-1.5">✓ Handoff humano e motor ativo</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Swagger & n8n / Make Automation Hub */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Swagger UI */}
+          <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col justify-between">
+            <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-widest">Documentação Swagger UI</h3>
+                <p className="text-[11px] text-secondary">Especificação OpenAPI 3.0 interativa</p>
+              </div>
+            </header>
+            <div className="p-6 space-y-4 flex-1">
+              <p className="text-xs text-secondary leading-relaxed">
+                Acesse o console interativo do Swagger para testar requisições, visualizar os schemas de endpoints e integrar sistemas externos com facilidade.
+              </p>
+              <a
+                href="/api/docs"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm"
+              >
+                Abrir Swagger UI <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </section>
+
+          {/* n8n / Make Template */}
+          <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col justify-between">
+            <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                <FileJson className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-widest">Workflow Oficial n8n</h3>
+                <p className="text-[11px] text-secondary">Template JSON pronto para importação</p>
+              </div>
+            </header>
+            <div className="p-6 space-y-4 flex-1">
+              <p className="text-xs text-secondary leading-relaxed">
+                Importe nosso template no n8n ou Make com nós prontos para capturar leads, acionar tags e disparar mensagens automáticas.
+              </p>
+              <div className="flex gap-2">
+                <a
+                  href="/assets/integrations/n8n_acassia_workflow.json"
+                  download="n8n_acassia_workflow.json"
+                  className="flex-1 text-center py-2.5 px-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm"
+                >
+                  Baixar JSON n8n
+                </a>
+              </div>
+            </div>
+          </section>
+        </div>
 
         {/* Webhooks */}
         <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">

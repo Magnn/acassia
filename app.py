@@ -315,6 +315,8 @@ def _register_saas_blueprints():
     from api.saas.ritual import ritual_bp as saas_ritual_bp
     from api.public.v1.astrology import public_astro_bp
     from api.public.webchat import webchat_bp
+    from api.public.swagger_docs import swagger_bp
+    from api.public.telegram_webhook import telegram_bp
     from api.saas.broadcast import broadcast_bp as saas_broadcast_bp
     from api.saas.events import events_bp as saas_events_bp
     from api.saas.content import content_bp as saas_content_bp
@@ -373,7 +375,7 @@ def _register_saas_blueprints():
         saas_calendar_bp, saas_integrations_wa_bp,
         saas_audio_lib_bp, saas_daily_msg_bp, saas_sched_tarot_bp,
         saas_persona_bp, saas_exp_bp, saas_realtime_bp,
-        saas_api_keys_bp, saas_ritual_bp, public_astro_bp, webchat_bp,
+        saas_api_keys_bp, saas_ritual_bp, public_astro_bp, webchat_bp, swagger_bp, telegram_bp,
         saas_broadcast_bp, saas_events_bp,
         saas_content_bp, saas_coupons_bp,
         saas_scheduling_bp, saas_subscriptions_bp,

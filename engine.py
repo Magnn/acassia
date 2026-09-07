@@ -1511,10 +1511,10 @@ class Engine:
                     logger.warning("⚠️ [FILA] dispatch_started patch falhou lead=%s: %s", lead_id, e)
             # Só neste disparo: evita repetir o mesmo balão fatiado duas vezes na mesma lista de ações.
             dedup_texto_neste_lote: Set[str] = set()
-            is_web_channel = str(ctx.telefone or "").startswith("web_")
+            is_fast_channel = str(ctx.telefone or "").startswith(("web_", "tg_"))
             for acao in acoes:
                 if acao.tipo == "delay":
-                    if is_web_channel:
+                    if is_fast_channel:
                         time.sleep(0.05)
                     else:
                         fator = 0.10 if acao.segundos < 5 else 0.20
@@ -1522,7 +1522,7 @@ class Engine:
                         time.sleep(max(0.5, acao.segundos + random.uniform(-jitter, jitter)))
 
                 elif acao.tipo == "typing":
-                    if not is_web_channel:
+                    if not is_fast_channel:
                         _meta_ty = getattr(acao, "metadata", None) or {}
                         _kind = str(_meta_ty.get("whatsapp_typing") or "text").strip().lower()
                         if _kind not in ("text", "audio"):
@@ -1651,12 +1651,12 @@ class Engine:
                             self._salvar_mensagem(db, lead_id, "bot", balao_limpo, "text", auto_commit=False)
                             enviados += 1
                             pendentes_db += 1
-                            if is_web_channel or pendentes_db >= batch_commit:
+                            if is_fast_channel or pendentes_db >= batch_commit:
                                 db.commit()
                                 pendentes_db = 0
                         else:
                             falhas += 1
-                        if not is_web_channel:
+                        if not is_fast_channel:
                             time.sleep(delay_entre_baloes())
                         ultimo_tipo_enviado = "text"
 
@@ -2924,7 +2924,7 @@ class Engine:
 
     def _enviar_typing_indicator(self, telefone: str, kind: str) -> bool:
         """Indicador 'digitando' ou 'gravando áudio' (Cloud API `typing`)."""
-        if str(telefone or "").startswith("web_"):
+        if str(telefone or "").startswith(("web_", "tg_")):
             return True
         if not self._circuit.pode_tentar():
             return False
@@ -2973,7 +2973,7 @@ class Engine:
         *,
         audio_voice: bool = False,
     ) -> bool:
-        if str(telefone or "").startswith("web_"):
+        if str(telefone or "").startswith(("web_", "tg_")):
             return True
         if not self._circuit.pode_tentar():
             return False

@@ -1,0 +1,97 @@
+{
+  "name": "Acássia SaaS — Fluxo Oficial de Automação n8n",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "acassia-novo-lead",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      },
+      "name": "Webhook: Novo Lead ou Evento",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.event }}",
+              "value2": "lead.created"
+            }
+          ]
+        }
+      },
+      "name": "Condição: É Novo Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://acassia-production.up.railway.app/saas/inbox/{{ $json.body.lead_id }}/tags",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "tag",
+              "value": "n8n_qualificado"
+            }
+          ]
+        }
+      },
+      "name": "Acássia: Adicionar Tag",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [720, 200]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "=https://acassia-production.up.railway.app/saas/inbox/{{ $json.body.lead_id }}/takeover/data",
+        "options": {}
+      },
+      "name": "Acássia: Pausar Robô (Takeover)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [720, 380]
+    }
+  ],
+  "connections": {
+    "Webhook: Novo Lead ou Evento": {
+      "main": [
+        [
+          {
+            "node": "Condição: É Novo Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Condição: É Novo Lead?": {
+      "main": [
+        [
+          {
+            "node": "Acássia: Adicionar Tag",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Acássia: Pausar Robô (Takeover)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1.0.0"
+}
