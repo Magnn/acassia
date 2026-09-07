@@ -29,7 +29,7 @@ import logging
 import math
 from typing import Any, Optional
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
+from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify, has_request_context
 from flask_login import current_user, login_required
 
 from db import models
@@ -359,6 +359,7 @@ def save_whatsapp(
         binding.waba_id = waba_id
         binding.display_phone_number = info.get("display_phone_number") if isinstance(info, dict) else None
         binding.verify_token = binding.verify_token or _secrets.token_urlsafe(32)
+        binding.webhook_path = binding.webhook_path or f"wh_{_secrets.token_urlsafe(24)}"
         binding.status = "pending" if skip_validation else "active"
         binding.last_verified_at = None if skip_validation else _dt.now(_tz.utc)
         binding.last_error = None
@@ -422,7 +423,9 @@ def save_whatsapp(
         # Webhook URL pra UI mostrar
         import os
         public_url = (os.getenv("PUBLIC_URL") or "").rstrip("/")
-        webhook_url = f"{public_url}/webhook" if public_url else "/webhook"
+        if not public_url and has_request_context():
+            public_url = request.host_url.rstrip("/")
+        webhook_url = f"{public_url}/webhook/{binding.webhook_path}"
 
         return {
             "phone_number_id": binding.phone_number_id,

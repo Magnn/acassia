@@ -291,6 +291,31 @@ def test_readiness_requires_authentication(client):
     assert client.get("/saas/onboarding/readiness").status_code == 302
 
 
+def test_whatsapp_uses_request_host_and_preserves_webhook_path(logged_in_client, monkeypatch):
+    client, user = logged_in_client
+    monkeypatch.delenv("PUBLIC_URL", raising=False)
+    payload = {"phone_number_id": "123456789", "waba_id": "987654321", "access_token": "EAAxxxxxxxxxxxxxxxxxx"}
+    first = client.post("/saas/onboarding/whatsapp", json=payload, base_url="https://app.example.test")
+    assert first.status_code == 200
+    url = first.json["binding"]["webhook_url"]
+    assert url.startswith("https://app.example.test/webhook/wh_")
+    second = client.post("/saas/onboarding/whatsapp", json=payload, base_url="https://app.example.test")
+    assert second.json["binding"]["webhook_url"] == url
+
+
+@pytest.mark.parametrize("delivery_status,expected", [(None, False), ("failed", False), ("sent", True), ("delivered", True), ("read", True)])
+def test_readiness_requires_successful_outbound_status(delivery_status, expected):
+    from launch_readiness import launch_readiness
+    with SessionLocal() as db:
+        lead = models.Lead(tenant_id="readiness-delivery", telefone="5592999991111")
+        db.add(lead)
+        db.flush()
+        db.add(models.Mensagem(lead_id=lead.id, remetente="bot", texto="Resposta", delivery_status=delivery_status))
+        db.commit()
+    steps = {s["key"]: s["completed"] for s in launch_readiness("readiness-delivery")["steps"]}
+    assert steps["reply"] is expected
+
+
 def test_readiness_is_scoped_to_logged_in_tenant(logged_in_client):
     client, user = logged_in_client
     save_persona("other", "Ana", "direto", "Atendimento da nossa empresa", [])

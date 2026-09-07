@@ -22,7 +22,8 @@ def launch_readiness(tenant_id: str) -> dict:
         ).first() if publication and publication.published_blueprint_id else None
         valid = bool(published and validate_flow_document(published.body_json or {}, strict=True).get("ok"))
         sent = db.query(models.Mensagem).join(models.Lead, models.Mensagem.lead_id == models.Lead.id).filter(
-            models.Lead.tenant_id == tenant_id, models.Mensagem.remetente == "bot"
+            models.Lead.tenant_id == tenant_id, models.Mensagem.remetente == "bot",
+            models.Mensagem.delivery_status.in_(("sent", "delivered", "read")),
         ).first() is not None
         steps = [
             ("business", "Configurar atendente e oferta", bool(agent and variables.get("oferta.nome")), "/onboarding"),

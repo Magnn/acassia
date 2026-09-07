@@ -337,7 +337,7 @@ function TemplateStep({ onSave, isPending }: { onSave: (d: TemplateDraft) => voi
   const [selectedId, setSelectedId] = useState<string>('em_branco');
   const [previewing, setPreviewing] = useState<FlowTemplate | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error: templatesError } = useQuery({
     queryKey: ['onboarding-templates'],
     queryFn: () => templatesApi.list(),
   });
@@ -356,6 +356,7 @@ function TemplateStep({ onSave, isPending }: { onSave: (d: TemplateDraft) => voi
         </p>
       </div>
 
+      {templatesError && <p role="alert" className="text-sm text-secondary">Não foi possível carregar os kits do catálogo. Você pode usar o modelo comercial ou começar em branco.</p>}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-pulse">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -490,9 +491,9 @@ function KitPreviewModal({
     queryFn: () => templatesApi.get(template.id),
   });
 
-  const nodes = detail?.blueprint_json
-    ? (detail.blueprint_json as { nodes?: Array<{ id: string; type: string; text?: string }> }).nodes || []
-    : [];
+  type PreviewNode = { id: string; type: string; label?: string; text?: string; config?: { body?: string; content_text?: string; question?: string } };
+  const document = detail?.blueprint_json as { graph?: { nodes?: PreviewNode[] }; nodes?: PreviewNode[] } | undefined;
+  const nodes = document?.graph?.nodes ?? document?.nodes ?? [];
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
@@ -502,7 +503,7 @@ function KitPreviewModal({
             <h2 className="text-xl font-black tracking-tight truncate">{template.name}</h2>
             <p className="text-xs text-secondary mt-1 line-clamp-2">{template.description}</p>
           </div>
-          <button onClick={onClose} className="text-secondary hover:text-primary text-2xl leading-none flex-shrink-0">
+          <button aria-label="Fechar prévia" onClick={onClose} className="text-secondary hover:text-primary text-2xl leading-none flex-shrink-0">
             ×
           </button>
         </div>
@@ -525,9 +526,7 @@ function KitPreviewModal({
                       <span className="text-[10px] text-secondary">·</span>
                       <span className="text-[10px] font-mono text-secondary truncate">{n.id}</span>
                     </div>
-                    {n.text && (
-                      <p className="text-xs text-primary whitespace-pre-wrap leading-relaxed">{n.text}</p>
-                    )}
+                    <p className="text-xs text-primary whitespace-pre-wrap leading-relaxed">{n.text || n.config?.content_text || n.config?.body || n.config?.question || n.label || 'Configure esta etapa no editor.'}</p>
                   </div>
                 </div>
               ))}
@@ -633,7 +632,7 @@ function WhatsAppStep() {
           <ShieldCheck className="w-6 h-6 text-amber-500" />
         </div>
         <div className="text-xs text-amber-600/90 leading-relaxed font-medium space-y-1">
-          <div>Token de acesso e app secret são criptografados por tenant.</div>
+          <div>Use as credenciais do número que deseja conectar a esta conta.</div>
           <a
             href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
             target="_blank"
@@ -686,6 +685,7 @@ function WhatsAppStep() {
             <button
               type="button"
               onClick={() => setShowToken(!showToken)}
+              aria-label={showToken ? 'Ocultar token' : 'Mostrar token'}
               className="absolute right-4 top-4 text-secondary hover:text-primary"
             >
               {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
