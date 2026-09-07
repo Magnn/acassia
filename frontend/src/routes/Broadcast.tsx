@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, Plus, Users, CheckCircle2, XCircle, Clock, Eye, Megaphone } from 'lucide-react';
+import { Send, Plus, Users, CheckCircle2, XCircle, Clock, Megaphone, CalendarClock } from 'lucide-react';
 import { broadcastApi, type Campaign } from '../api/saas';
 import { handleApiError } from '../lib/handleApiError';
 import { toast } from '../lib/toast';
@@ -60,8 +60,10 @@ function CampaignCard({ campaign: c, onRefresh }: { campaign: Campaign; onRefres
 
   const statusConfig: Record<string, { color: string; label: string; Icon: typeof Clock }> = {
     draft: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/30', label: 'Rascunho', Icon: Clock },
+    scheduled: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/30', label: 'Agendado', Icon: CalendarClock },
     sending: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/30', label: 'Enviando', Icon: Send },
     sent: { color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30', label: 'Enviado', Icon: CheckCircle2 },
+    completed: { color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30', label: 'Concluído', Icon: CheckCircle2 },
     failed: { color: 'text-red-400 bg-red-500/10 border-red-500/30', label: 'Falhou', Icon: XCircle },
   };
   const cfg = statusConfig[c.status] || statusConfig.draft;
@@ -79,7 +81,14 @@ function CampaignCard({ campaign: c, onRefresh }: { campaign: Campaign; onRefres
         <span className="flex items-center gap-1"><Users className="w-3 h-3" />{c.total_recipients} destinatários</span>
         <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />{c.total_delivered} entregues</span>
         {c.total_failed > 0 && <span className="flex items-center gap-1 text-red-400"><XCircle className="w-3 h-3" />{c.total_failed} falhas</span>}
-        <span>{new Date(c.created_at).toLocaleDateString('pt-BR')}</span>
+        {c.scheduled_at ? (
+          <span className="flex items-center gap-1 text-blue-400">
+            <CalendarClock className="w-3 h-3" />
+            {new Date(c.scheduled_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+          </span>
+        ) : (
+          <span>{new Date(c.created_at).toLocaleDateString('pt-BR')}</span>
+        )}
       </div>
       {c.status === 'draft' && (
         <div className="flex gap-2">
@@ -89,7 +98,7 @@ function CampaignCard({ campaign: c, onRefresh }: { campaign: Campaign; onRefres
           </button>
         </div>
       )}
-      {c.status === 'sent' && c.total_recipients > 0 && (
+      {(c.status === 'sent' || c.status === 'completed') && c.total_recipients > 0 && (
         <div className="w-full bg-bg-primary rounded-full h-2 mt-1">
           <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${Math.round((c.total_delivered / c.total_recipients) * 100)}%` }} />
         </div>
@@ -102,14 +111,16 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [filterTag, setFilterTag] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
 
   const createMut = useMutation({
     mutationFn: () => broadcastApi.create({
       name,
       message_template: message,
       segment_filters: filterTag ? { tags: [filterTag] } : {},
+      ...(scheduledAt ? { scheduled_at: new Date(scheduledAt).toISOString(), status: 'scheduled' } : {}),
     }),
-    onSuccess: () => { toast.success('Campanha criada!'); onCreated(); },
+    onSuccess: () => { toast.success(scheduledAt ? 'Campanha agendada!' : 'Campanha criada!'); onCreated(); },
     onError: handleApiError('Erro ao criar campanha'),
   });
 
@@ -123,10 +134,19 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
           <div className="text-[10px] text-secondary mt-1">Use {'{nome}'} para personalizar com o nome do lead.</div>
         </F>
         <F label="Filtro por tag (opcional)"><input value={filterTag} onChange={e => setFilterTag(e.target.value)} placeholder="vip, tarot, retiro..." className="inp" /></F>
+        <F label="Agendar para (opcional)">
+          <input
+            type="datetime-local"
+            value={scheduledAt}
+            onChange={e => setScheduledAt(e.target.value)}
+            className="inp"
+          />
+          <div className="text-[10px] text-secondary mt-1">Deixe em branco para enviar manualmente.</div>
+        </F>
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 px-5 py-3 bg-bg-primary border border-border rounded-2xl text-sm font-bold">Cancelar</button>
           <button onClick={() => createMut.mutate()} disabled={!name || !message || createMut.isPending} className="flex-1 px-5 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-30 text-white rounded-2xl text-sm font-black uppercase tracking-widest">
-            {createMut.isPending ? 'Criando...' : 'Criar'}
+            {createMut.isPending ? 'Criando...' : scheduledAt ? 'Agendar' : 'Criar'}
           </button>
         </div>
       </div>

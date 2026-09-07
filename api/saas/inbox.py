@@ -452,3 +452,101 @@ def takeover_data(lead_id: int):
         return jsonify({"status": "ok", "bot_pausado": lead.bot_pausado})
     finally:
         db.close()
+
+
+@inbox_bp.route("/tags", methods=["GET"])
+@login_required
+def get_tenant_tags():
+    """Retorna lista de todas as tags únicas usadas no tenant para autocomplete."""
+    tenant_id = current_user.tenant_id
+    db = SessionLocal()
+    try:
+        leads = db.query(models.Lead.tags).filter_by(tenant_id=tenant_id).filter(models.Lead.tags.isnot(None)).all()
+        tag_set = set()
+        for (t_list,) in leads:
+            if isinstance(t_list, list):
+                for t in t_list:
+                    clean = str(t).strip().lower()
+                    if clean:
+                        tag_set.add(clean)
+        return jsonify({"tags": sorted(list(tag_set))})
+    finally:
+        db.close()
+
+
+@inbox_bp.route("/<int:lead_id>/tags", methods=["POST"])
+@login_required
+def add_lead_tag(lead_id: int):
+    """Adiciona uma ou mais tags ao lead."""
+    tenant_id = current_user.tenant_id
+    body = request.get_json(silent=True) or {}
+    new_tag = body.get("tag")
+    new_tags = body.get("tags")
+
+    tags_to_add = []
+    if new_tag and isinstance(new_tag, str):
+        tags_to_add.append(new_tag.strip().lower())
+    if new_tags and isinstance(new_tags, list):
+        for t in new_tags:
+            if isinstance(t, str) and t.strip():
+                tags_to_add.append(t.strip().lower())
+
+    if not tags_to_add:
+        return jsonify({"error": "missing_tag"}), 400
+
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(id=lead_id, tenant_id=tenant_id).first()
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+
+        current_tags = list(lead.tags) if isinstance(lead.tags, list) else []
+        modified = False
+        for t in tags_to_add:
+            if t not in current_tags:
+                current_tags.append(t)
+                modified = True
+
+        if modified:
+            lead.tags = current_tags
+            db.commit()
+            try:
+                from api.saas.realtime_hooks import notify_lead_updated
+                notify_lead_updated(tenant_id, lead_id, {"tags": current_tags})
+            except Exception:
+                pass
+
+        return jsonify({"ok": True, "tags": current_tags})
+    finally:
+        db.close()
+
+
+@inbox_bp.route("/<int:lead_id>/tags/<path:tag_name>", methods=["DELETE"])
+@login_required
+def remove_lead_tag(lead_id: int, tag_name: str):
+    """Remove uma tag do lead."""
+    tenant_id = current_user.tenant_id
+    target = tag_name.strip().lower()
+
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(id=lead_id, tenant_id=tenant_id).first()
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+
+        current_tags = list(lead.tags) if isinstance(lead.tags, list) else []
+        new_tags = [t for t in current_tags if t.strip().lower() != target]
+
+        if len(new_tags) != len(current_tags):
+            lead.tags = new_tags
+            db.commit()
+            try:
+                from api.saas.realtime_hooks import notify_lead_updated
+                notify_lead_updated(tenant_id, lead_id, {"tags": new_tags})
+            except Exception:
+                pass
+
+        return jsonify({"ok": True, "tags": new_tags})
+    finally:
+        db.close()
+

@@ -50,4 +50,14 @@ export const leadContextApi = {
     api.post<{ ok: boolean; suggestion: NextActionSuggestion; cached: boolean }>(
       `/saas/inbox/${leadId}/next-action`, { force },
     ),
+
+  listTenantTags: () =>
+    api.get<{ tags: string[] }>('/saas/inbox/tags'),
+
+  addTag: (leadId: number, tag: string) =>
+    api.post<{ ok: boolean; tags: string[] }>(`/saas/inbox/${leadId}/tags`, { tag }),
+
+  removeTag: (leadId: number, tag: string) =>
+    api.del<{ ok: boolean; tags: string[] }>(`/saas/inbox/${leadId}/tags/${encodeURIComponent(tag)}`),
 };
+

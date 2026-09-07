@@ -146,11 +146,12 @@ export interface Campaign {
   total_failed: number;
   created_at: string;
   sent_at: string | null;
+  scheduled_at?: string | null;
 }
 
 export const broadcastApi = {
   campaigns: () => api.get<{ campaigns: Campaign[] }>('/saas/broadcast/'),
-  create: (b: { name: string; message_template: string; segment_filters?: Record<string, unknown> }) =>
+  create: (b: { name: string; message_template: string; segment_filters?: Record<string, unknown>; scheduled_at?: string; status?: string }) =>
     api.post<{ ok: boolean; id: number }>('/saas/broadcast/', b),
   preview: (id: number) => api.post<{ preview: Array<{ lead_id: number; nome: string }> }>(`/saas/broadcast/${id}/preview`),
   send: (id: number) => api.post<{ ok: boolean; total_queued: number }>(`/saas/broadcast/${id}/send`),

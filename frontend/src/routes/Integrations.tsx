@@ -6,6 +6,8 @@ import {
   Database,
   ExternalLink,
   Webhook,
+  MessageSquare,
+  Code,
 } from 'lucide-react';
 import { integrationsApi } from '../api/integrations';
 import { toast } from '../lib/toast';
@@ -58,6 +60,66 @@ export default function Integrations() {
           </header>
           <div className="px-6 py-6">
             <WhatsAppConnect />
+          </div>
+        </section>
+
+        {/* Webchat Widget Embed (ManyChat / ChatbotX style) */}
+        <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
+          <header className="px-6 py-4 border-b border-border bg-bg-primary/20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-widest">Webchat Widget para Sites</h3>
+                <p className="text-[11px] text-secondary">Incorpore o chat inteligente em landing pages, WordPress, Shopify ou qualquer site externo</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                if (!document.getElementById('acassia-widget-container')) {
+                  const s = document.createElement('script');
+                  s.src = '/assets/widget.js';
+                  s.setAttribute('data-tenant', 'default');
+                  s.setAttribute('data-title', 'Atendimento Acássia');
+                  s.setAttribute('data-color', '#9333ea');
+                  document.body.appendChild(s);
+                  toast.success('Widget ativado no canto inferior direito!');
+                } else {
+                  toast.success('Widget já está carregado na página.');
+                }
+              }}
+              className="text-xs px-3.5 py-1.5 bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 border border-purple-500/30 rounded-xl font-bold transition-all"
+            >
+              Testar Widget ao Vivo
+            </button>
+          </header>
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-xs text-secondary leading-relaxed">
+              Cole esta tag <code className="text-primary font-mono bg-bg-primary px-1.5 py-0.5 rounded border border-border">&lt;script&gt;</code> antes do fechamento de <code className="text-primary font-mono bg-bg-primary px-1.5 py-0.5 rounded border border-border">&lt;/body&gt;</code> do seu site para ativar o chat integrado diretamente com seu funil e Inbox:
+            </p>
+            <div className="relative group">
+              <pre className="p-4 bg-bg-primary border border-border rounded-2xl font-mono text-xs text-primary overflow-x-auto select-all leading-relaxed">
+{`<script 
+  src="${window.location.origin}/assets/widget.js" 
+  data-tenant="default" 
+  data-title="Atendimento" 
+  data-color="#9333ea">
+</script>`}
+              </pre>
+              <button
+                onClick={() => copy(`<script src="${window.location.origin}/assets/widget.js" data-tenant="default" data-title="Atendimento" data-color="#9333ea"></script>`)}
+                className="absolute top-3 right-3 p-2 rounded-xl bg-bg-surface border border-border hover:bg-bg-primary text-secondary hover:text-primary transition-all shadow-sm"
+                title="Copiar snippet"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] text-secondary">
+              <span className="flex items-center gap-1.5">✓ Totalmente responsivo (mobile & desktop)</span>
+              <span className="flex items-center gap-1.5">✓ Conectado ao Inbox em tempo real</span>
+              <span className="flex items-center gap-1.5">✓ Suporte a handoff para atendente</span>
+            </div>
           </div>
         </section>
 

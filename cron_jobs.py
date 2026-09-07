@@ -416,6 +416,7 @@ def run_hourly():
     _run_with_lock(hourly_pick_ab_winners, "hourly_ab_winners")
     _run_with_lock(hourly_check_launch_phases, "hourly_launch_phases")
     _run_with_lock(hourly_cleanup_media, "hourly_cleanup_media")
+    _run_with_lock(hourly_dispatch_scheduled_broadcasts, "hourly_scheduled_broadcasts")
     logger.info("[cron] hourly done")
 
 
@@ -674,7 +675,87 @@ def daily_recompute_spiritual_intents():
         logger.warning("[cron.spiritual_intents] falha: %s", exc)
 
 
+def hourly_dispatch_scheduled_broadcasts():
+    """
+    Verifica campanhas de broadcast com scheduled_at <= now() e status='scheduled'.
+    Dispara o worker de envio para cada uma.
+
+    Idempotente: muda o status para 'sending' antes de spawnar a thread,
+    portanto re-execuções do cron não disparam a mesma campanha duas vezes.
+    """
+    import threading
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        due = db.query(models.BroadcastCampaign).filter(
+            models.BroadcastCampaign.status == "scheduled",
+            models.BroadcastCampaign.scheduled_at.isnot(None),
+            models.BroadcastCampaign.scheduled_at <= now,
+        ).all()
+
+        if not due:
+            return
+
+        logger.info("[cron.scheduled_broadcasts] %d campanhas vencidas", len(due))
+
+        for campaign in due:
+            try:
+                from api.saas.broadcast import _apply_segment_filters, _send_campaign_worker
+
+                # Resolver leads
+                q = _apply_segment_filters(
+                    db.query(models.Lead),
+                    campaign.segment_filters or {},
+                    campaign.tenant_id,
+                )
+                leads = q.all()
+                if not leads:
+                    campaign.status = "completed"
+                    campaign.completed_at = now
+                    logger.warning(
+                        "[cron.scheduled_broadcasts] campaign=%d sem leads, marcada completed",
+                        campaign.id,
+                    )
+                    db.commit()
+                    continue
+
+                # Criar recipients
+                for lead in leads:
+                    db.add(models.BroadcastRecipient(
+                        campaign_id=campaign.id,
+                        lead_id=lead.id,
+                        status="pending",
+                    ))
+
+                campaign.status = "sending"
+                campaign.total_recipients = len(leads)
+                campaign.started_at = now
+                db.commit()
+
+                # Disparar worker em background
+                t = threading.Thread(
+                    target=_send_campaign_worker,
+                    args=(campaign.id, campaign.tenant_id),
+                    daemon=True,
+                )
+                t.start()
+
+                logger.info(
+                    "[cron.scheduled_broadcasts] campaign=%d disparada: %d leads",
+                    campaign.id, len(leads),
+                )
+            except Exception as exc:
+                db.rollback()
+                logger.exception(
+                    "[cron.scheduled_broadcasts] erro na campaign=%d: %s",
+                    campaign.id, exc,
+                )
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",

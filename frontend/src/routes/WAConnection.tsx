@@ -21,10 +21,16 @@ interface Device { id: number; nickname: string; provider: string; phone_display
 export default function WAConnection() {
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
+  const [showMetaModal, setShowMetaModal] = useState(false);
   const [form, setForm] = useState({ nickname: '', provider: 'meta_cloud', phone_display: '', meta_phone_number_id: '', meta_waba_id: '', meta_access_token: '', evolution_server_url: '', evolution_instance: '', evolution_api_key: '' });
 
   const { data } = useQuery({ queryKey: ['devices'], queryFn: () => api.get<any>('/saas/devices/') });
   const devices: Device[] = data?.devices || [];
+
+  const { data: metaConfig } = useQuery({
+    queryKey: ['meta-embedded-config'],
+    queryFn: () => api.get<any>('/saas/wa/embedded-signup/config'),
+  });
 
   const createMut = useMutation({
     mutationFn: (d: any) => api.post('/saas/devices/', d),
@@ -43,7 +49,7 @@ export default function WAConnection() {
   return (
     <div className="px-8 py-8 max-w-[1100px] mx-auto min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between mb-10">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#25D366] to-[#128C7E] flex items-center justify-center shadow-lg shadow-[#25D366]/20">
             <WaLogo className="w-7 h-7 text-white" />
@@ -53,9 +59,17 @@ export default function WAConnection() {
             <p className="text-xs text-secondary mt-0.5">{devices.length} dispositivo{devices.length !== 1 ? 's' : ''} cadastrado{devices.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-[#25D366]/20 transition-all">
-          <Plus className="w-4 h-4" /> Novo Dispositivo
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setShowMetaModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-xl text-sm font-bold transition-all shadow-sm"
+          >
+            <MetaLogo className="w-4 h-4" /> Conectar via Meta
+          </button>
+          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-[#25D366]/20 transition-all">
+            <Plus className="w-4 h-4" /> Novo Dispositivo
+          </button>
+        </div>
       </div>
 
       {/* Grid de dispositivos */}
@@ -129,6 +143,23 @@ export default function WAConnection() {
             </footer>
           </div>
         </div>
+      )}
+
+      {/* Modal Meta Embedded Signup */}
+      {showMetaModal && (
+        <MetaEmbeddedModal
+          config={metaConfig}
+          onClose={() => setShowMetaModal(false)}
+          onSuccess={() => {
+            setShowMetaModal(false);
+            qc.invalidateQueries({ queryKey: ['devices'] });
+          }}
+          onFallbackManual={() => {
+            setShowMetaModal(false);
+            setShowAdd(true);
+            setForm(f => ({ ...f, provider: 'meta_cloud' }));
+          }}
+        />
       )}
     </div>
   );
@@ -262,3 +293,203 @@ function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onD
     </div>
   );
 }
+
+/* ── Meta Embedded Signup Modal ─────────────────────────────── */
+function MetaEmbeddedModal({
+  config, onClose, onSuccess, onFallbackManual,
+}: {
+  config: { configured?: boolean; app_id?: string; config_id?: string; graph_version?: string } | undefined;
+  onClose: () => void;
+  onSuccess: () => void;
+  onFallbackManual: () => void;
+}) {
+  const [nickname, setNickname] = useState('WhatsApp Oficial');
+  const [code, setCode] = useState('');
+  const [phoneNumberId, setPhoneNumberId] = useState('');
+  const [wabaId, setWabaId] = useState('');
+  const [showManualCode, setShowManualCode] = useState(false);
+
+  const exchangeMut = useMutation({
+    mutationFn: (payload: { code: string; phone_number_id?: string; waba_id?: string; nickname?: string }) =>
+      api.post<{ ok: boolean; device: any }>('/saas/wa/embedded-signup/exchange', payload),
+    onSuccess: () => {
+      toast.success('WhatsApp conectado com sucesso via Meta Embedded Signup!');
+      onSuccess();
+    },
+    onError: (err: any) => toast.error(err?.message || 'Falha ao autorizar com a Meta.'),
+  });
+
+  const isConfigured = Boolean(config?.configured && config?.app_id);
+
+  const launchMetaOAuth = () => {
+    if (!config?.app_id) return;
+    const redirectUri = `${window.location.origin}/builder/wa-connection`;
+    const version = config.graph_version || 'v20.0';
+    const oauthUrl = `https://www.facebook.com/${version}/dialog/oauth?client_id=${config.app_id}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=whatsapp_business_management,whatsapp_business_messaging`;
+
+    const width = 600;
+    const height = 700;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    const popup = window.open(
+      oauthUrl,
+      'MetaEmbeddedSignup',
+      `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`,
+    );
+
+    // Listener para o retorno do popup
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.origin.includes(window.location.hostname) && !event.origin.includes('facebook.com')) {
+        return;
+      }
+      try {
+        const raw = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (raw?.type === 'WA_EMBEDDED_SIGNUP' || raw?.code) {
+          window.removeEventListener('message', handleMessage);
+          if (popup && !popup.closed) popup.close();
+          const authCode = raw.code || raw?.data?.code;
+          const pId = raw.phone_number_id || raw?.data?.phone_number_id;
+          const wId = raw.waba_id || raw?.data?.waba_id;
+          if (authCode) {
+            exchangeMut.mutate({
+              code: authCode,
+              phone_number_id: pId,
+              waba_id: wId,
+              nickname,
+            });
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener('message', handleMessage);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-bg-surface border border-border rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-600/10 via-transparent to-transparent">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-600/20 flex items-center justify-center text-[#0082FB]">
+              <MetaLogo className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg text-primary">Conectar via Meta</h3>
+              <p className="text-[10px] text-secondary">WhatsApp Cloud API Oficial (Embedded Signup)</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-primary text-secondary">
+            <X className="w-4 h-4" />
+          </button>
+        </header>
+
+        <div className="p-6 space-y-5">
+          {isConfigured ? (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-xs text-secondary leading-relaxed">
+                <span className="font-bold text-primary block mb-1">Conexão em 1 Clique</span>
+                Você será redirecionado para autorizar o número da sua empresa diretamente com o Facebook / WhatsApp Business Manager, sem precisar copiar tokens manualmente.
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-secondary block mb-1">Apelido do dispositivo</label>
+                <input
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  placeholder="Ex: WhatsApp Comercial"
+                  className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={launchMetaOAuth}
+                disabled={exchangeMut.isPending}
+                className="w-full flex items-center justify-center gap-3 py-3.5 bg-[#0082FB] hover:bg-[#0070db] text-white rounded-xl font-bold text-sm shadow-lg shadow-[#0082FB]/20 transition-all"
+              >
+                <MetaLogo className="w-5 h-5" />
+                {exchangeMut.isPending ? 'Autenticando...' : 'Entrar com Facebook'}
+              </button>
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowManualCode(!showManualCode)}
+                  className="text-[11px] text-secondary hover:text-primary underline"
+                >
+                  {showManualCode ? 'Ocultar inserção manual de código' : 'Possui um código de autorização manual?'}
+                </button>
+              </div>
+
+              {showManualCode && (
+                <div className="space-y-3 p-4 bg-bg-primary rounded-xl border border-border">
+                  <input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Cole o authorization code aqui"
+                    className="w-full px-3 py-2 bg-bg-surface border border-border rounded-lg text-xs font-mono"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={phoneNumberId}
+                      onChange={(e) => setPhoneNumberId(e.target.value)}
+                      placeholder="phone_number_id (opcional)"
+                      className="px-3 py-2 bg-bg-surface border border-border rounded-lg text-xs font-mono"
+                    />
+                    <input
+                      value={wabaId}
+                      onChange={(e) => setWabaId(e.target.value)}
+                      placeholder="waba_id (opcional)"
+                      className="px-3 py-2 bg-bg-surface border border-border rounded-lg text-xs font-mono"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => exchangeMut.mutate({ code, phone_number_id: phoneNumberId, waba_id: wabaId, nickname })}
+                    disabled={!code.trim() || exchangeMut.isPending}
+                    className="w-full py-2 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg text-xs font-bold transition-all disabled:opacity-40"
+                  >
+                    {exchangeMut.isPending ? 'Verificando...' : 'Trocar código por token'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-secondary leading-relaxed">
+                <span className="font-bold text-amber-400 block mb-1">Configuração do Servidor Pendente</span>
+                Para habilitar o login em 1 clique via Meta, configure as variáveis de ambiente no servidor:
+                <div className="mt-2 p-2 bg-black/40 rounded-lg font-mono text-[11px] text-amber-200 space-y-0.5">
+                  <div>META_APP_ID=seu_app_id</div>
+                  <div>META_APP_SECRET=seu_app_secret</div>
+                </div>
+                <p className="mt-2 text-[11px]">
+                  Enquanto isso, você pode adicionar seu número manualmente inserindo o token da API Cloud do Meta diretamente.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={onFallbackManual}
+                  className="w-full py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl font-bold text-sm shadow-md"
+                >
+                  Inserir Credenciais Manualmente
+                </button>
+                <a
+                  href="https://developers.facebook.com/apps"
+                  target="_blank"
+                  rel="noopener"
+                  className="text-center py-2 text-xs text-secondary hover:text-primary flex items-center justify-center gap-1"
+                >
+                  <ExternalLink className="w-3 h-3" /> Abrir Meta Developers Portal
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+

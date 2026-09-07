@@ -4,7 +4,7 @@ import {
   User, MapPin, Calendar, Sparkles, MessageSquare,
   TrendingUp, TrendingDown, Activity, Star, CreditCard,
   Wand2, Phone, Edit3, Save, X, Plus, Trash2, RefreshCw,
-  StickyNote, Check, Copy,
+  StickyNote, Check, Copy, Tag, SlidersHorizontal,
 } from 'lucide-react';
 import { useLeadContext } from '../hooks/useLeadContext';
 import { leadContextApi, type LeadNote } from '../api/leadContext';
@@ -343,25 +343,8 @@ function EditableLeadCard({
           {lead.criado_em && (
             <KV k="Cliente desde" v={new Date(lead.criado_em).toLocaleDateString('pt-BR')} />
           )}
-          {lead.tags && lead.tags.length > 0 && (
-            <div className="pt-2 mt-2 border-t border-border">
-              <div className="text-[9px] font-black uppercase tracking-widest text-secondary mb-1.5">Tags</div>
-              <div className="flex flex-wrap gap-1">
-                {lead.tags.map((t, i) => (
-                  <span
-                    key={`${t}-${i}`}
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                      t === 'opted_out'
-                        ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                        : 'bg-bg-primary text-secondary border border-border'
-                    }`}
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          <LeadTagsManager leadId={leadId} tags={lead.tags || []} />
+          <LeadCustomFieldsManager leadId={leadId} customFields={lead.custom_fields || {}} />
         </div>
       ) : (
         <div className="space-y-2">
@@ -377,6 +360,252 @@ function EditableLeadCard({
             value={draft.tags}
             onChange={(v) => setDraft({ ...draft, tags: v })}
           />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LeadTagsManager({
+  leadId, tags,
+}: {
+  leadId: number;
+  tags: string[];
+}) {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [newTag, setNewTag] = useState('');
+
+  const { data: tenantTagsData } = useQuery({
+    queryKey: ['tenant-tags'],
+    queryFn: leadContextApi.listTenantTags,
+    staleTime: 60_000,
+  });
+  const allTenantTags = tenantTagsData?.tags || [];
+  const suggestions = allTenantTags.filter((t) => !tags.includes(t) && t.toLowerCase().includes(newTag.toLowerCase()));
+
+  const addMut = useMutation({
+    mutationFn: (tag: string) => leadContextApi.addTag(leadId, tag),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lead-context', leadId] });
+      qc.invalidateQueries({ queryKey: ['leads-list'] });
+      qc.invalidateQueries({ queryKey: ['tenant-tags'] });
+      setNewTag('');
+    },
+    onError: handleApiError('Erro ao adicionar tag'),
+  });
+
+  const removeMut = useMutation({
+    mutationFn: (tag: string) => leadContextApi.removeTag(leadId, tag),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lead-context', leadId] });
+      qc.invalidateQueries({ queryKey: ['leads-list'] });
+    },
+    onError: handleApiError('Erro ao remover tag'),
+  });
+
+  const handleAdd = (tagToAdd: string) => {
+    const clean = tagToAdd.trim().toLowerCase();
+    if (!clean || tags.includes(clean)) return;
+    addMut.mutate(clean);
+  };
+
+  return (
+    <div className="pt-2.5 mt-2.5 border-t border-border">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5">
+          <Tag className="w-3 h-3 text-accent-amethyst" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-secondary">Tags</span>
+        </div>
+        <button
+          onClick={() => setAdding(!adding)}
+          className="text-[9px] font-bold text-accent-amethyst hover:underline flex items-center gap-0.5"
+        >
+          <Plus className="w-2.5 h-2.5" /> {adding ? 'fechar' : 'adicionar'}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-1 items-center">
+        {tags.length === 0 && !adding && (
+          <span className="text-[10px] text-secondary italic">Nenhuma tag</span>
+        )}
+        {tags.map((t, i) => (
+          <span
+            key={`${t}-${i}`}
+            className={`text-[10px] pl-2 pr-1 py-0.5 rounded-md font-bold flex items-center gap-1 group ${
+              t === 'opted_out'
+                ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                : 'bg-bg-primary text-primary border border-border'
+            }`}
+          >
+            {t}
+            <button
+              onClick={() => removeMut.mutate(t)}
+              disabled={removeMut.isPending}
+              title={`Remover tag ${t}`}
+              className="text-secondary hover:text-red-400 p-0.5 rounded transition-colors"
+            >
+              <X className="w-2.5 h-2.5" />
+            </button>
+          </span>
+        ))}
+      </div>
+
+      {adding && (
+        <div className="mt-2 space-y-1.5">
+          <div className="flex gap-1">
+            <input
+              type="text"
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAdd(newTag);
+                }
+              }}
+              placeholder="Digite uma tag (ex: vip, hot)..."
+              className="flex-1 bg-bg-primary border border-border rounded-lg px-2 py-1 text-[11px] focus:outline-none focus:border-accent-amethyst"
+              autoFocus
+            />
+            <button
+              onClick={() => handleAdd(newTag)}
+              disabled={!newTag.trim() || addMut.isPending}
+              className="px-2.5 py-1 bg-accent-amethyst text-white text-[10px] font-bold rounded-lg disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1 max-h-20 overflow-y-auto">
+              <span className="text-[9px] text-secondary w-full">Sugestões:</span>
+              {suggestions.slice(0, 6).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleAdd(s)}
+                  className="text-[9px] px-1.5 py-0.5 bg-accent-amethyst/10 text-accent-amethyst hover:bg-accent-amethyst/20 rounded border border-accent-amethyst/20 font-medium"
+                >
+                  +{s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LeadCustomFieldsManager({
+  leadId, customFields,
+}: {
+  leadId: number;
+  customFields: Record<string, unknown>;
+}) {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [key, setKey] = useState('');
+  const [val, setVal] = useState('');
+
+  const entries = Object.entries(customFields || {});
+
+  const saveMut = useMutation({
+    mutationFn: (updatedFields: Record<string, unknown>) =>
+      leadContextApi.patchProfile(leadId, {
+        custom_fields: updatedFields as Record<string, string | number | boolean>,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lead-context', leadId] });
+      setKey('');
+      setVal('');
+      setAdding(false);
+      toast.success('Campos personalizados atualizados');
+    },
+    onError: handleApiError('Erro ao salvar campo'),
+  });
+
+  const handleAdd = () => {
+    const cleanKey = key.trim();
+    const cleanVal = val.trim();
+    if (!cleanKey) return;
+    const updated = { ...customFields, [cleanKey]: cleanVal };
+    saveMut.mutate(updated);
+  };
+
+  const handleRemove = (targetKey: string) => {
+    const updated = { ...customFields };
+    delete updated[targetKey];
+    saveMut.mutate(updated);
+  };
+
+  return (
+    <div className="pt-2.5 mt-2.5 border-t border-border">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5">
+          <SlidersHorizontal className="w-3 h-3 text-accent-amethyst" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-secondary">Campos Personalizados</span>
+        </div>
+        <button
+          onClick={() => setAdding(!adding)}
+          className="text-[9px] font-bold text-accent-amethyst hover:underline flex items-center gap-0.5"
+        >
+          <Plus className="w-2.5 h-2.5" /> {adding ? 'fechar' : 'adicionar'}
+        </button>
+      </div>
+
+      <div className="space-y-1">
+        {entries.length === 0 && !adding && (
+          <span className="text-[10px] text-secondary italic">Nenhum campo personalizado</span>
+        )}
+        {entries.map(([k, v]) => (
+          <div key={k} className="flex items-center justify-between gap-1 text-[10px] bg-bg-primary/50 px-2 py-1 rounded-lg border border-border/60">
+            <span className="font-mono text-secondary truncate max-w-[45%]" title={k}>{k}:</span>
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="font-medium text-primary truncate max-w-[120px]" title={String(v)}>{String(v)}</span>
+              <button
+                onClick={() => handleRemove(k)}
+                disabled={saveMut.isPending}
+                title={`Remover ${k}`}
+                className="text-secondary hover:text-red-400 transition-colors p-0.5"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {adding && (
+        <div className="mt-2 p-2 bg-bg-primary rounded-xl border border-border space-y-1.5">
+          <input
+            type="text"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder="Nome do campo (ex: nicho, vip)"
+            className="w-full bg-bg-surface border border-border rounded-lg px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-accent-amethyst"
+            autoFocus
+          />
+          <input
+            type="text"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+            placeholder="Valor (ex: psicologia, sim)"
+            className="w-full bg-bg-surface border border-border rounded-lg px-2 py-1 text-[11px] focus:outline-none focus:border-accent-amethyst"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={!key.trim() || saveMut.isPending}
+            className="w-full py-1 bg-accent-amethyst text-white text-[10px] font-bold rounded-lg disabled:opacity-40"
+          >
+            {saveMut.isPending ? 'Salvando...' : 'Salvar Campo'}
+          </button>
         </div>
       )}
     </div>
