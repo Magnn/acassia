@@ -74,7 +74,7 @@ export default function Voice() {
   const setDefaultMut = useMutation({
     mutationFn: (id: number) => voiceApi.setDefault(id),
     onSuccess: () => {
-      toast.success('Voz definida como padrão para o Oráculo.');
+      toast.success('Voz definida como padrão para o Atendente de IA.');
       qc.invalidateQueries({ queryKey: ['voice-clones'] });
     },
     onError: handleApiError('Erro ao definir padrão'),
@@ -254,7 +254,7 @@ export default function Voice() {
                           <div className="font-bold text-sm text-primary flex items-center gap-2">
                             {c.name}
                             {isDefault && (
-                              <span title="Voz Padrão do Oráculo">
+                              <span title="Voz Padrão do Atendente IA">
                                 <Star className="w-3 h-3 text-sibila-gold fill-current" />
                               </span>
                             )}

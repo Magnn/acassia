@@ -15,13 +15,13 @@ import { Activity, CheckCircle, DollarSign, PauseCircle, Users } from 'lucide-re
 import { metricsApi } from '../api/metrics';
 import LaunchChecklist from '../components/LaunchChecklist';
 
-// Cores dos charts — alinhado à paleta interna sibila-*.
+// Cores dos charts — padrão SaaS B2B.
 const CHART = {
-  amethyst: '#7c6a99',
-  ember: '#d4a574',
-  rose: '#b46e7c',
-  grid: '#2a2538',
-  axis: '#6b6677',
+  amethyst: '#6366f1',
+  ember: '#10b981',
+  rose: '#f43f5e',
+  grid: '#27272a',
+  axis: '#71717a',
 };
 
 export default function Dashboard() {
@@ -42,9 +42,9 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="p-12 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[400px]">
-        <div className="w-12 h-12 border-4 border-accent-amethyst/30 border-t-accent-amethyst rounded-full animate-spin mb-4" />
-        <div className="text-secondary text-sm font-bold animate-pulse">
-          Consultando os astros…
+        <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4" />
+        <div className="text-zinc-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+          Consolidando métricas e conversões…
         </div>
       </div>
     );

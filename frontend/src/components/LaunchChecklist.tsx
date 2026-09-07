@@ -30,7 +30,7 @@ export default function LaunchChecklist() {
             </Link>
           </li>)}
         </ul>
-        {data.next_step && <Link to={data.next_step.href} className="inline-block rounded-xl bg-accent-amethyst text-white px-4 py-2 text-sm font-bold">Continuar: {data.next_step.label}</Link>}
+        {data.next_step && <Link to={data.next_step.href} className="inline-block rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 text-sm font-bold shadow-sm transition-all">Continuar: {data.next_step.label}</Link>}
       </>}
     </section>
   );

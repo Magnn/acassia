@@ -12,7 +12,6 @@ import { handleApiError } from '../lib/handleApiError';
 import { toast } from '../lib/toast';
 import ScoreBadge from './ScoreBadge';
 import AudioSuggestPanel from './AudioSuggestPanel';
-import TarotTrendsCard from './TarotTrendsCard';
 import LeadSummaryCard from './LeadSummaryCard';
 
 interface Props {
@@ -147,16 +146,6 @@ export default function LeadContextPanel({ leadId }: Props) {
         )}
       </Card>
 
-      {/* Tarot count */}
-      {tarot_readings_count > 0 && (
-        <Card title="Tarot" icon={Wand2}>
-          <KV k="Tiragens feitas" v={String(tarot_readings_count)} />
-        </Card>
-      )}
-
-      <TarotTrendsCard leadId={leadId} />
-
-      <SpiritualIntentCard leadId={leadId} spiritual={spiritual} />
       <LeadSummaryCard leadId={leadId} />
       <AudioSuggestPanel leadId={leadId} />
       <NextActionCard leadId={leadId} />

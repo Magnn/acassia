@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 twofa_bp = Blueprint("admin_twofa", __name__, url_prefix="/admin/2fa")
 
 
-_TOTP_ISSUER = "Meu Mistério"
+_TOTP_ISSUER = "Acássia"
 _RECOVERY_CODES_COUNT = 10
 
 

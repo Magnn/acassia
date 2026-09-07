@@ -46,8 +46,8 @@ const SPIRITUAL_EMOJI: Record<string, string> = {
   familia: '🏠', espiritual: '🙏', decisao: '🔀', luto: '🕊️',
 };
 
-const DENSITY_KEY = 'meumisterio.inbox.density';
-const VOICE_ONLY_KEY = 'meumisterio.inbox.voice_only';
+const DENSITY_KEY = 'acassia.inbox.density';
+const VOICE_ONLY_KEY = 'acassia.inbox.voice_only';
 
 function DeliveryStatus({ status }: { status: string | null | undefined }) {
   if (!status) return <Clock className="w-2.5 h-2.5" />;
@@ -407,20 +407,23 @@ export default function Leads() {
             </div>
 
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[9px] font-black uppercase tracking-widest text-secondary mr-0.5">Tema:</span>
-              {(['amor', 'dinheiro', 'familia', 'carreira', 'espiritual', 'decisao', 'saude', 'luto'] as const).map((c) => (
+              <span className="text-[9px] font-black uppercase tracking-widest text-secondary mr-0.5">Status:</span>
+              {[
+                { id: 'all', label: 'Todas' },
+                { id: 'ativas', label: 'Ativas' },
+                { id: 'convertidos', label: 'Convertidos' },
+                { id: 'pausadas', label: 'Pausadas' },
+              ].map((st) => (
                 <button
-                  key={c}
-                  onClick={() => setSpiritualFilter(spiritualFilter === c ? null : c)}
-                  title={c}
-                  className={`text-[10px] px-2 py-1 rounded-lg border transition-all flex items-center gap-1 ${
-                    spiritualFilter === c
-                      ? 'bg-accent-amethyst text-white border-accent-amethyst'
-                      : 'bg-bg-primary/50 border-border/50 text-secondary hover:text-primary'
+                  key={st.id}
+                  onClick={() => setFiltro(st.id)}
+                  className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all font-bold ${
+                    filtro === st.id
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                      : 'bg-bg-primary/50 border-border/50 text-secondary hover:text-primary hover:bg-bg-surface'
                   }`}
                 >
-                  <span>{SPIRITUAL_EMOJI[c]}</span>
-                  <span className="font-bold capitalize">{c}</span>
+                  {st.label}
                 </button>
               ))}
             </div>

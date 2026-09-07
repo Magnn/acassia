@@ -70,7 +70,7 @@ export default function Community() {
             </div>
             <h1 className="text-3xl font-black tracking-tight">Comunidade</h1>
           </div>
-          <p className="text-secondary text-sm font-medium">Grupos temáticos com IA Oráculo — sabedoria coletiva 24/7.</p>
+          <p className="text-secondary text-sm font-medium">Grupos temáticos e canais de engajamento com suporte de Assistente IA.</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all">
           <Plus className="w-4 h-4" /> Criar Grupo
