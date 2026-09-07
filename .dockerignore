@@ -32,9 +32,8 @@ env.example
 *.db-shm
 *.db-wal
 
-# Node/Frontend source (apenas dist é copiado)
+# Node/Frontend source
 frontend/node_modules
-frontend/src
 frontend/.git
 
 # Binaries
