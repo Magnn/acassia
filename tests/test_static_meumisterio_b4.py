@@ -54,6 +54,7 @@ class TestStaticMeumisterioB4(unittest.TestCase):
                 "__config__": {"public_url": "https://example.com"},
                 R.META_B4_SEQ: True,
                 R.META_B4_PHASE: "awaiting_reply",
+                "static_mm_b4_entregue": True,
             },
         )
         acoes, prox = b4.executar_v2(ctx)

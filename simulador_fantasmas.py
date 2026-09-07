@@ -1,7 +1,7 @@
 """
 simulador_fantasmas.py — Versão SUPREME v5.0 (Chaos Engine)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Ferramenta de testes de estresse para o Império da Cigana Esmeralda.
+Ferramenta de testes de estresse para o Império do Meu Mistério Esmeralda.
 Focado em simular o CAOS do mundo real: leads apressados, céticos,
 erros gramaticais e perguntas fora de hora.
 
@@ -49,11 +49,11 @@ FANTASMAS = {
         "telefone": "559284979402",
         "perfil": "Manda um texto gigante, com erros e cita terceiros (Roberto e Maria). Perfeito para forçar uma Leitura Fria profunda (Node 6).",
         "script": [
-            ("text", "Oie cigana presiso de ajuda urgente"),
+            ("text", "Oie meumisterio presiso de ajuda urgente"),
             ("text", "Juliana"),
             ("text", "ja salvei sim"),
             ("image", "ta ai a foto"),
-            ("text", "Cigana meu ex marido roberto saiu de casa fas 3 meses. a familia dele fez macumba pra jente, eu achei terra na porta. to sem durmir, sem comer, ele me bloqueou e ta com uma tal de maria. me ajuda a faser ele voltar manso por favor")
+            ("text", "Meu Mistério meu ex marido roberto saiu de casa fas 3 meses. a familia dele fez macumba pra jente, eu achei terra na porta. to sem durmir, sem comer, ele me bloqueou e ta com uma tal de maria. me ajuda a faser ele voltar manso por favor")
         ]
     },
     "3": {
@@ -187,7 +187,7 @@ def jornada_caos(persona_key):
         
         # Pausa de 12 segundos entre as mensagens para o bot poder "pensar" e responder,
         # e para você acompanhar a resposta no Painel Dashboard
-        print("⏳ Aguardando a reação da Cigana (12s)... Verifique o Dashboard.")
+        print("⏳ Aguardando a reação do Meu Mistério (12s)... Verifique o Dashboard.")
         time.sleep(12)
 
     if persona_key == "5":

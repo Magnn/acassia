@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-# Ajuste o caminho se o seu banco tiver outro nome (ex: cigana.db, sqlite.db)
+# Ajuste o caminho se o seu banco tiver outro nome (ex: meumisterio.db, sqlite.db)
 DB_PATH = os.path.join("db", "database.db") 
 
 def fix():

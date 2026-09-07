@@ -12,7 +12,7 @@ import re
 import random
 from typing import Optional
 
-from schema import Acao, slice_historico_para_ia
+from schema import Acao
 from api.cakto_api import CaktoAPIClient
 from copy_sanitizer import (
     MOBILE_CHARS_POR_LINHA,
@@ -20,10 +20,12 @@ from copy_sanitizer import (
     aplicar_substituicoes_proibidas,
     compactar_url_https_monolitica,
     contexto_lead_para_nodes,
+    extrair_blocos_fallback,
     fatiar_texto_ritmo_celular,
     frase_dor_contextualizada,
     genero_efetivo_para_copy,
     genero_hint_para_prompt,
+    historico_limpo_para_ia,
     limpar_colagem_primeira_msg_whatsapp_em_texto,
     normalizar_enxerto_dor_sem_contexto,
     normalizar_link_para_envio,
@@ -32,7 +34,7 @@ from copy_sanitizer import (
     sufixo_ancoras_node3_para_prompt,
     unificar_vocativos_por_genero,
 )
-from analytics.copy_constituicao_cigana import camada_constituicao_node8
+from analytics.copy_constituicao_meumisterio import camada_constituicao_node8
 from conversation_policy import lead_reportou_problema_entrega
 from analytics.copy_personalization import (
     contexto_desejo_resultado_para_prompt,
@@ -42,6 +44,12 @@ from analytics.copy_personalization import (
     instrucao_eco_esforco_concreto,
     norte_editorial_venda_fria_direta_para_prompt,
     perfil_copy_para_prompt,
+)
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    oferta_dare_para_prompt,
+    calcular_intensidade_ressonancia,
+    nome_padrao_invisivel,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,9 +61,6 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
-_RE_RUIDO_CURTO_HIST = re.compile(r"(?i)^(ok|sim|oi|opa|pronto|blz|beleza|ta|tá|show|feito|entendi|combinado|👍|🙏|👀)$")
-
-
 def _bloco_e_somente_link(texto: str) -> bool:
     t = (texto or "").strip()
     if not t:
@@ -96,50 +101,6 @@ def _cadencia_oferta(num_bloco: int, delay_pre: int, pausa_pos: int, score: floa
         pos += 2
 
     return pre, pos
-
-
-def _historico_limpo_para_ia(ctx, limite: int = 20) -> list:
-    base = slice_historico_para_ia(ctx, limite)
-    if not base:
-        return []
-    out = []
-    for h in base:
-        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
-        t = str(txt).replace("|", " ").strip()
-        t = re.sub(r"\s+", " ", t).strip()
-        if not t:
-            continue
-        if len(t.split()) <= 3 and _RE_RUIDO_CURTO_HIST.match(t.lower()):
-            continue
-        rem = getattr(h, "remetente", None) if not isinstance(h, dict) else h.get("remetente")
-        tip = getattr(h, "tipo", "text") if not isinstance(h, dict) else h.get("tipo", "text")
-        out.append({"remetente": rem or "", "texto": t, "tipo": tip or "text"})
-    return out
-
-
-def _extrair_blocos_fallback(texto: str, max_blocos: int = 9, min_len: int = 8) -> list[str]:
-    """
-    Recupera blocos de oferta quando a IA não entrega BLOCO_N:: corretamente.
-    """
-    t = (texto or "").strip()
-    if not t:
-        return []
-    partes = re.split(r"\[?BAL[AÃ]O\]?", t, flags=re.I)
-    out: list[str] = []
-    for p in partes:
-        p = re.sub(r"`{3}(?:json|text)?|`{3}", "", p).strip()
-        if not p:
-            continue
-        lines = p.splitlines() if "\n" in p else [p]
-        for ln in lines:
-            ln2 = re.sub(r"^\s*BLOCO[_\s]*\d+\s*::\s*", "", ln.strip(), flags=re.I).strip()
-            if len(ln2) >= min_len and not _bloco_e_somente_link(ln2):
-                out.append(ln2)
-            if len(out) >= max_blocos:
-                break
-        if len(out) >= max_blocos:
-            break
-    return out[:max_blocos]
 
 
 def _normalizar_link_checkout(link: str) -> str:
@@ -345,7 +306,7 @@ def _resolver_link_ticket(meta: dict, config: dict, link_fallback: str, ticket: 
     return link_fallback
 
 
-_SYSTEM_OFERTA_SUPREMA = """Você é Esmeralda Ácassia (Cigana Esmeralda), mesma voz da leitura: firme, acolhedora, transparente no que custa e no que vem depois.
+_SYSTEM_OFERTA_SUPREMA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), mesma voz da leitura: firme, acolhedora, transparente no que custa e no que vem depois.
 
 IMPORTANTE: Não escreva tags de estágio, [COLCHETES] técnicos nem metadados na resposta. Não inclua URL nem link na resposta.
 CONTEXTO INTERNO (CRÍTICO): use histórico apenas como base interna. PROIBIDO reproduzir texto bruto do histórico, PROIBIDO citar mensagens literais entre aspas, e PROIBIDO imprimir separadores técnicos (ex.: "|", "||", "->").
@@ -362,6 +323,8 @@ DADOS (use com respeito):
 - Nome/Pessoa envolvida no relato: {nome_pessoa_envolvida}
 - Tempo exato citado pelo lead (quando houver): {tempo_exato}
 - Evento gatilho citado pelo lead (quando houver): {evento_gatilho}
+- Desejo oculto (Hive Mind Node 5 — o que ela mais quer mas não verbalizou diretamente): {desejo_oculto}
+- Gatilho emocional central (Node 5 — o que ativa o medo/anseio mais fundo): {gatilho_emocional}
 - Última mensagem do lead: "{msg_lead}"
 
 {entregaveis}
@@ -380,7 +343,7 @@ VALORES (não altere números):
 - Pagamento online: Cakto (cartão ou PIX). Não escreva o link; o sistema envia depois.
 
 MISSÃO — exatamente 9 BLOCOS (BLOCO_1:: … BLOCO_9::); cada bloco CURTO (ritmo celular, ~160 caracteres ou menos quando possível); pode continuar o texto nas linhas abaixo até o próximo BLOCO_N::; nunca coloque o próximo BLOCO_N:: no fim da mesma linha do texto anterior:
-1. Pergunte com naturalidade se a leitura ressoou; pode usar "Gostou da sua leitura?" de forma humilde.
+1. ESPELHO EXATO (obrigatório): abra devolvendo em 1-2 frases o que o lead carrega — use `desejo_oculto` e `gatilho_emocional` se não forem INDEFINIDO; mostre que você VIU o que ela não disse em voz alta. Só depois pergunte humildemente se a leitura ressoou. Se ambos forem INDEFINIDO, ancora só na dor e no desejo declarado.
 2. CENA DO RESULTADO DESEJADO: convide a imaginar o caminho **em direção ao que ela já disse que quer** (trazer a pessoa de volta, **separar com clareza do cônjuge**, **superar e fechar ciclo com o ex**, **encontrar um novo amor**, fortalecer o casamento atual, justiça, prosperidade…), com imagem viva — não frase genérica nem "o que você precisa entender". Não troque o desejo dela por outro.
 3. CONTRASTE: ficar só na dor repetida vs dar o passo que favorece o que ela busca — sem humilhar.
 4. MECANISMO: nomeie o trabalho com o nome exato «{mecanismo}» como firmação **alinhada ao pedido dela** (sem trocadilho nem título ridículo); não venda "lição", venda continuidade honesta do que ela veio buscar.
@@ -415,6 +378,7 @@ def _fallback_oferta(
     p_serv: str,
     p_promo_total: str,
     ancora_quer: str = "",
+    msg_lead: str = "",
 ) -> list[str]:
     dor_ctx = frase_dor_contextualizada(dor_c, abertura="quando você traz")
     tempo_ctx = tempo_exato if (tempo_exato or "").upper() != "INDEFINIDO" else tempo
@@ -426,15 +390,23 @@ def _fallback_oferta(
     alvo = (ancora_quer or "").strip()
     if len(alvo) > 140:
         alvo = alvo[:137].rstrip() + "…"
+    
+    respondeu_cta = bool(re.search(r"\b(pode|sim|manda|quero|sim|ok|tudo|combinado)\b", msg_lead.lower()))
+    
+    if respondeu_cta:
+        intro_bloco = f"Que bom que você deseja dar esse passo, {nome_fmt}. Vou te explicar tudo com o máximo de transparência."
+    else:
+        intro_bloco = f"{nome_fmt}, a leitura mostrou com clareza onde está a trava. Agora, a escolha de agir sobre ela está em suas mãos."
+        
     b2 = (
-        f"Imagina o caminho ficando mais claro em direção ao que você veio buscar, {voc}, com menos peso repetido no peito."
+        f"Visualizar o seu caminho livre desse peso e alinhado com a sua intenção de {alvo} é o que nos move aqui, {voc}."
         if alvo
-        else f"Imagina os próximos dias com menos peso no peito e mais direção prática, {voc}."
+        else f"Visualizar os seus caminhos livres desse peso e com mais clareza para os seus próximos dias é o que nos move aqui, {voc}."
     )
     mec_linha = (
-        f"O {mecanismo} é firmação séria voltada ao que você pediu"
-        + (f" — no que você descreveu: {alvo}" if alvo else "")
-        + ". Corta o nó na raiz, sem promessa de milagre nem data certa."
+        f"O {mecanismo} é uma firmação séria voltada para a sua intenção"
+        + (f" de {alvo}" if alvo else "")
+        + "."
     )
     bloco_valor = (
         f"O valor de referência é R$ {p_ref},00. Eu consigo fazer por R$ {p_promo_total} pra você, em pagamento direto hoje."
@@ -446,20 +418,15 @@ def _fallback_oferta(
         )
     )
     return [
-        f"{nome_fmt}, a leitura bateu com o que você vive por dentro? Quero te mostrar o próximo passo com clareza.",
+        intro_bloco,
         b2,
-        f"Ou manter o mesmo ciclo de sempre: {dor_ctx}, arrastando isso há {tempo_ctx} sem tocar a raiz.{gatilho_ctx}",
-        f"{mec_linha} Com o que apareceu nas suas linhas, você já era pra estar em um patamar mais alto do que está hoje.",
+        "O caminho é simples: ou a gente resolve a causa real agora, ou o ciclo continua se repetindo. A escolha é sempre sua.",
+        f"{mec_linha} Essa firmação atua diretamente na origem do bloqueio, abrindo as portas para a energia fluir livremente. Sem ilusões, mas com compromisso real com a sua jornada.",
         bloco_valor,
-        "A leitura já mostrou o padrão. A decisão agora é honesta: mudar de verdade ou continuar no mesmo ciclo. "
-        "Sem história de vaga limitada, isso é respeito com você.",
-        "O pagamento é pela Cakto: plataforma segura, confiável, cartão ou PIX.",
-        "Se decidir seguir, me envia o comprovante pra gente iniciar — eu monto seu nome no altar e te mando a foto da firmação.",
-        (
-            f"{nome_fmt}, você carrega isso há {tempo_ctx}.{gatilho_ctx} "
-            "Chegou a hora de atacar a raiz, não só o sintoma. "
-            "Se quiser começar hoje, me manda FIRMO aqui que na mensagem seguinte eu te envio o link de pagamento, tudo bem?"
-        ),
+        "A decisão agora está com você: dar esse passo de transformação ou continuar no mesmo padrão de antes. Sem pressões, por puro respeito a você.",
+        "O pagamento é feito de forma segura pela Cakto, com opção de cartão ou PIX.",
+        "Assim que concluir, me avisa aqui. Eu mesma firmo seu nome no altar e te mando a foto do ritual para começarmos.",
+        f"Se quiser seguir hoje, {nome_fmt}, me manda *FIRMO* aqui que na mensagem seguinte eu te envio o link de pagamento, tudo bem?",
     ]
 
 
@@ -477,9 +444,21 @@ def executar_v2(ctx) -> tuple:
     tempo_exato = str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO")
     evento_gatilho = str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO")
     nome_pessoa_envolvida = str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO")
+    desejo_oculto = str(meta.get("desejo_oculto") or "INDEFINIDO").strip()[:200]
+    gatilho_emocional = str(meta.get("gatilho_emocional") or "INDEFINIDO").strip()[:150]
     mecanismo = definir_nome_mecanismo_se_generico(meta, dor)
     ctx_desejo_res = contexto_desejo_resultado_para_prompt(meta, mecanismo)
     ancora_quer_fb = str(meta.get("desejo_declarado") or meta.get("desejo_oculto") or "").strip()
+    # Sanitiza: remove apresentações de nome ("me chamo X") que podem ter sido capturadas
+    # junto com o desejo quando o lead enviou duas mensagens simultâneas.
+    _re_nome_n8 = re.compile(
+        r"(?:^|[\s,;])[^\n.]{0,60}(?:me\s+chamo|meu\s+nome\s+[eéh]|chamo[- ]?me|sou\s+(?:o|a)\s+)\s*\w+[^\n.]{0,80}",
+        re.IGNORECASE,
+    )
+    _quer_limpo = _re_nome_n8.sub("", ancora_quer_fb)
+    _quer_limpo = re.sub(r"\s{2,}", " ", _quer_limpo).strip().rstrip(",;.")
+    if _quer_limpo and len(_quer_limpo) > 5:
+        ancora_quer_fb = _quer_limpo
     msg_lead = str(ctx.texto_recebido or "").strip()
     if lead_reportou_problema_entrega(msg_lead):
         ctx.estado_coleta = "node8_reparo_entrega"
@@ -648,6 +627,15 @@ def executar_v2(ctx) -> tuple:
                     conteudo=link_final,
                     metadata={"skip_gancho_final": True},
                 ),
+                Acao(tipo="delay", segundos=random.randint(8, 12)),
+                Acao(
+                    tipo="text",
+                    conteudo=(
+                        "Após o pagamento, me envia o comprovante aqui. "
+                        "Eu monto o seu nome no altar e te mando a foto da firmação na sequência, tudo bem?"
+                    ),
+                    metadata={"skip_gancho_final": True},
+                ),
             ]
             return acoes, "aguardando_pagamento"
 
@@ -685,6 +673,15 @@ def executar_v2(ctx) -> tuple:
                 f"{entregaveis}"
             )
             prompt_ia += sufixo_ancoras_node3_para_prompt(meta)
+            # DARE: oferta personalizada por desejo_tipo (Hormozi value stack + intensidade)
+            _desejo_tipo_n8 = classificar_desejo_tipo(meta, msg_lead)
+            _historico_blob_n8 = " ".join(
+                str((h.get("texto") if isinstance(h, dict) else getattr(h, "texto", "")) or "")
+                for h in (getattr(ctx, "historico", None) or [])[-8:]
+            )
+            _intensidade_n8 = calcular_intensidade_ressonancia(meta, _historico_blob_n8)
+            _padrao_n8 = nome_padrao_invisivel(_desejo_tipo_n8)
+            _dare_oferta_injecao = oferta_dare_para_prompt(_desejo_tipo_n8, meta, p_mat, p_serv)
             sys_oferta = _SYSTEM_OFERTA_SUPREMA.format(
                 nome=nome_fmt,
                 genero=genero,
@@ -699,6 +696,8 @@ def executar_v2(ctx) -> tuple:
                 nome_pessoa_envolvida=nome_pessoa_envolvida,
                 tempo_exato=tempo_exato,
                 evento_gatilho=evento_gatilho,
+                desejo_oculto=desejo_oculto,
+                gatilho_emocional=gatilho_emocional,
                 entregaveis=entregaveis,
                 instrucao_ancoragem=instrucao_anc,
                 instrucao_eco_esforco=instrucao_eco_esf,
@@ -709,6 +708,10 @@ def executar_v2(ctx) -> tuple:
                 p_mat=p_mat,
                 p_serv=p_serv,
                 p_promo_total=p_promo_total,
+            ) + (
+                f"\n\nPADRÃO INVISÍVEL IDENTIFICADO: \"{_padrao_n8}\""
+                f"\nINTENSIDADE DE RESSONÂNCIA DO LEAD: {_intensidade_n8.upper()}"
+                f"\n\n{_dare_oferta_injecao}"
             )
             resposta = ""
             ultima_exc: Optional[Exception] = None
@@ -717,7 +720,7 @@ def executar_v2(ctx) -> tuple:
             max_tent = max(1, min(int(ie.get("max_tentativas_ia_por_node", 2) or 2), 3))
             for tentativa in range(max_tent):
                 try:
-                    hist_ia = _historico_limpo_para_ia(ctx)
+                    hist_ia = historico_limpo_para_ia(ctx)
                     resposta = ctx.personalizer.gerar_resposta(
                         system_prompt=sys_oferta,
                         historico_lista=hist_ia,
@@ -730,8 +733,7 @@ def executar_v2(ctx) -> tuple:
                     blocos_gerados = [blocos_dict.get(i, "") for i in range(1, 10) if blocos_dict.get(i)]
                     blocos_gerados = [b for b in blocos_gerados if not _bloco_e_somente_link(b)]
                     if len(blocos_gerados) < 5:
-                        blocos_gerados = _extrair_blocos_fallback(resposta, max_blocos=9, min_len=8)
-                        blocos_gerados = [b for b in blocos_gerados if not _bloco_e_somente_link(b)]
+                        blocos_gerados = extrair_blocos_fallback(resposta, 9, min_len=8, filtrar_links=True)
                     if len(blocos_gerados) >= 4:
                         break
                     if len(blocos_gerados) >= 3:
@@ -766,6 +768,7 @@ def executar_v2(ctx) -> tuple:
             p_serv,
             p_promo_total,
             ancora_quer=ancora_quer_fb,
+            msg_lead=msg_lead,
         )
 
     idx_preco = -1
@@ -782,8 +785,13 @@ def executar_v2(ctx) -> tuple:
                 _ponte_emocional_preco(nome_fmt, dor, tempo_ctx, ancora_quer_fb),
             )
 
+    _DELAY_BUDGET_S = 210
+    _delay_acumulado = 0
+
     acoes: list = []
-    acoes.append(Acao(tipo="delay", segundos=random.randint(9, 15)))
+    _d_inicial = random.randint(9, 15)
+    acoes.append(Acao(tipo="delay", segundos=_d_inicial))
+    _delay_acumulado += _d_inicial
 
     for i, conteudo_raw in enumerate(blocos_gerados):
         if not conteudo_raw:
@@ -824,10 +832,16 @@ def executar_v2(ctx) -> tuple:
             pausa_pos = 16 if num_bloco in _INDICES_IMPACTO else 9
             delay_pre, pausa_pos = _cadencia_oferta(num_bloco, delay_pre, pausa_pos, score_eng)
 
+            if _delay_acumulado >= _DELAY_BUDGET_S:
+                delay_pre = min(delay_pre, 8)
+                pausa_pos = min(pausa_pos, 4)
+
             acoes.append(Acao(tipo="delay", segundos=delay_pre))
+            _delay_acumulado += delay_pre
             if eh_audio and j == 0:
                 acoes.append(Acao(tipo="tts", tts_template=pedaco))
                 acoes.append(Acao(tipo="delay", segundos=15))
+                _delay_acumulado += 15
             else:
                 acoes.append(
                     Acao(
@@ -837,6 +851,7 @@ def executar_v2(ctx) -> tuple:
                     )
                 )
                 acoes.append(Acao(tipo="delay", segundos=pausa_pos))
+                _delay_acumulado += pausa_pos
 
     meta["node8_fase"] = "esperando_firmo"
     meta["node8_ticket_atual"] = int(meta.get("node8_ticket_atual", ticket_inicial) or ticket_inicial)
@@ -844,14 +859,13 @@ def executar_v2(ctx) -> tuple:
     ctx.estado_coleta = "node8_oferta_enviada"
     ctx.metadata = meta
     total_textos = sum(1 for a in acoes if getattr(a, "tipo", "") == "text")
-    total_delays = sum(int(getattr(a, "segundos", 0) or 0) for a in acoes if getattr(a, "tipo", "") == "delay")
     logger.info(
         "event=node8_oferta_ok lead=%s blocos=%s fase=esperando_firmo ticket=%s textos=%s delay_total_s=%s",
         nome_fmt,
         len(blocos_gerados),
         meta.get("node8_ticket_atual"),
         total_textos,
-        total_delays,
+        _delay_acumulado,
     )
 
     return acoes, "8_oferta_principal"

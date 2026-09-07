@@ -28,7 +28,7 @@ class ContextCompressor:
         try:
             if self.api_key:
                 # ✨ Novo padrão da SDK: genai.Client
-                self.client = genai.Client(api_key=self.api_key)
+                self.client = genai.Client(api_key=self.api_key, http_options={"timeout": 90})
                 logger.info(f"🗜️ Compressor Conectado: {self.model_name}")
             else:
                 self.client = None
@@ -56,25 +56,35 @@ class ContextCompressor:
         conversa_fmt = self._formatar_conversa(historico)
         prompt_completo = f"Resuma:\n\n{conversa_fmt}\n\n{SYSTEM_PROMPT}"
 
-        try:
-            config = {"temperature": 0.2, "max_output_tokens": 400}
-            
-            # ✨ Chamada geradora da nova SDK
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt_completo,
-                config=config
-            )
-            
-            resumo = (response.text or "").replace("```markdown", "").replace("```", "").strip()
-            self._cache[cache_key] = resumo
-            
-            logger.info(f"📦 [COMPRESSOR] {len(historico)} msgs → resumo de {len(resumo)} chars")
-            return resumo
+        import time
+        for tentativa in range(3):
+            try:
+                config = {"temperature": 0.2, "max_output_tokens": 400}
+                
+                # ✨ Chamada geradora da nova SDK
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt_completo,
+                    config=config
+                )
+                
+                resumo = (response.text or "").replace("```markdown", "").replace("```", "").strip()
+                self._cache[cache_key] = resumo
+                
+                logger.info(f"📦 [COMPRESSOR] {len(historico)} msgs → resumo de {len(resumo)} chars")
+                return resumo
 
-        except Exception as e:
-            logger.error(f"🚨 [COMPRESSOR] Erro ao comprimir: {e}")
-            return self._resumo_fallback(historico)
+            except Exception as e:
+                err_str = str(e).lower()
+                if "timeout" in err_str or "ssl" in err_str or "handshake" in err_str or "503" in err_str:
+                    if tentativa < 2:
+                        logger.warning(f"⚠️ [COMPRESSOR] Timeout/SSL Gemini (tentativa {tentativa+1}/3). Retentando sem recriar cliente...")
+                        time.sleep(1.5)
+                        continue
+                logger.error(f"🚨 [COMPRESSOR] Erro ao comprimir: {e}")
+                return self._resumo_fallback(historico)
+
+        return self._resumo_fallback(historico)
 
     def _formatar_conversa(self, historico: List[Any]) -> str:
         """Formata o histórico para o prompt."""

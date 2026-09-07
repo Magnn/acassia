@@ -17,10 +17,17 @@ from urllib.parse import urlparse
 
 import requests
 from flask import Flask, jsonify, request
+from flask_login import login_required
 
+from api.saas.auth import require_role
 from db import models
 from db.database import SessionLocal
 from tenant_context import get_request_tenant_id
+
+# Atalho local — permitimos "user" e "admin" pois a filtragem é por tenant_id,
+# e donos de tenant (role='user' ou 'admin') precisam gerenciar seus próprios
+# fluxos. Sem "admin" aqui, uma conta admin ficava travada fora do builder.
+_admin = require_role("user", "admin")
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +40,10 @@ _SAFE_WEBHOOK_TEST_HOSTS = {
 
 
 def _secret_master_bytes() -> bytes:
-    k = (os.getenv("ACASSIA_FLOW_SECRETS_KEY") or "").strip()
+    k = (os.getenv("MEU_MISTERIO_FLOW_SECRETS_KEY") or "").strip()
     if not k:
         # Fail-safe para evitar segredo previsível em produção.
-        raise RuntimeError("ACASSIA_FLOW_SECRETS_KEY ausente")
+        raise RuntimeError("MEU_MISTERIO_FLOW_SECRETS_KEY ausente")
     raw = k.encode("utf-8")
     return hashlib.sha256(raw).digest()
 
@@ -182,7 +189,187 @@ def record_execute_flow_run(tenant_id: str, blueprint_id: int, lead_id: int) -> 
 def register_flow_platform_routes(app: Flask) -> None:
     """Registra rotas /api/flows/* da plataforma."""
 
+    @app.route("/api/flows/blueprints", methods=["GET"])
+    @login_required
+    @_admin
+    def api_flow_bp_list():
+        tid = get_request_tenant_id()
+        db = SessionLocal()
+        try:
+            rows = db.query(models.FlowBlueprint).filter_by(tenant_id=tid).order_by(models.FlowBlueprint.criado_em.desc()).all()
+            return jsonify({
+                "ok": True,
+                "blueprints": [
+                    {
+                        "id": r.id,
+                        "slug": r.slug,
+                        "title": r.title,
+                        "updated_at": r.atualizado_em.isoformat() if r.atualizado_em else (r.criado_em.isoformat() if r.criado_em else ""),
+                        "created_at": r.criado_em.isoformat() if r.criado_em else ""
+                    } for r in rows
+                ]
+            }), 200
+        except Exception as e:
+            logger.error("[API] bp list: %s", e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            db.close()
+
+    @app.route("/api/flows/blueprints/<int:bid>", methods=["GET", "PATCH", "DELETE"])
+    @login_required
+    @_admin
+    def api_flow_bp_detail(bid: int):
+        tid = get_request_tenant_id()
+        db = SessionLocal()
+        try:
+            bp = _bp_row(db, tid, bid)
+            if not bp:
+                return jsonify({"ok": False, "error": "fluxo não encontrado"}), 404
+            
+            if request.method == "GET":
+                return jsonify({
+                    "ok": True,
+                    "blueprint": {
+                        "id": bp.id,
+                        "slug": bp.slug,
+                        "title": bp.title,
+                        "body": bp.body_json if isinstance(bp.body_json, dict) else {},
+                        "updated_at": bp.atualizado_em.isoformat() if bp.atualizado_em else (bp.criado_em.isoformat() if bp.criado_em else ""),
+                        "created_at": bp.criado_em.isoformat() if bp.criado_em else ""
+                    }
+                }), 200
+                
+            if request.method == "DELETE":
+                db.delete(bp)
+                db.commit()
+                return jsonify({"ok": True}), 200
+                
+            body = request.get_json(silent=True) or {}
+            if "title" in body:
+                bp.title = str(body["title"])[:300]
+            if "slug" in body:
+                bp.slug = str(body["slug"]).strip()[:128]
+            if "body" in body and isinstance(body["body"], dict):
+                bp.body_json = body["body"]
+                
+            db.commit()
+            return jsonify({
+                "ok": True,
+                "blueprint": {
+                    "id": bp.id,
+                    "slug": bp.slug,
+                    "title": bp.title,
+                    "updated_at": bp.atualizado_em.isoformat() if bp.atualizado_em else "",
+                    "created_at": bp.criado_em.isoformat() if bp.criado_em else ""
+                }
+            }), 200
+            
+        except Exception as e:
+            logger.error("[API] bp detail %s: %s", bid, e)
+            db.rollback()
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            db.close()
+
+    @app.route("/api/flows/publish", methods=["POST", "DELETE"])
+    @login_required
+    @_admin
+    def api_flow_publish():
+        tid = get_request_tenant_id()
+        body = request.get_json(silent=True) or {}
+        bid = body.get("blueprint_id")
+        if bid is None and request.method == "POST":
+            return jsonify({"ok": False, "error": "blueprint_id obrigatório"}), 400
+            
+        db = SessionLocal()
+        try:
+            bid = int(bid) if bid is not None else None
+            if request.method == "DELETE":
+                pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+                if pub and (
+                    bid is None
+                    or pub.published_blueprint_id is None
+                    or int(pub.published_blueprint_id) == bid
+                ):
+                    pub.published_blueprint_id = None
+                    db.commit()
+                    return jsonify({"ok": True, "published_blueprint_id": None}), 200
+                if pub and bid is not None:
+                    return jsonify({"ok": False, "error": "este fluxo não está publicado"}), 409
+                return jsonify({"ok": True, "published_blueprint_id": None}), 200
+
+            bp = _bp_row(db, tid, bid)
+            if not bp:
+                return jsonify({"ok": False, "error": "fluxo não encontrado"}), 404
+
+            from flow_builder_runtime import validate_flow_document
+
+            doc = dict(bp.body_json) if isinstance(bp.body_json, dict) else {}
+            doc.setdefault("title", bp.title)
+            validation = validate_flow_document(doc, strict=True)
+            if not validation.get("ok"):
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "error": "corrija os erros do fluxo antes de publicar",
+                            "validation": validation,
+                        }
+                    ),
+                    422,
+                )
+                
+            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            if not pub:
+                pub = models.FlowPublish(tenant_id=tid, published_blueprint_id=bid)
+                db.add(pub)
+            else:
+                pub.published_blueprint_id = bid
+                
+            db.commit()
+            return jsonify({
+                "ok": True,
+                "published_blueprint_id": bid
+            }), 200
+        except Exception as e:
+            logger.error("[API] publish %s: %s", bid, e)
+            db.rollback()
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            db.close()
+
+    @app.route("/api/flows/publish/status", methods=["GET"])
+    @login_required
+    @_admin
+    def api_flow_publish_status():
+        tid = get_request_tenant_id()
+        db = SessionLocal()
+        try:
+            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            if not pub or not pub.published_blueprint_id:
+                return jsonify({"ok": True, "published": None}), 200
+                
+            bp = _bp_row(db, tid, pub.published_blueprint_id)
+            if not bp:
+                return jsonify({"ok": True, "published": None}), 200
+                
+            return jsonify({
+                "ok": True,
+                "published": {
+                    "blueprint_id": bp.id,
+                    "slug": bp.slug,
+                    "title": bp.title
+                }
+            }), 200
+        except Exception as e:
+            logger.error("[API] publish status: %s", e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            db.close()
+
     @app.route("/api/flows/blueprints/<int:bid>/versions", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_bp_versions(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -251,6 +438,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/versions/<int:vid>", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_bp_version_one(bid: int, vid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -288,6 +477,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/versions/<int:vid>/restore", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_bp_version_restore(bid: int, vid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -313,6 +504,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/lock", methods=["GET", "POST", "DELETE"])
+    @login_required
+    @_admin
     def api_flow_bp_lock(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -386,6 +579,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/comments", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_bp_comments(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -444,6 +639,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/runs", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_runs_list():
         tid = get_request_tenant_id()
         blueprint_id = request.args.get("blueprint_id")
@@ -467,6 +664,7 @@ def register_flow_platform_routes(app: Flask) -> None:
                                 "blueprint_id": r.blueprint_id,
                                 "lead_id": r.lead_id,
                                 "status": r.status,
+                                "meta": r.meta_json if isinstance(r.meta_json, dict) else {},
                                 "started_at": r.started_at.isoformat() if r.started_at else "",
                                 "finished_at": r.finished_at.isoformat() if r.finished_at else None,
                             }
@@ -483,6 +681,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/runs/<int:rid>", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_run_one(rid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -514,6 +714,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/runs/<int:rid>/events", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_run_events(rid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -551,6 +753,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/<int:bid>/runs", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_bp_runs_create(bid: int):
         tid = get_request_tenant_id()
         body = request.get_json(silent=True) or {}
@@ -597,6 +801,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/webhooks/test", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_webhook_test():
         body = request.get_json(silent=True) or {}
         url = (body.get("url") or "").strip()
@@ -644,6 +850,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             return jsonify({"ok": False, "error": str(e)}), 502
 
     @app.route("/api/flows/schedules", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_schedules():
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -707,6 +915,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/schedules/<int:sid>", methods=["PATCH", "DELETE"])
+    @login_required
+    @_admin
     def api_flow_schedule_one(sid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -737,12 +947,14 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/tenant/secrets", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_tenant_secrets():
         tid = get_request_tenant_id()
         db = SessionLocal()
         try:
-            if not (os.getenv("ACASSIA_FLOW_SECRETS_KEY") or "").strip():
-                return jsonify({"ok": False, "error": "configure ACASSIA_FLOW_SECRETS_KEY"}), 503
+            if not (os.getenv("MEU_MISTERIO_FLOW_SECRETS_KEY") or "").strip():
+                return jsonify({"ok": False, "error": "configure MEU_MISTERIO_FLOW_SECRETS_KEY"}), 503
             if request.method == "GET":
                 rows = db.query(models.TenantFlowSecret).filter_by(tenant_id=tid).all()
                 items = []
@@ -778,6 +990,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/tenant/secrets/<string:key>", methods=["DELETE"])
+    @login_required
+    @_admin
     def api_flow_tenant_secret_delete(key: str):
         tid = get_request_tenant_id()
         k = (key or "").strip()
@@ -796,6 +1010,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/tenant/variables", methods=["GET", "POST"])
+    @login_required
+    @_admin
     def api_flow_tenant_variables():
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -839,6 +1055,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/tenant/variables/<string:key>", methods=["DELETE"])
+    @login_required
+    @_admin
     def api_flow_tenant_variable_delete(key: str):
         tid = get_request_tenant_id()
         k = (key or "").strip()
@@ -857,6 +1075,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/catalog/nodes", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_catalog_nodes():
         from flow_builder_runtime import ALLOWED_NODE_TYPES, NODE_SPECS
 
@@ -875,6 +1095,8 @@ def register_flow_platform_routes(app: Flask) -> None:
         return jsonify({"ok": True, "nodes": nodes}), 200
 
     @app.route("/api/flows/blueprints/<int:bid>/export", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_bp_export(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -902,6 +1124,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/import", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_bp_import():
         tid = get_request_tenant_id()
         body = request.get_json(silent=True) or {}
@@ -944,6 +1168,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/blueprints/diff", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_bp_diff():
         body = request.get_json(silent=True) or {}
         a = body.get("a")
@@ -955,6 +1181,8 @@ def register_flow_platform_routes(app: Flask) -> None:
         return jsonify({"ok": True, "changes": chg, "truncated": len(changes) > 5000}), 200
 
     @app.route("/api/flows/blueprints/<int:bid>/acl", methods=["GET", "PUT"])
+    @login_required
+    @_admin
     def api_flow_bp_acl(bid: int):
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -1010,6 +1238,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/quotas", methods=["GET"])
+    @login_required
+    @_admin
     def api_flow_quotas():
         tid = get_request_tenant_id()
         db = SessionLocal()
@@ -1049,6 +1279,8 @@ def register_flow_platform_routes(app: Flask) -> None:
             db.close()
 
     @app.route("/api/flows/lint", methods=["POST"])
+    @login_required
+    @_admin
     def api_flow_lint():
         from flow_builder_runtime import validate_flow_document
 
@@ -1058,23 +1290,15 @@ def register_flow_platform_routes(app: Flask) -> None:
         raw = json.dumps(body)
         if len(raw) > _MAX_BODY_PREVIEW:
             return jsonify({"ok": False, "error": "documento muito grande"}), 413
-        rep = validate_flow_document(body)
+        rep = validate_flow_document(body, strict=True)
         extra = []
-        nodes = body.get("nodes") if isinstance(body.get("nodes"), list) else []
-        edges = body.get("edges") if isinstance(body.get("edges"), list) else []
+        graph = body.get("graph") if isinstance(body.get("graph"), dict) else body
+        nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
+        edges = graph.get("edges") if isinstance(graph.get("edges"), list) else []
         if len(nodes) > 500:
             extra.append({"level": "warning", "code": "too_many_nodes", "message": "Mais de 500 nós."})
         if len(edges) > 2000:
             extra.append({"level": "warning", "code": "too_many_edges", "message": "Mais de 2000 arestas."})
-        return (
-            jsonify(
-                _json_safe(
-                    {
-                        "ok": True,
-                        "validation": rep,
-                        "lint": extra,
-                    }
-                )
-            ),
-            200,
-        )
+        result = dict(rep)
+        result["warnings"] = list(rep.get("warnings") or []) + extra
+        return jsonify(_json_safe(result)), 200

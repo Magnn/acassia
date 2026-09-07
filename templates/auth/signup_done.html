@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Conta criada — Meu Mistério SaaS{% endblock %}
+{% block content %}
+<div class="text-center mb-8">
+  <h1 class="text-3xl font-bold mb-2">🔮</h1>
+  <p class="text-emerald-400">Bem-vindo(a), {{ current_user.email }}</p>
+</div>
+
+<div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-6 space-y-3">
+  <h2 class="font-bold text-lg">Próximo passo</h2>
+  <p class="text-sm text-slate-300">
+    Tua conta foi criada. Em breve abrimos o wizard de onboarding em 4 passos:
+  </p>
+  <ol class="text-sm text-slate-400 list-decimal list-inside space-y-1">
+    <li>Persona do Meu Mistério (nome, tom, restrições)</li>
+    <li>Oferta + pagamento (Stripe Connect)</li>
+    <li>Escolha do template (Tarot Express / Quiromancia Premium)</li>
+    <li>Conectar WhatsApp</li>
+  </ol>
+  <p class="text-xs text-slate-500 pt-2 border-t border-meumisterio-border">
+    tenant_id: <code class="text-meumisterio-purple">{{ current_user.tenant_id }}</code>
+  </p>
+</div>
+
+<form method="POST" action="{{ url_for('saas_auth.logout') }}" class="mt-6">
+  <button type="submit" class="w-full bg-meumisterio-surface border border-meumisterio-border hover:border-red-500 transition py-2 rounded-lg text-sm">
+    Sair
+  </button>
+</form>
+{% endblock %}

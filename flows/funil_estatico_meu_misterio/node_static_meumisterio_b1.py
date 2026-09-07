@@ -18,6 +18,14 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     phase = (meta.get(R.META_B1_PHASE) or "").strip()
 
     if phase == "awaiting_reply":
+        if not bool(meta.get("static_mm_b1_entregue")):
+            if R.lead_respondeu_texto_ou_midia(ctx) and R.dispatch_em_andamento_recente(meta, "static_mm_b1"):
+                logger.info("event=static_mm_b1_reply_durante_dispatch lead=%s", getattr(ctx, "lead_id", "?"))
+                meta["static_mm_b1_concluido_em"] = True
+                return [Acao(tipo="delay", segundos=R.B1_DELAY_ANTES_B2_S)], "static_meumisterio_b2"
+            # Segurança anti-pulo: se caiu antes de entregar o bloco, reenvia o B1.
+            meta[R.META_B1_PHASE] = "awaiting_reply"
+            return R.montar_acoes_bloco1(cfg), "static_meumisterio_b1"
         if not R.lead_respondeu_texto_ou_midia(ctx):
             return [], "static_meumisterio_b1"
         meta["static_mm_b1_concluido_em"] = True

@@ -1,0 +1,20 @@
+{
+  "title": "Audit D1 — Blueprint puro",
+  "slug": "audit_d1_puro",
+  "body": {
+    "format": "meumisterio-flow",
+    "version": 1,
+    "title": "Audit D1",
+    "graph": {
+      "nodes": [
+        {"id": "n-trigger", "type": "trigger", "label": "Gatilho", "x": 100, "y": 200, "config": {"keyword": "audit"}},
+        {"id": "n-conteudo", "type": "conteudo", "label": "Boas-vindas", "x": 400, "y": 200, "config": {"contents": [{"type": "text", "value": "Ola! Resposta do blueprint puro do audit D1."}]}},
+        {"id": "n-end", "type": "end", "label": "Fim", "x": 700, "y": 200, "config": {}}
+      ],
+      "edges": [
+        {"id": "e1", "from": "n-trigger", "to": "n-conteudo"},
+        {"id": "e2", "from": "n-conteudo", "to": "n-end"}
+      ]
+    }
+  }
+}

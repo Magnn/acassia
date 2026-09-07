@@ -1,8 +1,45 @@
-# Projeto Cigana — dependências principais (instalar: pip install -r requirements.txt)
+# Projeto Acássia SaaS — dependências principais (instalar: pip install -r requirements.txt)
+#
+# Core Framework
 flask>=3.0.0
 flask-cors>=4.0.0
+flask-limiter>=3.5.0
+flask-login>=0.6.3
+
+# Security
+bcrypt>=4.0.0
+pyotp>=2.9.0
+qrcode[pil]>=7.4.0
+
+# Payments
+stripe>=10.0.0
+
+# Environment
 python-dotenv>=1.0.0
+
+# HTTP
 requests>=2.31.0
+
+# Database
 sqlalchemy>=2.0.0
+alembic>=1.13.0
+
+# AI
 google-genai>=1.0.0
+
+# Media
 pillow>=10.0.0
+
+# Cache / Distributed State
+redis>=5.0.0
+
+# Monitoring
+sentry-sdk[flask]>=2.0.0
+
+# ── Production Server ──
+gunicorn>=22.0.0
+gevent>=24.0.0
+
+# ── PostgreSQL (production) ──
+psycopg2-binary>=2.9.9
+faster-whisper==1.0.3

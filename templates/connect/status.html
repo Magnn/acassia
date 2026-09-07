@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Stripe Connect — Meu Mistério SaaS{% endblock %}
+{% block main_class %}max-w-2xl mx-auto py-12 px-6{% endblock %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-1">Stripe Connect</h1>
+<p class="text-sm text-slate-400 mb-6">Pra receber pagamentos dos seus clientes (split automático), você precisa onboardar no Stripe Connect Express.</p>
+
+{% if not stripe_configured %}
+  <div class="mb-4 p-4 rounded-lg bg-red-900/40 border border-red-800 text-red-200 text-sm">
+    ⚠️ Stripe não configurado neste ambiente.
+  </div>
+{% endif %}
+
+<div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-6">
+  <div class="mb-4">
+    <strong class="text-sm">Status:</strong>
+    {% if not connect_account_id %}
+      <span class="text-slate-400 text-sm">não iniciado</span>
+    {% elif payouts_enabled and charges_enabled %}
+      <span class="text-emerald-400 text-sm">✓ ativo (pagamentos e payouts liberados)</span>
+    {% else %}
+      <span class="text-amber-400 text-sm">em onboarding (KYC pendente)</span>
+    {% endif %}
+  </div>
+
+  {% if connect_account_id %}
+    <div class="text-xs text-slate-500 mb-4 font-mono">
+      account_id: {{ connect_account_id }}
+    </div>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('saas_connect.onboard') }}">
+    <button type="submit" {% if not stripe_configured %}disabled{% endif %}
+            class="w-full bg-meumisterio-purple hover:bg-purple-600 disabled:opacity-40 transition py-2 rounded-lg font-bold">
+      {% if not connect_account_id %}
+        Iniciar onboarding KYC
+      {% elif payouts_enabled %}
+        Reabrir Stripe (gerenciar conta)
+      {% else %}
+        Continuar onboarding
+      {% endif %}
+    </button>
+  </form>
+</div>
+
+<p class="mt-4 text-xs text-slate-500">
+  KYC é exigência regulatória (Bacen). Vai precisar CPF, RG/CNH, comprovante de residência e dados bancários.
+  Stripe processa em ~24h.
+</p>
+
+{% endblock %}

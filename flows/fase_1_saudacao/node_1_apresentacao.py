@@ -1,5 +1,5 @@
 """
-flows/fase_1_saudacao/node_1_apresentacao.py — Node 1 (apresentação / AcassIA)
+flows/fase_1_saudacao/node_1_apresentacao.py — Node 1 (apresentação / Meu Mistério)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 A CHEGADA DA AUTORIDADE — Lead primeiro, funil em segundo; menos fallback por truncamento.
 
@@ -21,11 +21,16 @@ from flows.funnel_gates import (
     pode_burst_coleta_sem_node2,
     VOCATIVO_SEM_NOME,
 )
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    hook_abertura_para_prompt,
+    _DESIRE_MAP,
+)
 
 logger = logging.getLogger(__name__)
 
 # ── CONFIGURAÇÕES E REGEX DE SEGURANÇA ──
-# Não use "ana" isolado: casa dentro de "cigana" e força IA em toda saudação ao bot.
+# Não use "ana" isolado: casa dentro de "meumisterio" e força IA em toda saudação ao bot.
 _GATILHOS_DINAMICOS = ["valor", "preço", "preco", "custa", "pago", "ajuda", "desesperad", "dor"]
 _RUIDO_INICIAL = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"]
 
@@ -45,11 +50,11 @@ _RE_DOR_OU_SOFRIMENTO = re.compile(
 )
 
 # ── PROMPT NODE 1: JSON hierárquico + briefing comportamental ──
-_SYSTEM_NODE1_JSON = """Você é Esmeralda Ácassia (Cigana Esmeralda), atendimento por WhatsApp no nosso instituto de luz chamado Meu Mistério.
+_SYSTEM_NODE1_JSON = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), atendimento por WhatsApp no nosso instituto de luz chamado Meu Mistério.
 
 TOM DE OURO (imitar este ritmo, sem copiar palavra por palavra se o briefing pedir outra coisa):
 - A_saudacao: saudação do período + prazer em receber no instituto de luz chamado Meu Mistério + bem-vindo + ✨
-- B_apresentacao: "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, respeito e presença de verdade." (variação leve permitida; sem travessão —; sem tom de telemarketing)
+- B_apresentacao: "Me chamo Esmeralda Ácassia, sou meumisterio e te atendo por aqui nesse templo com calma, respeito e presença de verdade." (variação leve permitida; sem travessão —; sem tom de telemarketing)
 - Se vaga ativa: um balão acolhedor sobre última vaga da consulta inicial e linhas, calma (como conversa, não como anúncio)
 - C_nome (se sem nome): "Me diz como você se chama, meu bem? Assim eu te falo direito."
 - D: transição humana; se C já pediu o nome, D pode ser curto ou integrar o convite sem repetir vaga
@@ -69,7 +74,7 @@ ANTI-REPETIÇÃO (obrigatório):
 - A_saudacao: obrigatório. Saudação calorosa + UMA vez a boas-vindas ao espaço (ex.: prazer em te receber no nosso instituto de luz chamado Meu Mistério), neste balão só.
   * Duas frases curtas OU um parágrafo fluido (até ~45 palavras). Use o nome se souber.
 
-- B_apresentacao: obrigatório. Quem você é: Esmeralda Ácassia, cigana, tom e como acompanha o lead — SEM repetir o instituto nem o nome Meu Mistério (já ditos em A ou extra).
+- B_apresentacao: obrigatório. Quem você é: Esmeralda Ácassia, meumisterio, tom e como acompanha o lead — SEM repetir o instituto nem o nome Meu Mistério (já ditos em A ou extra).
   * Uma ou duas frases completas (até ~45 palavras). Frase inteira, sem cortar.
 
 - C_nome: null se o primeiro nome já veio; senão pergunta humana pelo nome (ex.: "Me diz como você se chama, meu bem? Assim eu te falo direito.").
@@ -248,6 +253,21 @@ def _briefing_comportamental(
     linhas.append(
         "[ANTI-DUPLICAÇÃO VAGA] Se o texto de vaga/consulta inicial já existir em extra, A ou B, D_confirmacao é só transição humana (próximo passo da leitura), sem repetir 'última vaga', 'essa leva' nem 'consulta inicial' outra vez."
     )
+
+    # ── DARE: Hook de abertura por quebra de padrão (Schwartz nível 1-2) ──
+    if tem_dor or tem_amor:
+        _meta_tmp = metadata or {}
+        desejo_tipo = classificar_desejo_tipo(_meta_tmp, msg_raw)
+        dados_desejo = _DESIRE_MAP.get(desejo_tipo, _DESIRE_MAP["amor"])
+        hook = dados_desejo["hook_frio"]
+        linhas.append(
+            f"[DARE HOOK] Lead chegou com contexto emocional claro. "
+            f"Se usar o campo 'extra', priorize este hook de abertura como referência de tom "
+            f"(adapte ao contexto real, não copie igual): \"{hook}\" — "
+            "objetivo: fazer o lead sentir que Esmeralda JÁ viu algo, antes de qualquer saudação genérica. "
+            "Isso é Schwartz nível 1-2: o lead não sabe que existe saída — mostre que existe, antes de pedir o nome."
+        )
+
     return "\n".join(linhas)
 
 
@@ -320,7 +340,7 @@ def _blob_user_para_extrair_nome(ctx, msg_raw: str) -> str:
 
 
 _BLOCO_APRESENTACAO_PADRAO = (
-    "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, "
+    "Me chamo Esmeralda Ácassia, sou meumisterio e te atendo por aqui nesse templo com calma, "
     "respeito e presença de verdade."
 )
 
@@ -649,7 +669,7 @@ def _deduplicar_baloes_node1(baloes: List[str]) -> List[str]:
     viu_vaga = False
 
     re_saudacao = re.compile(r"\b(bom dia|boa tarde|boa noite|prazer te receber|instituto)\b", re.I)
-    re_apresentacao = re.compile(r"\b(me chamo esmeralda|sou cigana|templo)\b", re.I)
+    re_apresentacao = re.compile(r"\b(me chamo esmeralda|sou meumisterio|templo)\b", re.I)
     re_vaga = re.compile(r"\b(última vaga|vaga gratuita|consulta inicial)\b", re.I)
 
     for b in baloes:
@@ -704,7 +724,7 @@ def _gerar_fallback(
         Acao(
             tipo="text",
             conteudo=(
-                "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, "
+                "Me chamo Esmeralda Ácassia, sou meumisterio e te atendo por aqui nesse templo com calma, "
                 "respeito e presença de verdade."
             ),
         ),
@@ -758,7 +778,7 @@ def _montar_baloes_contrato_node1(
             "Seja muito bem-vindo. ✨"
         ),
         (
-            "Me chamo Esmeralda Ácassia, sou cigana e te atendo por aqui nesse templo com calma, "
+            "Me chamo Esmeralda Ácassia, sou meumisterio e te atendo por aqui nesse templo com calma, "
             "respeito e presença de verdade."
         ),
     ]
@@ -899,6 +919,17 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             ctx.metadata = {}
         ctx.metadata["nome_lead"] = nome
         ctx.nome_lead = nome
+
+    # ── 2b. DARE: classificar desejo_tipo cedo para downstream (nodes 3, 7, 8) ──
+    if not hasattr(ctx, "metadata") or ctx.metadata is None:
+        ctx.metadata = {}
+    if not ctx.metadata.get("desejo_tipo"):
+        _desejo_tipo_node1 = classificar_desejo_tipo(ctx.metadata, blob_ctx)
+        if _desejo_tipo_node1 != "amor" or any(
+            kw in blob_ctx.lower()
+            for kw in _DESIRE_MAP.get(_desejo_tipo_node1, {}).get("keywords", [])
+        ):
+            ctx.metadata["desejo_tipo"] = _desejo_tipo_node1
 
     # ── 3. Abertura: adaptive JSON (quando possível) -> contrato determinístico (fallback seguro) ──
     if not hasattr(ctx, "metadata") or ctx.metadata is None:

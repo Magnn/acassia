@@ -16,7 +16,7 @@ from typing import Any, Optional, List, Dict
 @dataclass
 class Acao:
     """
-    Representa uma ação unitária que a Cigana (bot) deve executar.
+    Representa uma ação unitária que o Meu Mistério (bot) deve executar.
     """
     tipo: str = field(
         default="",

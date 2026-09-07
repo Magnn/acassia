@@ -1,0 +1,708 @@
+"""
+Cron jobs / scheduled background tasks.
+
+Cada job é idempotente (pode rodar múltiplas vezes sem efeito colateral).
+Recomendado rodar a cada hora via systemd timer ou cron host:
+
+    # Hourly
+    0 * * * * cd /opt/meumisterio && python -m cron_jobs hourly
+
+    # Daily 2am UTC (off-peak)
+    0 2 * * * cd /opt/meumisterio && python -m cron_jobs daily
+
+Jobs:
+    hourly_trial_warnings  — D-12, D-7, D-3, D-1 emails (Frente 2.19)
+    hourly_quota_warnings  — 80%, 95%, 100% emails (Frente 2.11)
+    daily_hard_delete      — soft-deleted > 30d → hard delete (Frente 1.9)
+    daily_at_risk_signals  — gera tenant_health + at_risk_signals (Frente 1.15/1.16)
+"""
+
+from __future__ import annotations
+
+import glob
+import logging
+import os
+import sys
+from datetime import datetime, timezone, timedelta
+
+from db import models
+from db.database import SessionLocal
+from reliability.distributed_lock import DistributedLock
+
+
+logger = logging.getLogger(__name__)
+
+_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
+def _run_with_lock(job_fn, lock_name: str, ttl_ms: int = 300_000) -> None:
+    """
+    Executa job_fn apenas se conseguir adquirir lock distribuído.
+    Garante que apenas 1 worker execute cada cron job em multi-worker.
+    TTL padrão: 5 min (suficiente para a maioria dos jobs).
+    """
+    dl = DistributedLock(f"cron:{lock_name}", ttl_ms=ttl_ms)
+    if not dl.acquire(timeout=1.0):
+        logger.debug("[cron] %s — outro worker já executando, skip", lock_name)
+        return
+    try:
+        job_fn()
+    finally:
+        dl.release()
+
+
+# Centralizado em utils/datetime_helpers (evita cópias divergentes)
+from utils.datetime_helpers import aware as _aware
+
+
+# ─── Trial warnings (Frente 2.19) ─────────────────────────────────────
+
+
+TRIAL_WARNING_DAYS = (12, 7, 3, 1)  # D-N antes do trial expirar
+
+
+def hourly_trial_warnings():
+    """
+    Para cada user com trial ativo: identifica se está em D-N marker (12/7/3/1)
+    e emite log estruturado. (Email transacional fica pra integração 7.25 Resend.)
+
+    Idempotência: usa AuditEvent pra rastrear quais warnings já foram enviados.
+    """
+    db = SessionLocal()
+    sent_count = 0
+    expired_count = 0
+    try:
+        now = datetime.now(timezone.utc)
+        # Trial ativo
+        users = db.query(models.User).filter(
+            models.User.trial_ends_at.isnot(None),
+            models.User.is_active == True,  # noqa: E712
+            models.User.deleted_at.is_(None),
+        ).all()
+
+        for user in users:
+            trial_ends = _aware(user.trial_ends_at)
+            if trial_ends is None:
+                continue
+
+            # Se já expirou: log evento expired (uma vez)
+            if trial_ends < now:
+                already = db.query(models.AuditEvent).filter(
+                    models.AuditEvent.tenant_id == user.tenant_id,
+                    models.AuditEvent.event_type == "trial.expired",
+                ).first()
+                if not already:
+                    ev = models.AuditEvent(
+                        tenant_id=user.tenant_id,
+                        actor_user_id=None,
+                        event_type="trial.expired",
+                        target_type="user",
+                        target_id=str(user.id),
+                        payload={"trial_ended_at": trial_ends.isoformat()},
+                    )
+                    db.add(ev)
+                    expired_count += 1
+                continue
+
+            # Quantos dias até expirar
+            days_left = (trial_ends - now).days
+            if days_left not in TRIAL_WARNING_DAYS:
+                continue
+
+            # Já enviou aviso pra esse marker?
+            event_type = f"trial.warning_d{days_left}"
+            already = db.query(models.AuditEvent).filter(
+                models.AuditEvent.tenant_id == user.tenant_id,
+                models.AuditEvent.event_type == event_type,
+            ).first()
+            if already:
+                continue
+
+            ev = models.AuditEvent(
+                tenant_id=user.tenant_id,
+                actor_user_id=None,
+                event_type=event_type,
+                target_type="user",
+                target_id=str(user.id),
+                payload={"days_left": days_left, "trial_ends_at": trial_ends.isoformat()},
+            )
+            db.add(ev)
+            sent_count += 1
+            logger.info(
+                "[trial.warning] user=%s tenant=%s d-%d ends=%s",
+                user.id, user.tenant_id, days_left, trial_ends.isoformat(),
+            )
+            # TODO Frente 7.25: send email via Resend
+
+        if sent_count or expired_count:
+            db.commit()
+            logger.info(
+                "[cron.hourly_trial_warnings] sent=%d expired_logged=%d",
+                sent_count, expired_count,
+            )
+    finally:
+        db.close()
+
+
+# ─── Quota warnings (Frente 2.11) ─────────────────────────────────────
+
+
+QUOTA_WARNING_THRESHOLDS = (80, 95, 100)
+
+
+def hourly_quota_warnings():
+    """
+    Para cada (tenant, kind) com count > threshold, dispara warning 1x/mês/threshold.
+
+    Idempotência: usa TenantUsageQuotaWarning como dedup table.
+    """
+    import plans as plans_module
+
+    db = SessionLocal()
+    sent_count = 0
+    try:
+        now = datetime.now(timezone.utc)
+        yyyymm = now.year * 100 + now.month
+
+        # Para cada tenant com counter ativo no período corrente
+        counters = db.query(models.TenantUsageCounter).filter_by(
+            period_yyyymm=yyyymm,
+        ).all()
+
+        for c in counters:
+            limit = plans_module.effective_quota(c.tenant_id, c.kind, db_session=db)
+            if limit == plans_module.UNLIMITED or limit <= 0:
+                continue
+
+            pct = (c.count / limit) * 100 if limit > 0 else 0
+
+            for threshold in QUOTA_WARNING_THRESHOLDS:
+                if pct < threshold:
+                    continue
+                # Já enviou esse threshold neste período?
+                existing = db.query(models.TenantUsageQuotaWarning).filter_by(
+                    tenant_id=c.tenant_id,
+                    period_yyyymm=yyyymm,
+                    kind=c.kind,
+                    threshold_pct=threshold,
+                ).first()
+                if existing:
+                    continue
+
+                # Marca enviado
+                db.add(models.TenantUsageQuotaWarning(
+                    tenant_id=c.tenant_id,
+                    period_yyyymm=yyyymm,
+                    kind=c.kind,
+                    threshold_pct=threshold,
+                ))
+
+                # Audit event
+                db.add(models.AuditEvent(
+                    tenant_id=c.tenant_id,
+                    actor_user_id=None,
+                    event_type=f"quota.warning_{threshold}pct",
+                    target_type="quota",
+                    target_id=c.kind,
+                    payload={
+                        "kind": c.kind, "count": c.count, "limit": limit,
+                        "pct": round(pct, 2), "threshold": threshold,
+                    },
+                ))
+                sent_count += 1
+                logger.info(
+                    "[quota.warning] tenant=%s kind=%s threshold=%d count=%d/%d (%.1f%%)",
+                    c.tenant_id, c.kind, threshold, c.count, limit, pct,
+                )
+                # TODO Frente 7.25: send email + push notification
+
+        if sent_count:
+            db.commit()
+            logger.info("[cron.hourly_quota_warnings] sent=%d", sent_count)
+    finally:
+        db.close()
+
+
+# ─── Hard delete (Frente 1.9) ─────────────────────────────────────────
+
+
+def daily_hard_delete():
+    """
+    Hard delete users soft-deleted há > 30 dias.
+    CASCADE FK remove leads, mensagens, etc.
+
+    Em prod: confirm via dry_run first; ativar só após teste manual.
+    """
+    db = SessionLocal()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    try:
+        targets = db.query(models.User).filter(
+            models.User.deleted_at.isnot(None),
+            models.User.deleted_at < cutoff,
+        ).all()
+        if not targets:
+            return
+
+        for u in targets:
+            logger.warning(
+                "[cron.daily_hard_delete] HARD DELETING user=%s tenant=%s deleted_at=%s",
+                u.id, u.tenant_id, u.deleted_at,
+            )
+            # TODO: delete cascading data manualmente onde FK não tem ON DELETE CASCADE
+            # Por enquanto, soft-delete protege; hard-delete fica como TODO V2
+
+        # SAFETY: NÃO commit ainda — implementação real precisa de:
+        # 1. Cancelar Stripe subscriptions ativas
+        # 2. Limpar Redis queues do tenant
+        # 3. Confirmar que CASCADE está em todas FKs (auditar via Alembic)
+        # 4. Email final ao user
+        # 5. Audit event hard_delete_executed
+        logger.warning(
+            "[cron.daily_hard_delete] DRY RUN — %d users seriam deletados, mas hard-delete está desabilitado V1",
+            len(targets),
+        )
+    finally:
+        db.close()
+
+
+# ─── Tenant health score (Frente 1.15) ────────────────────────────────
+
+
+def daily_recompute_tenant_health():
+    """
+    Recalcula health score pra todos tenants ativos.
+    Score = peso(activity 40, result 30, billing 15, engagement 15) × 100.
+
+    Otimizado: 3 aggregate queries com GROUP BY em vez de N*4 queries por user.
+    """
+    from sqlalchemy import func as sql_func
+
+    db = SessionLocal()
+    updated = 0
+    try:
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=30)
+
+        users = db.query(models.User).filter(
+            models.User.is_active == True,  # noqa: E712
+            models.User.deleted_at.is_(None),
+        ).all()
+
+        if not users:
+            return
+
+        tenant_ids = list({u.tenant_id for u in users if u.tenant_id})
+
+        # ── Batch 1: msgs_7d por tenant (1 query) ──────────────────────
+        msgs_rows = db.query(
+            models.Lead.tenant_id,
+            sql_func.count(models.Mensagem.id),
+        ).join(
+            models.Lead, models.Mensagem.lead_id == models.Lead.id,
+        ).filter(
+            models.Lead.tenant_id.in_(tenant_ids),
+            models.Mensagem.timestamp > week_ago,
+        ).group_by(models.Lead.tenant_id).all()
+        msgs_by_tenant = {tid: int(n) for tid, n in msgs_rows}
+
+        # ── Batch 2: sales_30d por tenant (1 query) ────────────────────
+        sales_rows = db.query(
+            models.PaymentEventReceipt.tenant_id,
+            sql_func.count(models.PaymentEventReceipt.id),
+        ).filter(
+            models.PaymentEventReceipt.tenant_id.in_(tenant_ids),
+            models.PaymentEventReceipt.processed_at > month_ago,
+        ).group_by(models.PaymentEventReceipt.tenant_id).all()
+        sales_by_tenant = {tid: int(n) for tid, n in sales_rows}
+
+        # ── Batch 3: leads_total por tenant (1 query) ──────────────────
+        leads_rows = db.query(
+            models.Lead.tenant_id,
+            sql_func.count(models.Lead.id),
+        ).filter(
+            models.Lead.tenant_id.in_(tenant_ids),
+        ).group_by(models.Lead.tenant_id).all()
+        leads_by_tenant = {tid: int(n) for tid, n in leads_rows}
+
+        # ── Batch 4: TenantHealth existentes (1 query) ─────────────────
+        existing_healths = db.query(models.TenantHealth).filter(
+            models.TenantHealth.tenant_id.in_(tenant_ids),
+        ).all()
+        health_by_tenant = {h.tenant_id: h for h in existing_healths}
+
+        # ── Computar scores (0 queries adicionais) ─────────────────────
+        for u in users:
+            tid = u.tenant_id
+            if not tid:
+                continue
+
+            # Activity (40%): last_login + msgs/week
+            last_login = _aware(u.last_login_at)
+            login_score = 100 if last_login and last_login > week_ago else \
+                (50 if last_login and last_login > month_ago else 0)
+            msgs_7d = msgs_by_tenant.get(tid, 0)
+            msgs_score = min(100, msgs_7d * 5)  # 20+ msgs/7d = 100
+            activity = (login_score + msgs_score) / 2
+
+            # Result (30%): vendas
+            sales_30d = sales_by_tenant.get(tid, 0)
+            sales_score = min(100, sales_30d * 20)  # 5+ vendas/30d = 100
+            result = sales_score
+
+            # Billing (15%): plano pago, sem dunning
+            billing = 100 if u.dunning_status is None else 30
+
+            # Engagement (15%): proxy via leads totais
+            leads_total = leads_by_tenant.get(tid, 0)
+            engagement = min(100, leads_total * 2)  # 50+ leads = 100
+
+            score = int(
+                activity * 0.40 +
+                result * 0.30 +
+                billing * 0.15 +
+                engagement * 0.15
+            )
+            band = "healthy" if score >= 80 else ("at_risk" if score >= 50 else "critical")
+
+            components = {
+                "activity": int(activity), "result": int(result),
+                "billing": int(billing), "engagement": int(engagement),
+            }
+
+            existing = health_by_tenant.get(tid)
+            if existing:
+                old_band = existing.band
+                existing.score = score
+                existing.band = band
+                existing.components = components
+                existing.updated_at = now
+                # Audit transição de banda
+                if old_band != band:
+                    db.add(models.AuditEvent(
+                        tenant_id=tid,
+                        actor_user_id=None,
+                        event_type="health.band_changed",
+                        target_type="tenant",
+                        target_id=tid,
+                        payload={"from": old_band, "to": band, "score": score},
+                    ))
+            else:
+                db.add(models.TenantHealth(
+                    tenant_id=tid,
+                    score=score, band=band,
+                    components=components,
+                ))
+            updated += 1
+
+        db.commit()
+        logger.info("[cron.daily_recompute_tenant_health] updated=%d", updated)
+    finally:
+        db.close()
+
+
+# ─── CLI dispatch ─────────────────────────────────────────────────────
+
+
+def run_hourly():
+    logger.info("[cron] starting hourly jobs")
+    _run_with_lock(hourly_trial_warnings, "hourly_trial_warnings")
+    _run_with_lock(hourly_quota_warnings, "hourly_quota_warnings")
+    _run_with_lock(hourly_apply_pending_downgrades, "hourly_downgrades")
+    _run_with_lock(hourly_fire_lunar_triggers, "hourly_lunar_triggers")
+    _run_with_lock(hourly_dispatch_daily_horoscopes, "hourly_horoscopes")
+    _run_with_lock(hourly_dispatch_daily_personal_messages, "hourly_personal_msgs")
+    _run_with_lock(hourly_process_scheduled_readings, "hourly_scheduled_readings")
+    _run_with_lock(hourly_pick_ab_winners, "hourly_ab_winners")
+    _run_with_lock(hourly_check_launch_phases, "hourly_launch_phases")
+    _run_with_lock(hourly_cleanup_media, "hourly_cleanup_media")
+    logger.info("[cron] hourly done")
+
+
+def hourly_pick_ab_winners():
+    """Avalia experimentos A/B e promove vencedoras (Frente 3.29)."""
+    try:
+        import flow_experiments
+        n = flow_experiments.hourly_pick_winners()
+        if n:
+            logger.info("[cron.hourly_pick_ab_winners] experimentos_avaliados=%d", n)
+    except Exception as exc:
+        logger.warning("[cron.ab_test_winner] falha: %s", exc)
+
+
+def hourly_process_scheduled_readings():
+    """Processa tiragens agendadas vencidas (Frente 4.28)."""
+    try:
+        import scheduled_readings as sr_mod
+        stats = sr_mod.process_due_readings()
+        if stats.get("warnings_sent") or stats.get("completed") or stats.get("failed"):
+            logger.info(
+                "[cron.hourly_process_scheduled_readings] warnings=%d completed=%d failed=%d errors=%d",
+                stats.get("warnings_sent", 0),
+                stats.get("completed", 0),
+                stats.get("failed", 0),
+                stats.get("errors", 0),
+            )
+    except Exception as exc:
+        logger.warning("[cron.scheduled_readings] falha: %s", exc)
+
+
+def hourly_dispatch_daily_personal_messages():
+    """Mensagem do dia personalizada por lead (Frente 4.27)."""
+    try:
+        import daily_personal_message as dpm
+        n = dpm.hourly_dispatch_due_tenants()
+        if n:
+            logger.info(
+                "[cron.hourly_dispatch_daily_personal_messages] tenants_processed=%d", n,
+            )
+    except Exception as exc:
+        logger.warning("[cron.daily_personal_message] falha: %s", exc)
+
+
+def hourly_dispatch_daily_horoscopes():
+    """Dispara horoscopo diario para tenants cuja hora local bateu (Frente 4.13)."""
+    try:
+        import horoscope as horoscope_engine
+        n = horoscope_engine.hourly_dispatch_due_tenants()
+        if n:
+            logger.info("[cron.hourly_dispatch_daily_horoscopes] tenants_processed=%d", n)
+    except Exception as exc:
+        logger.warning("[cron.daily_horoscope] falha: %s", exc)
+
+
+def hourly_apply_pending_downgrades():
+    """
+    Aplica downgrades agendados quando current_period_end passou.
+    Chama Stripe pra atualizar o subscription pro plano menor (Frente 2.18).
+    """
+    db = SessionLocal()
+    applied = 0
+    try:
+        from api.payments.stripe_client import update_subscription_to_plan, price_id_for_plan
+        now = datetime.now(timezone.utc)
+
+        rows = db.query(models.TenantBilling).filter(
+            models.TenantBilling.pending_plan.isnot(None),
+        ).all()
+        for billing in rows:
+            effective_at = _aware(billing.pending_effective_at)
+            if effective_at is None or effective_at > now:
+                continue  # ainda não chegou a hora
+            if not billing.subscription_id:
+                continue
+
+            new_price_id = price_id_for_plan(
+                billing.pending_plan,
+                billing_period=billing.pending_billing_period or "monthly",
+            )
+            if not new_price_id:
+                logger.warning(
+                    "[cron.downgrade] tenant=%s sem price_id pra %s — pulando",
+                    billing.tenant_id, billing.pending_plan,
+                )
+                continue
+
+            try:
+                update_subscription_to_plan(
+                    billing.subscription_id, new_price_id,
+                    proration_behavior="none",  # sem cobrar diferença em downgrade
+                    metadata={"tenant_id": billing.tenant_id, "scheduled_downgrade": "true"},
+                )
+            except Exception as exc:
+                logger.exception("[cron.downgrade] stripe error tenant=%s: %s",
+                                billing.tenant_id, exc)
+                continue
+
+            # Webhook customer.subscription.updated vai sincronizar TenantBilling
+            # Limpa pending fields
+            billing.pending_plan = None
+            billing.pending_billing_period = None
+            billing.pending_effective_at = None
+            applied += 1
+
+            db.add(models.AuditEvent(
+                tenant_id=billing.tenant_id,
+                actor_user_id=None,
+                event_type="billing.downgrade.applied",
+                target_type="tenant_billing",
+                target_id=billing.tenant_id,
+                payload={"plan": billing.pending_plan},
+            ))
+
+        if applied:
+            db.commit()
+            logger.info("[cron.hourly_apply_pending_downgrades] applied=%d", applied)
+    finally:
+        db.close()
+
+
+def hourly_fire_lunar_triggers():
+    """
+    Verifica triggers lunares ativos. Dispara fluxo se:
+    - Janela atingida (now é dentro do window_hours_before da fase target)
+    - Trigger não foi disparado nas últimas 23h (anti-double-fire)
+
+    V1: marca last_fired_at + envia broadcast genérico.
+    V2: realmente executa flow via engine pra cada lead matching.
+    """
+    try:
+        import lunar
+        db = SessionLocal()
+        try:
+            now = datetime.now(timezone.utc)
+            triggers = db.query(models.LunarTrigger).filter_by(active=True).all()
+            fired = 0
+
+            today_phase = lunar.phase_for_date(now)["phase_name"]
+
+            for tr in triggers:
+                # Anti double-fire: skipa se disparou nas últimas 23h
+                last_fired = _aware(tr.last_fired_at)
+                if last_fired and (now - last_fired).total_seconds() < 23 * 3600:
+                    continue
+
+                # Está na fase correta agora?
+                if today_phase != tr.trigger_phase:
+                    continue
+
+                # Janela: por enquanto, dispara sempre que estamos na fase
+                # window_hours_before pra futuro V2 com timing antecipado
+
+                tr.last_fired_at = now
+                tr.fire_count = (tr.fire_count or 0) + 1
+                fired += 1
+
+                # Audit
+                db.add(models.AuditEvent(
+                    tenant_id=tr.tenant_id,
+                    actor_user_id=None,
+                    event_type="lunar_trigger.fired",
+                    target_type="lunar_trigger",
+                    target_id=str(tr.id),
+                    payload={
+                        "phase": tr.trigger_phase,
+                        "flow_id": tr.flow_id,
+                        "flow_slug": tr.flow_slug,
+                    },
+                ))
+                logger.info(
+                    "[lunar.trigger.fired] tenant=%s phase=%s flow=%s",
+                    tr.tenant_id, tr.trigger_phase, tr.flow_slug or tr.flow_id,
+                )
+
+            if fired:
+                db.commit()
+                logger.info("[cron.hourly_fire_lunar_triggers] fired=%d", fired)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("[cron.lunar_triggers] falha: %s", exc)
+
+
+def daily_recompute_lead_scores():
+    """
+    Recalcula score de todos os leads ativos. Frente 3.24.
+    """
+    try:
+        import lead_scoring
+        updated = lead_scoring.recompute_all()
+        logger.info("[cron.daily_recompute_lead_scores] updated=%d", updated)
+    except Exception as exc:
+        logger.warning("[cron.daily_recompute_lead_scores] falha: %s", exc)
+
+
+def daily_cleanup_stale_receipts():
+    """
+    Remove receipts de webhook WhatsApp com mais de 7 dias.
+    A tabela `whatsapp_inbound_receipts` cresce linearmente com volume;
+    após 7 dias a janela de retry da Meta já passou (24h).
+    Mantém o DB lean e queries de dedup rápidas.
+    """
+    db = SessionLocal()
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        deleted = db.query(models.WhatsAppInboundReceipt).filter(
+            models.WhatsAppInboundReceipt.criado_em < cutoff,
+        ).delete(synchronize_session=False)
+        db.commit()
+        if deleted:
+            logger.info("[cron.cleanup_receipts] removed=%d (older than 7d)", deleted)
+    except Exception as exc:
+        db.rollback()
+        logger.warning("[cron.cleanup_receipts] falha: %s", exc)
+    finally:
+        db.close()
+
+
+def run_daily():
+    logger.info("[cron] starting daily jobs")
+    _run_with_lock(daily_recompute_tenant_health, "daily_tenant_health", ttl_ms=600_000)
+    _run_with_lock(daily_recompute_lead_scores, "daily_lead_scores", ttl_ms=600_000)
+    _run_with_lock(daily_recompute_spiritual_intents, "daily_spiritual_intents", ttl_ms=600_000)
+    _run_with_lock(daily_cleanup_stale_receipts, "daily_cleanup_receipts")
+    _run_with_lock(daily_hard_delete, "daily_hard_delete", ttl_ms=600_000)
+    logger.info("[cron] daily done")
+
+
+def hourly_cleanup_media():
+    """Limpa mídias temporárias com mais de 2h (downloads WhatsApp processados)."""
+    download_dir = os.path.join(_ROOT, "downloads")
+    if not os.path.isdir(download_dir):
+        return
+    import time
+    cutoff = time.time() - 7200  # 2 horas
+    removed = 0
+    for f in glob.glob(os.path.join(download_dir, "*")):
+        try:
+            if os.path.getmtime(f) < cutoff:
+                os.remove(f)
+                removed += 1
+        except Exception:
+            pass
+    if removed:
+        logger.info("[cron.cleanup_media] %d arquivos removidos", removed)
+
+
+def daily_recompute_spiritual_intents():
+    """Reclassifica intent espiritual de leads ativos (Frente 4.19)."""
+    try:
+        import spiritual_classifier
+        n = spiritual_classifier.recompute_recent_leads(days_back=7, max_leads=200)
+        logger.info("[cron.daily_recompute_spiritual_intents] leads_processed=%d", n)
+    except Exception as exc:
+        logger.warning("[cron.spiritual_intents] falha: %s", exc)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "hourly"
+    if cmd == "hourly":
+        run_hourly()
+    elif cmd == "daily":
+        run_daily()
+    elif cmd == "minutely":
+        run_minutely()
+    else:
+        print(f"Unknown command: {cmd}. Use 'hourly', 'daily', or 'minutely'.")
+        sys.exit(1)
+
+
+def hourly_check_launch_phases():
+    """Executa fases de lançamento cujo scheduled_at já passou."""
+    try:
+        from api.saas.launch_manager import check_and_execute_due_phases
+        check_and_execute_due_phases()
+    except Exception as exc:
+        logger.warning("[cron.launch_phases] falha: %s", exc)
+
+
+def run_minutely():
+    """Para lançamentos: checa fases a cada minuto (precisão de timing)."""
+    logger.info("[cron] starting minutely jobs")
+    hourly_check_launch_phases()
+    logger.info("[cron] minutely done")
+

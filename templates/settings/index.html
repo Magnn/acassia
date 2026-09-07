@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Configurações — Meu Mistério SaaS{% endblock %}
+{% block main_class %}max-w-3xl mx-auto py-8 px-6{% endblock %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">Configurações</h1>
+
+{# Recovery #}
+<section class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-5 mb-4">
+  <h2 class="font-bold mb-1">Cadência de recovery</h2>
+  <p class="text-xs text-slate-400 mb-3">
+    Tempo (em minutos) entre tentativas de reabordar lead que sumiu. Ex: <code>5, 60, 180</code> = 5min, 1h, 3h. Mínimo 5min, máximo 7 toques.
+  </p>
+  <form method="POST" action="{{ url_for('saas_settings.recovery') }}" class="flex gap-2">
+    <input type="text" name="cadence_minutes" value="{{ cadence_str }}"
+           pattern="[\d, ]+" required
+           class="flex-1 px-3 py-2 rounded-lg bg-meumisterio-bg border border-meumisterio-border focus:border-meumisterio-purple focus:outline-none font-mono">
+    <button type="submit" class="bg-meumisterio-purple hover:bg-purple-600 transition px-4 py-2 rounded-lg text-sm font-bold">
+      Salvar
+    </button>
+  </form>
+</section>
+
+{# WhatsApp #}
+<section class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-5 mb-4">
+  <h2 class="font-bold mb-3">WhatsApp Cloud API</h2>
+  {% if whatsapp_configured %}
+    <div class="text-sm space-y-1">
+      <div><span class="text-slate-400">phone_number_id:</span> <code class="text-emerald-300">{{ whatsapp_phone_id }}</code></div>
+      <div><span class="text-slate-400">waba_id:</span> <code class="text-emerald-300">{{ whatsapp_waba_id }}</code></div>
+      <div><span class="text-slate-400">access_token:</span> <span class="text-slate-500">••••••••</span> (cifrado)</div>
+    </div>
+    <p class="text-xs text-slate-500 mt-3">Pra reconfigurar, contate suporte (interface de edição em V2).</p>
+  {% else %}
+    <p class="text-sm text-amber-400">Não configurado. Volte ao onboarding step 4.</p>
+  {% endif %}
+</section>
+
+{# Stripe / Billing #}
+<section class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-5 mb-4">
+  <h2 class="font-bold mb-3">Assinatura e Conta Stripe</h2>
+  <div class="text-sm space-y-2">
+    <div>
+      Plano:
+      {% if subscription_status == 'active' %}
+        <span class="text-emerald-400">{{ subscription_status }}</span>
+      {% elif subscription_status %}
+        <span class="text-amber-400">{{ subscription_status }}</span>
+      {% else %}
+        <span class="text-slate-500">sem assinatura</span>
+      {% endif %}
+      <a href="{{ url_for('saas_billing.plans') }}" class="ml-2 text-meumisterio-purple hover:underline text-xs">gerenciar →</a>
+    </div>
+    <div>
+      Connect (split end-user):
+      {% if connect_payouts %}
+        <span class="text-emerald-400">ativo</span>
+      {% else %}
+        <span class="text-slate-500">não configurado</span>
+      {% endif %}
+      <a href="{{ url_for('saas_connect.status') }}" class="ml-2 text-meumisterio-purple hover:underline text-xs">gerenciar →</a>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

@@ -2,14 +2,26 @@
 Executor ponta-a-ponta: plano compilado do Flow Builder → lista de Acao (schema.py).
 
 - Tipos seguros: message (texto), delay, entry/terminal/note (no-op).
-- HTTP opcional: só se FLOW_BLUEPRINT_ALLOW_HTTP=1 (timeout curto).
+- HTTP opcional: só se a variável de ambiente **FLOW_BLUEPRINT_ALLOW_HTTP** estiver ativa
+  (`1`, `true`, `yes`, `on`). Caso contrário, nós `api` são ignorados na execução (sem pedido HTTP).
+  Ver `env.example` e `flow_blueprint_allow_http()`.
+- B3: nó `api` grava resultado em variáveis (`save_as` / `flow_http__<node_id>`); textos seguintes
+  resolvem `{{chave}}` com o contexto acumulado (metadata do lead + variáveis do run).
+- B4: nó `anotacao` gera `Acao` marcada como nota interna; o **engine** não envia ao WhatsApp.
+- C2: com **FLOW_BLUEPRINT_ALLOW_LLM** e **GEMINI_API_KEY**, nós GPT/Agente chamam a API Gemini em
+  `steps_to_acoes`; o texto devolvido vai em `conteudo` com `metadata.runtime=llm_gemini` (o **engine** envia).
+  Sem flag ou sem chave, mantém-se o placeholder `runtime=llm` (não enviado — A1).
+- C3: nó **motor_ref** com **FLOW_BLUEPRINT_ALLOW_MOTOR_REF** chama `flow_motor_ref.invoke_flow_motor_ref`
+  (`module_hint` = `módulo:função`, allowlist por prefixo). Sem flag, `runtime=motor_ref_pending` (engine não envia).
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
-from typing import Any, Dict, List, Mapping, Optional
+import re
+import time
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import requests
 
@@ -17,6 +29,54 @@ from schema import Acao
 from flow_builder_runtime import NODE_SPECS, compile_flow_plan, validate_flow_document
 
 logger = logging.getLogger(__name__)
+
+
+def flow_context_from_lead(lead: Any, tenant_id: Optional[str] = None) -> Dict[str, Any]:
+    """Contexto plano para regras do canvas: metadata do lead + campos comuns."""
+    meta = getattr(lead, "metadata_json", None) or {}
+    if not isinstance(meta, dict):
+        meta = {}
+    ctx: Dict[str, Any] = {str(k): v for k, v in meta.items()}
+    if getattr(lead, "nome", None) is not None:
+        ctx["nome"] = lead.nome
+        ctx["lead.nome"] = lead.nome
+        ctx["contact.name"] = lead.nome
+        ctx["contact.first_name"] = str(lead.nome or "").strip().split(" ", 1)[0]
+    if getattr(lead, "telefone", None) is not None:
+        ctx["telefone"] = lead.telefone
+        ctx["lead.telefone"] = lead.telefone
+        ctx["contact.phone"] = lead.telefone
+        digits = re.sub(r"\D+", "", str(lead.telefone or ""))
+        ctx["contact.ddd"] = digits[-11:-9] if len(digits) >= 10 else ""
+    if getattr(lead, "node_atual", None) is not None:
+        ctx["node_atual"] = lead.node_atual
+    for attr in (
+        "email",
+        "idade",
+        "cidade",
+        "pipeline_stage",
+        "score_value",
+        "score_band",
+        "convertido",
+        "produto_comprado",
+        "timezone",
+    ):
+        value = getattr(lead, attr, None)
+        if value is not None:
+            ctx[attr] = value
+            ctx[f"lead.{attr}"] = value
+    tags = list(getattr(lead, "tags", None) or [])
+    ctx["tags"] = tags
+    ctx["etiqueta"] = tags
+    custom_fields = getattr(lead, "custom_fields", None) or {}
+    if isinstance(custom_fields, dict):
+        for key, value in custom_fields.items():
+            ctx[str(key)] = value
+            ctx[f"contact.custom.{key}"] = value
+    ctx["lead_id"] = str(getattr(lead, "id", "") or "")
+    if tenant_id is not None:
+        ctx["tenant_id"] = str(tenant_id).strip() or "default"
+    return ctx
 
 _MAX_DELAY_S = min(120.0, float(os.getenv("FLOW_BLUEPRINT_MAX_DELAY_S", "120") or 120))
 _ALLOW_HTTP = str(os.getenv("FLOW_BLUEPRINT_ALLOW_HTTP", "") or "").strip().lower() in (
@@ -27,23 +87,334 @@ _ALLOW_HTTP = str(os.getenv("FLOW_BLUEPRINT_ALLOW_HTTP", "") or "").strip().lowe
 )
 
 
-def document_to_acoes(doc: Mapping[str, Any]) -> List[Acao]:
-    """Valida documento, compila e converte passos em ações do motor."""
+def flow_blueprint_allow_http() -> bool:
+    """Indica se nós `api` executam pedidos HTTP reais em `steps_to_acoes` (C1)."""
+    return _ALLOW_HTTP
+
+
+_ALLOW_LLM = str(os.getenv("FLOW_BLUEPRINT_ALLOW_LLM", "") or "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+_DEFAULT_FLOW_LLM_MODEL = (os.getenv("FLOW_BLUEPRINT_LLM_DEFAULT_MODEL") or "gemini-2.5-flash").strip()
+
+
+def flow_blueprint_allow_llm() -> bool:
+    """Indica se blocos GPT/Agente IA resolvem texto via Gemini em `steps_to_acoes` (C2)."""
+    return _ALLOW_LLM
+
+
+def flow_blueprint_gemini_configured() -> bool:
+    """True se `GEMINI_API_KEY` está definida (sem expor o segredo)."""
+    return bool((os.getenv("GEMINI_API_KEY") or "").strip())
+
+
+def _llm_max_output_tokens() -> int:
+    try:
+        n = int(os.getenv("FLOW_BLUEPRINT_LLM_MAX_OUTPUT_TOKENS", "1024") or 1024)
+    except ValueError:
+        n = 1024
+    return max(64, min(n, 8192))
+
+
+def _sanitize_gemini_model(raw: Optional[str]) -> str:
+    s = re.sub(r"[^\w.\-]", "", str(raw or "").strip())[:80]
+    if s.lower().startswith(("gpt-", "openai")):
+        return _DEFAULT_FLOW_LLM_MODEL
+    return s or _DEFAULT_FLOW_LLM_MODEL
+
+
+def _parse_llm_temperature(cfg: Mapping[str, Any]) -> float:
+    for k in ("ai_temperature", "temperature"):
+        v = cfg.get(k)
+        if v is not None and str(v).strip() != "":
+            try:
+                return max(0.0, min(2.0, float(str(v).replace(",", "."))))
+            except ValueError:
+                pass
+    return 0.7
+
+
+def _gemini_response_text(res_json: Mapping[str, Any]) -> str:
+    cands = res_json.get("candidates")
+    if not isinstance(cands, list) or not cands:
+        return ""
+    parts = (cands[0].get("content") or {}).get("parts")
+    if not isinstance(parts, list):
+        return ""
+    chunks: List[str] = []
+    for p in parts:
+        if isinstance(p, dict) and p.get("text"):
+            chunks.append(str(p["text"]))
+    return "".join(chunks).strip()
+
+
+def flow_gemini_generate_text(
+    prompt: str,
+    *,
+    model: str,
+    temperature: float,
+    api_key: Optional[str],
+    system_instruction: Optional[str] = None,
+    max_output_tokens: Optional[int] = None,
+) -> Tuple[str, Optional[str]]:
+    """
+    Uma chamada `generateContent` ao Gemini (REST v1beta).
+    Devolve (texto, erro). Erro None em sucesso.
+
+    ``system_instruction`` (opcional): conteúdo injetado como
+    ``systemInstruction`` no payload — usado para passar a personalidade /
+    instruções do agente Studio publicado pra moldar o output sem poluir o
+    prompt de turno.
+    """
+    if not (api_key or "").strip():
+        return "", "GEMINI_API_KEY ausente"
+    m = _sanitize_gemini_model(model)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key.strip()}"
+    try:
+        output_tokens = int(max_output_tokens or _llm_max_output_tokens())
+    except (TypeError, ValueError):
+        output_tokens = _llm_max_output_tokens()
+    output_tokens = max(64, min(output_tokens, 8192))
+    payload: Dict[str, Any] = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": float(temperature),
+            "maxOutputTokens": output_tokens,
+        },
+    }
+    if system_instruction and system_instruction.strip():
+        payload["systemInstruction"] = {
+            "parts": [{"text": system_instruction.strip()[:8000]}]
+        }
+    try:
+        to = min(90, max(8, int(os.getenv("FLOW_BLUEPRINT_LLM_TIMEOUT_S", "45") or 45)))
+    except ValueError:
+        to = 45
+    try:
+        r = requests.post(url, json=payload, timeout=to)
+    except requests.RequestException as e:
+        return "", str(e)[:500]
+    if r.status_code != 200:
+        return "", f"HTTP {r.status_code}: {(r.text or '')[:280]}"
+    try:
+        data = r.json()
+    except json.JSONDecodeError:
+        return "", "resposta JSON inválida"
+    text = _gemini_response_text(data)
+    if not text:
+        return "", "resposta vazia ou bloqueada pelo modelo"
+    return text[:4000], None
+
+
+def _coerce_section(value: Any, *, nested_keys: Tuple[str, ...] = ()) -> str:
+    """
+    Aceita string OU dict aninhado e devolve texto unificado.
+
+    Studio tem 2 shapes em circulação:
+      - Plano (frontend AgentStudio.tsx novo): valor é string direta.
+      - Aninhado (legacy `_studio_default_data` no app.py): valor é dict com
+        sub-campos (ex.: ``{identidade, diretrizes}``).
+
+    ``nested_keys`` define a ordem dos sub-campos a concatenar caso seja dict.
+    Strings vazias / chaves ausentes são puladas silenciosamente.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        chunks: List[str] = []
+        for k in nested_keys or list(value.keys()):
+            v = value.get(k)
+            if isinstance(v, str) and v.strip():
+                chunks.append(v.strip())
+        return "\n\n".join(chunks)
+    return ""
+
+
+def _build_system_instruction_from_studio(snap: Any) -> Optional[str]:
+    """
+    Constrói o ``systemInstruction`` para o Gemini a partir do snapshot do
+    agente Studio publicado (injetado em ``ctx.metadata['__meumisterio_studio__']``
+    pelo ``studio_runtime.inject_published_studio_into_metadata``).
+
+    Tolera ambos os shapes do Studio (plano novo e aninhado legado), juntando
+    personalidade + instruções + base + FAQ em seções markdown. Retorna None
+    se o snapshot estiver vazio ou malformado.
+    """
+    if not isinstance(snap, dict):
+        return None
+    data = snap.get("data") if isinstance(snap.get("data"), dict) else snap
+    if not isinstance(data, dict):
+        return None
+    parts: List[str] = []
+
+    persona = _coerce_section(
+        data.get("personalidade"),
+        nested_keys=("identidade", "diretrizes"),
+    )
+    if persona:
+        parts.append(f"## Personalidade\n{persona}")
+
+    instrucoes = _coerce_section(
+        data.get("instrucoes"),
+        nested_keys=("gerais", "proibicoes", "formato_saida"),
+    )
+    if instrucoes:
+        parts.append(f"## Instruções operacionais\n{instrucoes}")
+
+    # Base aceita "base_conhecimento" (novo) OR "base" (legado) com sub-campos.
+    base = _coerce_section(
+        data.get("base_conhecimento"),
+    ) or _coerce_section(
+        data.get("base"),
+        nested_keys=("contexto_empresa", "produtos", "politica_preco"),
+    )
+    if base:
+        parts.append(f"## Base de conhecimento\n{base}")
+
+    # FAQ: array de {q, a} (novo) OR objeto {perguntas: str} (legado)
+    faq_lines: List[str] = []
+    faqs_new = data.get("faqs")
+    if isinstance(faqs_new, list):
+        for f in faqs_new:
+            if isinstance(f, dict):
+                q = str(f.get("q") or "").strip()
+                a = str(f.get("a") or "").strip()
+                if q and a:
+                    faq_lines.append(f"P: {q}\nR: {a}")
+    if not faq_lines:
+        legacy = data.get("faq")
+        if isinstance(legacy, dict):
+            perguntas = str(legacy.get("perguntas") or "").strip()
+            if perguntas:
+                faq_lines.append(perguntas)
+    if faq_lines:
+        parts.append("## FAQ\n" + "\n\n".join(faq_lines))
+
+    return "\n\n".join(parts) if parts else None
+
+
+def _flow_http_var_key(node_id: str) -> str:
+    safe = re.sub(r"[^\w\-.]+", "_", str(node_id).strip() or "api")
+    return f"flow_http__{safe}"
+
+
+def _format_flow_var_value(v: Any) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, dict):
+        if "body" in v:
+            return str(v.get("body") or "")
+        try:
+            return json.dumps(v, ensure_ascii=False)[:4000]
+        except (TypeError, ValueError):
+            return str(v)[:4000]
+    return str(v)
+
+
+def apply_flow_template(template: str, ctx: Mapping[str, Any]) -> str:
+    """Substitui `{{chave}}` / `{{ chave }}` usando valores do contexto (B3).
+
+    Variáveis ausentes são removidas silenciosamente (Graceful Degradation)
+    para nunca enviar `{{nome_espiritual}}` cru ao cliente.
+    """
+    s = str(template or "")
+    if "{{" not in s:
+        return s
+    out = s
+    for k, v in ctx.items():
+        key = str(k).strip()
+        if not key:
+            continue
+        rep = _format_flow_var_value(v)
+        out = out.replace("{{" + key + "}}", rep)
+        out = out.replace("{{ " + key + " }}", rep)
+    # Graceful cleanup: remove variáveis não resolvidas (typos, campos nulos)
+    # Regex: {{qualquer_coisa}} → "" (string vazia)
+    if "{{" in out:
+        out = re.sub(r"\{\{\s*[^{}]+?\s*\}\}", "", out)
+        # Limpa espaços duplos criados pela remoção
+        out = re.sub(r"  +", " ", out).strip()
+    return out
+
+
+def document_to_acoes(
+    doc: Mapping[str, Any],
+    context: Optional[Mapping[str, Any]] = None,
+    *,
+    blueprint_id: Optional[int] = None,
+    tenant_id: Optional[str] = None,
+    divisao_metadata_out: Optional[Dict[str, Any]] = None,
+    flow_vars_metadata_out: Optional[Dict[str, Any]] = None,
+) -> List[Acao]:
+    """
+    Valida documento, compila e converte passos em ações do motor.
+
+    Com `context` e nós `condicao` / `divisao`, usa percurso com ramificação (`flow_graph_walk`).
+    Sem contexto ou sem esses nós, mantém plano linear (topológico).
+
+    Com `flow_vars_metadata_out`, grava chaves de variáveis de fluxo (HTTP / `save_as`) para persistir
+    no metadata do lead (ex.: `execute` no app).
+    """
+    from flow_graph_walk import graph_needs_context_walk, graph_walk_steps
+
     rep = validate_flow_document(doc)
     if not rep.get("ok"):
         raise ValueError("documento inválido: " + str(rep.get("errors") or []))
     norm = rep.get("normalized") or doc
+
+    if context is None and graph_needs_context_walk(norm):
+        logger.warning(
+            "document_to_acoes: fluxo com condicao/divisao sem context — usando plano linear (ramos não aplicados)"
+        )
+
+    flow_vars: Dict[str, Any] = dict(context) if context else {}
+
+    if context is not None and graph_needs_context_walk(norm):
+        steps = graph_walk_steps(
+            norm,
+            context,
+            blueprint_id=blueprint_id,
+            tenant_id=tenant_id,
+            divisao_metadata_out=divisao_metadata_out,
+        )
+        if not steps:
+            logger.warning("graph_walk_steps vazio — fallback ao plano linear (revise o grafo)")
+            plan = compile_flow_plan(norm)
+            if not plan.get("ok"):
+                raise ValueError("compilação falhou: " + str(plan.get("issues") or []))
+            steps = plan.get("steps") or []
+        if divisao_metadata_out:
+            flow_vars.update(divisao_metadata_out)
+        return steps_to_acoes(
+            steps,
+            flow_vars=flow_vars,
+            flow_vars_metadata_out=flow_vars_metadata_out,
+            blueprint_id=blueprint_id,
+            tenant_id=tenant_id,
+        )
+
     plan = compile_flow_plan(norm)
     if not plan.get("ok"):
         raise ValueError("compilação falhou: " + str(plan.get("issues") or []))
     steps = plan.get("steps") or []
-    return steps_to_acoes(steps)
+    return steps_to_acoes(
+        steps,
+        flow_vars=flow_vars,
+        flow_vars_metadata_out=flow_vars_metadata_out,
+        blueprint_id=blueprint_id,
+        tenant_id=tenant_id,
+    )
 
 
 _MAX_CONTEUDO_CARDS = 5  # alinhado ao Flow Builder (Meta / WhatsApp + métricas)
 
 
-def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
+def _expand_conteudo_items(cfg: Mapping[str, Any], flow_vars: Mapping[str, Any]) -> List[Acao]:
     """Lista ordenada do bloco Conteúdo (texto, mídia, delay) → ações do motor.
 
     Cada item pode usar o formato novo do Flow Builder: ``{type, value}`` (texto/delay)
@@ -58,7 +429,7 @@ def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
             continue
         t = str(it.get("type") or "text").lower()
         if t == "text":
-            body = str(it.get("body") or it.get("value") or "").strip()
+            body = apply_flow_template(str(it.get("body") or it.get("value") or "").strip(), flow_vars)
             if body:
                 out.append(
                     Acao(
@@ -81,11 +452,11 @@ def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
         elif t in ("image", "video", "audio", "document"):
             val = it.get("value")
             if isinstance(val, dict):
-                url = str(val.get("url") or "").strip()
-                cap = str(val.get("caption") or "").strip()
+                url = apply_flow_template(str(val.get("url") or "").strip(), flow_vars)
+                cap = apply_flow_template(str(val.get("caption") or "").strip(), flow_vars)
             else:
-                url = str(it.get("url") or "").strip()
-                cap = str(it.get("caption") or "").strip()
+                url = apply_flow_template(str(it.get("url") or "").strip(), flow_vars)
+                cap = apply_flow_template(str(it.get("caption") or "").strip(), flow_vars)
             if not url:
                 continue
             meta: Dict[str, Any] = {"source": "flow_builder", "conteudo_item": t}
@@ -100,14 +471,61 @@ def _expand_conteudo_items(cfg: Mapping[str, Any]) -> List[Acao]:
             elif t == "audio":
                 out.append(Acao(tipo="audio", url=url, conteudo=url, metadata=meta))
             else:
-                fn = str(it.get("filename") or "documento").strip()[:200]
+                fn = apply_flow_template(str(it.get("filename") or "documento").strip(), flow_vars)[:200]
                 out.append(Acao(tipo="document", url=url, conteudo=fn, metadata=meta))
     return out
 
 
-def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
+def steps_to_acoes(
+    steps: List[Dict[str, Any]],
+    *,
+    flow_vars: Optional[Dict[str, Any]] = None,
+    flow_vars_metadata_out: Optional[Dict[str, Any]] = None,
+    blueprint_id: Optional[int] = None,
+    tenant_id: Optional[str] = None,
+) -> List[Acao]:
+    fv: Dict[str, Any] = flow_vars if flow_vars is not None else {}
+
+    def _persist_flow_var(key: str, value: Any) -> None:
+        if flow_vars_metadata_out is None or not key:
+            return
+        flow_vars_metadata_out[str(key)] = value
+
+    # Guard: timeout global para evitar runaway execution (LLM + HTTP loops)
+    _max_exec_s = min(300, max(30, int(os.getenv("FLOW_EXECUTOR_MAX_SECONDS", "120") or 120)))
+    _started_at = time.time()
+    _MAX_STEPS = 200  # Hard limit — nenhum fluxo legítimo tem 200 nós
+    _seen_node_ids: set = set()  # Detecta ciclos no plano compilado
+
     acoes: List[Acao] = []
-    for st in steps:
+    for _step_idx, st in enumerate(steps):
+        # Circuit Breaker 1: Limite de passos
+        if _step_idx >= _MAX_STEPS:
+            logger.error(
+                "[FLOW_EXEC] CIRCUIT_BREAK: atingiu %d steps — possível loop infinito. Abortando.",
+                _MAX_STEPS,
+            )
+            break
+
+        # Circuit Breaker 2: Timeout por tempo
+        if (time.time() - _started_at) > _max_exec_s:
+            logger.warning(
+                "[FLOW_EXEC] Timeout após %.1fs processando %d steps (max=%ds) — retornando %d ações parciais",
+                time.time() - _started_at, len(steps), _max_exec_s, len(acoes),
+            )
+            break
+
+        # Circuit Breaker 3: Detecção de ciclo (mesmo node_id apareceu 2x)
+        _nid = str(st.get("node_id") or "").strip()
+        if _nid:
+            if _nid in _seen_node_ids:
+                logger.error(
+                    "[FLOW_EXEC] CYCLE_DETECTED: node '%s' já foi executado — interrompendo ciclo.",
+                    _nid,
+                )
+                break
+            _seen_node_ids.add(_nid)
+
         ntype = str(st.get("type") or "generic").lower()
         cfg = st.get("config") if isinstance(st.get("config"), dict) else {}
         spec = NODE_SPECS.get(ntype) or NODE_SPECS["generic"]
@@ -119,30 +537,82 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
             continue
 
         if rk == "note" or ntype == "anotacao":
-            note = str(cfg.get("note") or cfg.get("body") or "").strip()
+            note = apply_flow_template(str(cfg.get("note") or cfg.get("body") or "").strip(), fv)
             if note:
                 acoes.append(
-                    Acao(tipo="text", conteudo=note[:4000], metadata={"source": "flow_builder", "kind": "note"})
+                    Acao(
+                        tipo="text",
+                        conteudo=note[:4000],
+                        metadata={
+                            "source": "flow_builder",
+                            "kind": "note",
+                            "runtime": "note_internal",
+                        },
+                    )
                 )
             continue
 
         if rk == "message" and ntype == "conteudo":
-            expanded = _expand_conteudo_items(cfg)
+            expanded = _expand_conteudo_items(cfg, fv)
             if expanded:
                 acoes.extend(expanded)
                 continue
-            body = (
-                str(cfg.get("body") or "").strip()
-                or str(cfg.get("step_name") or "").strip()
+            body = apply_flow_template(
+                (
+                    str(cfg.get("body") or "").strip()
+                    or str(cfg.get("content_text") or "").strip()
+                    or str(cfg.get("step_name") or "").strip()
+                ),
+                fv,
             )
             if body:
                 acoes.append(Acao(tipo="text", conteudo=body[:4000], metadata={"source": "flow_builder", "node_type": "conteudo"}))
             continue
 
         if rk == "message" or rk == "action":
-            body = (
-                str(cfg.get("body") or cfg.get("question") or cfg.get("payload") or "").strip()
-                or str(cfg.get("step_name") or "").strip()
+            stack = cfg.get("acao_stack")
+            if ntype == "acao" and isinstance(stack, list) and len(stack) > 0:
+                for raw_step in stack:
+                    if not isinstance(raw_step, dict):
+                        continue
+                    merged = dict(cfg)
+                    merged.pop("acao_stack", None)
+                    merged.pop("acao_etiqueta_catalog", None)
+                    step_only = {
+                        k: v
+                        for k, v in raw_step.items()
+                        if k not in ("acao_stack", "acao_etiqueta_catalog")
+                    }
+                    merged.update(step_only)
+                    body = apply_flow_template(
+                        (
+                            str(merged.get("body") or merged.get("question") or merged.get("payload") or "").strip()
+                            or str(merged.get("step_name") or "").strip()
+                        ),
+                        fv,
+                    )
+                    if body:
+                        meta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype}
+                        ak = str(merged.get("action_kind") or "").strip()
+                        if ak:
+                            meta["action_kind"] = ak
+                        rm = str(merged.get("reply_mode") or "").strip()
+                        if rm:
+                            meta["reply_mode"] = rm
+                        acoes.append(Acao(tipo="text", conteudo=body[:4000], metadata=meta))
+                continue
+            body = apply_flow_template(
+                (
+                    str(
+                        cfg.get("body")
+                        or cfg.get("message")
+                        or cfg.get("question")
+                        or cfg.get("payload")
+                        or ""
+                    ).strip()
+                    or str(cfg.get("step_name") or "").strip()
+                ),
+                fv,
             )
             if body:
                 meta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype}
@@ -152,6 +622,31 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
                 rm = str(cfg.get("reply_mode") or "").strip()
                 if rm:
                     meta["reply_mode"] = rm
+                
+                # Suporte avançado para "pergunta" (mapeamento Frontend -> Motor)
+                if ntype == "pergunta":
+                    qr = cfg.get("quick_replies")
+                    if isinstance(qr, list) and len(qr) > 0:
+                        meta["quick_replies"] = qr
+                    sv = str(cfg.get("save_to_flow_field") or "").strip()
+                    if sv:
+                        meta["save_to_flow_field"] = sv
+                    to_sec = cfg.get("question_timeout_seconds")
+                    if to_sec is not None:
+                        try:
+                            meta["question_timeout_seconds"] = int(to_sec)
+                        except ValueError:
+                            pass
+                
+                # Suporte avançado para "menu" (mapeamento Frontend -> Motor)
+                if ntype == "menu":
+                    opts = cfg.get("options")
+                    if isinstance(opts, list) and len(opts) > 0:
+                        meta["quick_replies"] = [str(o) for o in opts if str(o).strip()]
+                    sv = str(cfg.get("save_to_flow_field") or "").strip()
+                    if sv:
+                        meta["save_to_flow_field"] = sv
+
                 acoes.append(Acao(tipo="text", conteudo=body[:4000], metadata=meta))
             continue
 
@@ -160,18 +655,110 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
                 sec = float(cfg.get("seconds") or 0)
             except (TypeError, ValueError):
                 sec = 0.0
+            if str(cfg.get("mode") or "").strip().lower() == "inteligente":
+                try:
+                    sec_max = float(cfg.get("seconds_max") or sec)
+                except (TypeError, ValueError):
+                    sec_max = sec
+                low, high = sorted((sec, sec_max))
+                sec = random.uniform(low, high)
             sec = max(0.0, min(sec, _MAX_DELAY_S))
             if sec > 0:
+                if str(cfg.get("status_typing") or "").lower() == "true":
+                    acoes.append(
+                        Acao(tipo="typing", metadata={"source": "flow_builder", "whatsapp_typing": "text"})
+                    )
+                if str(cfg.get("status_recording") or "").lower() == "true":
+                    acoes.append(
+                        Acao(tipo="typing", metadata={"source": "flow_builder", "whatsapp_typing": "audio"})
+                    )
                 dmeta: Dict[str, Any] = {"source": "flow_builder"}
-                note = str(cfg.get("body") or "").strip()
+                note = apply_flow_template(str(cfg.get("body") or "").strip(), fv)
                 if note:
                     dmeta["delay_note"] = note[:400]
                 acoes.append(Acao(tipo="delay", segundos=int(sec), metadata=dmeta))
             continue
 
+        if rk == "integration":
+            node_id = str(st.get("node_id") or "integration").strip()
+            service = str(cfg.get("service") or "").strip()
+            action = str(cfg.get("action") or "").strip()
+            credential_id = cfg.get("credential_id")
+            save_as = str(cfg.get("save_as") or cfg.get("output_var") or "").strip()
+
+            vault_data = {}
+            if credential_id:
+                _db = None
+                try:
+                    from db.database import SessionLocal
+                    from db import models
+                    from api.utils.crypto import decrypt_credential
+                    _db = SessionLocal()
+                    query = _db.query(models.TenantIntegrationCredential).filter_by(id=int(credential_id))
+                    if tenant_id:
+                        query = query.filter_by(tenant_id=str(tenant_id))
+                    cred = query.first()
+                    if cred:
+                        vault_data = decrypt_credential(cred.encrypted_data)
+                except Exception as e:
+                    logger.warning("flow_executor integration vault: %s", e)
+                finally:
+                    if _db is not None:
+                        _db.close()
+
+            try:
+                from api.saas.integration_runners import execute_integration
+                cfg_eval = dict(cfg)
+                if "payload" in cfg_eval and isinstance(cfg_eval["payload"], str):
+                    cfg_eval["payload"] = apply_flow_template(cfg_eval["payload"], fv)
+
+                result_str = execute_integration(service, action, cfg_eval, vault_data, fv)
+
+                payload = {"status": 200, "body": result_str}
+                http_key = _flow_http_var_key(node_id)
+                fv[http_key] = payload
+                _persist_flow_var(http_key, payload)
+                if save_as:
+                    fv[save_as] = result_str[:4000]
+                    _persist_flow_var(save_as, fv[save_as])
+                logger.info("flow_executor integration ok: service=%s action=%s node=%s", service, action, node_id)
+            except Exception as e:
+                logger.warning("flow_executor integration error: service=%s action=%s err=%s", service, action, e)
+                http_key = _flow_http_var_key(node_id)
+                payload = {"status": 500, "body": "", "error": str(e)[:500]}
+                fv[http_key] = payload
+                _persist_flow_var(http_key, payload)
+            continue
+
         if rk == "http" and _ALLOW_HTTP:
-            url = str(cfg.get("url") or "").strip()
-            method = str(cfg.get("method") or "GET").upper()
+            node_id = str(st.get("node_id") or "api").strip()
+            
+            # --- n8n-style Vault Integration ---
+            vault_hdrs = {}
+            credential_id = cfg.get("credential_id")
+            if credential_id:
+                try:
+                    from db.database import SessionLocal
+                    from db import models
+                    from api.utils.crypto import decrypt_credential
+                    
+                    db = SessionLocal()
+                    query = db.query(models.TenantIntegrationCredential).filter_by(id=int(credential_id))
+                    if tenant_id:
+                        query = query.filter_by(tenant_id=str(tenant_id))
+                    cred = query.first()
+                    if cred:
+                        vault_data = decrypt_credential(cred.encrypted_data)
+                        if "headers" in vault_data and isinstance(vault_data["headers"], dict):
+                            vault_hdrs.update(vault_data["headers"])
+                    db.close()
+                except Exception as e:
+                    logger.warning(f"[FLOW EXECUTOR] Falha ao carregar cofre: {e}")
+            # -----------------------------------
+
+            save_as = str(cfg.get("save_as") or cfg.get("output_var") or "").strip()
+            url = apply_flow_template(str(cfg.get("url") or cfg.get("api_url") or "").strip(), fv)
+            method = str(cfg.get("method") or cfg.get("api_method") or "GET").upper()
             qs = str(cfg.get("query_string") or "").strip().lstrip("?")
             if qs and url and ("https://" in url or "http://" in url):
                 url = url + ("&" if "?" in url else "?") + qs
@@ -179,12 +766,17 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
             raw_h = cfg.get("headers")
             if isinstance(raw_h, str) and raw_h.strip():
                 try:
-                    parsed = json.loads(raw_h)
+                    parsed = json.loads(raw_h.strip())
                     if isinstance(parsed, dict):
                         hdrs = {str(k): str(v) for k, v in parsed.items()}
                 except (json.JSONDecodeError, TypeError, ValueError):
                     pass
-            body_raw = str(cfg.get("body") or "").strip()
+            
+            # Inject vault headers
+            if vault_hdrs:
+                hdrs.update(vault_hdrs)
+
+            body_raw = apply_flow_template(str(cfg.get("body") or cfg.get("api_body") or "").strip(), fv)
             if url.startswith("https://") or url.startswith("http://"):
                 try:
                     req_kw: Dict[str, Any] = {"method": method, "url": url, "timeout": 8}
@@ -199,33 +791,41 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
                         else:
                             req_kw["data"] = body_raw
                     r = requests.request(**req_kw)
-                    preview = (r.text or "")[:280]
-                    hmeta: Dict[str, Any] = {
-                        "source": "flow_builder",
-                        "http_status": r.status_code,
-                    }
-                    if hdrs:
-                        hmeta["http_headers_sent"] = True
-                    acoes.append(
-                        Acao(
-                            tipo="text",
-                            conteudo=f"🔧 API {method} {url[:96]}… → HTTP {r.status_code}\n{preview}",
-                            metadata=hmeta,
-                        )
-                    )
+                    text_full = r.text or ""
+                    payload = {"status": r.status_code, "body": text_full[:8000]}
+                    http_key = _flow_http_var_key(node_id)
+                    fv[http_key] = payload
+                    _persist_flow_var(http_key, payload)
+                    if save_as:
+                        fv[save_as] = text_full[:4000]
+                        _persist_flow_var(save_as, fv[save_as])
                 except Exception as e:
                     logger.warning("flow_executor http: %s", e)
-                    acoes.append(
-                        Acao(
-                            tipo="text",
-                            conteudo=f"🔧 API falhou: {url[:80]}… ({e})"[:900],
-                            metadata={"source": "flow_builder", "error": str(e)},
-                        )
-                    )
+                    http_key = _flow_http_var_key(node_id)
+                    payload = {"status": 599, "body": "", "error": str(e)[:500]}
+                    fv[http_key] = payload
+                    _persist_flow_var(http_key, payload)
+            else:
+                http_key = _flow_http_var_key(node_id)
+                payload = {"status": 400, "body": "", "error": "URL HTTP inválida"}
+                fv[http_key] = payload
+                _persist_flow_var(http_key, payload)
+            continue
+
+        if rk == "http" and not _ALLOW_HTTP:
+            logger.info(
+                "event=flow_http_disabled node_id=%s — defina FLOW_BLUEPRINT_ALLOW_HTTP=1 no servidor para executar API HTTP",
+                st.get("node_id"),
+            )
+            node_id = str(st.get("node_id") or "api").strip()
+            http_key = _flow_http_var_key(node_id)
+            payload = {"status": 503, "body": "", "error": "execução HTTP desativada"}
+            fv[http_key] = payload
+            _persist_flow_var(http_key, payload)
             continue
 
         if rk == "notify":
-            msg = str(cfg.get("message") or "Notificação (flow builder)").strip()
+            msg = apply_flow_template(str(cfg.get("message") or "Notificação (flow builder)").strip(), fv)
             ch = str(cfg.get("channel") or "log")
             acoes.append(
                 Acao(
@@ -237,29 +837,124 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
             continue
 
         if rk == "tts":
-            script = str(cfg.get("script") or cfg.get("body") or cfg.get("step_name") or "").strip()
+            script = apply_flow_template(
+                str(cfg.get("script") or cfg.get("body") or cfg.get("step_name") or "").strip(),
+                fv,
+            )
             if script:
                 tmeta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype}
-                vp = str(cfg.get("voice_profile") or "").strip()
+                vp = str(cfg.get("voice_profile") or cfg.get("voice_id") or "").strip()
                 if vp:
                     tmeta["voice_profile"] = vp[:64]
+                for source_key, meta_key in (
+                    ("stability", "voice_stability"),
+                    ("similarity", "voice_similarity"),
+                    ("style", "voice_style"),
+                    ("speed", "voice_speed"),
+                ):
+                    if cfg.get(source_key) is not None:
+                        tmeta[meta_key] = cfg.get(source_key)
+                tmeta["whatsapp_voice"] = str(
+                    cfg.get("send_as_voice") or cfg.get("send_as_voice_note") or "true"
+                ).lower() == "true"
                 acoes.append(Acao(tipo="tts", tts_template=script[:2000], metadata=tmeta))
             continue
 
         if rk == "llm":
-            prompt = str(
-                cfg.get("prompt")
-                or cfg.get("instructions")
-                or cfg.get("body")
-                or cfg.get("step_name")
-                or ""
-            ).strip()
-            if prompt:
-                lmeta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype, "runtime": "llm"}
-                for key in ("model", "temperature"):
-                    v = cfg.get(key)
-                    if v is not None and str(v).strip() != "":
-                        lmeta[key] = str(v).strip()[:64]
+            prompt = apply_flow_template(
+                str(
+                    cfg.get("prompt")
+                    or cfg.get("instructions")
+                    or cfg.get("context_prompt")
+                    or cfg.get("body")
+                    or cfg.get("step_name")
+                    or ""
+                ).strip(),
+                fv,
+            )
+            if not prompt:
+                continue
+            if ntype == "agente_ia":
+                inbound = str(fv.get("chat.message") or fv.get("texto_recebido") or "").strip()
+                if inbound:
+                    prompt = f"{prompt}\n\nMensagem atual do contato:\n{inbound}"
+            node_id = str(st.get("node_id") or ntype).strip()
+            safe_node_id = re.sub(r"[^\w\-.]+", "_", node_id)
+            llm_key = f"flow_llm__{safe_node_id}"
+            api_key = os.getenv("GEMINI_API_KEY") or ""
+            model_raw = ""
+            for k in ("ai_model", "model"):
+                v = cfg.get(k)
+                if v is not None and str(v).strip():
+                    model_raw = str(v).strip()
+                    break
+            temp = _parse_llm_temperature(cfg)
+            save_as = str(
+                cfg.get("save_as") or cfg.get("output_var") or cfg.get("ai_output_var") or ""
+            ).strip().strip("{} ")
+            lmeta: Dict[str, Any] = {"source": "flow_builder", "node_type": ntype}
+            for key in ("model", "temperature"):
+                v = cfg.get(key)
+                if v is not None and str(v).strip() != "":
+                    lmeta[key] = str(v).strip()[:64]
+
+            # Agente Studio publicado: vira systemInstruction (personalidade + base + FAQ).
+            studio_snap = fv.get("__meumisterio_studio__")
+            system_instruction = _build_system_instruction_from_studio(studio_snap)
+            
+            # Combina a instrução global do Studio com o `system_prompt` local deste nó
+            local_sys = apply_flow_template(str(cfg.get("system_prompt") or "").strip(), fv)
+            if local_sys:
+                if system_instruction:
+                    system_instruction = f"{system_instruction}\n\n## Instruções do Nó GPT\n{local_sys}"
+                else:
+                    system_instruction = local_sys
+
+            if system_instruction:
+                lmeta["studio_agent"] = (
+                    studio_snap.get("agent_name") if isinstance(studio_snap, dict) else None
+                ) or "?"
+                vn = studio_snap.get("version_number") if isinstance(studio_snap, dict) else None
+                if vn is not None:
+                    lmeta["studio_version"] = int(vn) if isinstance(vn, int) else 0
+
+            if _ALLOW_LLM and api_key.strip():
+                text, err = flow_gemini_generate_text(
+                    prompt,
+                    model=model_raw or _DEFAULT_FLOW_LLM_MODEL,
+                    temperature=temp,
+                    api_key=api_key,
+                    system_instruction=system_instruction,
+                    max_output_tokens=cfg.get("max_tokens"),
+                )
+                if err:
+                    logger.warning("flow_executor llm: %s", err)
+                    lmeta["runtime"] = "llm_gemini"
+                    lmeta["llm_error"] = err[:300]
+                    llm_result = {"status": 500, "body": "", "error": err[:500]}
+                    fv[llm_key] = llm_result
+                    _persist_flow_var(llm_key, llm_result)
+                    fb = "Desculpe, não consegui gerar a mensagem agora. Tente de novo em instantes."
+                    acoes.append(Acao(tipo="text", conteudo=fb[:400], metadata=lmeta))
+                else:
+                    lmeta["runtime"] = "llm_gemini"
+                    lmeta["llm_model"] = _sanitize_gemini_model(model_raw or _DEFAULT_FLOW_LLM_MODEL)
+                    if save_as:
+                        fv[save_as] = text[:4000]
+                        _persist_flow_var(save_as, fv[save_as])
+                    llm_result = {"status": 200, "body": text[:4000]}
+                    fv[llm_key] = llm_result
+                    _persist_flow_var(llm_key, llm_result)
+                    if ntype == "agente_ia" or str(cfg.get("send_as_text") or "true").lower() != "false":
+                        acoes.append(Acao(tipo="text", conteudo=text[:4000], metadata=lmeta))
+            else:
+                # Placeholder: engine não envia (runtime=llm) — ver A1 / C2.
+                if _ALLOW_LLM and not api_key.strip():
+                    logger.info("event=flow_llm_disabled_reason reason=missing_gemini_key")
+                lmeta["runtime"] = "llm"
+                llm_result = {"status": 503, "body": "", "error": "execução LLM desativada"}
+                fv[llm_key] = llm_result
+                _persist_flow_var(llm_key, llm_result)
                 acoes.append(
                     Acao(
                         tipo="text",
@@ -270,56 +965,167 @@ def steps_to_acoes(steps: List[Dict[str, Any]]) -> List[Acao]:
             continue
 
         if rk == "branch":
-            expr = str(cfg.get("expression") or "").strip()
-            if expr:
-                acoes.append(
-                    Acao(
-                        tipo="text",
-                        conteudo=f"🔀 Condição: {expr}"[:900],
-                        metadata={"source": "flow_builder", "runtime": "branch"},
-                    )
-                )
+            # Routing-only node — no message sent to user.
+            logger.debug("flow_executor branch: expr=%s", str(cfg.get("expression") or "")[:200])
             continue
 
         if rk == "split":
-            weights = str(cfg.get("weights") or "").strip()
-            if weights:
-                acoes.append(
-                    Acao(
-                        tipo="text",
-                        conteudo=f"🧪 Divisão A/B: {weights}"[:900],
-                        metadata={"source": "flow_builder", "runtime": "split"},
-                    )
-                )
+            # ── A/B SPLIT RUNTIME: roleta + rastreamento de exposição ──
+            import random
+            node_id = str(st.get("node_id") or "").strip()
+            wa = max(1, min(99, int(cfg.get("weight_a") or 50)))
+            wb = 100 - wa
+            roll = random.randint(1, 100)
+            variant = "A" if roll <= wa else "B"
+            # Salva variante como flow_var para downstream ({{ab_variant}})
+            fv["ab_variant"] = variant
+            fv[f"ab_{node_id}_variant"] = variant
+            _persist_flow_var("ab_variant", variant)
+            _persist_flow_var(f"ab_{node_id}_variant", variant)
+
+            # Grava exposição no banco (rastreamento para analytics)
+            try:
+                _lead_id_val = fv.get("lead_id") or fv.get("_lead_id")
+                if _lead_id_val and tenant_id and blueprint_id:
+                    from db.database import SessionLocal as _AbSL
+                    from db import models as _ab_m
+                    _ab_db = _AbSL()
+                    try:
+                        # UPSERT: se lead já passou por este nó, atualiza variante
+                        existing = _ab_db.query(_ab_m.ABTestExposure).filter_by(
+                            tenant_id=tenant_id,
+                            blueprint_id=blueprint_id,
+                            node_id=node_id,
+                            lead_id=int(_lead_id_val),
+                        ).first()
+                        if existing:
+                            existing.variant = variant
+                            existing.weight_a = wa
+                            existing.weight_b = wb
+                        else:
+                            from datetime import datetime, timezone as _tz
+                            _ab_db.add(_ab_m.ABTestExposure(
+                                tenant_id=tenant_id,
+                                blueprint_id=blueprint_id,
+                                node_id=node_id,
+                                lead_id=int(_lead_id_val),
+                                variant=variant,
+                                weight_a=wa,
+                                weight_b=wb,
+                            ))
+                        _ab_db.commit()
+                    except Exception as _ab_err:
+                        logger.debug("[FLOW_EXEC] AB exposure save failed (non-fatal): %s", _ab_err)
+                        _ab_db.rollback()
+                    finally:
+                        _ab_db.close()
+            except Exception:
+                pass
+
+            logger.info(
+                "event=ab_split node=%s variant=%s weights=%d/%d lead=%s",
+                node_id, variant, wa, wb, fv.get("lead_id"),
+            )
             continue
 
+
         if rk == "schedule":
-            tz = str(cfg.get("timezone") or "").strip()
-            if tz:
+            # Config-only node — no message sent to user.
+            logger.debug("flow_executor schedule: tz=%s", str(cfg.get("timezone") or ""))
+            continue
+
+        if ntype == "motor_ref":
+            from flow_motor_ref import flow_blueprint_allow_motor_ref, invoke_flow_motor_ref
+
+            hint = apply_flow_template(
+                str(cfg.get("module_hint") or cfg.get("body") or "").strip(),
+                fv,
+            )
+            if not hint:
+                continue
+            nid = str(st.get("node_id") or "").strip()
+            if flow_blueprint_allow_motor_ref():
+                resolved, err = invoke_flow_motor_ref(
+                    hint,
+                    fv,
+                    node_id=nid,
+                    blueprint_id=blueprint_id,
+                    tenant_id=tenant_id,
+                )
+                if err:
+                    logger.warning("flow_executor motor_ref: %s", err)
+                    acoes.append(
+                        Acao(
+                            tipo="text",
+                            conteudo="Passo do motor indisponível.",
+                            metadata={
+                                "source": "flow_builder",
+                                "runtime": "motor_ref_error",
+                                "motor_ref": hint[:220],
+                                "motor_error": err[:300],
+                            },
+                        )
+                    )
+                else:
+                    acoes.extend(resolved)
+            else:
+                logger.info(
+                    "event=flow_motor_ref_disabled node_id=%s — defina FLOW_BLUEPRINT_ALLOW_MOTOR_REF=1",
+                    st.get("node_id"),
+                )
                 acoes.append(
                     Acao(
                         tipo="text",
-                        conteudo=f"🕒 Expediente ({tz}) configurado."[:900],
-                        metadata={"source": "flow_builder", "runtime": "schedule"},
+                        conteudo=hint[:900],
+                        metadata={
+                            "source": "flow_builder",
+                            "runtime": "motor_ref_pending",
+                            "motor_ref": hint[:220],
+                        },
                     )
                 )
             continue
 
         if rk == "system":
-            hint = str(cfg.get("body") or cfg.get("module_hint") or cfg.get("step_name") or "").strip()
-            if hint:
-                acoes.append(
-                    Acao(
-                        tipo="text",
-                        conteudo=f"⚙️ Sistema: {hint}"[:900],
-                        metadata={"source": "flow_builder", "runtime": "system"},
-                    )
-                )
+            # Internal system node — no message sent to user.
+            logger.debug("flow_executor system: hint=%s", str(cfg.get("body") or cfg.get("step_name") or "")[:200])
             continue
 
         logger.info("flow_executor skip runtime=%s type=%s node_id=%s", rk, ntype, st.get("node_id"))
 
     return acoes
+
+
+def tenant_has_published_content(tenant_id: Optional[str]) -> bool:
+    """
+    Retorna True se o tenant tem flow OU studio agent publicado.
+
+    Usado pelo engine pra decidir se pode rodar funil estatico legado
+    ou se deve mandar fallback "Ainda configurando" (multi-tenant safe).
+    """
+    if not tenant_id:
+        return False
+    try:
+        from db.database import SessionLocal
+        from db import models
+        tid = (tenant_id or "default").strip() or "default"
+        db = SessionLocal()
+        try:
+            flow_pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            if flow_pub and flow_pub.published_blueprint_id:
+                return True
+            try:
+                # StudioPublish é opcional — V1 pode não estar registrado
+                studio_pub = db.query(models.StudioPublish).filter_by(tenant_id=tid).first()
+                if studio_pub and getattr(studio_pub, "published_agent_id", None):
+                    return True
+            except Exception:
+                pass
+            return False
+        finally:
+            db.close()
+    except Exception:
+        return False
 
 
 def inject_published_flow_metadata(metadata: Optional[dict], tenant_id: Optional[str]) -> None:
@@ -335,13 +1141,13 @@ def inject_published_flow_metadata(metadata: Optional[dict], tenant_id: Optional
         try:
             pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
             if not pub or not pub.published_blueprint_id:
-                metadata.pop("__acassia_flow_blueprint__", None)
+                metadata.pop("__meumisterio_flow_blueprint__", None)
                 return
             bp = db.query(models.FlowBlueprint).filter_by(id=pub.published_blueprint_id, tenant_id=tid).first()
             if not bp:
                 return
             body = bp.body_json if isinstance(bp.body_json, dict) else {}
-            metadata["__acassia_flow_blueprint__"] = {
+            metadata["__meumisterio_flow_blueprint__"] = {
                 "blueprint_id": bp.id,
                 "slug": bp.slug,
                 "title": bp.title,

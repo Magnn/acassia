@@ -1,4 +1,4 @@
-"""Bloco 6 — placeholder até o roteiro ser definido."""
+"""Bloco 6 — fecho do funil estático Meu Mistério (ver `roteiro.py`)."""
 
 from __future__ import annotations
 
@@ -14,21 +14,8 @@ logger = logging.getLogger(__name__)
 
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
     meta = getattr(ctx, "metadata", None) or {}
-    if meta.get("static_mm_b6_placeholder_enviado"):
+    if meta.get(R.META_B6_SEQ):
         return [], "static_meumisterio_b6"
 
-    meta["static_mm_b6_placeholder_enviado"] = True
-    texto = (
-        "Obrigada pela confiança. 💙 "
-        "O *Bloco 6* (ex.: garantia) ainda vai ser montado no código quando você enviar o roteiro."
-    )
-    return (
-        [
-            R.acao_texto_copy_exata(
-                texto,
-                source="static_meumisterio_b6",
-                kind="placeholder_b6",
-            )
-        ],
-        "static_meumisterio_b6",
-    )
+    meta[R.META_B6_SEQ] = True
+    return R.montar_acoes_bloco6(R.cfg(ctx)), "static_meumisterio_b6"

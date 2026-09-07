@@ -85,7 +85,27 @@ class TestNode3Regressoes(unittest.TestCase):
         self.assertNotIn("deixei meu cartão", textos[0].lower())
         self.assertNotIn("calma", textos[0].lower())
 
-    def test_aguardando_dados_com_preflight_completo_avanca_para_node4(self):
+    def test_aguardando_dados_com_preflight_completo_e_signo_avanca_para_node4(self):
+        """Quando signo já está capturado, avança direto para node4."""
+        ctx = _ctx(
+            "",
+            estado="aguardando_dados",
+            meta_extra={
+                "foto_recebida": True,
+                "desabafo_recebido": True,
+                "desabafo_original": "já sofro com isso há dois anos",
+                "desejo_declarado": "quero virar essa fase e ter paz no amor",
+                "aprofundamento_texto": "há dois anos, já tentei conversa, terapia e oração",
+                "signo": "Peixes",
+            },
+        )
+        acoes, prox = node_3_coleta_profunda.executar_v2(ctx)
+        self.assertEqual(prox, "4_instagram")
+        self.assertEqual(ctx.metadata.get("node3_estado"), "coleta_completa")
+        self.assertTrue(_textos(acoes))
+
+    def test_aguardando_dados_com_preflight_completo_sem_signo_pede_nascimento(self):
+        """Quando signo ainda não foi coletado, para no estado aguardando_nascimento."""
         ctx = _ctx(
             "",
             estado="aguardando_dados",
@@ -98,9 +118,36 @@ class TestNode3Regressoes(unittest.TestCase):
             },
         )
         acoes, prox = node_3_coleta_profunda.executar_v2(ctx)
+        self.assertEqual(prox, "3_coleta_profunda")
+        self.assertEqual(ctx.metadata.get("node3_estado"), "aguardando_nascimento")
+        joined = " ".join(t.lower() for t in _textos(acoes))
+        self.assertIn("?", joined)
+
+    def test_aguardando_nascimento_captura_signo_e_avanca(self):
+        """Estado aguardando_nascimento: resposta com data → persiste signo → node4."""
+        ctx = _ctx(
+            "15/03/1990",
+            estado="aguardando_nascimento",
+            meta_extra={
+                "foto_recebida": True,
+                "desabafo_recebido": True,
+            },
+        )
+        acoes, prox = node_3_coleta_profunda.executar_v2(ctx)
         self.assertEqual(prox, "4_instagram")
-        self.assertEqual(ctx.metadata.get("node3_estado"), "coleta_completa")
-        self.assertTrue(_textos(acoes))
+        self.assertEqual(ctx.metadata.get("signo"), "Peixes")
+        self.assertIsNotNone(ctx.metadata.get("lead_birth_date_capturado"))
+
+    def test_aguardando_nascimento_aceita_nome_de_signo(self):
+        """Estado aguardando_nascimento: lead diz 'sou peixes' → captura signo."""
+        ctx = _ctx(
+            "sou peixes",
+            estado="aguardando_nascimento",
+            meta_extra={},
+        )
+        acoes, prox = node_3_coleta_profunda.executar_v2(ctx)
+        self.assertEqual(prox, "4_instagram")
+        self.assertEqual(ctx.metadata.get("signo"), "Peixes")
 
 
 if __name__ == "__main__":

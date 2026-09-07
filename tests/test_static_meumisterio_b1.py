@@ -39,7 +39,7 @@ class TestStaticMeumisterioB1(unittest.TestCase):
         intro = next(a for a in acoes if a.tipo == "text" and (a.metadata or {}).get("kind") == "intro")
         self.assertTrue((intro.metadata or {}).get("engine_texto_unico"))
         self.assertTrue((intro.conteudo or "").strip().startswith("Olá, tudo bem!"))
-        self.assertIn("  Esmeralda  ", intro.conteudo or "")
+        self.assertIn("Esmeralda", intro.conteudo or "")
 
     def test_sem_gatilho_envia_nudge(self):
         ctx = self._ctx(texto_recebido="oi")
@@ -53,6 +53,7 @@ class TestStaticMeumisterioB1(unittest.TestCase):
             metadata={
                 "__config__": {"public_url": "https://example.com"},
                 "static_mm_b1_phase": "awaiting_reply",
+                "static_mm_b1_entregue": True,
             },
         )
         acoes, prox = b1.executar_v2(ctx)

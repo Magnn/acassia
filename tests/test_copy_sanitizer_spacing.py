@@ -116,7 +116,7 @@ class TestNode6FallbackSanitize(unittest.TestCase):
         self.assertIn("ex", r.lower())
 
     def test_frase_dor_nao_ecoa_abertura_comercial(self):
-        blob = "Bom dia cigana Esmeralda, tudo bem? me chamo Magno, essa consulta é paga?"
+        blob = "Bom dia meumisterio Esmeralda, tudo bem? me chamo Magno, essa consulta é paga?"
         f = frase_dor_contextualizada(resumo_dor_para_copy(blob, max_len=90))
         self.assertNotIn("consulta", f.lower())
         self.assertNotIn("paga", f.lower())
@@ -126,7 +126,7 @@ class TestNode6FallbackSanitize(unittest.TestCase):
         self.assertEqual(
             "",
             fragmento_seguro_para_eco_fallback(
-                "Bom dia cigana Esmeralda tudo bem me chamo Magno essa consulta é paga"
+                "Bom dia meumisterio Esmeralda tudo bem me chamo Magno essa consulta é paga"
             ),
         )
 

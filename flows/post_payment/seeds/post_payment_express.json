@@ -1,0 +1,100 @@
+{
+  "format": "meumisterio-flow",
+  "version": 1,
+  "title": "Pós-pagamento Express (Tarot)",
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger",
+        "label": "Pagamento aprovado",
+        "config": {
+          "event": "webhook.payment.approved",
+          "step_name": "Trigger pós-pagamento"
+        }
+      },
+      {
+        "id": "msg_confirm",
+        "type": "conteudo",
+        "label": "Confirmação imediata",
+        "config": {
+          "content_text": "🔮 Recebi tua energia. Pagamento confirmado. Já estou preparando teu altar...",
+          "content_typing": true,
+          "step_name": "Confirma recebimento"
+        }
+      },
+      {
+        "id": "delay_30s",
+        "type": "delay",
+        "label": "Pausa ritualística",
+        "config": {
+          "seconds": 30
+        }
+      },
+      {
+        "id": "msg_intro",
+        "type": "conteudo",
+        "label": "Anuncia tiragem",
+        "config": {
+          "content_text": "As cartas que sairão pra ti são únicas. Cada uma fala diretamente do teu momento.",
+          "content_typing": true
+        }
+      },
+      {
+        "id": "envia_cartas",
+        "type": "motor_ref",
+        "label": "Sortear e enviar 3 cartas",
+        "config": {
+          "module_hint": "flows.tarot.envio:sortear_e_enviar_3_cartas",
+          "step_name": "Sorteio + envio de 3 cartas com pausa"
+        }
+      },
+      {
+        "id": "msg_leitura",
+        "type": "conteudo",
+        "label": "Convite à leitura",
+        "config": {
+          "content_text": "Lê com calma. Deixa cada carta tocar onde precisa.",
+          "content_typing": true
+        }
+      },
+      {
+        "id": "delay_24h",
+        "type": "delay",
+        "label": "Espera de um dia",
+        "config": {
+          "delay_amount": 24,
+          "delay_unit": "h"
+        }
+      },
+      {
+        "id": "msg_recorrencia",
+        "type": "conteudo",
+        "label": "Oferta de recorrência",
+        "config": {
+          "content_text": "Foi forte tua tiragem ontem... 🌙\nPosso te avisar quando o céu estiver favorecendo tua questão? Tenho um plano mensal de R$49,90 — mando tiragens automáticas em momentos-chave (Lua nova, eclipses, datas pessoais)."
+        }
+      },
+      {
+        "id": "tag_convertido",
+        "type": "acao",
+        "label": "Tag de conversão",
+        "config": {
+          "action_kind": "add_tag",
+          "payload": "convertido_express",
+          "step_name": "Marca conversão pra audit/analytics"
+        }
+      }
+    ],
+    "edges": [
+      {"id": "e1", "from": "trigger",        "to": "msg_confirm"},
+      {"id": "e2", "from": "msg_confirm",    "to": "delay_30s"},
+      {"id": "e3", "from": "delay_30s",      "to": "msg_intro"},
+      {"id": "e4", "from": "msg_intro",      "to": "envia_cartas"},
+      {"id": "e5", "from": "envia_cartas",   "to": "msg_leitura"},
+      {"id": "e6", "from": "msg_leitura",    "to": "delay_24h"},
+      {"id": "e7", "from": "delay_24h",      "to": "msg_recorrencia"},
+      {"id": "e8", "from": "msg_recorrencia","to": "tag_convertido"}
+    ]
+  }
+}

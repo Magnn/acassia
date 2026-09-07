@@ -51,7 +51,7 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|card|cart[aã]o\s+de\s+contato)"
 )
-_IG_CANONICO_CIGANA = "https://www.instagram.com/meumisterio_oficial/"
+_IG_CANONICO_MEU_MISTERIO = "https://www.instagram.com/meumisterio_oficial/"
 
 
 def _handle_instagram_para_fallback(link_ig: str) -> str:
@@ -68,9 +68,9 @@ def _handle_instagram_para_fallback(link_ig: str) -> str:
     return f"@{seg}"
 
 # ── PROMPT (mesma linha editorial do Node 1: leitura, calma, sem telemarketing) ──
-_SYSTEM_ANTECAMARA = """Você é Esmeralda Ácassia (Cigana Esmeralda), a mesma voz dos passos anteriores: quiromancia com presença, como no templo.
+_SYSTEM_ANTECAMARA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), a mesma voz dos passos anteriores: quiromancia com presença, como no templo.
 
-ESTÁGIO: ANTECAMARA_PROVA_SOCIAL (acolher o relato, preparar a leitura; o link do perfil vem na mensagem SEGUINTE, automática — não cite URL, @ nem "Instagram")
+ESTÁGIO: ANTECAMARA_PROVA_SOCIAL (acolher o relato e preparar a leitura; o link do perfil vem na mensagem SEGUINTE, automática — não cite URL, @ nem "Instagram")
 
 GÊNERO PARA CONCORDÂNCIA: {genero_hint}
 
@@ -78,19 +78,30 @@ NOME DO LEAD (use com naturalidade se couber): {nome}
 
 CONTEXTO DO DESABAFO (reconheça com respeito; não repita tudo se for longo): {desabafo}
 
+DADOS ESPECÍFICOS DO LEAD (use SE couber naturalmente — nunca force):
+- Pessoa envolvida: {nome_pessoa}
+- Tempo de sofrimento: {tempo_exato}
+- Evento que desencadeou: {evento_gatilho}
+
 SUA MISSÃO:
-1. VALIDAÇÃO: Uma frase curta que mostre que você ouviu a dor dele/dela, sem soar genérica.
-2. PREPARO: Diga que vai fechar os olhos e se concentrar nas linhas da palma. Use espaços entre palavras normais (ex.: "cruzando as", nunca "cruzandoas").
+1. VALIDAÇÃO (balão 1): Frase que mostre que você ouviu a dor ESPECÍFICA dele/dela. Se souber o nome da pessoa envolvida ou o evento, ecoe com naturalidade — sem repetir o relato inteiro.
+2. PREPARO (balão 2): Diga que vai se concentrar nas linhas da palma agora, com presença total.
+
+REGRAS:
+- Use espaços entre palavras normais (ex.: "cruzando as", nunca "cruzandoas").
+- Não prometa o que vai aparecer nas linhas antes da leitura.
+- Se não tiver dados específicos, use acolhimento genuíno e genérico.
 
 FORMATO OBRIGATÓRIO:
-- Exatamente 2 balões com [BALAO].
-- Cada balão: no máximo 220 caracteres, uma ou duas frases completas, termina com . ou ?
-- Sem travessão (—). Sem "—". Máximo 1 emoji no último balão, opcional.
-- Não prometa o que vai aparecer nas linhas antes da leitura de verdade.
+- Exatamente 2 balões separados por [BALAO].
+- Cada balão: máximo 220 caracteres, termina em . ou ! ou ?
+- Sem travessão (—). Máximo 1 emoji no último balão, opcional.
 
-EXEMPLO:
-❌ ERRADO: "Vou focar nas suas linhas, [BALAO] enquanto isso veja isso."
-✅ CERTO: "Sinto o peso do que você trouxe, {nome}. [BALAO] Vou me concentrar nas suas linhas agora, com calma."
+EXEMPLO COM DADOS:
+✅ "Três anos carregando isso sozinha é muito, {nome}. [BALAO] Vou me concentrar nas suas linhas agora, com toda a presença. ✋"
+
+EXEMPLO SEM DADOS:
+✅ "Sinto o peso do que você trouxe, {nome}. [BALAO] Vou me concentrar nas suas linhas agora, com calma."
 """
 
 def _delay_digitacao(texto: str) -> int:
@@ -105,7 +116,7 @@ def _normalizar_link_ig(link_raw: str) -> str:
     link = normalizar_link_para_envio(link_raw, instagram_mode=True)
     link = preparar_texto_envio(link, "node4_link_ig").strip()
     if not link:
-        return _IG_CANONICO_CIGANA
+        return _IG_CANONICO_MEU_MISTERIO
     if _RE_LINK_VALIDO.match(link):
         # Preferir perfil (não reel/página interna) para manter URL estável.
         if _RE_LINK_INSTAGRAM_ESTRITO.match(link):
@@ -120,8 +131,8 @@ def _normalizar_link_ig(link_raw: str) -> str:
     m_handle = re.search(r"@([A-Za-z0-9._]+)", link_raw or "")
     if m_handle:
         return f"https://www.instagram.com/{m_handle.group(1)}/"
-    logger.warning("[NODE 4] link_prova_social inválido no .env. Usando canônico da Cigana.")
-    return _IG_CANONICO_CIGANA
+    logger.warning("[NODE 4] link_prova_social inválido no .env. Usando canônico do Meu Mistério.")
+    return _IG_CANONICO_MEU_MISTERIO
 
 
 def _encurtar_balao_node4(texto: str, limite: int = 170) -> str:
@@ -237,7 +248,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     f"ou busca no Instagram pelo perfil {handle}, é o mesmo lugar."
                 )
             else:
-                exib = ((config.get("perfil_negocio") or {}).get("nome_exibicao") or "Cigana Esmeralda")
+                exib = ((config.get("perfil_negocio") or {}).get("nome_exibicao") or "Meu Mistério Esmeralda")
                 linha = (
                     f"{voc}, às vezes o WhatsApp corta o link. Busca pelo nome {exib} no Instagram "
                     "ou me diz aqui que te ajudo a achar."
@@ -252,14 +263,49 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         ctx.metadata = meta
         return acoes_pre, "5_processa_leitura"
 
-    # 3) Padrão fixo: envia perfil sem perguntar e avança para leitura.
+    # 3) Padrão: acolhimento personalizado via IA + link Instagram + avança para leitura.
+    acoes_acolhimento: List[Acao] = []
+    personalizer = getattr(ctx, "personalizer", None)
+    if personalizer is not None:
+        try:
+            desabafo_ctx = str(meta.get("desabafo_original") or _seg.get("desabafo") or "").strip()[:400]
+            nome_pessoa = str(meta.get("nome_pessoa_envolvida") or "").strip()[:40]
+            tempo_exato = str(meta.get("tempo_exato") or "").strip()[:40]
+            evento_gatilho = str(meta.get("evento_gatilho") or "").strip()[:100]
+            system_fmt = _SYSTEM_ANTECAMARA.format(
+                genero_hint=genero_hint_para_prompt(meta),
+                nome=nome_fmt,
+                desabafo=desabafo_ctx or "(não informado)",
+                nome_pessoa=nome_pessoa or "(não identificado)",
+                tempo_exato=tempo_exato or "(não informado)",
+                evento_gatilho=evento_gatilho or "(não informado)",
+            )
+            historico = slice_historico_para_ia(getattr(ctx, "historico", []) or [], limite=8)
+            resposta_ia = personalizer.gerar_resposta(
+                system_prompt=system_fmt,
+                historico_lista=historico,
+                mensagem_lead=texto_puro or "",
+                metadata=meta,
+            )
+            baloes = _tratar_frases_ia(resposta_ia)
+            if not baloes:
+                baloes = _baloes_node4_de_paragrafos(resposta_ia)
+            for i, balao in enumerate(baloes[:2]):
+                if i > 0:
+                    acoes_acolhimento.append(Acao(tipo="delay", segundos=random.randint(3, 5)))
+                acoes_acolhimento.append(Acao(tipo="text", conteudo=balao))
+            if acoes_acolhimento:
+                acoes_acolhimento.insert(0, Acao(tipo="delay", segundos=random.randint(4, 7)))
+        except Exception as exc:
+            logger.warning("[NODE 4] acolhimento IA falhou (fail-open): %s", exc)
+
     acoes_instagram = _acoes_texto_e_url_instagram(link_ig, imagem_perfil_ig)
     meta["node4_contrato_enviado"] = True
     meta["insta_enviado"] = True
     meta["node5_ignorar_ruido_um_turno"] = True
     ctx.estado_coleta = "node4_envio_insta_sem_pergunta"
     ctx.metadata = meta
-    return acoes_instagram, "5_processa_leitura"
+    return acoes_acolhimento + acoes_instagram, "5_processa_leitura"
 
 def _balao_node4_aceito(c: str) -> bool:
     if len(c) < 5:

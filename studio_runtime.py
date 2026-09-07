@@ -1,5 +1,5 @@
 """
-Runtime do Studio AcassIA: snapshot publicado injetado no motor (engine → personalizer).
+Runtime do Studio Meu Mistério: snapshot publicado injetado no motor (engine → personalizer).
 Escopado por tenant_id (uma publicação ativa por conta).
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ def ensure_publish_row(db, tenant_id: str = "default") -> models.StudioPublish:
 
 def load_published_studio_snapshot(tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
-    Retorna dict para metadata['__acassia_studio__'] ou None se nada publicado.
+    Retorna dict para metadata['__meumisterio_studio__'] ou None se nada publicado.
     """
     tid = (tenant_id or "default").strip() or "default"
     db = SessionLocal()
@@ -62,9 +62,9 @@ def load_published_studio_snapshot(tenant_id: Optional[str] = None) -> Optional[
 
 
 def inject_published_studio_into_metadata(metadata: Optional[dict], tenant_id: Optional[str] = None) -> None:
-    """Anexa __acassia_studio__ ao metadata do contexto (motor / recuperação / webhook)."""
+    """Anexa __meumisterio_studio__ ao metadata do contexto (motor / recuperação / webhook)."""
     if not isinstance(metadata, dict):
         return
     snap = load_published_studio_snapshot(tenant_id)
     if snap:
-        metadata["__acassia_studio__"] = snap
+        metadata["__meumisterio_studio__"] = snap

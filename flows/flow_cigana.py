@@ -1,9 +1,9 @@
 # ==========================================
-# FUNIL DE VENDAS DA CIGANA ESMERALDA (VSL Imersivo)
+# FUNIL DE VENDAS DA MEU_MISTERIO ESMERALDA (VSL Imersivo)
 # Arquitetura Visual em Nó
 # ==========================================
 
-FLOW_CIGANA = {
+FLOW_MEU_MISTERIO = {
     "NODE_INICIAL": {
         "tipo": "roteamento",
         "acao_sucesso": "NODE_SAUDACAO"

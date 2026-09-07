@@ -13,30 +13,39 @@ import logging
 import random
 import re
 from typing import Optional
-from schema import Acao, slice_historico_para_ia
+from schema import Acao
 from copy_sanitizer import (
     MOBILE_CHARS_POR_LINHA,
     MOBILE_MAX_LINHAS_BALO,
     aplicar_substituicoes_proibidas,
+    assinar_semantica_curta,
     contexto_lead_para_nodes,
+    extrair_blocos_fallback,
     fatiar_texto_ritmo_celular,
     frase_dor_contextualizada,
     genero_efetivo_para_copy,
     genero_hint_para_prompt,
+    historico_limpo_para_ia,
     limpar_colagem_primeira_msg_whatsapp_em_texto,
+    limpar_meta_textual,
     normalizar_enxerto_dor_sem_contexto,
     parse_blocos_leitura_ia,
     remover_marcadores_bloco_ia_vazados,
     sufixo_ancoras_node3_para_prompt,
     unificar_vocativos_por_genero,
 )
-from analytics.copy_constituicao_cigana import camada_constituicao_node7
+from analytics.copy_constituicao_meumisterio import camada_constituicao_node7
 from conversation_policy import lead_reportou_problema_entrega
 from analytics.copy_personalization import (
     contexto_desejo_resultado_para_prompt,
     definir_nome_mecanismo_se_generico,
     norte_editorial_venda_fria_direta_para_prompt,
     perfil_copy_para_prompt,
+)
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    ressonancia_para_prompt,
+    nome_padrao_invisivel,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,7 +58,6 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
 _RE_URL_AUDIO = re.compile(r"(?i)^https?://\S+\.(mp3|m4a|ogg|opus|wav|aac)(\?\S*)?$")
-_RE_RUIDO_CURTO_HIST = re.compile(r"(?i)^(ok|sim|oi|opa|pronto|blz|beleza|ta|tá|show|feito|entendi|combinado|👍|🙏|👀)$")
 
 def _delay_digitacao(texto: str, eh_audio: bool = False) -> int:
     if not texto: return 8
@@ -59,49 +67,6 @@ def _delay_digitacao(texto: str, eh_audio: bool = False) -> int:
 
 def _depoimento_audio_valido(url: str) -> bool:
     return bool(_RE_URL_AUDIO.match(str(url or "").strip()))
-
-
-def _extrair_blocos_fallback(texto: str, max_blocos: int = 7, min_len: int = 8) -> list[str]:
-    """
-    Recupera blocos quando a IA vem sem BLOCO_N::.
-    """
-    t = (texto or "").strip()
-    if not t:
-        return []
-    partes = re.split(r"\[?BAL[AÃ]O\]?", t, flags=re.I)
-    out: list[str] = []
-    for p in partes:
-        p = re.sub(r"`{3}(?:json|text)?|`{3}", "", p).strip()
-        if not p:
-            continue
-        for ln in p.splitlines():
-            ln2 = re.sub(r"^\s*BLOCO[_\s]*\d+\s*::\s*", "", ln.strip(), flags=re.I).strip()
-            if len(ln2) >= min_len:
-                out.append(ln2)
-        if "\n" not in p:
-            p2 = re.sub(r"^\s*BLOCO[_\s]*\d+\s*::\s*", "", p, flags=re.I).strip()
-            if len(p2) >= min_len:
-                out.append(p2)
-        if len(out) >= max_blocos:
-            break
-    return out[:max_blocos]
-
-
-def _limpar_meta_textual(v: str, max_len: int = 220) -> str:
-    t = " ".join((v or "").split()).strip()
-    if not t:
-        return ""
-    if t.upper() in {"INDEFINIDO", "NONE", "NULL", "N/A"}:
-        return ""
-    return t[:max_len]
-
-
-def _assinar_semantica_curta(texto: str) -> str:
-    t = re.sub(r"[^a-z0-9\s]", " ", (texto or "").lower())
-    toks = [w for w in t.split() if len(w) > 2]
-    if not toks:
-        return ""
-    return " ".join(toks[:8])
 
 
 def _sanear_citacoes_abertas(texto: str) -> str:
@@ -122,15 +87,17 @@ def _sanear_citacoes_abertas(texto: str) -> str:
 
 def _aplicar_framework_fechamento(blocos: list[str], nome_fmt: str) -> list[str]:
     base = [str(b or "").strip() for b in (blocos or []) if str(b or "").strip()]
+    # Node 7 é agitação → oferta: perguntas de decisão e abertura do próximo passo.
+    # Propositalmente diferente do Node 6 para o lead não sentir script repetido.
     q1_opcoes = [
-        f"{nome_fmt}, você quer resolver isso?",
-        f"{nome_fmt}, você quer encerrar esse ciclo de uma vez?",
-        f"{nome_fmt}, você quer mudar isso de verdade agora?",
+        f"{nome_fmt}, você quer saber o que fecha isso na raiz de vez?",
+        f"{nome_fmt}, você quer que eu te mostre o caminho que corta esse padrão?",
+        f"{nome_fmt}, você quer entender o que a leitura aponta como saída real?",
     ]
     q2_opcoes = [
-        "Se eu te mostrar um caminho claro, você topa seguir?",
-        "Se eu te mostrar o passo a passo certo, você topa ir comigo?",
-        "Se eu te explicar o caminho com clareza, você topa fazer do jeito certo?",
+        "Posso te apresentar o próximo passo com clareza agora?",
+        "Quer ouvir como funciona o que fecha esse nó de verdade?",
+        "Posso te mostrar o que a firmação faz de diferente aqui?",
     ]
     q1 = random.choice(q1_opcoes)
     q2 = random.choice(q2_opcoes)
@@ -152,7 +119,7 @@ def _reacao_curta_ao_input(msg_lead: str, nome_fmt: str) -> str:
     return f"Recebi o que você me falou agora, {nome_fmt}, e vou ser direta com você."
 
 # ── PROMPT (mesma voz dos nodes 5 e 6; quiromancia + compromisso com o caminho) ──
-_SYSTEM_AGITACAO_SUPREMA = """Você é Esmeralda Ácassia (Cigana Esmeralda), mesma presença da leitura anterior: firme, acolhedora, sem tom de telemarketing.
+_SYSTEM_AGITACAO_SUPREMA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), mesma presença da leitura anterior: firme, acolhedora, sem tom de telemarketing.
 
 ESTÁGIO: AGITACAO_E_MECANISMO_UNICO (interesse e desejo depois da leitura fria)
 
@@ -171,6 +138,8 @@ DADOS DA HIVE MIND:
 - Nome/Pessoa envolvida no relato: {nome_pessoa_envolvida}
 - Tempo exato citado pelo lead (quando houver): {tempo_exato}
 - Evento gatilho citado pelo lead (quando houver): {evento_gatilho}
+- Objeção silenciosa (medo/resistência que o lead não verbalizou — Node 5): {obj_silenciosa}
+- Signo do lead (quando houver — use com sutileza para fortalecer autoridade na agitação): {signo}
 - Última reação do lead: "{msg_lead}"
 
 {contexto_desejo_resultado}
@@ -189,6 +158,7 @@ MISSÃO (7 BLOCOS, prefixo BLOCO_1:: … BLOCO_7::; pode continuar o texto nas l
 8. MICRO-SINS: conduza com pequenos "sim" lógicos (ressonou -> faz sentido agir -> pedir explicação do próximo passo).
 9. POR QUE AGORA FUNCIONA: personalize em 1 linha usando dor + tempo + mecanismo; sem genérico.
 10. ANTIBARNUM: se houver {tempo_exato} e/ou {evento_gatilho}, use de forma natural para ancorar; evite abertura genérica.
+10.1 OBJEÇÃO SILENCIOSA: se {obj_silenciosa} não for "Nenhuma" nem INDEFINIDO, dissolva-a sutilmente em 1 bloco (sem citar a objeção com rótulo técnico — transforme em empatia com a resistência interna).
 11. POTENCIAL REPRESADO: inclua um bloco sobre "você já era para estar em patamar mais alto".
 12. CTA FORTE: termine pedindo permissão com pergunta de compromisso (sem "me responde sim").
 
@@ -242,13 +212,14 @@ def executar_v2(ctx) -> tuple:
     energia = meta.get("nivel_energia", "Ansioso")
     mecanismo = definir_nome_mecanismo_se_generico(meta, dor_clean)
     ctx_desejo_res = contexto_desejo_resultado_para_prompt(meta, mecanismo)
-    nome_pessoa_envolvida = _limpar_meta_textual(
+    nome_pessoa_envolvida = limpar_meta_textual(
         str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO"), 80
     ) or "INDEFINIDO"
-    tempo_exato = _limpar_meta_textual(str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO"), 60) or "INDEFINIDO"
-    evento_gatilho = _limpar_meta_textual(
+    tempo_exato = limpar_meta_textual(str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO"), 60) or "INDEFINIDO"
+    evento_gatilho = limpar_meta_textual(
         str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO"), 120
     ) or "INDEFINIDO"
+    obj_silenciosa = str(meta.get("objecao_silenciosa") or "Nenhuma").strip()[:180]
     perfil_copy = perfil_copy_para_prompt(meta, msg_lead)
 
     blocos_gerados = []
@@ -264,6 +235,10 @@ def executar_v2(ctx) -> tuple:
                 "(BLOCO_1:: … BLOCO_7::), tom de leitura e templo, sem frase de anúncio vazio."
             )
             prompt_ia += sufixo_ancoras_node3_para_prompt(meta)
+            # DARE: injetar ressonância + padrão invisível por desejo_tipo (Halbert + Sugarman)
+            _desejo_tipo_n7 = classificar_desejo_tipo(meta, msg_lead)
+            _padrao_n7 = nome_padrao_invisivel(_desejo_tipo_n7)
+            _dare_ressonancia = ressonancia_para_prompt(_desejo_tipo_n7, meta)
             sys_f = _SYSTEM_AGITACAO_SUPREMA.format(
                 nome=nome_fmt,
                 genero=genero,
@@ -278,11 +253,13 @@ def executar_v2(ctx) -> tuple:
                 nome_pessoa_envolvida=nome_pessoa_envolvida,
                 tempo_exato=tempo_exato,
                 evento_gatilho=evento_gatilho,
+                obj_silenciosa=obj_silenciosa,
+                signo=str(meta.get("signo") or "INDEFINIDO"),
                 msg_lead=msg_lead,
                 contexto_desejo_resultado=ctx_desejo_res,
                 norte_venda_fria=norte_editorial_venda_fria_direta_para_prompt(),
                 constituicao_camada=camada_constituicao_node7(meta, mecanismo),
-            )
+            ) + f"\n\nPADRÃO INVISÍVEL IDENTIFICADO: \"{_padrao_n7}\"\n\n{_dare_ressonancia}"
             blocos_dict = {}
             ultima_exc: Optional[Exception] = None
             _temps = (0.88, 0.92, 0.9)
@@ -290,7 +267,7 @@ def executar_v2(ctx) -> tuple:
             max_tent = max(1, min(int(ie.get("max_tentativas_ia_por_node", 2) or 2), 3))
             for tentativa in range(max_tent):
                 try:
-                    hist_ia = _historico_limpo_para_ia(ctx)
+                    hist_ia = historico_limpo_para_ia(ctx)
                     resposta = ctx.personalizer.gerar_resposta(
                         system_prompt=sys_f,
                         historico_lista=hist_ia,
@@ -302,7 +279,7 @@ def executar_v2(ctx) -> tuple:
                     blocos_dict = parse_blocos_leitura_ia(resposta, max_bloco=7, min_len=8)
                     blocos_gerados = [blocos_dict.get(i, "") for i in range(1, 8) if blocos_dict.get(i)]
                     if len(blocos_gerados) < _MIN_BLOCOS_OK:
-                        blocos_gerados = _extrair_blocos_fallback(resposta, max_blocos=7, min_len=8)
+                        blocos_gerados = extrair_blocos_fallback(resposta, 7, min_len=8)
                     if len(blocos_gerados) >= _MIN_BLOCOS_OK:
                         break
                     if len(blocos_gerados) >= 2:
@@ -328,26 +305,31 @@ def executar_v2(ctx) -> tuple:
         meta["node7_fallback_motivo"] = err_txt[:180]
         dor_ctx = frase_dor_contextualizada(dor_clean, abertura="quando você traz")
         tempo_ctx = tempo_exato if tempo_exato.upper() != "INDEFINIDO" else tempo
+        _gatilho_operacional = re.compile(
+            r"\b(quanto|custa|pre[cç]o|valor|pix|pagamento|link|instagram|consulta)\b", re.I
+        )
         gatilho_ctx = (
             f" Quando você lembra de {evento_gatilho}, isso fica ainda mais evidente."
             if evento_gatilho.upper() != "INDEFINIDO"
+            and not _gatilho_operacional.search(evento_gatilho)
             else ""
         )
         blocos_gerados = [
-            f"O que você confirmou agora bate exatamente com o que eu vi nas linhas, {nome_fmt}. Não é impressão solta, é padrão real.",
-            f"{dor_ctx}, e isso não é de hoje: há {tempo_ctx} esse ciclo vem drenando sua energia.{gatilho_ctx}",
-            "Se continuar do mesmo jeito, o custo cresce em silêncio. A dor muda de roupa, mas continua no comando.",
-            f"O {mecanismo} é firmação voltada ao que você pediu, com honestidade: corta o nó na raiz, sem promessa de milagre nem prazo mágico.",
-            "Com o que vejo em você, já era para estar em um patamar muito mais alto do que está agora.",
-            "Não é falta de fé nem de força sua. É causa ativa, ainda sem corte correto.",
-            "Se eu te mostrar agora, passo a passo, como esse resgate funciona para o seu caso, você topa seguir comigo?",
+            f"Recebi seu retorno, {nome_fmt}. Essa sua honestidade é o primeiro passo real para a mudança.",
+            "Quando olhei suas linhas, vi que o seu maior obstáculo não é a falta de merecimento. É uma barreira invisível que dispersa a sua energia antes que ela se concretize.",
+            "Você passa a sensação de que corre, corre, mas no final volta para a mesma estaca. Isso esgota o peito e cansa a alma.",
+            f"O trabalho de {mecanismo} foi desenhado exatamente para redirecionar essa força, limpando os caminhos e removendo o que está travado.",
+            "Não se trata de sorte ou de esperar o tempo resolver sozinho. Trata-se de reordenar o que está desalinhado por dentro.",
+            "Muitas pessoas chegam até mim com essa mesma sensação de estagnação, e é lindo ver a leveza retornar quando a firmação é feita.",
+            "Se você me permitir, posso te explicar agora como funciona esse próximo passo prático. Posso prosseguir?",
         ]
 
     if blocos_gerados:
         b1 = str(blocos_gerados[0] or "").strip().lower()
         if not re.search(r"\b(confirm|entendo\s+sua\s+d[uú]vida|recebi\s+o\s+que\s+voc[eê]\s+falou)\b", b1):
             blocos_gerados[0] = f"{_reacao_curta_ao_input(msg_lead, nome_fmt)} {blocos_gerados[0]}".strip()
-    blocos_gerados = _aplicar_framework_fechamento(blocos_gerados, nome_fmt)
+    # _aplicar_framework_fechamento removido: o bloco 7 (IA ou fallback) já fecha com CTA natural.
+    # Adicionar q1+q2 aqui causava "de novo?" pois node 6 já fez uma pergunta de transição.
 
     acoes = []
     leitura_pre = max(7, min(len(msg_lead) // 22, 12))
@@ -366,7 +348,7 @@ def executar_v2(ctx) -> tuple:
         conteudo_str = remover_marcadores_bloco_ia_vazados(conteudo_str)
         conteudo_str = unificar_vocativos_por_genero(conteudo_str, genero, nome_fmt)
         conteudo_str = aplicar_substituicoes_proibidas(conteudo_str)
-        assinatura = _assinar_semantica_curta(conteudo_str)
+        assinatura = assinar_semantica_curta(conteudo_str)
         if assinatura and assinatura in assinaturas_vistas:
             logger.info("event=node7_bloco_suprimido_redundancia bloco=%s", i + 1)
             continue
@@ -448,22 +430,3 @@ def executar_v2(ctx) -> tuple:
     )
     logger.info(f"🔥 [NODE 7 v17] Agitação finalizada para {nome_fmt}.")
     return acoes, "8_oferta_principal"
-
-
-def _historico_limpo_para_ia(ctx, limite: int = 20) -> list:
-    base = slice_historico_para_ia(ctx, limite)
-    if not base:
-        return []
-    out = []
-    for h in base:
-        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
-        t = str(txt).replace("|", " ").strip()
-        t = re.sub(r"\s+", " ", t).strip()
-        if not t:
-            continue
-        if len(t.split()) <= 3 and _RE_RUIDO_CURTO_HIST.match(t.lower()):
-            continue
-        rem = getattr(h, "remetente", None) if not isinstance(h, dict) else h.get("remetente")
-        tip = getattr(h, "tipo", "text") if not isinstance(h, dict) else h.get("tipo", "text")
-        out.append({"remetente": rem or "", "texto": t, "tipo": tip or "text"})
-    return out

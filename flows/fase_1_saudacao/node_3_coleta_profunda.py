@@ -31,7 +31,7 @@ from google.genai import types
 
 from schema import Acao, slice_historico_para_ia
 from copy_sanitizer import (
-    vocativo_cigana,
+    vocativo_meumisterio,
     delay_dramatico,
     genero_efetivo_para_copy,
     genero_hint_para_prompt,
@@ -42,6 +42,10 @@ from flows.funnel_gates import (
     meta_node3_forcar_camada1_completa,
     nome_eh_placeholder,
     VOCATIVO_SEM_NOME,
+)
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    instrucao_diagnostico_para_prompt,
 )
 
 logger = logging.getLogger(__name__)
@@ -75,6 +79,12 @@ _RE_ASSUNTO_OPERACIONAL = re.compile(
     re.I,
 )
 _RE_PRECO_DIRETO = re.compile(r"\b(pre[cç]o|valor|quanto|custa|pix|pagamento)\b", re.I)
+# Rejeita perguntas operacionais/preço armazenadas como evento_gatilho
+_RE_GATILHO_INVALIDO = re.compile(
+    r"\b(quanto|custa|pre[cç]o|valor|pix|pagamento|link|instagram|insta|"
+    r"como\s+funciona|o\s+que\s+[eé]|como\s+(?:manda|envia|fa[cç]o)|consulta)\b",
+    re.I,
+)
 _RE_VALOR_AFETIVO = re.compile(
     r"\b(?:homem|mulher|parceir[oa]|relacionamento|amor)\s+de\s+valor\b|\bde\s+valor\b",
     re.I,
@@ -94,9 +104,32 @@ _RESPOSTAS_VAZIAS = frozenset({
 })
 
 _SINAIS_DESISTENCIA = re.compile(
-    r"\b(não|nao|não quero|nao quero|desisto|parar|sair|deixa pra lá|esquece|mentira|golpe|charlatão|encerrar)\b",
+    r"\b(n[aã]o\s+quero|desisto|deixa\s+pra\s+l[aá]|esquece|mentira|golpe|charlat[aã]o|encerrar|"
+    r"n[aã]o\s+vou\s+continuar|vou\s+parar|quero\s+sair|para\s+de\s+enviar|me\s+tira\s+da\s+lista)\b",
     re.IGNORECASE,
 )
+
+# Meta-perguntas do funil: "quero sim, mas porque está perguntando isso?" — não são dor real
+_RE_META_PERGUNTA_FUNIL = re.compile(
+    r"^\s*(?:quero\s+sim|quero\s+(?:saber|entender)|sim\s*,|tá\s+(?:bem|bom)|ok\s*,?)\b"
+    r".{0,120}\b(?:porque|por\s+que|pq)\b",
+    re.I | re.DOTALL,
+)
+
+# Apresentações de nome inline: "me chamo Magnus", "meu nome é X" — remove antes de acumular
+_RE_APRESENTACAO_NOME_INLINE = re.compile(
+    r"(?:^|[\n,;])[^\n.]{0,60}(?:me\s+chamo|meu\s+nome\s+[eéh]|chamo[- ]?me|sou\s+(?:o|a)\s+)\s*\w+[^\n.]{0,80}",
+    re.I,
+)
+
+
+def _sanitizar_msg_para_desabafo(texto: str) -> str:
+    """Remove apresentações de nome antes de armazenar no desabafo_original."""
+    if not texto:
+        return texto
+    sanitizado = _RE_APRESENTACAO_NOME_INLINE.sub("", texto)
+    sanitizado = re.sub(r"\s{2,}", " ", sanitizado).strip()
+    return sanitizado
 
 _REGEX_CORTE_FATAL = r"([,;:\-]|\b(?:a|ao|as|e|é|eh|éh|foi|o|os|se|à|em|mas|ou|um|uma|que|de|do|da|com|por|para|sem|são|tão|tbm|também|esse|essa|isso|isto|nele|nela|nisso|nisto|meu|seu|sua|minha))\s*$"
 
@@ -136,7 +169,7 @@ _PERGUNTA_DESEJO_POR_UNIVERSO: Dict[str, str] = {
     "geral": "Qual é o foco principal da leitura pra você agora?",
 }
 
-# Transição camada 1 → 2: uma linha de acolhimento (sem “?” — o normalizador corta no primeiro interrogação).
+# Transição camada 1 → 2: uma linha de acolhimento (sem "?" — o normalizador corta no primeiro interrogação).
 def _fechamento_camada2_presenca(universo: str) -> str:
     u = (universo or "geral").strip().lower()
     mapa = {
@@ -183,6 +216,8 @@ def _tem_substancia_dor(texto: str) -> bool:
     if _RE_ASSUNTO_OPERACIONAL.search(limpo):
         return False
     if _RE_PRECO_DIRETO.search(limpo) and not _RE_VALOR_AFETIVO.search(limpo):
+        return False
+    if _RE_META_PERGUNTA_FUNIL.search(limpo):
         return False
     if _RE_MARCADORES_DOR_OU_DESEJO.search(limpo):
         return True
@@ -471,12 +506,26 @@ def _validar_foto_mao_com_gemini(ctx) -> bool:
     if not media_bytes:
         img_url = getattr(ctx, "imagem_url", None) or (getattr(ctx, "metadata", {}) or {}).get("imagem_url")
         if img_url:
-            try:
-                resp = requests.get(img_url, timeout=10)
-                if resp.status_code == 200:
-                    media_bytes = resp.content
-            except Exception as e:
-                logger.warning("⚠️ [VISION] Erro URL: %s", e)
+            # Tenta ler do arquivo local primeiro (evita requests externas e problemas de DNS/PUBLIC_URL)
+            filename = os.path.basename(img_url.split("?")[0])
+            _curr_dir = os.path.dirname(os.path.abspath(__file__))
+            local_path = os.path.join(os.path.dirname(os.path.dirname(_curr_dir)), "downloads", filename)
+            if os.path.exists(local_path):
+                try:
+                    with open(local_path, "rb") as f:
+                        media_bytes = f.read()
+                    logger.info("✅ [VISION] Bytes da imagem carregados localmente do arquivo: %s", local_path)
+                except Exception as e:
+                    logger.warning("⚠️ [VISION] Erro ao ler arquivo local %s: %s", local_path, e)
+            
+            # Fallback para HTTP requests
+            if not media_bytes:
+                try:
+                    resp = requests.get(img_url, timeout=10)
+                    if resp.status_code == 200:
+                        media_bytes = resp.content
+                except Exception as e:
+                    logger.warning("⚠️ [VISION] Erro URL: %s", e)
 
     if not media_bytes:
         logger.warning("⚠️ [VISION] Sem bytes de imagem para validação.")
@@ -489,7 +538,7 @@ def _validar_foto_mao_com_gemini(ctx) -> bool:
             return bool(media_bytes)
 
         mime = _mime_por_magic_bytes(media_bytes)
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=api_key, http_options={"timeout": 30})
         # Critério mais humano: mão/palma perceptível (iluminação e foco variam no WhatsApp)
         prompt = (
             "Analise esta imagem. Há uma mão humana com a palma visível (mesmo que pouco nítida, "
@@ -522,7 +571,7 @@ def _validar_foto_mao_com_gemini(ctx) -> bool:
         return bool(media_bytes)
 
 
-_SYSTEM_COLETA_DINAMICA = """Você é Esmeralda Ácassia (Cigana Esmeralda): mesma voz dos passos anteriores — quiromancia com presença, como conversa no terreiro ou à beira da mesa, nunca como script de call center nem questionário.
+_SYSTEM_COLETA_DINAMICA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda): mesma voz dos passos anteriores — quiromancia com presença, como conversa no terreiro ou à beira da mesa, nunca como script de call center nem questionário.
 
 ESTÁGIO: COLETA_DADOS_DIAGNOSTICO (nesta etapa só existem duas peças: foto da mão + desabafo com corpo; peça SOMENTE o que ainda faltar).
 
@@ -547,16 +596,17 @@ WHATSAPP:
 PROIBIDO nesta etapa: "o que você quer saber sobre sua vida", "mapa da vida", segunda grande pergunta existencial, ou qualquer coisa que pule a fila antes de foto+desabafo estarem completos.
 """
 
-_SYSTEM_GRACEFUL_EXIT = """Você é Esmeralda Ácassia (Cigana Esmeralda). O lead quer desistir ou está com muito medo.
-Acolha com respeito. Se fizer sentido, lembre que pode digitar ENCERRAR para parar de verdade.
-Tom: leitura, curta, sem culpa. Sem travessão.
+_SYSTEM_GRACEFUL_EXIT = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda). O lead demonstrou hesitação ou medo.
+Acolha com respeito e leveza. Mantenha a porta aberta sem pressão. NÃO sugira encerrar nem mencione a palavra ENCERRAR.
+Responda com 1 a 2 balões curtos. Tom: templo, suave, sem culpa, sem travessão.
 """
 
 _SYSTEM_EXTRACAO_RICA = """Do texto do lead abaixo, extraia (use INDEFINIDO se não houver):
 NOME_PESSOA::nome da outra pessoa ou INDEFINIDO
 TEMPO_EXATO::há quanto tempo pesa ou INDEFINIDO
 EVENTO_GATILHO::momento ou fatos que pioraram ou INDEFINIDO
-Só estas três linhas, formato exato."""
+SIGNO_MENCIONADO::signo zodiacal ou data de nascimento mencionada (ex: "Escorpião" ou "15/03") ou INDEFINIDO
+Só estas quatro linhas, formato exato."""
 
 
 def _graceful_exit(ctx, nome_fmt: str, msg_lead: str) -> List[Acao]:
@@ -582,12 +632,12 @@ def _graceful_exit(ctx, nome_fmt: str, msg_lead: str) -> List[Acao]:
         Acao(tipo="delay", segundos=8),
         Acao(
             tipo="text",
-            conteudo=f"Sinto seu receio daqui, {nome_fmt}… o medo às vezes aperta mesmo. 😔",
+            conteudo=f"Sinto seu receio daqui, {nome_fmt}. O medo às vezes aperta bem antes da resposta chegar.",
         ),
         Acao(tipo="delay", segundos=12),
         Acao(
             tipo="text",
-            conteudo="Estou aqui se quiser continuar. Se preferir encerrar, digite ENCERRAR.",
+            conteudo="Estou aqui quando você estiver pronta. Pode continuar no seu tempo.",
         ),
     ]
 
@@ -609,7 +659,7 @@ def _tratar_frases_ia(texto: str) -> List[str]:
 
 
 def _parse_extracao_rica(texto: str) -> Dict[str, str]:
-    out = {"nome_pessoa_envolvida": "", "tempo_exato": "", "evento_gatilho": ""}
+    out = {"nome_pessoa_envolvida": "", "tempo_exato": "", "evento_gatilho": "", "signo_mencionado": ""}
     if not texto:
         return out
     for linha in texto.split("\n"):
@@ -618,12 +668,19 @@ def _parse_extracao_rica(texto: str) -> Dict[str, str]:
         k, _, v = linha.partition("::")
         key = k.strip().upper()
         val = v.strip().strip('"').strip("'")
+        # Proteção contra vazamento de múltiplas chaves na mesma linha (ex: "Magnus TEMPO_EXATO::1 ano")
+        val = re.split(r"(?i)\b(?:NOME_PESSOA|TEMPO_EXATO|EVENTO_GATILHO|SIGNO_MENCIONADO|INDEFINIDO)\b", val)[0].strip()
+        # Remove pontuações residuais no fim da extração
+        val = val.rstrip(" :;.,|")
         if key == "NOME_PESSOA":
             out["nome_pessoa_envolvida"] = val
         elif key == "TEMPO_EXATO":
             out["tempo_exato"] = val
         elif key == "EVENTO_GATILHO":
-            out["evento_gatilho"] = val
+            if not _RE_GATILHO_INVALIDO.search(val):
+                out["evento_gatilho"] = val
+        elif key == "SIGNO_MENCIONADO":
+            out["signo_mencionado"] = val
     return out
 
 
@@ -648,13 +705,99 @@ def _extrair_dados_ricos_ia(ctx, meta: dict) -> None:
             metadata=meta,
         )
         parsed = _parse_extracao_rica(raw or "")
+        nome_lead_lower = str(meta.get("nome_lead") or "").strip().lower()
         for k, v in parsed.items():
-            if v and v.upper() != "INDEFINIDO":
-                meta[k] = v
+            if not v or v.upper() == "INDEFINIDO":
+                continue
+            if k == "nome_pessoa_envolvida" and v.strip().lower() == nome_lead_lower:
+                continue
+            if k == "signo_mencionado":
+                # Tenta normalizar e resolver o signo passivamente
+                signo_resolvido = _calcular_signo(v)
+                if signo_resolvido and not meta.get("signo"):
+                    meta["signo"] = signo_resolvido
+                    meta["lead_birth_date_capturado"] = v[:60]
+                    logger.info("event=node3_signo_passivo signo=%s lead=%s", signo_resolvido, nome_lead_lower)
+                continue
+            meta[k] = v
         meta["node3_extracao_feita"] = True
         logger.info("event=node3_extracao_ok lead_fields=%s", list(parsed.keys()))
     except Exception as e:
         logger.error("🚨 [NODE3] Extração rica: %s", e)
+
+
+_MESES_PT: Dict[str, int] = {
+    "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+    "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12,
+    "janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3,
+    "abril": 4, "maio": 5, "junho": 6, "julho": 7, "agosto": 8,
+    "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+}
+
+_FAIXAS_SIGNO: List[Tuple[int, int, int, int, str]] = [
+    (3, 21, 4, 19, "Áries"),
+    (4, 20, 5, 20, "Touro"),
+    (5, 21, 6, 20, "Gêmeos"),
+    (6, 21, 7, 22, "Câncer"),
+    (7, 23, 8, 22, "Leão"),
+    (8, 23, 9, 22, "Virgem"),
+    (9, 23, 10, 22, "Libra"),
+    (10, 23, 11, 21, "Escorpião"),
+    (11, 22, 12, 21, "Sagitário"),
+    (12, 22, 12, 31, "Capricórnio"),
+    (1, 1, 1, 19, "Capricórnio"),
+    (1, 20, 2, 18, "Aquário"),
+    (2, 19, 3, 20, "Peixes"),
+]
+
+
+_SIGNO_DIRETO: Dict[str, str] = {
+    "aries": "Áries", "áries": "Áries",
+    "touro": "Touro",
+    "gemeos": "Gêmeos", "gêmeos": "Gêmeos", "gémeos": "Gêmeos",
+    "cancer": "Câncer", "câncer": "Câncer",
+    "leao": "Leão", "leão": "Leão",
+    "virgem": "Virgem",
+    "libra": "Libra",
+    "escorpiao": "Escorpião", "escorpião": "Escorpião",
+    "sagitario": "Sagitário", "sagitário": "Sagitário",
+    "capricornio": "Capricórnio", "capricórnio": "Capricórnio",
+    "aquario": "Aquário", "aquário": "Aquário",
+    "peixes": "Peixes",
+}
+
+
+def _calcular_signo(texto: str) -> Optional[str]:
+    """Extrai signo de texto livre: data numérica, data por extenso ou nome do signo."""
+    t = (texto or "").lower().strip()
+    # Nome direto do signo (ex: "sou peixes", "capricórnio")
+    for token, signo in _SIGNO_DIRETO.items():
+        if re.search(rf"\b{re.escape(token)}\b", t):
+            return signo
+    dia: Optional[int] = None
+    mes: Optional[int] = None
+    # DD/MM[/YYYY] ou DD-MM[-YYYY]
+    m = re.search(r"\b(\d{1,2})[/\-\.](\d{1,2})(?:[/\-\.]\d{2,4})?\b", t)
+    if m:
+        d, mo = int(m.group(1)), int(m.group(2))
+        if 1 <= d <= 31 and 1 <= mo <= 12:
+            dia, mes = d, mo
+    if dia is None:
+        # "15 de março" ou "15 março"
+        m2 = re.search(r"\b(\d{1,2})\s+(?:de\s+)?([a-záéíóúãõçêâîôû]{3,})", t)
+        if m2:
+            d = int(m2.group(1))
+            mes_txt = m2.group(2)[:8]
+            mo = _MESES_PT.get(mes_txt[:3])
+            if mo and 1 <= d <= 31:
+                dia, mes = d, mo
+    if dia is None or mes is None:
+        return None
+    cur = mes * 100 + dia
+    for mi, di, mf, df, nome in _FAIXAS_SIGNO:
+        if mi * 100 + di <= cur <= mf * 100 + df:
+            return nome
+    return None
 
 
 def executar_v2(ctx) -> Tuple[List[Acao], str]:
@@ -679,8 +822,24 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
     proximo_node = "3_coleta_profunda"
 
+    # Guard: se todos os dados já estão coletados (burst_elegivel) mas o estado não reflete isso,
+    # avança direto — evita ficar preso quando Gemini falha em turnos já completos.
+    # IMPORTANTE: requer desejo_declarado com substância para não pular camada 2 (personalização).
+    _desejo_burst = str(meta.get("desejo_declarado") or "").strip()
+    _snap_burst = bool(
+        meta.get("foto_recebida")
+        and meta.get("desabafo_recebido")
+        and meta.get("lead_contato_salvo_declarado")
+        and _tem_substancia_desejo(_desejo_burst)
+        and estado not in ("inicial",)
+    )
+    if _snap_burst and estado not in ("coleta_completa",):
+        meta["node3_estado"] = "coleta_completa"
+        estado = "coleta_completa"
+        logger.info("event=node3_burst_avanco_direto lead=%s estado_anterior=%s", getattr(ctx, 'lead_id', '?'), estado)
+
     # Leads antigos (DB) ou resquício: o pré-flight costuma pular para o 4 antes; se o 3 ainda rodar,
-    # não devolve lista vazia (evita turno “mudo” se o encadeamento falhar).
+    # não devolve lista vazia (evita turno "mudo" se o encadeamento falhar).
     if estado == "coleta_completa":
         ctx.metadata = meta
         acoes_handoff = [
@@ -750,12 +909,16 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             if desabafo:
                 meta["desabafo_original"] = desabafo[:2000]
             meta["universo_desejo"] = _classificar_universo(ctx, meta, meta.get("desabafo_original", ""))
+            # DARE: mapear universo para desejo_tipo estruturado (alimenta nodes 7 e 8)
+            if not meta.get("desejo_tipo"):
+                meta["desejo_tipo"] = classificar_desejo_tipo(meta, meta.get("desabafo_original", ""))
             desejo_precoce = (meta.get("desejo_declarado") or "").strip()
             aprofundamento_precoce = (meta.get("aprofundamento_texto") or "").strip()
             logger.info(
-                "⚡ [NODE 3] Fast-track (foto+dor via Sniffer). Lead=%s universo=%s desejo_precoce=%s aprofundamento_precoce=%s",
+                "⚡ [NODE 3] Fast-track (foto+dor via Sniffer). Lead=%s universo=%s desejo_tipo=%s desejo_precoce=%s aprofundamento_precoce=%s",
                 nome_fmt,
                 meta.get("universo_desejo"),
+                meta.get("desejo_tipo"),
                 bool(desejo_precoce),
                 bool(aprofundamento_precoce),
             )
@@ -765,22 +928,30 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     _append_node3_ancora(meta, desejo_precoce[:240])
                     _append_node3_ancora(meta, aprofundamento_precoce[:260])
                     _extrair_dados_ricos_ia(ctx, meta)
+                    acoes_iniciais.extend([
+                        Acao(tipo="delay", segundos=random.randint(9, 14)),
+                        Acao(tipo="text", conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção."),
+                    ])
+                    if not meta.get("signo"):
+                        meta["node3_estado"] = "aguardando_nascimento"
+                        acoes_iniciais.extend([
+                            Acao(tipo="delay", segundos=random.randint(7, 11)),
+                            Acao(tipo="text", conteudo="Me diz só o dia e o mês que você nasceu?"),
+                        ])
+                        ctx.metadata = meta
+                        return _normalizar_acoes_texto_node3(acoes_iniciais), "3_coleta_profunda"
                     meta["node3_estado"] = "coleta_completa"
                     ctx.estado_coleta = "node3_camada4_extracao_ok"
-                    acoes_iniciais.extend(
-                        [
-                            Acao(tipo="delay", segundos=random.randint(9, 14)),
-                            Acao(tipo="text", conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção."),
-                            Acao(tipo="delay", segundos=random.randint(8, 12)),
-                            Acao(tipo="text", conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos."),
-                        ]
-                    )
+                    acoes_iniciais.extend([
+                        Acao(tipo="delay", segundos=random.randint(8, 12)),
+                        Acao(tipo="text", conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos."),
+                    ])
                     ctx.metadata = meta
                     return _normalizar_acoes_texto_node3(acoes_iniciais), "4_instagram"
 
-                meta["node3_estado"] = "aguardando_aprofundamento"
+                meta["node3_estado"] = "aguardando_aprofundamento_tempo"
                 meta["node3_aprofundamento_acumulado"] = ""
-                ctx.estado_coleta = "node3_camada3_tempo_tentativas"
+                ctx.estado_coleta = "node3_camada3_tempo"
                 _append_node3_ancora(meta, desejo_precoce[:240])
                 acoes_iniciais.extend(
                     [
@@ -789,7 +960,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                         Acao(tipo="delay", segundos=random.randint(8, 14)),
                         Acao(
                             tipo="text",
-                            conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
+                            conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim?",
                         ),
                     ]
                 )
@@ -887,10 +1058,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 meta["foto_recebida"] = True
             elif not _validar_foto_mao_com_gemini(ctx):
                 # Só zera `foto_recebida` quando esta é a única mídia no fio (primeira tentativa falhou).
-                # Se já houve foto antes (ex.: node 1), não apagar a prova do sniffer — pede outra imagem sem “esquecer” a primeira.
+                # Se já houve foto antes (ex.: node 1), não apagar a prova do sniffer — pede outra imagem sem "esquecer" a primeira.
                 if _historico_conta_midia_usuario(ctx) <= 1:
                     meta["foto_recebida"] = False
-                voc = vocativo_cigana(nome_db, genero, meta)
+                voc = vocativo_meumisterio(nome_db, genero, meta)
                 ctx.metadata = meta
                 return [
                     Acao(tipo="delay", segundos=6),
@@ -905,8 +1076,10 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
 
         if _tem_substancia_dor(msg_lead):
             meta["desabafo_recebido"] = True
-            acum = meta.get("desabafo_original", "")
-            meta["desabafo_original"] = f"{acum} {msg_lead[:1500]}".strip()
+            msg_dor = _sanitizar_msg_para_desabafo(msg_lead)
+            if msg_dor:
+                acum = meta.get("desabafo_original", "")
+                meta["desabafo_original"] = f"{acum} {msg_dor[:1500]}".strip()
 
         if _historico_tem_midia_usuario(ctx):
             meta["foto_recebida"] = True
@@ -945,6 +1118,9 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             else:
                 universo = _classificar_universo(ctx, meta, desabafo)
             meta["universo_desejo"] = universo
+            # DARE: mapear universo para desejo_tipo estruturado (alimenta nodes 7 e 8)
+            if not meta.get("desejo_tipo"):
+                meta["desejo_tipo"] = classificar_desejo_tipo(meta, desabafo)
 
             # Se o pré-flight já trouxe desejo/aprofundamento com substância, não repetir pedidos.
             desejo_precoce = (meta.get("desejo_declarado") or "").strip()
@@ -954,25 +1130,29 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     _append_node3_ancora(meta, desejo_precoce[:240])
                     _append_node3_ancora(meta, aprofundamento_precoce[:260])
                     _extrair_dados_ricos_ia(ctx, meta)
+                    fechar_ft: List[Acao] = [
+                        Acao(tipo="delay", segundos=random.randint(8, 12)),
+                        Acao(tipo="text", conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção."),
+                    ]
+                    if not meta.get("signo"):
+                        meta["node3_estado"] = "aguardando_nascimento"
+                        fechar_ft.extend([
+                            Acao(tipo="delay", segundos=random.randint(7, 11)),
+                            Acao(tipo="text", conteudo="Me diz só o dia e o mês que você nasceu?"),
+                        ])
+                        ctx.metadata = meta
+                        return _normalizar_acoes_texto_node3(fechar_ft), "3_coleta_profunda"
                     meta["node3_estado"] = "coleta_completa"
                     ctx.estado_coleta = "node3_camada4_extracao_ok"
-                    fechar_ft = [
-                        Acao(tipo="delay", segundos=random.randint(8, 12)),
-                        Acao(
-                            tipo="text",
-                            conteudo="Perfeito. Você já me trouxe os pontos principais e eu guardei tudo com atenção.",
-                        ),
+                    fechar_ft.extend([
                         Acao(tipo="delay", segundos=random.randint(7, 11)),
-                        Acao(
-                            tipo="text",
-                            conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos.",
-                        ),
-                    ]
+                        Acao(tipo="text", conteudo="Agora vou te mostrar meu Instagram rapidinho e seguimos."),
+                    ])
                     ctx.metadata = meta
                     return _normalizar_acoes_texto_node3(fechar_ft), "4_instagram"
-                meta["node3_estado"] = "aguardando_aprofundamento"
+                meta["node3_estado"] = "aguardando_aprofundamento_tempo"
                 meta["node3_aprofundamento_acumulado"] = ""
-                ctx.estado_coleta = "node3_camada3_tempo_tentativas"
+                ctx.estado_coleta = "node3_camada3_tempo"
                 _append_node3_ancora(meta, desejo_precoce[:240])
                 acoes_ap: List[Acao] = [
                     Acao(tipo="delay", segundos=random.randint(7, 11)),
@@ -980,7 +1160,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     Acao(tipo="delay", segundos=random.randint(8, 13)),
                     Acao(
                         tipo="text",
-                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
+                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim?",
                     ),
                 ]
                 ctx.metadata = meta
@@ -1004,8 +1184,15 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         acoes: List[Acao] = []
         if ctx.personalizer:
             try:
+                # DARE: injetar instrução de diagnóstico cirúrgico quando desejo_tipo já identificado
+                _desejo_tipo_c1 = meta.get("desejo_tipo") or "amor"
+                _dare_injecao_c1 = (
+                    "\n\n" + instrucao_diagnostico_para_prompt(_desejo_tipo_c1)
+                    if meta.get("desabafo_recebido") and not meta.get("desejo_declarado")
+                    else ""
+                )
                 resp_ia = ctx.personalizer.gerar_resposta(
-                    system_prompt=_SYSTEM_COLETA_DINAMICA.format(genero_hint=genero_hint),
+                    system_prompt=_SYSTEM_COLETA_DINAMICA.format(genero_hint=genero_hint) + _dare_injecao_c1,
                     historico_lista=slice_historico_para_ia(ctx, 10),
                     mensagem_lead=(
                         f"SITUAÇÃO (lead {nome_fmt}): foto da mão = {bool(meta.get('foto_recebida'))}; "
@@ -1079,10 +1266,12 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                     Acao(tipo="delay", segundos=random.randint(10, 18)),
                     Acao(
                         tipo="text",
-                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim? E o que você já tentou antes de chegar aqui?",
+                        conteudo="Pra fechar o mapa com cuidado: há quanto tempo isso pesa assim?",
                     ),
                 ]
             )
+            meta["node3_estado"] = "aguardando_aprofundamento_tempo"
+            meta["node3_aprofundamento_acumulado"] = ""
             ctx.metadata = meta
             return _normalizar_acoes_texto_node3(acoes_c3), proximo_node
 
@@ -1095,6 +1284,24 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             Acao(tipo="delay", segundos=random.randint(6, 10)),
             Acao(tipo="text", conteudo=_PERGUNTA_DESEJO_POR_UNIVERSO.get(u, _PERGUNTA_DESEJO_POR_UNIVERSO["geral"])),
         ], proximo_node
+
+    # ── camada 3a: primeira pergunta respondida (tempo) → pede tentativas ──
+    if estado == "aguardando_aprofundamento_tempo":
+        ctx.estado_coleta = "node3_camada3_tempo"
+        cur = (msg_lead or "").strip()
+        if cur:
+            meta["node3_aprofundamento_acumulado"] = cur[:1500]
+        meta["node3_estado"] = "aguardando_aprofundamento"
+        ctx.metadata = meta
+        return _normalizar_acoes_texto_node3(
+            [
+                Acao(tipo="delay", segundos=random.randint(8, 14)),
+                Acao(
+                    tipo="text",
+                    conteudo="E o que você já tentou antes de chegar aqui?",
+                ),
+            ]
+        ), proximo_node
 
     # ── camada 3 + 4 ──
     if estado == "aguardando_aprofundamento":
@@ -1119,6 +1326,16 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
             meta.pop("node3_aprofundamento_acumulado", None)
             _append_node3_ancora(meta, str(meta.get("aprofundamento_texto") or "")[:260])
             _extrair_dados_ricos_ia(ctx, meta)
+            if not meta.get("signo"):
+                meta["node3_estado"] = "aguardando_nascimento"
+                fechar = [
+                    Acao(tipo="delay", segundos=delay_dramatico()),
+                    Acao(tipo="text", conteudo=f"{nome_fmt}, o que você trouxe fecha com o que as linhas já sussurravam."),
+                    Acao(tipo="delay", segundos=random.randint(8, 13)),
+                    Acao(tipo="text", conteudo="Me diz só o dia e o mês que você nasceu?"),
+                ]
+                ctx.metadata = meta
+                return _normalizar_acoes_texto_node3(fechar), "3_coleta_profunda"
             meta["node3_estado"] = "coleta_completa"
             ctx.estado_coleta = "node3_camada4_extracao_ok"
             fechar = [
@@ -1144,6 +1361,38 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
                 metadata={"skip_gancho_final": True},
             ),
         ], proximo_node
+
+    # ── signo: captura data de nascimento (estado intermediário após extração rica) ──
+    if estado == "aguardando_nascimento":
+        signo = _calcular_signo(msg_lead)
+        if signo:
+            meta["signo"] = signo
+            meta["lead_birth_date_capturado"] = msg_lead[:60]
+            logger.info("event=node3_signo_capturado signo=%s lead=%s", signo, nome_fmt)
+            meta["node3_estado"] = "coleta_completa"
+            ctx.estado_coleta = "node3_camada4_extracao_ok"
+            ctx.metadata = meta
+            return _normalizar_acoes_texto_node3([
+                Acao(tipo="delay", segundos=random.randint(6, 10)),
+                Acao(tipo="text", conteudo=f"Anotei. Seguimos agora com a leitura. ✨"),
+            ]), "4_instagram"
+        # Lead não deu data reconhecível — tenta mais uma vez ou avança
+        tentativas_signo = int(meta.get("node3_tentativas_signo", 0) or 0) + 1
+        meta["node3_tentativas_signo"] = tentativas_signo
+        if tentativas_signo < 2:
+            ctx.metadata = meta
+            return [
+                Acao(tipo="delay", segundos=6),
+                Acao(tipo="text", conteudo="Pode ser bem simples: tipo 15/03 ou 15 de março, só o dia e o mês?"),
+            ], "3_coleta_profunda"
+        # Desiste do signo, avança sem ele
+        meta["node3_estado"] = "coleta_completa"
+        ctx.estado_coleta = "node3_camada4_extracao_ok"
+        ctx.metadata = meta
+        return _normalizar_acoes_texto_node3([
+            Acao(tipo="delay", segundos=random.randint(6, 10)),
+            Acao(tipo="text", conteudo="Tudo bem, seguimos com o que você trouxe. ✨"),
+        ]), "4_instagram"
 
     ctx.metadata = meta
     ctx.estado_coleta = "node3_fallback_instagram"

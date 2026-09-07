@@ -170,8 +170,8 @@ def carregar() -> dict:
 
     # Perfil de negócio (base para multi-tenant / wizard — preencher via .env)
     perfil_negocio = {
-        "slug": _obter_limpo("NEGOCIO_SLUG", "CLIENTE_SLUG", "cigana_piloto"),
-        "nome_exibicao": _obter_limpo("NEGOCIO_NOME", "CLIENTE_NOME_EXIBICAO", "Cigana Esmeralda"),
+        "slug": _obter_limpo("NEGOCIO_SLUG", "CLIENTE_SLUG", "meumisterio_piloto"),
+        "nome_exibicao": _obter_limpo("NEGOCIO_NOME", "CLIENTE_NOME_EXIBICAO", "Meu Mistério Esmeralda"),
         "vertical": _obter_limpo("NEGOCIO_VERTICAL", None, "consultoria_mistica"),
         "oferta_resumo": _obter_limpo("NEGOCIO_OFERTA_RESUMO", None, "Leitura guiada + ritual personalizado no WhatsApp"),
         "publico_hint": _obter_limpo("NEGOCIO_PUBLICO", None, "Pessoas em crise afetiva buscando clareza"),
@@ -268,11 +268,25 @@ def carregar() -> dict:
         "audio_bloco4_d3": (_obter_limpo("CLIENTE_AUDIO_BLOCO4_D3", None, "") or "").strip(),
         "audio_bloco5_url": (_obter_limpo("CLIENTE_AUDIO_BLOCO5_URL", None, "") or "").strip(),
         "link_pagamento_b5": (_obter_limpo("LINK_PAGAMENTO_B5", "CLIENTE_LINK_PAGAMENTO_B5", "") or "").strip(),
+        "audio_bloco6_a": (_obter_limpo("CLIENTE_AUDIO_BLOCO6_A", None, "") or "").strip(),
+        "audio_bloco6_b": (_obter_limpo("CLIENTE_AUDIO_BLOCO6_B", None, "") or "").strip(),
+        "audio_bloco6_c": (_obter_limpo("CLIENTE_AUDIO_BLOCO6_C", None, "") or "").strip(),
+        "audio_bloco6_d": (_obter_limpo("CLIENTE_AUDIO_BLOCO6_D", None, "") or "").strip(),
+        "audio_bloco7_01": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_01", None, "") or "").strip(),
+        "audio_bloco7_02": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_02", None, "") or "").strip(),
+        "audio_bloco7_03": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_03", None, "") or "").strip(),
+        "audio_bloco7_04": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_04", None, "") or "").strip(),
+        "audio_bloco7_05": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_05", None, "") or "").strip(),
+        "audio_bloco7_06": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_06", None, "") or "").strip(),
+        "audio_bloco7_07": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_07", None, "") or "").strip(),
+        "audio_bloco7_08": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_08", None, "") or "").strip(),
+        "audio_bloco7_09": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_09", None, "") or "").strip(),
+        "audio_bloco7_10": (_obter_limpo("CLIENTE_AUDIO_BLOCO7_10", None, "") or "").strip(),
         # Indicadores typing na API Cloud (muitas contas devolvem #100 — default desligado)
         "whatsapp_typing_enabled": (
             _obter_limpo("WHATSAPP_TYPING_ENABLED", None, "0").lower() in ("1", "true", "yes", "sim")
         ),
-        # Novo lead: "1_apresentacao" (padrão Cigana) ou "static_meumisterio_b1" (funil estático Meu Mistério)
+        # Novo lead: "1_apresentacao" (padrão Meu Mistério) ou "static_meumisterio_b1" (funil estático Meu Mistério)
         "funil_entrada_inicial": (_obter_limpo("FUNIL_ENTRADA_INICIAL", None, "") or "").strip(),
 
         # Identidade
@@ -308,6 +322,14 @@ def carregar() -> dict:
             },
             "webhook_secret": cakto_webhook_secret,
             "enabled": bool(cakto_client_id and cakto_client_secret),
+            # Webhook /webhook/cakto (venda aprovada): disjuntor — não dispara `iniciar_fluxo_post_venda` para funil IA
+            # por defeito; mantém disparo para leads em `static_meumisterio_*`.
+            "webhook_dispara_pos_venda_ia": _obter_limpo("CAKTO_WEBHOOK_POS_VENDA_IA", None, "0").lower()
+            in ("1", "true", "yes", "sim"),
+            "webhook_dispara_pos_venda_funil_estatico": _obter_limpo(
+                "CAKTO_WEBHOOK_POS_VENDA_FUNIL_ESTATICO", None, "1"
+            ).lower()
+            in ("1", "true", "yes", "sim"),
         },
 
         # IA e Speech
@@ -385,10 +407,12 @@ def carregar() -> dict:
             ", ".join(sorted(config["checkout_urls"].keys(), key=lambda x: int(x))),
         )
     logger.info(
-        "🧾 [CONFIG] Cakto API: %s | offer_id=%s | offer_slug=%s",
+        "🧾 [CONFIG] Cakto API: %s | offer_id=%s | offer_slug=%s | webhook_pos_venda_ia=%s | webhook_pos_venda_estatico=%s",
         "ok" if config["cakto"]["enabled"] else "desativada",
         "ok" if config["cakto"]["offer_id"] else "vazio",
         "ok" if config["cakto"]["offer_slug"] else "vazio",
+        config["cakto"].get("webhook_dispara_pos_venda_ia"),
+        config["cakto"].get("webhook_dispara_pos_venda_funil_estatico"),
     )
     if config.get("funil_estatico_meu_misterio_ativo"):
         logger.info(
@@ -419,6 +443,21 @@ def carregar() -> dict:
             )
 
     return config
+
+
+def cakto_webhook_deve_iniciar_pos_venda(node_atual, cakto_cfg=None):
+    """
+    Se o lead está no funil estático (`static_meumisterio_*`), respeita
+    `webhook_dispara_pos_venda_funil_estatico`. Caso contrário (funil IA), respeita
+    `webhook_dispara_pos_venda_ia`. Evita que o motor dispare `14_confirmacao_entrega`
+    quando só se quer entrega automática para compradores do fluxo estático.
+    """
+    cfg = cakto_cfg if cakto_cfg is not None else {}
+    na = str(node_atual or "").strip()
+    if na.startswith("static_meumisterio_"):
+        return bool(cfg.get("webhook_dispara_pos_venda_funil_estatico", True))
+    return bool(cfg.get("webhook_dispara_pos_venda_ia", False))
+
 
 # Inicialização Única (Singleton)
 CONFIG_CLIENTE: dict = carregar()

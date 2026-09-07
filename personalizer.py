@@ -9,9 +9,12 @@ MEMÓRIA COMPLETA: Histórico + Metadados (Fatos do Lead)
 import logging
 import os
 import re
+import ssl
 import time
 import requests
 import json
+import certifi
+import httpx
 from PIL import Image
 from io import BytesIO
 from google import genai
@@ -32,13 +35,34 @@ class Personalizer:
         self.client = self._inicializar_gemini()
         self._quota_cooldown_until = 0.0
 
+    # Timeout padrão para chamadas Gemini (connect + read).
+    # Gemini 2.5 Flash responde em <30s para a maioria dos prompts; 90s cobre casos com contexto grande.
+    _GEMINI_TIMEOUT_S: int = 90
+
+    def _criar_httpx_client(self, timeout: float | None = None) -> httpx.Client:
+        """
+        Cliente httpx com SSL explícito via certifi.
+        Bypassa o Windows certificate store (onde antivírus injetam certificados)
+        e ignora proxy settings do ambiente (trust_env=False).
+        """
+        t = float(timeout or self._GEMINI_TIMEOUT_S)
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        return httpx.Client(
+            verify=ssl_ctx,
+            timeout=httpx.Timeout(t, connect=15.0),
+            trust_env=False,
+        )
+
     def _inicializar_gemini(self):
         """Inicializa o cliente Gemini e trata possíveis erros."""
         if not self.api_key:
             logger.error("🚨 ERRO: GEMINI_API_KEY ausente.")
             return None
         try:
-            client = genai.Client(api_key=self.api_key)
+            client = genai.Client(
+                api_key=self.api_key,
+                http_options={"httpx_client": self._criar_httpx_client()},
+            )
             logger.info(f"🔮 Oráculo Conectado: {self.model_name} [Memória Completa Ativa]")
             return client
         except Exception as e:
@@ -152,8 +176,8 @@ class Personalizer:
             return ""
         limpo = texto.strip()
         marcadores = [
-            "RESPOSTA DA CIGANA:", "RESPOSTA DA CIGANA",
-            "CIGANA:", "RESPOSTA:", "###", "SISTEMA:",
+            "RESPOSTA DA MEU_MISTERIO:", "RESPOSTA DA MEU_MISTERIO",
+            "MEU_MISTERIO:", "RESPOSTA:", "###", "SISTEMA:",
         ]
         for marcador in marcadores:
             limpo = limpo.replace(marcador, "")
@@ -175,11 +199,11 @@ class Personalizer:
         )
 
     @staticmethod
-    def _bloco_acassia_studio(metadata: Optional[dict]) -> str:
-        """Perfil publicado do Studio AcassIA (engine injeta __acassia_studio__)."""
+    def _bloco_meumisterio_studio(metadata: Optional[dict]) -> str:
+        """Perfil publicado do Studio Meu Mistério (engine injeta __meumisterio_studio__)."""
         if not isinstance(metadata, dict):
             return ""
-        snap = metadata.get("__acassia_studio__")
+        snap = metadata.get("__meumisterio_studio__")
         if not isinstance(snap, dict):
             return ""
         data = snap.get("data")
@@ -188,7 +212,7 @@ class Personalizer:
         nome = str(snap.get("agent_name") or "").strip()
         vn = snap.get("version_number")
         head = (
-            f"PERFIL AGENTE ACASSIA PUBLICADO (v{vn}"
+            f"PERFIL AGENTE MEU_MISTERIO PUBLICADO (v{vn}"
             + (f" — {nome}" if nome else "")
             + "):\n"
         )
@@ -281,6 +305,23 @@ class Personalizer:
             "Depois integre o roteiro da etapa sem ignorar o que já foi endereçado.\n\n"
         )
 
+    @staticmethod
+    def _bloco_knowledge_base(metadata: Optional[dict]) -> str:
+        """Injeta Base de Conhecimento Dinâmica do tenant (Context Stuffing via Redis)."""
+        if not isinstance(metadata, dict):
+            return ""
+        cfg = metadata.get("__config__")
+        if not isinstance(cfg, dict):
+            return ""
+        tenant_id = str(cfg.get("_tenant_id") or metadata.get("tenant_id") or "").strip()
+        if not tenant_id:
+            return ""
+        try:
+            from api.saas.knowledge import get_knowledge_base_cached
+            return get_knowledge_base_cached(tenant_id)
+        except Exception:
+            return ""
+
     def _montar_fatos_contexto(self, metadata: dict) -> str:
         """Extrai dados do metadata e transforma em fatos para a IA."""
         if not metadata:
@@ -312,6 +353,30 @@ class Personalizer:
         if metadata.get("detalhe_especifico"):
             fatos.append(f"- Detalhes: {metadata['detalhe_especifico']}")
 
+        # Dados relacionais coletados no Node 3
+        if metadata.get("nome_pessoa_envolvida"):
+            fatos.append(f"- Nome da pessoa envolvida: {str(metadata['nome_pessoa_envolvida']).strip()[:60]}")
+        if metadata.get("tempo_exato"):
+            fatos.append(f"- Tempo de sofrimento citado: {str(metadata['tempo_exato']).strip()[:60]}")
+        if metadata.get("evento_gatilho"):
+            fatos.append(f"- Evento gatilho (o que desencadeou): {str(metadata['evento_gatilho']).strip()[:120]}")
+
+        # Dados do profiler (Node 5)
+        if metadata.get("gatilho_emocional"):
+            _ge = str(metadata["gatilho_emocional"]).strip()[:120]
+            fatos.append(f"- Gatilho emocional central: {_ge}")
+        if metadata.get("objecao_silenciosa"):
+            _ob = str(metadata["objecao_silenciosa"]).strip()[:150]
+            fatos.append(f"- Objeção silenciosa (maior medo): {_ob}")
+        if metadata.get("arquetipo_lead"):
+            fatos.append(f"- Arquétipo emocional: {metadata['arquetipo_lead']}")
+
+        # Astrologia — coletada no Node 3
+        if metadata.get("signo"):
+            fatos.append(f"- Signo: {metadata['signo']}")
+        if metadata.get("lead_birth_date_capturado"):
+            fatos.append(f"- Data de nascimento: {metadata['lead_birth_date_capturado']}")
+
         si = metadata.get("stage_intel") or {}
         if isinstance(si, dict) and si:
             if si.get("prioridade"):
@@ -336,7 +401,7 @@ class Personalizer:
             rem = getattr(m, "remetente", None) or (m.get("remetente") if isinstance(m, dict) else "")
             txt = getattr(m, "texto", None) or (m.get("texto") if isinstance(m, dict) else str(m))
             if txt and not txt.startswith("[") and not txt.startswith("SISTEMA_"):
-                quem = "Cliente" if rem == "user" else "Cigana"
+                quem = "Cliente" if rem == "user" else "Meu Mistério"
                 linhas.append(f"{quem}: {txt}")
         # Evita duplicar a última mensagem: o engine já a gravou no histórico e repete em ÚLTIMA MENSAGEM.
         dup = (mensagem_lead or "").strip()
@@ -421,55 +486,63 @@ class Personalizer:
         if self.em_cooldown_quota():
             return ""
 
-        try:
-            contexto_dialogo = self._formatar_historico(historico_lista, mensagem_lead=mensagem_lead)
-            fatos_cliente = self._montar_fatos_contexto(metadata)
-            prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
-            guard = self._bloco_copy_guardrails(metadata)
-            studio = self._bloco_acassia_studio(metadata)
-            si = (metadata or {}).get("stage_intel") or {}
-            longo = bool(si.get("varias_perguntas_detectadas"))
+        contexto_dialogo = self._formatar_historico(historico_lista, mensagem_lead=mensagem_lead)
+        fatos_cliente = self._montar_fatos_contexto(metadata)
+        prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
+        guard = self._bloco_copy_guardrails(metadata)
+        studio = self._bloco_meumisterio_studio(metadata)
+        knowledge = self._bloco_knowledge_base(metadata)
+        si = (metadata or {}).get("stage_intel") or {}
+        longo = bool(si.get("varias_perguntas_detectadas"))
 
-            prompt_final = (
-                f"{prioridade}{guard}{studio}"
-                f"DIRETRIZ DE PERSONALIDADE:\n{system_prompt}\n\n"
-                f"FATOS CONHECIDOS SOBRE O CLIENTE (Não esqueça disto):\n{fatos_cliente}\n\n"
-                f"HISTÓRICO RECENTE DA CONVERSA:\n{contexto_dialogo}\n\n"
-                f"ÚLTIMA MENSAGEM DO CLIENTE: {mensagem_lead}\n\n"
-                "RESPOSTA DA CIGANA (Mística, acolhedora e direta):"
-            )
-            prompt_final = self._append_instrucao_etapa(metadata, prompt_final)
+        prompt_final = (
+            f"{prioridade}{guard}{studio}{knowledge}"
+            f"DIRETRIZ DE PERSONALIDADE:\n{system_prompt}\n\n"
+            f"FATOS CONHECIDOS SOBRE O CLIENTE (Não esqueça disto):\n{fatos_cliente}\n\n"
+            f"HISTÓRICO RECENTE DA CONVERSA:\n{contexto_dialogo}\n\n"
+            f"ÚLTIMA MENSAGEM DO CLIENTE: {mensagem_lead}\n\n"
+            "RESPOSTA DA MEU_MISTERIO (Mística, acolhedora e direta):"
+        )
+        prompt_final = self._append_instrucao_etapa(metadata, prompt_final)
 
-            if max_output_tokens is not None:
-                max_tokens = max_output_tokens
-            else:
-                max_tokens = 1200 if longo else 1000
-            temp = 0.9 if temperature is None else temperature
-            max_tokens, temp = self._aplicar_guardrails_custo(
-                metadata=metadata,
-                max_tokens_solicitado=max_tokens,
-                temperatura_solicitada=temp,
-            )
-            config = {"max_output_tokens": max_tokens, "temperature": temp}
-            resposta = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt_final,
-                config=config
-            )
-            saida = preparar_texto_envio(self._limpar_saida_ia(resposta.text or ""), "personalizer_text")
-            self._registrar_consumo_ia(metadata, prompt_final, saida)
-            return saida
+        if max_output_tokens is not None:
+            max_tokens = max_output_tokens
+        else:
+            max_tokens = 1200 if longo else 1000
+        temp = 0.9 if temperature is None else temperature
+        max_tokens, temp = self._aplicar_guardrails_custo(
+            metadata=metadata,
+            max_tokens_solicitado=max_tokens,
+            temperatura_solicitada=temp,
+        )
+        config = {"max_output_tokens": max_tokens, "temperature": temp}
 
-        except Exception as e:
-            if self._erro_e_quota_excedida(e):
-                self._ativar_cooldown_quota(75)
-                logger.warning("⚠️ [PERSONALIZER] Quota Gemini excedida: %s", e)
-                # Não vaza erro técnico/quota para o lead.
-                # O node chamador decide o fallback canônico da etapa.
+        for tentativa in range(3):
+            try:
+                resposta = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt_final,
+                    config=config,
+                )
+                saida = preparar_texto_envio(self._limpar_saida_ia(resposta.text or ""), "personalizer_text")
+                self._registrar_consumo_ia(metadata, prompt_final, saida)
+                return saida
+
+            except Exception as e:
+                if self._erro_e_quota_excedida(e):
+                    self._ativar_cooldown_quota(75)
+                    logger.warning("⚠️ [PERSONALIZER] Quota Gemini excedida: %s", e)
+                    return ""
+                err_str = str(e).lower()
+                if ("timeout" in err_str or "timed out" in err_str or "ssl" in err_str or "handshake" in err_str) and tentativa < 2:
+                    logger.warning("⚠️ [PERSONALIZER] Timeout/SSL Gemini (tentativa %s/3). Recriando cliente com certifi...", tentativa + 1)
+                    self.client = genai.Client(api_key=self.api_key, http_options={"httpx_client": self._criar_httpx_client(120)})
+                    time.sleep(2 ** (tentativa + 1))
+                    continue
+                logger.error("🚨 Erro inesperado: %s", e)
                 return ""
-            logger.error(f"🚨 Erro inesperado: {e}")
-            # Mantém fallback no próprio node para preservar tom e objetivo da etapa.
-            return ""
+
+        return ""
 
     def gerar_node1_json(
         self,
@@ -492,9 +565,10 @@ class Personalizer:
             fatos_cliente = self._montar_fatos_contexto(metadata)
             prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
             guard = self._bloco_copy_guardrails(metadata)
-            studio = self._bloco_acassia_studio(metadata)
+            studio = self._bloco_meumisterio_studio(metadata)
+            knowledge = self._bloco_knowledge_base(metadata)
             prompt_final = (
-                f"{prioridade}{guard}{studio}"
+                f"{prioridade}{guard}{studio}{knowledge}"
                 f"{system_prompt}\n\n"
                 f"FATOS CONHECIDOS SOBRE O CLIENTE:\n{fatos_cliente}\n\n"
                 f"HISTÓRICO RECENTE:\n{contexto_dialogo}\n\n"
@@ -541,21 +615,36 @@ class Personalizer:
             return ""
 
         try:
-            resp = requests.get(imagem_url, timeout=15)
-            if resp.status_code != 200:
-                logger.warning(f"⚠️ Imagem não encontrada: Status {resp.status_code}")
-                return ""
+            img = None
+            # Tenta ler do arquivo local primeiro (evita requests externas e problemas de DNS/PUBLIC_URL)
+            filename = os.path.basename(imagem_url.split("?")[0])
+            _curr_dir = os.path.dirname(os.path.abspath(__file__))
+            local_path = os.path.join(_curr_dir, "downloads", filename)
+            if os.path.exists(local_path):
+                try:
+                    img = Image.open(local_path)
+                    logger.info("✅ [VISION] Imagem aberta localmente do arquivo: %s", local_path)
+                except Exception as e:
+                    logger.warning("⚠️ [VISION] Erro ao abrir arquivo local %s: %s", local_path, e)
+            
+            # Fallback para HTTP requests
+            if img is None:
+                resp = requests.get(imagem_url, timeout=15)
+                if resp.status_code != 200:
+                    logger.warning(f"⚠️ Imagem não encontrada: Status {resp.status_code}")
+                    return ""
+                img = Image.open(BytesIO(resp.content))
 
-            img = Image.open(BytesIO(resp.content))
             fatos_cliente = self._montar_fatos_contexto(metadata)
             prioridade = self._bloco_prioridade_ultima_mensagem(metadata)
             guard = self._bloco_copy_guardrails(metadata)
-            studio = self._bloco_acassia_studio(metadata)
+            studio = self._bloco_meumisterio_studio(metadata)
+            knowledge = self._bloco_knowledge_base(metadata)
             si = (metadata or {}).get("stage_intel") or {}
             longo = bool(si.get("varias_perguntas_detectadas"))
 
             prompt_final = (
-                f"{prioridade}{guard}{studio}"
+                f"{prioridade}{guard}{studio}{knowledge}"
                 f"SISTEMA: {system_prompt}\n\n"
                 f"FATOS SOBRE O CLIENTE:\n{fatos_cliente}\n\n"
                 f"MENSAGEM ANEXA: {mensagem_lead}"

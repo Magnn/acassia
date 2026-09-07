@@ -15,31 +15,40 @@ import random
 import re
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-from schema import Acao, slice_historico_para_ia
+from schema import Acao
 from copy_sanitizer import (
     MOBILE_CHARS_POR_LINHA,
     MOBILE_MAX_LINHAS_BALO,
     aplicar_substituicoes_proibidas,
+    assinar_semantica_curta,
     contexto_lead_para_nodes,
+    extrair_blocos_fallback,
     fatiar_texto_ritmo_celular,
     fragmento_seguro_para_eco_fallback,
     frase_dor_contextualizada,
     genero_efetivo_para_copy,
     genero_hint_para_prompt,
+    historico_limpo_para_ia,
     limpar_colagem_primeira_msg_whatsapp_em_texto,
+    limpar_meta_textual,
     normalizar_enxerto_dor_sem_contexto,
     parse_blocos_leitura_ia,
     remover_marcadores_bloco_ia_vazados,
     sufixo_ancoras_node3_para_prompt,
     unificar_vocativos_por_genero,
 )
-from analytics.copy_constituicao_cigana import camada_constituicao_node6
+from analytics.copy_constituicao_meumisterio import camada_constituicao_node6
 from conversation_policy import lead_reportou_problema_entrega
 from analytics.copy_personalization import (
     definir_nome_mecanismo_se_generico,
     instrucao_ancoragem_node6,
     instrucao_eco_esforco_concreto,
     perfil_copy_para_prompt,
+)
+from analytics.dare_copy_engine import (
+    classificar_desejo_tipo,
+    nome_padrao_invisivel,
+    revelacao_padrao_para_prompt,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,7 +67,6 @@ _RE_PROBLEMA_ENTREGA = re.compile(
     r"(?i)(mensagem\s+cortad|t[aá]\s+atropel|n[aã]o\s+deu\s+tempo|"
     r"n[aã]o\s+deu\s+pra\s+ver|n[aã]o\s+carreg|travou|bugou)"
 )
-_RE_RUIDO_CURTO_HIST = re.compile(r"(?i)^(ok|sim|oi|opa|pronto|blz|beleza|ta|tá|show|feito|entendi|combinado|👍|🙏|👀)$")
 
 def _delay_digitacao(texto: str, eh_audio: bool = False, tom: str = "Maternal") -> int:
     if not texto: return 8
@@ -69,9 +77,11 @@ def _delay_digitacao(texto: str, eh_audio: bool = False, tom: str = "Maternal") 
 
 def _resolver_pausa_ritual_por_periodo(config: dict, hora: int) -> int:
     """
-    Resolve pausa do ritual por janela horária com fallback único.
+    Resolve pausa ritual antes da leitura. Default: 25s (tráfego frio — não mata engajamento).
+    Para criar mais suspense em leads quentes: node6_pausa_leitura_segundos=60 no config_cliente.
+    Cap: 60s (além disso o lead de tráfego frio fecha o WhatsApp).
     """
-    padrao = int(config.get("node6_pausa_leitura_segundos", 180) or 180)
+    padrao = int(config.get("node6_pausa_leitura_segundos", 25) or 25)
     manha = int(config.get("node6_pausa_leitura_manha_segundos", padrao) or padrao)
     tarde = int(config.get("node6_pausa_leitura_tarde_segundos", padrao) or padrao)
     noite = int(config.get("node6_pausa_leitura_noite_segundos", padrao) or padrao)
@@ -81,86 +91,30 @@ def _resolver_pausa_ritual_por_periodo(config: dict, hora: int) -> int:
         val = tarde
     else:
         val = noite
-    return max(25, min(val, 120))
-
-
-def _extrair_blocos_fallback(texto: str, max_blocos: int = 12, min_len: int = 8) -> list[str]:
-    """
-    Recupera blocos quando a IA não respeita BLOCO_N::, usando [BALAO], quebras e frases.
-    """
-    t = (texto or "").strip()
-    if not t:
-        return []
-    partes = re.split(r"\[?BAL[AÃ]O\]?", t, flags=re.I)
-    base: list[str] = []
-    for p in partes:
-        p = re.sub(r"`{3}(?:json|text)?|`{3}", "", p).strip()
-        if not p:
-            continue
-        if "\n" in p:
-            for ln in p.splitlines():
-                ln = ln.strip().strip("-•* ").strip()
-                if len(ln) >= min_len:
-                    base.append(ln)
-        else:
-            base.append(p)
-    out: list[str] = []
-    for b in base:
-        b = re.sub(r"^\s*BLOCO[_\s]*\d+\s*::\s*", "", b, flags=re.I).strip()
-        if len(b) >= min_len:
-            out.append(b)
-        if len(out) >= max_blocos:
-            break
-    return out[:max_blocos]
-
-
-def _limpar_meta_textual(v: str, max_len: int = 220) -> str:
-    t = " ".join((v or "").split()).strip()
-    if not t:
-        return ""
-    if t.upper() in {"INDEFINIDO", "NONE", "NULL", "N/A"}:
-        return ""
-    return t[:max_len]
+    return max(10, min(val, 60))
 
 
 def _aplicar_framework_fechamento(blocos: list[str], nome_fmt: str) -> list[str]:
     """
-    Framework de fechamento universal:
-    1) Você quer resolver isso?
-    2) Se eu te mostrar um caminho claro, você topa seguir?
+    Framework de fechamento: UMA única pergunta de transição no último bloco.
+    Uma pergunta só → lead responde → node 7 avança. Duas perguntas consecutivas
+    criam o efeito "de novo?" quando node 7 também abre com CTA.
     """
     base = [str(b or "").strip() for b in (blocos or []) if str(b or "").strip()]
-    q1_opcoes = [
-        f"{nome_fmt}, você quer resolver isso?",
-        f"{nome_fmt}, você quer encerrar esse ciclo de uma vez?",
-        f"{nome_fmt}, você quer mudar isso de verdade agora?",
+    q_opcoes = [
+        f"Isso que a mão mostrou é real, {nome_fmt}. Tenho algo que fecha com a leitura. Quer ouvir?",
+        f"O padrão está claro nas linhas, {nome_fmt}. Posso te apresentar o próximo passo que fecha com isso?",
+        f"A leitura tocou em algo verdadeiro, {nome_fmt}. Quer que eu te mostre o que fecha com o que apareceu aqui?",
     ]
-    q2_opcoes = [
-        "Se eu te mostrar um caminho claro, você topa seguir?",
-        "Se eu te mostrar o passo a passo certo, você topa ir comigo?",
-        "Se eu te explicar o caminho com clareza, você topa fazer do jeito certo?",
-    ]
-    q1 = random.choice(q1_opcoes)
-    q2 = random.choice(q2_opcoes)
+    q = random.choice(q_opcoes)
     if not base:
-        return [q1, q2]
-    if len(base) == 1:
-        return base + [q2]
-    base[-2] = q1
-    base[-1] = q2
+        return [q]
+    base[-1] = q
     return base
 
 
-def _assinar_semantica_curta(texto: str) -> str:
-    t = re.sub(r"[^a-z0-9\s]", " ", (texto or "").lower())
-    toks = [w for w in t.split() if len(w) > 2]
-    if not toks:
-        return ""
-    # assinatura curta para bloquear repetições do mesmo sentido
-    return " ".join(toks[:8])
-
 # ── PROMPT DE GERAÇÃO DA LEITURA (quiromancia, mesma voz dos nodes anteriores) ──
-_SYSTEM_LEITURA_SUPREMA = """Você é Esmeralda Ácassia (Cigana Esmeralda), a mesma voz calorosa e firme da conversa: quiromancia com presença, como no templo, não como telemarketing.
+_SYSTEM_LEITURA_SUPREMA = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), a mesma voz calorosa e firme da conversa: quiromancia com presença, como no templo, não como telemarketing.
 
 ESTÁGIO: LEITURA_FRIA_SUPREMA (leitura das linhas da mão)
 
@@ -180,6 +134,7 @@ DADOS DA HIVE MIND (use tudo com respeito):
 - Nome/Pessoa envolvida no relato: {nome_pessoa_envolvida}
 - Tempo exato citado pelo lead (quando houver): {tempo_exato}
 - Evento gatilho citado pelo lead (quando houver): {evento_gatilho}
+- Signo do lead (quando houver — use com sutileza astrológica para reforçar autoridade): {signo}
 - Dado concreto do lead para ecoar no diagnóstico (quando houver): {dado_concreto}
 - Última interação: "{msg_lead}"
 - Nome provisório do trabalho espiritual (use como fio condutor, pode ecoar em 1–2 blocos): {nome_mecanismo}
@@ -268,16 +223,16 @@ def executar_v2(ctx) -> tuple:
     tempo = meta.get("tempo_sofrimento", "muito tempo")
     energia = meta.get("nivel_energia", "Ansioso")
     obj_silenciosa = meta.get("objecao_silenciosa", "Nenhuma")
-    nome_pessoa_envolvida_raw = _limpar_meta_textual(str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO"), 80)
-    tempo_exato_raw = _limpar_meta_textual(str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO"), 60)
-    evento_gatilho_raw = _limpar_meta_textual(str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO"), 120)
+    nome_pessoa_envolvida_raw = limpar_meta_textual(str(meta.get("nome_pessoa_envolvida", "INDEFINIDO") or "INDEFINIDO"), 80)
+    tempo_exato_raw = limpar_meta_textual(str(meta.get("tempo_exato", "INDEFINIDO") or "INDEFINIDO"), 60)
+    evento_gatilho_raw = limpar_meta_textual(str(meta.get("evento_gatilho", "INDEFINIDO") or "INDEFINIDO"), 120)
     _raw_dado_concreto = str(
         meta.get("node5_dado_concreto")
         or meta.get("node5_tentativas_previas")
         or meta.get("desejo_declarado")
         or ""
     ).replace("|", " ").strip()
-    dado_concreto = _limpar_meta_textual(_raw_dado_concreto, 180)
+    dado_concreto = limpar_meta_textual(_raw_dado_concreto, 180)
     nome_pessoa_envolvida = nome_pessoa_envolvida_raw or "INDEFINIDO"
     tempo_exato = tempo_exato_raw or "INDEFINIDO"
     evento_gatilho = evento_gatilho_raw or "INDEFINIDO"
@@ -301,6 +256,28 @@ def executar_v2(ctx) -> tuple:
         "Vou te falar o que as linhas já começam a mostrar."
     )
 
+    estado = meta.get("node6_estado", "inicial")
+
+    if estado == "inicial":
+        meta["node6_estado"] = "aguardando_permissao"
+        ctx.metadata = meta
+        acoes = []
+        if img_altar:
+            acoes.append(Acao(tipo="image", url=img_altar))
+            acoes.append(Acao(tipo="delay", segundos=random.randint(6, 9)))
+        
+        acoes.append(Acao(tipo="delay", segundos=random.randint(5, 8)))
+        acoes.append(Acao(tipo="text", conteudo=saudacao_temporal))
+        acoes.append(Acao(tipo="delay", segundos=random.randint(5, 8)))
+        acoes.append(
+            Acao(
+                tipo="text",
+                conteudo="Me dá um minutinho, que eu já te entrego a leitura completa, tudo bem? 🔮",
+            )
+        )
+        return acoes, "6_atencao_dinamica"
+
+    # Estado "aguardando_permissao"
     blocos_gerados = []
 
     # Leitura fria: mais tokens e mais tentativas que nodes curtos — precisa fechar 12 blocos com densidade.
@@ -317,6 +294,10 @@ def executar_v2(ctx) -> tuple:
                 f"O trabalho espiritual já tem nome provisório: «{nome_mecanismo_ctx}» — pode ecoar com leveza, sem vender ainda."
             )
             prompt_ia += sufixo_ancoras_node3_para_prompt(meta)
+            # DARE: injetar leitura fria + padrão invisível por desejo_tipo
+            _desejo_tipo_n6 = classificar_desejo_tipo(meta, msg_lead)
+            _padrao_n6 = nome_padrao_invisivel(_desejo_tipo_n6)
+            _dare_leitura = revelacao_padrao_para_prompt(_desejo_tipo_n6, meta, msg_lead)
             sys_f = _SYSTEM_LEITURA_SUPREMA.format(
                 nome=nome_fmt,
                 genero=genero,
@@ -331,13 +312,14 @@ def executar_v2(ctx) -> tuple:
                 nome_pessoa_envolvida=nome_pessoa_envolvida,
                 tempo_exato=tempo_exato,
                 evento_gatilho=evento_gatilho,
+                signo=str(meta.get("signo") or "INDEFINIDO"),
                 dado_concreto=dado_concreto or "INDEFINIDO",
                 msg_lead=msg_lead,
                 nome_mecanismo=nome_mecanismo_ctx,
                 instrucao_ancoragem=instrucao_anc,
                 instrucao_eco_esforco=instrucao_eco_esf,
                 constituicao_camada=camada_constituicao_node6(meta, nome_mecanismo_ctx),
-            )
+            ) + f"\n\nPADRÃO INVISÍVEL IDENTIFICADO: \"{_padrao_n6}\"\n\n{_dare_leitura}"
             blocos_dict = {}
             ultima_exc: Optional[Exception] = None
             _temps = (0.86, 0.9, 0.88)
@@ -345,7 +327,7 @@ def executar_v2(ctx) -> tuple:
             max_tent = max(1, min(int(ie.get("max_tentativas_ia_por_node", 2) or 2), 3))
             for tentativa in range(max_tent):
                 try:
-                    hist_ia = _historico_limpo_para_ia(ctx)
+                    hist_ia = historico_limpo_para_ia(ctx, ruido_max_palavras=2)
                     resposta = ctx.personalizer.gerar_resposta(
                         system_prompt=sys_f,
                         historico_lista=hist_ia,
@@ -357,7 +339,7 @@ def executar_v2(ctx) -> tuple:
                     blocos_dict = parse_blocos_leitura_ia(resposta, max_bloco=12, min_len=8)
                     blocos_gerados = [blocos_dict.get(i, "") for i in range(1, 13) if blocos_dict.get(i)]
                     if len(blocos_gerados) < _MIN_BLOCOS_OK:
-                        blocos_gerados = _extrair_blocos_fallback(resposta, max_blocos=12, min_len=8)
+                        blocos_gerados = extrair_blocos_fallback(resposta, 12, min_len=8, strip_bullets=True)
                     if len(blocos_gerados) >= _MIN_BLOCOS_OK:
                         break
                     if len(blocos_gerados) >= 2:
@@ -389,8 +371,9 @@ def executar_v2(ctx) -> tuple:
             else ""
         )
         eco_frag = fragmento_seguro_para_eco_fallback(_raw_dado_concreto, max_len=90)
+        _adj_eco = "mesma" if genero == "feminino" else "mesmo"
         eco_dado = (
-            f"Você mesma(o) trouxe isso com clareza: {eco_frag}."
+            f"Você {_adj_eco} trouxe isso com clareza: {eco_frag}."
             if eco_frag
             else ""
         )
@@ -413,24 +396,16 @@ def executar_v2(ctx) -> tuple:
     if len(blocos_gerados) > 9:
         # Ritmo de WhatsApp: reduz carga sem perder progressão.
         blocos_gerados = blocos_gerados[:7] + blocos_gerados[-2:]
+    
     acoes = []
-    
-    if img_altar:
-        acoes.append(Acao(tipo="image", url=img_altar))
-        acoes.append(Acao(tipo="delay", segundos=random.randint(6, 9)))
-    
-    # Ritual de leitura: pausa perceptível antes de entregar os blocos (por janela horária).
-    pausa_leitura = _resolver_pausa_ritual_por_periodo(config, agora.hour)
-    acoes.append(Acao(tipo="delay", segundos=random.randint(5, 8)))
-    acoes.append(Acao(tipo="text", conteudo=saudacao_temporal))
-    acoes.append(Acao(tipo="delay", segundos=random.randint(5, 8)))
-    acoes.append(
-        Acao(
-            tipo="text",
-            conteudo="Me dá um minutinho, que eu já te entrego a leitura completa. 🔮",
-        )
-    )
-    acoes.append(Acao(tipo="delay", segundos=min(pausa_leitura, 90)))
+
+    # Pausa ritual antes de iniciar a leitura — configurable via node6_pausa_leitura_segundos.
+    # Padrão: 25s (suficiente para criar suspense sem matar tráfego frio).
+    # Para ajustar: NODE6_PAUSA_LEITURA_SEGUNDOS=60 no .env ou config_cliente.
+    _cfg_pausa = (meta.get("__config__") or {})
+    _hora_pausa = datetime.now(timezone.utc).hour
+    _pausa_s = _resolver_pausa_ritual_por_periodo(_cfg_pausa, _hora_pausa)
+    acoes.append(Acao(tipo="delay", segundos=_pausa_s))
 
     # Expressão Regular Expandida contra QUALQUER palavra de conexão que fique pendurada no final
     regex_corte_fatal = r'([,;:-]|\b(e|mas|ou|que|de|da|do|em|no|na|seu|sua|meu|minha|o|a|os|as|um|uma|com|por|para|se|é|são|sao|foi|vai|como|quando|onde|porque|qual|quem|pelo|pela|dos|das|nos|nas|este|esta|esse|essa|isso|isto|aquilo|aquele|aquela|sendo|tendo|estando))\s*$'
@@ -447,7 +422,7 @@ def executar_v2(ctx) -> tuple:
         conteudo_str = remover_marcadores_bloco_ia_vazados(conteudo_str)
         conteudo_str = unificar_vocativos_por_genero(conteudo_str, genero, nome_fmt)
         conteudo_str = aplicar_substituicoes_proibidas(conteudo_str)
-        assinatura = _assinar_semantica_curta(conteudo_str)
+        assinatura = assinar_semantica_curta(conteudo_str)
         if assinatura and assinatura in assinaturas_vistas:
             logger.info("event=node6_bloco_suprimido_redundancia bloco=%s", i + 1)
             continue
@@ -501,22 +476,3 @@ def executar_v2(ctx) -> tuple:
     )
     logger.info(f"🔮 [NODE 6 v15] Leitura enviada para {nome_fmt}.")
     return acoes, "7_interesse_desejo"
-
-
-def _historico_limpo_para_ia(ctx, limite: int = 20) -> list:
-    base = slice_historico_para_ia(ctx, limite)
-    if not base:
-        return []
-    out = []
-    for h in base:
-        txt = getattr(h, "texto", None) or (h.get("texto") if isinstance(h, dict) else None) or ""
-        t = str(txt).replace("|", " ").strip()
-        t = re.sub(r"\s+", " ", t).strip()
-        if not t:
-            continue
-        if len(t.split()) <= 2 and _RE_RUIDO_CURTO_HIST.match(t.lower()):
-            continue
-        rem = getattr(h, "remetente", None) if not isinstance(h, dict) else h.get("remetente")
-        tip = getattr(h, "tipo", "text") if not isinstance(h, dict) else h.get("tipo", "text")
-        out.append({"remetente": rem or "", "texto": t, "tipo": tip or "text"})
-    return out

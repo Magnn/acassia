@@ -1,5 +1,5 @@
 """
-app.py — Versão SUPREME v8.7 (IMPÉRIO DA CIGANA - FULL INTEGRATION)
+app.py — Versão SUPREME v8.7 (IMPÉRIO DA MEU_MISTERIO - FULL INTEGRATION)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 O CENTRO DE COMANDO DEFINITIVO — VERSÃO INTEGRAL E SEM RESUMOS
 
@@ -15,13 +15,18 @@ ESTA VERSÃO É O ÁPICE DA ARQUITETURA MAGNO 2026:
 
 import os
 import sys
+
+# Carrega .env ANTES de qualquer import que leia variáveis de ambiente
+# (db.database, engine, etc. leem DATABASE_URL/GEMINI_API_KEY no nível de módulo)
+from dotenv import load_dotenv
+load_dotenv()
+
 import hmac
 import hashlib
 import logging
 import threading
 import time
 import requests
-import base64
 import glob
 import queue
 import json
@@ -29,11 +34,29 @@ import random
 import re
 import uuid
 from decimal import Decimal
-from collections import deque
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, redirect, send_from_directory
+from flask_login import login_required
+from api.saas.auth import require_role
+
+# ── Autorização de rotas do app.py ────────────────────────────────────
+# Rotas deste arquivo são acessadas pelo **dono do tenant** (role='user').
+# Isso NÃO é o super-admin do painel /admin — pra esse, use:
+#     from api.admin.guard import require_admin  (4 camadas: login+role+allowlist+2FA)
+#
+# Aqui usamos require_tenant_owner = require_role("user", "admin") para garantir que:
+#   1. O user está logado (flask-login)
+#   2. O user é dono de um tenant — role='user' (taróloga comum) OU role='admin'
+#      (que deve poder fazer tudo que um 'user' faz, nunca menos — sem o
+#      "admin" aqui, require_role("user") exigia a role EXATA "user" e
+#      travava a própria conta admin fora do builder de funil).
+#
+# Rotas de blueprints SaaS (/saas/*) já têm seu próprio middleware.
+require_tenant_owner = require_role("user", "admin")
+
+# Backward compat — TODO: migrar usos para require_tenant_owner e remover.
+require_admin = require_tenant_owner
 from werkzeug.utils import secure_filename
-from flask_cors import CORS 
-from dotenv import load_dotenv
+from flask_cors import CORS
 from datetime import datetime, timezone, timedelta
 
 # ── AJUSTE DE PATH E AMBIENTE ────────────────────────────────────────
@@ -41,7 +64,45 @@ _ROOT = os.path.dirname(os.path.abspath(__file__))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-load_dotenv()
+# ── SENTRY (opcional) ────────────────────────────────────────────────
+_SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
+if _SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.flask import FlaskIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+        import logging as _logging_sentry
+
+        _sentry_traces = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1") or "0.1")
+        _sentry_profile = float(os.getenv("SENTRY_PROFILE_SAMPLE_RATE", "0.1") or "0.1")
+        _sentry_env     = os.getenv("SENTRY_ENVIRONMENT", "production")
+
+        sentry_sdk.init(
+            dsn=_SENTRY_DSN,
+            environment=_sentry_env,
+            # Logs nativos (Sentry Logs tab) — requer sentry-sdk >= 2.x
+            enable_logs=True,
+            # Tracing: % das requisições Flask que viram transações de performance
+            traces_sample_rate=_sentry_traces,
+            # Profiling: % das transações tracadas que também fazem profiling de CPU
+            profile_session_sample_rate=_sentry_profile,
+            profile_lifecycle="trace",
+            # Não enviar IPs nem headers de usuário (LGPD)
+            send_default_pii=False,
+            integrations=[
+                FlaskIntegration(),
+                # logger.error() → Issue Sentry  |  logger.warning() → Breadcrumb
+                LoggingIntegration(
+                    level=_logging_sentry.WARNING,   # breadcrumbs a partir de WARNING
+                    event_level=_logging_sentry.ERROR,  # Issue a partir de ERROR
+                ),
+            ],
+        )
+        print(f"[SENTRY] Inicializado — env={_sentry_env} traces={_sentry_traces} profile={_sentry_profile}")
+    except ImportError:
+        print("[SENTRY] sentry-sdk não instalado. Execute: pip install 'sentry-sdk[flask]'")
+    except Exception as _sentry_err:
+        print(f"[SENTRY] Falha ao inicializar: {_sentry_err}")
 
 # Consola Windows: evita linhas de log partidas com emojis (UTF-8).
 if sys.platform == "win32":
@@ -53,6 +114,7 @@ if sys.platform == "win32":
 
 # ── INFRAESTRUTURA DE BANCO E MODELOS ────────────────────────────────
 from sqlalchemy import func, case, text
+from sqlalchemy.exc import IntegrityError
 from db import database, models
 from db.database import engine, Base, SessionLocal
 from tenant_context import get_request_tenant_id, get_engine_tenant_id
@@ -61,7 +123,7 @@ from analytics.personalizacao_audit import auditar_personalizacao
 # ── MOTOR DE PROCESSAMENTO E IA ──────────────────────────────────────
 from engine import Engine
 from personalizer import Personalizer
-from config_cliente import CONFIG_CLIENTE
+from config_cliente import CONFIG_CLIENTE, cakto_webhook_deve_iniciar_pos_venda
 from schema import Acao
 
 # ── CONFIGURAÇÃO DE LOGGING ESTRUTURADO ───────────────────────────────
@@ -91,47 +153,271 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 REPORTS_DIR = os.path.join(_ROOT, "scripts", "reports")
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
-# Cache de Idempotência (Evita processar a mesma msg do WhatsApp 2x)
-CACHE_MENSAGENS   = deque(maxlen=2000)
-LOCK_IDEMPOTENCIA = threading.Lock()
+# Cache de Idempotência (extraído → webhooks/idempotency.py)
+# Importações com alias para manter compatibilidade com callsites existentes
+from webhooks.idempotency import (
+    CACHE_MENSAGENS,
+    LOCK_IDEMPOTENCIA,
+    try_claim_wamid_redis as _try_claim_wamid_redis,
+    try_claim_wamid_db as _try_claim_wamid_db,
+    is_wamid_duplicate as _is_wamid_duplicate,
+)
+
+# Cache Redis para APIs analíticas pesadas (dashboard, KPIs, executive)
+from reliability.api_cache import cached_api
+
+def _safe_thread(target, args=(), name: str = "bg-task", daemon: bool = True) -> threading.Thread:
+    """
+    Wrapper para threads fire-and-forget com error reporting.
+    Captura exceções e loga + envia para Sentry (se configurado).
+    """
+    def _wrapper():
+        try:
+            target(*args)
+        except Exception:
+            logger.error("🚨 [THREAD:%s] Exceção não tratada:", name, exc_info=True)
+            try:
+                import sentry_sdk
+                sentry_sdk.capture_exception()
+            except Exception:
+                pass
+    t = threading.Thread(target=_wrapper, daemon=daemon, name=name)
+    t.start()
+    return t
 
 # ── INICIALIZAÇÃO DA APLICAÇÃO ───────────────────────────────────────
 app = Flask(__name__)
-CORS(app) # Libera acesso para o Dashboard não ser bloqueado
 
-# Sincronização Obrigatória do Banco de Dados
-def _ensure_mensagens_media_url_column():
-    """Migração leve para bancos existentes: garante `mensagens.media_url`."""
+# Secret key — necessária para sessions (flask-login flash, CSRF, etc).
+# Em prod, defina FLASK_SECRET_KEY no .env (estável; mudar invalida sessões).
+# Em dev, gera uma chave volátil ao subir (sessões morrem ao reiniciar — OK).
+import secrets as _secrets_module
+_secret = (os.getenv("FLASK_SECRET_KEY") or "").strip()
+if not _secret:
+    _secret = _secrets_module.token_urlsafe(48)
+    _env_path = os.path.join(_ROOT, ".env")
     try:
-        with engine.begin() as conn:
-            cols = conn.execute(text("PRAGMA table_info(mensagens)")).fetchall()
-            names = {str(c[1]).lower() for c in cols if len(c) > 1}
-            if "media_url" not in names:
-                conn.execute(text("ALTER TABLE mensagens ADD COLUMN media_url TEXT"))
-                logger.info("🧩 [DATABASE] Coluna mensagens.media_url adicionada.")
+        with open(_env_path, "a", encoding="utf-8") as f:
+            f.write(f"\nFLASK_SECRET_KEY={_secret}\n")
+        logger.info("🔐 [SECURITY] FLASK_SECRET_KEY gerada e salva no .env para persistência das sessões.")
     except Exception as e:
-        logger.warning(f"⚠️ [DATABASE] Não foi possível garantir media_url: {e}")
+        logger.warning(
+            f"⚠️ [SECURITY] Falha ao salvar FLASK_SECRET_KEY no .env: {e}. "
+            "Sessões morrerão no restart."
+        )
+app.config["SECRET_KEY"] = _secret
 
-def _ensure_leads_tenant_id_column():
-    """Migração leve: garante `leads.tenant_id` em bases antigas."""
-    try:
-        with engine.begin() as conn:
-            cols = conn.execute(text("PRAGMA table_info(leads)")).fetchall()
-            names = {str(c[1]).lower() for c in cols if len(c) > 1}
-            if "tenant_id" not in names:
-                conn.execute(text("ALTER TABLE leads ADD COLUMN tenant_id VARCHAR(64) NOT NULL DEFAULT 'default'"))
-                logger.info("🧩 [DATABASE] Coluna leads.tenant_id adicionada.")
-    except Exception as e:
-        logger.warning(f"⚠️ [DATABASE] Não foi possível garantir tenant_id em leads: {e}")
+
+# ── CORS ─────────────────────────────────────────────────────────────
+# Em prod, FRONTEND_ORIGINS deve listar origens permitidas (vírgula-separadas).
+# Ex.: FRONTEND_ORIGINS=https://app.meumisterio.com.br,https://meumisterio.com.br
+# Em dev, fallback liberal pra localhost:5173 (Vite) e 5000 (Flask same-origin).
+_cors_env = (os.getenv("FRONTEND_ORIGINS") or "").strip()
+_is_prod = (
+    os.getenv("FLASK_ENV", "").strip().lower() == "production"
+    or os.getenv("RAILWAY_ENVIRONMENT", "")  # Railway
+    or os.getenv("RENDER", "")  # Render
+    or os.getenv("FLY_APP_NAME", "")  # Fly.io
+)
+if _cors_env:
+    _cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+elif _is_prod:
+    # Prod sem FRONTEND_ORIGINS: usa PUBLIC_URL como fallback seguro
+    _public_url = (os.getenv("PUBLIC_URL") or "").strip().rstrip("/")
+    if _public_url:
+        _cors_origins = [_public_url]
+        logger.warning(
+            "⚠️ [SECURITY] FRONTEND_ORIGINS não definida em PROD — usando PUBLIC_URL=%s. "
+            "Defina FRONTEND_ORIGINS no .env para controle explícito.", _public_url,
+        )
+    else:
+        _cors_origins = []
+        logger.error(
+            "🚨 [SECURITY] FRONTEND_ORIGINS E PUBLIC_URL não definidos em PROD! "
+            "CORS está bloqueando TODAS as origens. Configure no .env.",
+        )
+else:
+    _cors_origins = [
+        "http://localhost:5000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5000",
+        "http://127.0.0.1:5173",
+    ]
+    logger.info("[CORS] Modo dev — origens localhost permitidas.")
+CORS(app, origins=_cors_origins, supports_credentials=True)
+
+# ── Rate limiting ────────────────────────────────────────────────────
+# Protege endpoints sensíveis contra brute-force.
+# Storage: Redis (se REDIS_URL setada) ou memória (single-process só).
+# Limiter vive em extensions.py pra ser importável de blueprints sem
+# import circular (auth.py decora rotas com @limiter.limit(...)).
+from extensions import limiter
+
+_limiter_storage = (os.getenv("REDIS_URL") or "").strip()
+app.config["RATELIMIT_STORAGE_URI"] = _limiter_storage if _limiter_storage else "memory://"
+app.config["RATELIMIT_HEADERS_ENABLED"] = True  # X-RateLimit-* nas respostas
+limiter.init_app(app)
+if not _limiter_storage:
+    logger.warning(
+        "⚠️ [SECURITY] flask-limiter usando storage in-memory — limites zeram a cada restart "
+        "e não são compartilhados entre workers. Configure REDIS_URL pra prod.",
+    )
+
+# ─────────────────────────────────────────────────────────────────────
+# REGISTRO DE BLUEPRINTS SaaS
+# Os blueprints abaixo definem rotas /saas/* consumidas pelo painel React.
+# Se algum import falhar, deixa o erro subir — sem fail silencioso.
+# ─────────────────────────────────────────────────────────────────────
+def _register_saas_blueprints():
+    from api.saas.auth import auth_bp, login_manager
+    from api.saas.onboarding import onboarding_bp
+    from api.saas.inbox import inbox_bp
+    from api.saas.metrics import metrics_bp
+    from api.saas.settings import settings_bp
+    from api.saas.connect import connect_bp
+    from api.saas.billing import billing_bp
+    from api.saas.whatsapp import whatsapp_bp
+    from api.telemetry import telemetry_bp
+    from api.admin.twofa import twofa_bp
+    from api.admin.tenants import admin_tenants_bp
+    from api.admin.impersonate import impersonate_bp
+    from api.admin.lifecycle import lifecycle_bp
+    from api.admin.commercial import commercial_bp
+    from api.admin.metrics import metrics_bp as admin_metrics_bp
+    from api.saas.security import security_bp
+    from api.saas.privacy import privacy_bp
+    from api.saas.analytics import analytics_bp as saas_analytics_bp
+    from api.saas.templates import templates_bp as saas_templates_bp
+    from api.saas.tarot import tarot_bp as saas_tarot_bp
+    from api.saas.pix import pix_bp as saas_pix_bp
+    from api.saas.voice import voice_bp as saas_voice_bp
+    from api.saas.coach import coach_bp as saas_coach_bp
+    from api.saas.affiliate import affiliate_bp as saas_affiliate_bp, referral_bp as saas_referral_bp
+    from api.saas.lunar_api import lunar_bp as saas_lunar_bp
+    from api.saas.marketplace import (
+        marketplace_bp as saas_marketplace_bp,
+        admin_marketplace_bp as saas_admin_marketplace_bp,
+    )
+    from api.saas.horoscope import horoscope_bp as saas_horoscope_bp
+    from api.saas.spiritual import spiritual_bp as saas_spiritual_bp
+    from api.saas.aura import aura_bp as saas_aura_bp
+    from api.saas.compose import compose_bp as saas_compose_bp
+    from api.saas.lead_context import lead_context_bp as saas_lead_context_bp
+    from api.saas.realtime import realtime_bp as saas_realtime_bp
+    from api.saas.calendar_spiritual import calendar_bp as saas_calendar_bp
+    from api.saas.integrations_whatsapp import integrations_wa_bp as saas_integrations_wa_bp
+    from api.saas.audio_library import audio_lib_bp as saas_audio_lib_bp
+    from api.saas.daily_message import daily_msg_bp as saas_daily_msg_bp
+    from api.saas.scheduled_tarot import sched_bp as saas_sched_tarot_bp
+    from api.saas.persona_api import persona_bp as saas_persona_bp
+    from api.saas.experiments import exp_bp as saas_exp_bp
+    from api.saas.api_keys import api_keys_bp as saas_api_keys_bp
+    from api.saas.ritual import ritual_bp as saas_ritual_bp
+    from api.public.v1.astrology import public_astro_bp
+    from api.saas.broadcast import broadcast_bp as saas_broadcast_bp
+    from api.saas.events import events_bp as saas_events_bp
+    from api.saas.content import content_bp as saas_content_bp
+    from api.saas.content import coupons_bp as saas_coupons_bp
+    from api.saas.scheduling import scheduling_bp as saas_scheduling_bp
+    from api.saas.subscriptions import subscriptions_bp as saas_subscriptions_bp
+    from api.saas.profile import profile_bp as saas_profile_bp
+    from api.saas.journal import journal_bp as saas_journal_bp
+    from api.saas.trails import trails_bp as saas_trails_bp
+    from api.saas.dreams import dreams_bp as saas_dreams_bp
+    from api.saas.visionboard import visionboard_bp as saas_visionboard_bp
+    from api.saas.community import community_bp as saas_community_bp
+    from api.saas.unified_reading import reading_bp as saas_reading_bp
+    from api.saas.social_content import social_bp as saas_social_bp
+    from api.saas.client_progress import progress_bp as saas_progress_bp
+    from api.saas.platform_health import health_bp as saas_health_bp
+    from api.saas.launch_manager import launch_bp as saas_launch_bp
+    from api.saas.pipeline import pipeline_bp as saas_pipeline_bp
+    from api.saas.ac_engine import ac_bp as saas_ac_bp
+    from api.saas.checkout_webhooks import checkout_bp as saas_checkout_bp
+    from api.saas.ab_analytics import ab_bp as saas_ab_bp
+    from api.saas.multi_atendimento import multi_bp as saas_multi_bp
+    from api.saas.wa_groups import groups_bp as saas_groups_bp
+    from api.saas.devzapp_extras import extras_bp as saas_extras_bp
+    from api.saas.smart_links import smart_bp as saas_smart_bp
+    from api.saas.wa_connection import wa_conn_bp as saas_wa_conn_bp
+    from api.saas.wa_devices import devices_bp as saas_wa_devices_bp
+    from api.saas.knowledge import knowledge_bp as saas_knowledge_bp
+    from api.saas.fiscal import fiscal_bp as saas_fiscal_bp
+    from api.saas.credentials import credentials_bp as saas_credentials_bp
+    from api.b2c_marketplace import b2c_bp
+
+
+    login_manager.init_app(app)
+
+    # Blueprints críticos — se falharem, app DEVE crashar (webhook, auth, billing)
+    _critical = (
+        auth_bp, onboarding_bp, inbox_bp, billing_bp, whatsapp_bp,
+        connect_bp, settings_bp, security_bp, twofa_bp,
+    )
+    for bp in _critical:
+        app.register_blueprint(bp)
+
+    # Blueprints não-críticos — falha isolada não mata a app
+    _optional = (
+        metrics_bp, telemetry_bp,
+        admin_tenants_bp, impersonate_bp, lifecycle_bp, commercial_bp,
+        admin_metrics_bp, privacy_bp,
+        saas_analytics_bp, saas_templates_bp, saas_tarot_bp,
+        saas_pix_bp, saas_voice_bp, saas_coach_bp,
+        saas_affiliate_bp, saas_referral_bp,
+        saas_lunar_bp, saas_marketplace_bp, saas_admin_marketplace_bp,
+        saas_horoscope_bp, saas_spiritual_bp, saas_aura_bp,
+        saas_compose_bp, saas_lead_context_bp,
+        saas_calendar_bp, saas_integrations_wa_bp,
+        saas_audio_lib_bp, saas_daily_msg_bp, saas_sched_tarot_bp,
+        saas_persona_bp, saas_exp_bp, saas_realtime_bp,
+        saas_api_keys_bp, saas_ritual_bp, public_astro_bp,
+        saas_broadcast_bp, saas_events_bp,
+        saas_content_bp, saas_coupons_bp,
+        saas_scheduling_bp, saas_subscriptions_bp,
+        saas_profile_bp, saas_journal_bp, saas_trails_bp,
+        saas_dreams_bp, saas_visionboard_bp,
+        saas_community_bp, saas_reading_bp, saas_social_bp,
+        saas_progress_bp, saas_health_bp, saas_launch_bp,
+        saas_pipeline_bp, saas_ac_bp, saas_checkout_bp,
+        saas_multi_bp, saas_groups_bp, saas_extras_bp,
+        saas_smart_bp, saas_wa_conn_bp, saas_wa_devices_bp,
+        saas_ab_bp,
+        saas_knowledge_bp,
+        saas_fiscal_bp,
+        saas_credentials_bp,
+        b2c_bp,
+    )
+    _failed_bps = []
+    for bp in _optional:
+        try:
+            app.register_blueprint(bp)
+        except Exception as exc:
+            bp_name = getattr(bp, 'name', str(bp))
+            _failed_bps.append(bp_name)
+            logger.error("[SAAS] Blueprint '%s' falhou ao registrar: %s", bp_name, exc)
+    if _failed_bps:
+        logger.warning(
+            "⚠️ [SAAS] %d blueprint(s) falharam (app operando em modo degradado): %s",
+            len(_failed_bps), ", ".join(_failed_bps),
+        )
+
 
 try:
-    Base.metadata.create_all(bind=engine)
-    _ensure_leads_tenant_id_column()
-    _ensure_mensagens_media_url_column()
-    logger.info("✅ [DATABASE] Tabelas sincronizadas com sucesso.")
-except Exception as e:
-    logger.critical(f"🚨 [DATABASE] Falha ao sincronizar banco: {e}")
-    sys.exit(1)
+    _register_saas_blueprints()
+except Exception as _e:
+    logger.error("[SAAS] Falha registrando blueprints: %s", _e)
+    raise
+
+from db.sync import sync_database
+sync_database()
+
+# Auto-seed default community groups (zodiac + thematic)
+try:
+    from community_seed import seed_community_groups
+    seed_community_groups()
+except Exception as _seed_err:
+    logger.warning("[community] Seed falhou (OK se tabela não existe ainda): %s", _seed_err)
 
 from api.flow_platform import register_flow_platform_routes
 
@@ -146,313 +432,64 @@ motor = Engine(
     gemini_api_key=GEMINI_API_KEY,
     tenant_id=get_engine_tenant_id(),
 )
+app.extensions["flow_engine"] = motor
 
 # ─────────────────────────────────────────────────────────────────────
 # GESTÃO DE FILA POR LEAD (LeadInboxManager)
 # ─────────────────────────────────────────────────────────────────────
-class LeadInboxManager:
-    """
-    Ordem cronológica + fusão de texto.
-    Fluxo: (1) funde rajada imediata na fila; (2) espera silêncio (sem novas mensagens) por
-    inbox_silence_seconds; (3) só então processa um único batch — a IA vê o contexto completo antes de responder.
-    """
-    def __init__(self):
-        self.inboxes = {}
-        self.lock = threading.Lock()
-        self.max_busy_retries = int(CONFIG_CLIENTE.get("inbox_max_retries_busy", 8) or 8)
-        self.max_fila_por_lead = int(CONFIG_CLIENTE.get("inbox_max_tamanho_fila_por_lead", 96) or 96)
-        self.coalesce_s = max(1.0, min(float(CONFIG_CLIENTE.get("inbox_coalesce_seconds", 3) or 3), 12.0))
-        self.silence_s = max(0.0, min(float(CONFIG_CLIENTE.get("inbox_silence_seconds", 25) or 25), 120.0))
-        self.after_text_grace_s = max(
-            0.0, min(float(CONFIG_CLIENTE.get("inbox_after_text_grace_seconds", 20) or 20), 60.0)
-        )
-        self.after_text_grace_min_chars = int(CONFIG_CLIENTE.get("inbox_after_text_grace_min_chars", 40) or 40)
-        self._sem_processamento = threading.BoundedSemaphore(
-            value=max(4, int(CONFIG_CLIENTE.get("inbox_max_concorrencia_processamento", 24) or 24))
-        )
-        self._re_confirmacao_curta = re.compile(
-            r"\b(ok|sim|pronto|salvo|beleza|blz|show|feito|entendi|combinado)\b",
-            re.I,
-        )
-        self._re_feedback_entrega = re.compile(
-            r"\b(cortad[ao]|incomplet[ao]|atropel|card|cart[aã]o\s+de\s+contato|"
-            r"n[aã]o\s+deu\s+tempo|n[aã]o\s+deu\s+pra\s+ver)\b",
-            re.I,
-        )
-        self._re_intencao_midia = re.compile(
-            r"\b(foto|imagem|palma|m[aã]o|mao|print|selfie|enviei\s+foto|mandei\s+foto)\b",
-            re.I,
-        )
-
-    @staticmethod
-    def _merge_payload(base: dict, extra: dict) -> dict:
-        """Funde dois payloads do webhook (texto, imagem, áudio)."""
-        if extra.get("tipo_mensagem") == "audio":
-            return dict(extra)
-        p = dict(base)
-        if extra.get("texto_recebido"):
-            et = str(extra["texto_recebido"]).strip()
-            if et:
-                pt = str(p.get("texto_recebido") or "").strip()
-                # Não usar "|" como separador: esse símbolo já vazou em prompts/copy.
-                p["texto_recebido"] = f"{pt}. {et}".strip(" .") if pt else et
-        if extra.get("imagem_url"):
-            p["imagem_url"] = extra["imagem_url"]
-            p["tipo_mensagem"] = "image"
-        if extra.get("media_url"):
-            p["media_url"] = extra["media_url"]
-        if p.get("imagem_url") and p.get("tipo_mensagem") == "text":
-            p["tipo_mensagem"] = "image"
-        return p
-
-    def _drenar_rajada_imediata(self, q, payload: dict) -> dict:
-        """Consome tudo que já está na fila (mesmo burst Meta) e funde."""
-        merged = dict(payload)
-        while True:
-            try:
-                extra = q.get_nowait()
-                merged = self._merge_payload(merged, extra)
-                q.task_done()
-            except queue.Empty:
-                break
-        return merged
-
-    def _silence_period(self, q, payload: dict, timeout_sec: float) -> dict:
-        """Espera `timeout_sec` sem novos itens; cada item reinicia a janela e drena rajada."""
-        merged = dict(payload)
-        if timeout_sec <= 0:
-            return merged
-        while True:
-            try:
-                extra = q.get(timeout=timeout_sec)
-                merged = self._merge_payload(merged, extra)
-                q.task_done()
-                merged = self._drenar_rajada_imediata(q, merged)
-            except queue.Empty:
-                break
-        return merged
-
-    def _esperar_silencio_do_lead(self, q, payload: dict) -> dict:
-        """
-        Após a última mensagem visível na fila, espera `silence_s` sem novos itens.
-        Cada nova mensagem reinicia a janela e volta a drenar rajada.
-        """
-        return self._silence_period(q, payload, self.silence_s)
-
-    def _deve_grace_midia_pos_texto(self, payload: dict) -> bool:
-        if self.after_text_grace_s <= 0:
-            return False
-        if payload.get("imagem_url"):
-            return False
-        if payload.get("media_url"):
-            return False
-        tipo = str(payload.get("tipo_mensagem") or "text").lower()
-        if tipo in ("image", "video", "audio"):
-            return False
-        tx = str(payload.get("texto_recebido") or "").strip()
-        if self._re_feedback_entrega.search(tx):
-            # Lead reclamou de corte/cadência: não adicionar espera extra para mídia.
-            return False
-        # Confirmações curtas não precisam grace adicional.
-        palavras = tx.split()
-        if len(palavras) <= 8 and self._re_confirmacao_curta.search(tx):
-            return False
-        if len(tx) < self.after_text_grace_min_chars:
-            return False
-        # Grace só faz sentido quando há chance real de mídia chegar no webhook seguinte.
-        if not self._re_intencao_midia.search(tx):
-            return False
-        return True
-
-    def _esperar_grace_midia_pos_texto(self, q, payload: dict, telefone: str) -> dict:
-        """Segunda janela de silêncio após texto longo: imagem costuma vir em webhook separado (latência Meta)."""
-        if not self._deve_grace_midia_pos_texto(payload):
-            return payload
-        logger.info(
-            "⏳ [FILA] Grace pós-texto (mídia) para %s: %.1fs extra após lote principal",
-            telefone,
-            self.after_text_grace_s,
-        )
-        out = self._silence_period(q, payload, self.after_text_grace_s)
-        out["_inbox_after_text_grace"] = True
-        return out
-
-    @staticmethod
-    def _auditar_busy_por_telefone(telefone: str, evento: str, dados: dict):
-        db = SessionLocal()
-        try:
-            lead = db.query(models.Lead).filter_by(
-                telefone=telefone, tenant_id=get_engine_tenant_id()
-            ).first()
-            if not lead:
-                return
-            payload_audit = dict(dados or {})
-            if evento == "engine_busy_discarded":
-                payload_audit["node_atual"] = str(getattr(lead, "node_atual", "") or "")
-                raw = payload_audit.pop("_texto_recebido_preview", None)
-                if raw is not None:
-                    s = str(raw).strip()
-                    if s:
-                        payload_audit["texto_preview"] = (s[:117] + "…") if len(s) > 120 else s
-            db.add(
-                models.EventoAudit(
-                    lead_id=lead.id,
-                    evento=evento,
-                    dados=payload_audit,
-                )
-            )
-            db.commit()
-        except Exception:
-            db.rollback()
-        finally:
-            db.close()
-
-    def _auditar_batch_pronto(self, telefone: str, payload: dict) -> None:
-        """Regista batch processado com sucesso pelo motor (debounce já aplicado). Sem texto completo nos dados."""
-        tx = str(payload.get("texto_recebido") or "").strip()
-        partes = max(1, len([s for s in re.split(r"[.!?]\s+", tx) if s.strip()])) if tx else 1
-        self._auditar_busy_por_telefone(
-            telefone,
-            "inbox_batch_pronto",
-            {
-                "silence_s": round(float(self.silence_s), 2),
-                "after_text_grace_s": round(float(self.after_text_grace_s), 2)
-                if payload.get("_inbox_after_text_grace")
-                else 0.0,
-                "chars": len(tx),
-                "tipo_mensagem": str(payload.get("tipo_mensagem") or "text"),
-                "partes_fundidas": partes,
-            },
-        )
-
-    def enqueue(self, telefone, payload):
-        with self.lock:
-            if telefone not in self.inboxes:
-                self.inboxes[telefone] = queue.Queue()
-                thread_name = f"Worker-{telefone[-4:]}"
-                threading.Thread(target=self._worker, args=(telefone,), daemon=True, name=thread_name).start()
-        q = self.inboxes[telefone]
-        merged = dict(payload)
-        if q.qsize() >= self.max_fila_por_lead:
-            try:
-                old = q.get_nowait()
-                q.task_done()
-                merged = self._merge_payload(old, merged)
-                self._auditar_busy_por_telefone(
-                    telefone,
-                    "inbox_backpressure_merged_oldest",
-                    {"max_queue": self.max_fila_por_lead},
-                )
-                logger.warning("⚠️ [FILA] Backpressure: fundido item mais antigo com novo para %s", telefone)
-            except Exception:
-                pass
-        q.put(merged)
-        logger.info(f"📥 [FILA] Mensagem enfileirada para {telefone}.")
-
-    def _worker(self, telefone):
-        q = self.inboxes[telefone]
-        while True:
-            try:
-                # Aguarda nova mensagem (timeout de 5 minutos de inatividade)
-                payload = q.get(timeout=300)
-                q.task_done()
-
-                # 1) Funde tudo que já chegou em seguida (mesmo burst)
-                payload = self._drenar_rajada_imediata(q, payload)
-                # 2) Só processa após silêncio do lead (config inbox_silence_seconds)
-                payload = self._esperar_silencio_do_lead(q, payload)
-                # 3) Texto longo sem mídia: espera extra para imagem atrasada (webhook separado)
-                payload = self._esperar_grace_midia_pos_texto(q, payload, telefone)
-
-                tx = str(payload.get("texto_recebido") or "").strip()
-                logger.info(
-                    "📦 [FILA] Batch pronto para %s (silence_s=%.1fs, grace_extra=%s, chars=%s)",
-                    telefone,
-                    self.silence_s,
-                    bool(payload.get("_inbox_after_text_grace")),
-                    len(tx),
-                )
-
-                # Despacha para o motor de estados
-                acquired = False
-                try:
-                    acquired = self._sem_processamento.acquire(timeout=8)
-                    if not acquired:
-                        retry_payload = dict(payload)
-                        retries = int(retry_payload.get("_busy_retries", 0) or 0) + 1
-                        retry_payload["_busy_retries"] = retries
-                        q.put(retry_payload)
-                        self._auditar_busy_por_telefone(
-                            telefone,
-                            "engine_capacity_requeued",
-                            {"tentativa": retries},
-                        )
-                        continue
-
-                    motor_payload = dict(payload)
-                    motor_payload.pop("_inbox_after_text_grace", None)
-                    result = motor.processar_mensagem(**motor_payload) or {}
-                    if result.get("status") != "busy":
-                        self._auditar_batch_pronto(telefone, payload)
-                    if result.get("status") == "busy":
-                        retries = int(payload.get("_busy_retries", 0) or 0) + 1
-                        if retries <= self.max_busy_retries:
-                            retry_payload = dict(payload)
-                            retry_payload["_busy_retries"] = retries
-                            wait_s = min(5.0, 1.5 * retries + random.uniform(0.2, 1.0))
-                            logger.info(
-                                "⏳ [FILA] Motor busy para %s; requeue automático tentativa=%s em %.1fs.",
-                                telefone,
-                                retries,
-                                wait_s,
-                            )
-                            self._auditar_busy_por_telefone(
-                                telefone,
-                                "engine_busy_requeued",
-                                {"tentativa": retries, "espera_s": round(float(wait_s), 3)},
-                            )
-                            time.sleep(wait_s)
-                            q.put(retry_payload)
-                        else:
-                            logger.warning(
-                                "⚠️ [FILA] Motor busy persistente para %s; descartando após %s tentativas.",
-                                telefone,
-                                retries - 1,
-                            )
-                            self._auditar_busy_por_telefone(
-                                telefone,
-                                "engine_busy_discarded",
-                                {
-                                    "tentativas": retries - 1,
-                                    "_texto_recebido_preview": payload.get("texto_recebido"),
-                                },
-                            )
-                except Exception as e:
-                    logger.error(f"🚨 [ENGINE ERROR] Falha no processamento de {telefone}: {e}", exc_info=True)
-                finally:
-                    if acquired:
-                        try:
-                            self._sem_processamento.release()
-                        except Exception:
-                            pass
-            except queue.Empty:
-                with self.lock:
-                    self.inboxes.pop(telefone, None)
-                logger.debug(f"💤 [FILA] Worker para {telefone} encerrado por inatividade.")
-                break
-            except Exception as e:
-                logger.error(f"🚨 [FILA ERROR] Erro fatal no worker de {telefone}: {e}")
-
-inbox_manager = LeadInboxManager()
+from inbox_manager import LeadInboxManager
+inbox_manager = LeadInboxManager(process_callback=motor.processar_mensagem)
 
 # ─────────────────────────────────────────────────────────────────────
 # ROTAS DO DASHBOARD E API (INTEGRAÇÃO IMPERIAL)
 # ─────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────
+# FLOW BUILDER REACT (SPA servido a partir de frontend/dist)
+# ─────────────────────────────────────────────────────────────────────
+_FRONTEND_DIST = os.path.join(_ROOT, "frontend", "dist")
+
+
+def _flow_builder_react_enabled() -> bool:
+    """FLOW_BUILDER_REACT=1/true/yes ativa redirect /dashboard → /builder/."""
+    val = (os.getenv("FLOW_BUILDER_REACT", "") or "").strip().lower()
+    return val in ("1", "true", "yes", "on")
+
+
 @app.route("/dashboard")
 def render_dashboard():
-    """Serve a interface administrativa."""
+    """Serve a interface administrativa.
+
+    Se ``FLOW_BUILDER_REACT`` estiver ativo no ambiente E o build React
+    estiver disponível, redireciona pra ``/builder/``. Bypass via
+    ``?legacy=1`` mantém o builder antigo acessível como fallback.
+    """
+    use_react = (
+        _flow_builder_react_enabled()
+        and os.path.isfile(os.path.join(_FRONTEND_DIST, "index.html"))
+        and request.args.get("legacy") not in ("1", "true", "yes")
+    )
+    if use_react:
+        return redirect("/builder/", code=302)
     return send_from_directory(_ROOT, "dashboard.html")
+
+
+@app.route("/builder", defaults={"path": ""})
+@app.route("/builder/", defaults={"path": ""})
+@app.route("/builder/<path:path>")
+def render_builder_spa(path: str):
+    """Serve o SPA do Flow Builder; rota client-side cai em index.html."""
+    if path:
+        candidate = os.path.join(_FRONTEND_DIST, path)
+        if os.path.isfile(candidate):
+            return send_from_directory(_FRONTEND_DIST, path)
+    index_path = os.path.join(_FRONTEND_DIST, "index.html")
+    if not os.path.isfile(index_path):
+        return (
+            "Flow Builder não compilado — rode `cd frontend && npm install && npm run build`.",
+            503,
+        )
+    return send_from_directory(_FRONTEND_DIST, "index.html")
 
 
 @app.route("/assets/<path:filename>")
@@ -592,6 +629,111 @@ def _lead_metadata_as_dict(raw) -> dict:
         except json.JSONDecodeError:
             return {}
     return {}
+
+
+def _normalizar_static_target_node(raw: str) -> str:
+    s = (raw or "").strip().lower().replace(" ", "").replace("-", "_")
+    if not s:
+        return ""
+    if s in {"b1", "b2", "b3", "b4", "b5", "b6"}:
+        return f"static_meumisterio_{s}"
+    if s.startswith("static_meumisterio_"):
+        return s
+    if s.startswith("static_meumisteriob") and len(s) > len("static_meumisteriob"):
+        return "static_meumisterio_" + s.split("static_meumisteriob", 1)[1]
+    if s.startswith("static_mm_b"):
+        return "static_meumisterio_" + s.split("static_mm_", 1)[1]
+    return s
+
+
+def _next_static_node(node: str) -> str:
+    order = (
+        "static_meumisterio_b1",
+        "static_meumisterio_b2",
+        "static_meumisterio_b3",
+        "static_meumisterio_b4",
+        "static_meumisterio_b5",
+        "static_meumisterio_b6",
+    )
+    try:
+        idx = order.index(str(node or ""))
+    except ValueError:
+        return ""
+    if idx >= len(order) - 1:
+        return ""
+    return order[idx + 1]
+
+
+def _bot_state_snapshot_for_lead(db, lead) -> dict:
+    md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
+    node = str(getattr(lead, "node_atual", "") or "")
+    phase = ""
+    if node == "static_meumisterio_b1":
+        phase = str(md.get("static_mm_b1_phase") or "")
+    elif node == "static_meumisterio_b2":
+        phase = str(md.get("static_mm_b2_phase") or "")
+    elif node == "static_meumisterio_b3":
+        phase = str(md.get("static_mm_b3_phase") or "")
+    elif node == "static_meumisterio_b4":
+        phase = str(md.get("static_mm_b4_phase") or "")
+    elif node == "static_meumisterio_b5":
+        phase = str(md.get("static_mm_b5_phase") or "")
+    elif node == "static_meumisterio_b6":
+        phase = "awaiting_reply"
+
+    last_user = (
+        db.query(models.Mensagem)
+        .filter(models.Mensagem.lead_id == lead.id, models.Mensagem.remetente == "user")
+        .order_by(models.Mensagem.timestamp.desc())
+        .first()
+    )
+    last_bot = (
+        db.query(models.Mensagem)
+        .filter(models.Mensagem.lead_id == lead.id, models.Mensagem.remetente == "bot")
+        .order_by(models.Mensagem.timestamp.desc())
+        .first()
+    )
+    now = datetime.now(timezone.utc)
+    orphan_s = 0.0
+    if last_user and getattr(last_user, "timestamp", None):
+        tsu = last_user.timestamp
+        if tsu.tzinfo is None:
+            tsu = tsu.replace(tzinfo=timezone.utc)
+        tsb = None
+        if last_bot and getattr(last_bot, "timestamp", None):
+            tsb = last_bot.timestamp
+            if tsb.tzinfo is None:
+                tsb = tsb.replace(tzinfo=timezone.utc)
+        if tsb is None or tsb < tsu:
+            orphan_s = max(0.0, float((now - tsu).total_seconds()))
+
+    paused = bool(getattr(lead, "bot_pausado", False))
+    waiting_reply = phase.startswith("awaiting")
+    status = "running"
+    action_hint = "Aguardar próximo turno normal."
+    if paused:
+        status = "paused_handoff"
+        action_hint = "Clique em Reativar IA ou Retomar."
+    elif waiting_reply:
+        status = "waiting_reply"
+        action_hint = "Aguardando resposta do lead para avançar."
+    elif orphan_s >= 300:
+        status = "orphan_waiting_delivery"
+        action_hint = "Use Retomar para reprocessar o último turno."
+
+    return _json_safe_for_api(
+        {
+            "status": status,
+            "node_atual": node,
+            "phase": phase,
+            "waiting_reply": waiting_reply,
+            "paused": paused,
+            "orphan_wait_seconds": int(orphan_s),
+            "last_user_at": last_user.timestamp.isoformat() if last_user and last_user.timestamp else None,
+            "last_bot_at": last_bot.timestamp.isoformat() if last_bot and last_bot.timestamp else None,
+            "action_hint": action_hint,
+        }
+    )
 
 
 def _json_safe_for_api(obj):
@@ -795,9 +937,181 @@ def api_health():
     """Liveness para monitoramento e debug rápido."""
     return jsonify({
         "ok": True,
-        "service": "cigana",
+        "service": "meumisterio",
         "uptime_s": int(time.time() - _APP_STARTED_AT),
     }), 200
+
+
+@app.route("/metrics", methods=["GET"])
+def metrics_endpoint():
+    """
+    Prometheus exposition (Frente 1). Sem auth se METRICS_TOKEN nao setada.
+    Com METRICS_TOKEN, exige header "Authorization: Bearer <token>".
+    """
+    try:
+        from metrics_exporter import render_metrics, check_metrics_auth
+    except Exception as exc:
+        return f"# error loading metrics_exporter: {exc}", 500
+
+    if not check_metrics_auth(request.headers.get("Authorization")):
+        return "Unauthorized", 401
+
+    body = render_metrics(app_started_at=_APP_STARTED_AT)
+    return body, 200, {"Content-Type": "text/plain; version=0.0.4; charset=utf-8"}
+
+
+@app.route("/api/health/multi-tenant-summary", methods=["GET"])
+def api_health_multi_tenant_summary():
+    """
+    Visao agregada de todos os tenants — admin only.
+
+    Retorna pra cada tenant com binding:
+        - status, subscribed, has_flow_published
+        - inbound_count_total, last_inbound_at
+        - errors_24h
+    """
+    # Autoriza via mesmo token de metrics (operacional) ou usuario admin
+    if not _is_admin_or_metrics_authorized():
+        return jsonify({"error": "unauthorized"}), 401
+
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    from db.database import SessionLocal
+    from db import models
+    from sqlalchemy import func
+
+    db = SessionLocal()
+    try:
+        bindings = db.query(models.WaPhoneTenantBinding).all()
+        cutoff = _dt.now(_tz.utc) - _td(hours=24)
+
+        # Errors per tenant (24h)
+        err_rows = db.query(
+            models.WaInboundLog.phone_number_id,
+            func.count(models.WaInboundLog.id),
+        ).filter(
+            models.WaInboundLog.created_at >= cutoff,
+            models.WaInboundLog.event_type.in_(
+                ["error", "rate_limited", "hmac_invalid", "tenant_resolve_miss"]
+            ),
+        ).group_by(models.WaInboundLog.phone_number_id).all()
+        errors_by_phone = {pid: int(n) for pid, n in err_rows if pid}
+
+        out = []
+        for b in bindings:
+            pub = db.query(models.FlowPublish).filter_by(tenant_id=b.tenant_id).first()
+            has_flow = bool(pub and pub.published_blueprint_id)
+            out.append({
+                "tenant_id": b.tenant_id,
+                "phone_number_id": b.phone_number_id,
+                "display_phone_number": b.display_phone_number,
+                "status": b.status,
+                "subscribed": b.subscribed_at is not None,
+                "subscribe_error": b.subscribe_error,
+                "has_flow_published": has_flow,
+                "inbound_count_total": b.inbound_count or 0,
+                "first_inbound_at": b.first_inbound_at.isoformat() if b.first_inbound_at else None,
+                "last_inbound_at": b.last_inbound_at.isoformat() if b.last_inbound_at else None,
+                "errors_24h": errors_by_phone.get(b.phone_number_id, 0),
+            })
+
+        return jsonify({
+            "ok": True,
+            "tenants": out,
+            "summary": {
+                "total_bindings": len(bindings),
+                "subscribed_count": sum(1 for b in bindings if b.subscribed_at),
+                "with_flow_published": sum(1 for t in out if t["has_flow_published"]),
+                "with_recent_inbound": sum(
+                    1 for t in out if t["last_inbound_at"] and
+                    _dt.fromisoformat(t["last_inbound_at"]) > cutoff
+                ),
+            },
+        })
+    finally:
+        db.close()
+
+
+def _is_admin_or_metrics_authorized() -> bool:
+    """Helper compartilhado: aceita admin logado OU bearer token de metrics."""
+    try:
+        from metrics_exporter import check_metrics_auth
+        if check_metrics_auth(request.headers.get("Authorization")):
+            # Token bate; tambem valida que o token nao e vazio (ou seria bypass)
+            if (os.getenv("METRICS_TOKEN") or "").strip():
+                return True
+    except Exception:
+        pass
+    try:
+        from flask_login import current_user
+        if current_user.is_authenticated and getattr(current_user, "is_admin", False):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+@app.route("/api/health/deep", methods=["GET"])
+def api_health_deep():
+    """
+    Readiness probe — checa dependências críticas (DB, Redis, Gemini).
+    Retorna 200 se tudo OK ou Redis/Gemini estão "disabled" (não configurados).
+    Retorna 503 se algum check obrigatório falhou (DB).
+
+    Use em load balancer / k8s readinessProbe pra evitar rotear tráfego pra
+    instância com DB caindo. Liveness (/api/health) continua barato.
+    """
+    started = time.perf_counter()
+    checks: dict[str, dict] = {}
+
+    # ── DB: SELECT 1 ─────────────────────────────────────────────────
+    db_ok = False
+    try:
+        from db.database import SessionLocal
+        from sqlalchemy import text
+        _db = SessionLocal()
+        try:
+            _db.execute(text("SELECT 1"))
+            db_ok = True
+            checks["database"] = {"status": "ok"}
+        finally:
+            _db.close()
+    except Exception as exc:
+        checks["database"] = {"status": "error", "error": str(exc)[:200]}
+
+    # ── Redis: ping (skip se REDIS_URL ausente) ──────────────────────
+    if (os.getenv("REDIS_URL") or "").strip():
+        try:
+            from reliability.redis_inbound import _client as _redis_client_fn
+            _r = _redis_client_fn()
+            if _r is not None:
+                _r.ping()
+                checks["redis"] = {"status": "ok"}
+            else:
+                checks["redis"] = {"status": "error", "error": "client not available"}
+        except Exception as exc:
+            checks["redis"] = {"status": "error", "error": str(exc)[:200]}
+    else:
+        checks["redis"] = {"status": "disabled", "reason": "REDIS_URL not set"}
+
+    # ── Gemini: API key configurada (não chama API — caro pra probe) ─
+    if (os.getenv("GEMINI_API_KEY") or "").strip():
+        checks["gemini"] = {"status": "ok", "note": "key configured (not pinged)"}
+    else:
+        checks["gemini"] = {"status": "disabled", "reason": "GEMINI_API_KEY not set"}
+
+    # DB é o único check obrigatório — Redis e Gemini podem estar "disabled".
+    overall_ok = db_ok and all(
+        c.get("status") in ("ok", "disabled") for c in checks.values()
+    )
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+
+    return jsonify({
+        "ok": overall_ok,
+        "service": "meumisterio",
+        "uptime_s": int(time.time() - _APP_STARTED_AT),
+        "elapsed_ms": elapsed_ms,
+        "checks": checks,
+    }), (200 if overall_ok else 503)
 
 
 def _scan_flows_motor_nodes():
@@ -878,7 +1192,7 @@ def api_flows_summary():
 
     return jsonify({
         "ok": True,
-        "engine": "AcassIA / Cigana",
+        "engine": "Meu Mistério",
         "total_nodes": int(total_nodes),
         "phases": phases,
         "motor_nodes": motor_nodes,
@@ -966,8 +1280,10 @@ def api_flows_catalog():
 
 
 @app.route("/api/flows/validate", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_validate():
-    """Validação de documento do construtor visual (acassia-flow v1)."""
+    """Validação de documento do construtor visual (meumisterio-flow v1)."""
     try:
         from flow_builder_runtime import validate_flow_document
 
@@ -987,14 +1303,29 @@ def api_flows_schema():
     """Catálogo de blocos e campos (para o construtor)."""
     try:
         from flow_builder_runtime import public_node_catalog
+        from flow_executor import (
+            flow_blueprint_allow_http,
+            flow_blueprint_allow_llm,
+            flow_blueprint_gemini_configured,
+        )
+        from flow_motor_ref import flow_blueprint_allow_motor_ref
 
-        return jsonify({"ok": True, **_json_safe_for_api(public_node_catalog())}), 200
+        payload = public_node_catalog()
+        payload["runtime"] = {
+            "allow_http": flow_blueprint_allow_http(),
+            "allow_llm": flow_blueprint_allow_llm(),
+            "gemini_configured": flow_blueprint_gemini_configured(),
+            "allow_motor_ref": flow_blueprint_allow_motor_ref(),
+        }
+        return jsonify({"ok": True, **_json_safe_for_api(payload)}), 200
     except Exception as e:
         logger.error("🚨 [API] /api/flows/schema: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/flows/compile", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_compile():
     """Compila documento validado num plano linear (ordem de execução)."""
     try:
@@ -1013,6 +1344,8 @@ def api_flows_compile():
 
 
 @app.route("/api/flows/simulate", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_simulate():
     """Simulação dry-run (trace legível) — não envia WhatsApp."""
     try:
@@ -1046,6 +1379,8 @@ def _serialize_flow_blueprint_row(row: models.FlowBlueprint) -> dict:
 
 
 @app.route("/api/flows/blueprints", methods=["GET", "POST"])
+@login_required
+@require_admin
 def api_flows_blueprints():
     """Lista ou cria fluxos persistidos no servidor (tenant)."""
     tid = get_request_tenant_id()
@@ -1069,6 +1404,24 @@ def api_flows_blueprints():
         existing = db.query(models.FlowBlueprint).filter_by(tenant_id=tid, slug=slug).first()
         if existing:
             return jsonify({"ok": False, "error": "slug já existe neste tenant"}), 409
+
+        # Quota check (Frente 2.7) — limite de fluxos por plano
+        try:
+            import quota
+            current = db.query(models.FlowBlueprint).filter_by(tenant_id=tid).count()
+            allowed, current_count, limit = quota.check_state_quota(tid, "flows", current, db_session=db)
+            if not allowed:
+                return jsonify({
+                    "ok": False,
+                    "error": "quota_exceeded",
+                    "kind": "flows",
+                    "current": current_count,
+                    "limit": limit,
+                    "message": f"Seu plano permite {limit} fluxo(s). Faça upgrade pra criar mais.",
+                }), 402  # Payment Required
+        except Exception:
+            pass  # fail open
+
         doc = body.get("body") if isinstance(body.get("body"), dict) else {}
         row = models.FlowBlueprint(tenant_id=tid, slug=slug[:128], title=title[:300], body_json=doc)
         db.add(row)
@@ -1084,6 +1437,8 @@ def api_flows_blueprints():
 
 
 @app.route("/api/flows/blueprints/<int:bid>", methods=["GET", "PATCH", "DELETE"])
+@login_required
+@require_admin
 def api_flows_blueprint_one(bid: int):
     tid = get_request_tenant_id()
     db = SessionLocal()
@@ -1135,8 +1490,10 @@ def api_flows_blueprint_one(bid: int):
 
 
 @app.route("/api/flows/blueprints/by-slug/<string:slug>", methods=["GET"])
+@login_required
+@require_admin
 def api_flows_blueprint_by_slug(slug: str):
-    """Carrega documento acassia-flow por slug estável (uma ida ao servidor)."""
+    """Carrega documento meumisterio-flow por slug estável (uma ida ao servidor)."""
     tid = get_request_tenant_id()
     ns = (slug or "").strip().lower()[:128]
     if not ns:
@@ -1166,6 +1523,8 @@ def _ensure_flow_publish_row(db, tenant_id: str) -> models.FlowPublish:
 
 
 @app.route("/api/flows/publish", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_publish_blueprint():
     """Define o blueprint publicado do construtor para este tenant (metadados + executor)."""
     tid = get_request_tenant_id()
@@ -1195,6 +1554,8 @@ def api_flows_publish_blueprint():
 
 
 @app.route("/api/flows/publish/status", methods=["GET"])
+@login_required
+@require_admin
 def api_flows_publish_blueprint_status():
     tid = get_request_tenant_id()
     db = SessionLocal()
@@ -1221,6 +1582,8 @@ def api_flows_publish_blueprint_status():
 
 
 @app.route("/api/flows/blueprints/<int:bid>/execute", methods=["POST"])
+@login_required
+@require_admin
 def api_flows_blueprint_execute(bid: int):
     """
     Executa o fluxo compilado no motor real: gera Acao(s) e envia pela mesma fila WhatsApp.
@@ -1239,7 +1602,7 @@ def api_flows_blueprint_execute(bid: int):
             {
                 "ok": False,
                 "error": "motor_tenant_mismatch",
-                "hint": "ACASSIA_TENANT_ID do processo deve coincidir com X-Acassia-Tenant.",
+                "hint": "MEU_MISTERIO_TENANT_ID do processo deve coincidir com X-Meu Mistério-Tenant.",
             }
         ), 503
 
@@ -1252,16 +1615,33 @@ def api_flows_blueprint_execute(bid: int):
         if not lead or str(getattr(lead, "tenant_id", "default") or "default") != tid:
             return jsonify({"ok": False, "error": "lead não encontrado neste tenant"}), 404
 
-        from flow_executor import document_to_acoes
+        from flow_executor import document_to_acoes, flow_context_from_lead
         from schema import ContextoConversa
+        from sqlalchemy.orm.attributes import flag_modified
 
         doc = bp.body_json if isinstance(bp.body_json, dict) else {}
+        div_out = {}
+        fv_out = {}
         try:
-            acoes = document_to_acoes(doc)
+            acoes = document_to_acoes(
+                doc,
+                context=flow_context_from_lead(lead, tenant_id=tid),
+                blueprint_id=bid,
+                tenant_id=tid,
+                divisao_metadata_out=div_out,
+                flow_vars_metadata_out=fv_out,
+            )
         except ValueError as ve:
             return jsonify({"ok": False, "error": str(ve)}), 422
         if not acoes:
             return jsonify({"ok": False, "error": "nenhuma ação gerada (revise blocos message/delay)"}), 422
+
+        if div_out or fv_out:
+            meta = dict(lead.metadata_json or {}) if isinstance(lead.metadata_json, dict) else {}
+            meta.update(div_out)
+            meta.update(fv_out)
+            lead.metadata_json = meta
+            flag_modified(lead, "metadata_json")
 
         ctx = ContextoConversa(
             lead_id=lead.id,
@@ -1303,12 +1683,11 @@ def api_flows_blueprint_execute(bid: int):
         except Exception:
             pass
 
-        threading.Thread(
-            target=motor._processar_fila,
+        _safe_thread(
+            motor._processar_fila,
             args=(lead.id, ctx, acoes),
-            daemon=True,
             name=f"flow-bp-{bid}",
-        ).start()
+        )
         return jsonify({"ok": True, "queued_actions": len(acoes), "lead_id": lead.id}), 200
     except Exception as e:
         logger.error("🚨 [API] blueprint execute %s: %s", bid, e)
@@ -1319,6 +1698,7 @@ def api_flows_blueprint_execute(bid: int):
 
 
 @app.route("/api/stats", methods=["GET"])
+@cached_api(ttl_s=300, key_fn=lambda: f"stats:{get_request_tenant_id()}")
 def api_stats():
     """KPIs para o dashboard + campos extras para evolução da UI."""
     db = SessionLocal()
@@ -1494,6 +1874,7 @@ def api_stats():
 
 
 @app.route("/api/dashboard/kpis", methods=["GET"])
+@cached_api(ttl_s=180, key_fn=lambda: f"kpis:{get_request_tenant_id()}:{request.args.get('days', 7)}")
 def api_dashboard_kpis():
     """KPIs executivos para leitura rápida no dashboard."""
     db = SessionLocal()
@@ -1695,6 +2076,8 @@ def _serialize_studio_agent(db, agent: models.StudioAgent, tenant_id: str):
 
 
 @app.route("/api/studio/agents", methods=["GET", "POST"])
+@login_required
+@require_admin
 def api_studio_agents():
     """Lista ou cria agentes do Studio (persistência servidor)."""
     tid = get_request_tenant_id()
@@ -1712,6 +2095,21 @@ def api_studio_agents():
         name = (body.get("name") or "").strip()
         if not name:
             return jsonify({"ok": False, "error": "name obrigatório"}), 400
+
+        # Quota check (Frente 2.8) — limite de agentes por plano
+        try:
+            import quota
+            current = db.query(models.StudioAgent).filter_by(tenant_id=tid).count()
+            allowed, current_count, limit = quota.check_state_quota(tid, "agents", current, db_session=db)
+            if not allowed:
+                return jsonify({
+                    "ok": False, "error": "quota_exceeded", "kind": "agents",
+                    "current": current_count, "limit": limit,
+                    "message": f"Seu plano permite {limit} agente(s). Faça upgrade pra criar mais.",
+                }), 402
+        except Exception:
+            pass
+
         avatar = (body.get("avatar") or "#7c3aed").strip()
         agent = models.StudioAgent(
             tenant_id=tid,
@@ -1732,6 +2130,8 @@ def api_studio_agents():
 
 
 @app.route("/api/studio/agents/<int:aid>", methods=["GET", "PATCH", "DELETE"])
+@login_required
+@require_admin
 def api_studio_agent_one(aid: int):
     tid = get_request_tenant_id()
     db = SessionLocal()
@@ -1766,6 +2166,8 @@ def api_studio_agent_one(aid: int):
 
 
 @app.route("/api/studio/agents/<int:aid>/versions", methods=["POST"])
+@login_required
+@require_admin
 def api_studio_agent_version_create(aid: int):
     """Cria snapshot de versão a partir do rascunho atual."""
     tid = get_request_tenant_id()
@@ -1809,6 +2211,8 @@ def api_studio_agent_version_create(aid: int):
 
 
 @app.route("/api/studio/agents/<int:aid>/publish", methods=["POST"])
+@login_required
+@require_admin
 def api_studio_agent_publish(aid: int):
     """Define qual versão está no ar (motor WhatsApp / IA)."""
     from studio_runtime import ensure_publish_row
@@ -1854,6 +2258,8 @@ def api_studio_agent_publish(aid: int):
 
 
 @app.route("/api/studio/publish/status", methods=["GET"])
+@login_required
+@require_admin
 def api_studio_publish_status():
     tid = get_request_tenant_id()
     db = SessionLocal()
@@ -1890,6 +2296,7 @@ def api_studio_publish_status():
 
 
 @app.route("/api/executive/overview", methods=["GET"])
+@cached_api(ttl_s=300, key_fn=lambda: f"executive:{get_request_tenant_id()}")
 def api_executive_overview():
     """
     Visão executiva geral com departamentos:
@@ -2583,12 +2990,6 @@ def get_leads():
 
         tid = get_request_tenant_id()
         leads_q = db.query(models.Lead).filter(models.Lead.tenant_id == tid)
-        if status == "new":
-            leads_q = leads_q.filter(models.Lead.bot_pausado.is_(True), models.Lead.convertido.is_(False))
-        elif status == "open":
-            leads_q = leads_q.filter(models.Lead.convertido.is_(False))
-        elif status == "closed":
-            leads_q = leads_q.filter(models.Lead.convertido.is_(True))
 
         if q:
             like = f"%{q}%"
@@ -2601,29 +3002,80 @@ def get_leads():
         leads = leads_q.limit(limit).all()
 
         out = []
+
+        # ── BATCH: buscar últimas mensagens para TODOS os leads de uma vez ──
+        # Elimina N+1: antes = 3 queries por lead, agora = 3 queries TOTAL
+        lead_ids = [l.id for l in leads]
+        last_msgs = {}     # lead_id → Mensagem (última de qualquer remetente)
+        last_users = {}    # lead_id → Mensagem (última do user)
+        last_bots = {}     # lead_id → Mensagem (última do bot)
+
+        if lead_ids:
+            from sqlalchemy import func as sa_func
+
+            # Subquery: MAX(id) agrupado por lead_id (mais rápido que MAX(timestamp))
+            # Usamos id como proxy para timestamp pois são inseridos em ordem crescente.
+
+            # 1. Última mensagem (qualquer remetente)
+            sq_any = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    sa_func.max(models.Mensagem.id).label("max_id"),
+                )
+                .filter(models.Mensagem.lead_id.in_(lead_ids))
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(
+                sq_any, models.Mensagem.id == sq_any.c.max_id
+            ).all():
+                last_msgs[m.lead_id] = m
+
+            # 2. Última mensagem do USER
+            sq_user = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    sa_func.max(models.Mensagem.id).label("max_id"),
+                )
+                .filter(
+                    models.Mensagem.lead_id.in_(lead_ids),
+                    models.Mensagem.remetente == "user",
+                )
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(
+                sq_user, models.Mensagem.id == sq_user.c.max_id
+            ).all():
+                last_users[m.lead_id] = m
+
+            # 3. Última mensagem do BOT
+            sq_bot = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    sa_func.max(models.Mensagem.id).label("max_id"),
+                )
+                .filter(
+                    models.Mensagem.lead_id.in_(lead_ids),
+                    models.Mensagem.remetente == "bot",
+                )
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(
+                sq_bot, models.Mensagem.id == sq_bot.c.max_id
+            ).all():
+                last_bots[m.lead_id] = m
+
         for l in leads:
             md = _lead_metadata_as_dict(getattr(l, "metadata_json", None))
-            last_msg = (
-                db.query(models.Mensagem)
-                .filter(models.Mensagem.lead_id == l.id)
-                .order_by(models.Mensagem.timestamp.desc())
-                .first()
-            )
-            last_user = (
-                db.query(models.Mensagem)
-                .filter(models.Mensagem.lead_id == l.id, models.Mensagem.remetente == "user")
-                .order_by(models.Mensagem.timestamp.desc())
-                .first()
-            )
-            last_bot = (
-                db.query(models.Mensagem)
-                .filter(models.Mensagem.lead_id == l.id, models.Mensagem.remetente == "bot")
-                .order_by(models.Mensagem.timestamp.desc())
-                .first()
-            )
+            last_msg = last_msgs.get(l.id)
+            last_user = last_users.get(l.id)
+            last_bot = last_bots.get(l.id)
             waiting_human = False
             unread_human = False
             sla_wait_minutes = 0
+            resolved = False
             resolved_at = str(md.get("chat_resolvido_em") or "").strip()
             if last_user and (not last_bot or (last_user.timestamp and last_bot.timestamp and last_user.timestamp > last_bot.timestamp)):
                 waiting_human = bool(l.bot_pausado or str(getattr(l, "ultimo_sentimento", "") or "").lower() in ("frustrado", "resistente"))
@@ -2642,8 +3094,20 @@ def get_leads():
                             waiting_human = False
                             unread_human = False
                             sla_wait_minutes = 0
+                            resolved = True
                     except Exception:
                         pass
+            elif resolved_at:
+                try:
+                    _ = datetime.fromisoformat(resolved_at.replace("Z", "+00:00"))
+                    resolved = True
+                except Exception:
+                    resolved = False
+
+            manual_open = bool(getattr(l, "bot_pausado", False)) and (not bool(getattr(l, "convertido", False))) and (not resolved)
+            new_message = bool(unread_human) and (not manual_open) and (not bool(getattr(l, "convertido", False))) and (not resolved)
+            closed_chat = bool(getattr(l, "convertido", False)) or resolved
+            open_in_progress = (not closed_chat) and (not new_message)
 
             fechamento_score = 0.0
             try:
@@ -2672,11 +3136,22 @@ def get_leads():
                     "last_message_from": (str(last_msg.remetente or "") if last_msg else ""),
                     "waiting_human": waiting_human,
                     "unread_human": unread_human,
+                    "is_resolved": resolved,
+                    "is_manual_open": manual_open,
+                    "is_new_message": new_message,
+                    "is_closed_chat": closed_chat,
+                    "is_open_in_progress": open_in_progress,
                     "sla_wait_minutes": int(sla_wait_minutes),
                     "closing_priority_score": round(float(fechamento_score), 2),
                     "owner_operator": str(md.get("chat_owner_operator") or ""),
                 }
             )
+        if status == "new":
+            out = [x for x in out if bool(x.get("is_new_message"))]
+        elif status == "open":
+            out = [x for x in out if bool(x.get("is_open_in_progress"))]
+        elif status == "closed":
+            out = [x for x in out if bool(x.get("is_closed_chat"))]
         if sort == "priority":
             out = sorted(
                 out,
@@ -2708,6 +3183,7 @@ def resolve_lead_chat(lead_id: int):
         md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
         md["chat_resolvido_em"] = datetime.now(timezone.utc).isoformat()
         lead.metadata_json = md
+        lead.bot_pausado = False
         db.commit()
         return jsonify({"ok": True, "resolved_at": md["chat_resolvido_em"]}), 200
     except Exception as e:
@@ -2824,6 +3300,26 @@ def api_chat_rebalance():
         carga = {str(op): 0 for op in ops}
         pendentes = []
         now = datetime.now(timezone.utc)
+        # Batch: buscar última mensagem do USER para leads com bot_pausado
+        pausado_ids = [ld.id for ld in leads if bool(getattr(ld, "bot_pausado", False))]
+        last_user_by_lead = {}
+        if pausado_ids:
+            from sqlalchemy import func as sa_func
+            sq = (
+                db.query(
+                    models.Mensagem.lead_id,
+                    sa_func.max(models.Mensagem.id).label("max_id"),
+                )
+                .filter(
+                    models.Mensagem.lead_id.in_(pausado_ids),
+                    models.Mensagem.remetente == "user",
+                )
+                .group_by(models.Mensagem.lead_id)
+                .subquery()
+            )
+            for m in db.query(models.Mensagem).join(sq, models.Mensagem.id == sq.c.max_id).all():
+                last_user_by_lead[m.lead_id] = m
+
         for ld in leads:
             md = _lead_metadata_as_dict(getattr(ld, "metadata_json", None))
             owner = str(md.get("chat_owner_operator") or "")
@@ -2831,12 +3327,7 @@ def api_chat_rebalance():
                 carga[owner] += 1
             if not bool(getattr(ld, "bot_pausado", False)):
                 continue
-            last_user = (
-                db.query(models.Mensagem)
-                .filter(models.Mensagem.lead_id == ld.id, models.Mensagem.remetente == "user")
-                .order_by(models.Mensagem.timestamp.desc())
-                .first()
-            )
+            last_user = last_user_by_lead.get(ld.id)
             if not last_user or not last_user.timestamp:
                 continue
             tsu = last_user.timestamp
@@ -2902,6 +3393,7 @@ def get_messages(lead_id):
         meta_raw = _lead_metadata_as_dict(lead.metadata_json)
         meta = _json_safe_for_api(meta_raw)
         wa_win = _whatsapp_care_window_info(db, lead_id)
+        bot_state = _bot_state_snapshot_for_lead(db, lead)
 
         return jsonify({
             "messages": [{
@@ -2919,6 +3411,7 @@ def get_messages(lead_id):
             "messages_returned": len(rows),
             "truncated": (total > len(rows)) if include_total else False,
             "whatsapp_meta": _json_safe_for_api(wa_win),
+            "bot_state": bot_state,
             "whatsapp_policy_hint": (
                 "Regra usual Meta: dentro de ~24h após a última mensagem do lead, mensagens de sessão para continuar "
                 "o atendimento costumam ser aceitas. Fora disso, contatos proativos costumam exigir templates (HSM) "
@@ -2993,11 +3486,156 @@ def toggle_pause(lead_id):
     finally:
         db.close()
 
+
+@app.route("/api/leads/<int:lead_id>/resume-last-user", methods=["POST"])
+def resume_last_user_turn(lead_id: int):
+    """
+    Reprocessa a última mensagem do usuário para retomada manual do atendimento.
+    Não envia texto novo: apenas reaplica o último turno recebido.
+    """
+    db = SessionLocal()
+    try:
+        lead = db.get(models.Lead, lead_id)
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+        if str(getattr(lead, "tenant_id", "default") or "default") != get_request_tenant_id():
+            return jsonify({"error": "not_found"}), 404
+        last_user = (
+            db.query(models.Mensagem)
+            .filter(models.Mensagem.lead_id == lead.id, models.Mensagem.remetente == "user")
+            .order_by(models.Mensagem.id.desc())
+            .first()
+        )
+        if not last_user:
+            return jsonify({"error": "no_user_message"}), 400
+        texto = str(getattr(last_user, "texto", "") or "").strip()
+        if not texto:
+            return jsonify({"error": "empty_user_message"}), 400
+
+        lead.bot_pausado = False
+        db.commit()
+
+        out = motor.processar_mensagem(
+            str(getattr(lead, "telefone", "") or ""),
+            texto,
+            tipo_mensagem=str(getattr(last_user, "tipo", "text") or "text"),
+        )
+        return jsonify({"ok": True, "result": out or {"status": "ok"}}), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/leads/<int:lead_id>/resend-current-block", methods=["POST"])
+def resend_current_block(lead_id: int):
+    """
+    Reenvia o bloco atual do funil estático, limpando flags de dispatch/fase do bloco.
+    """
+    db = SessionLocal()
+    try:
+        lead = db.get(models.Lead, lead_id)
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+        if str(getattr(lead, "tenant_id", "default") or "default") != get_request_tenant_id():
+            return jsonify({"error": "not_found"}), 404
+        node = str(getattr(lead, "node_atual", "") or "").strip()
+        if not node.startswith("static_meumisterio_"):
+            return jsonify({"error": "not_static_node"}), 400
+
+        md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
+        reset_map = {
+            "static_meumisterio_b1": ["static_mm_b1_phase", "static_mm_b1_entregue"],
+            "static_meumisterio_b2": ["static_mm_b2_phase", "static_mm_b2_seq_dispatched", "static_mm_b2_entregue"],
+            "static_meumisterio_b3": ["static_mm_b3_phase", "static_mm_b3_seq_dispatched", "static_mm_b3_entregue"],
+            "static_meumisterio_b4": ["static_mm_b4_phase", "static_mm_b4_seq_dispatched", "static_mm_b4_entregue"],
+            "static_meumisterio_b5": ["static_mm_b5_phase", "static_mm_b5_seq_dispatched", "static_mm_b5_entregue"],
+            "static_meumisterio_b6": ["static_mm_b6_seq_dispatched"],
+        }
+        for k in reset_map.get(node, []):
+            md.pop(k, None)
+        lead.metadata_json = md
+        lead.bot_pausado = False
+        db.commit()
+
+        default_text = "quero minha consulta" if node == "static_meumisterio_b1" else "ok"
+        out = motor.processar_mensagem(str(getattr(lead, "telefone", "") or ""), default_text, tipo_mensagem="text")
+        return jsonify({"ok": True, "node": node, "result": out or {"status": "ok"}}), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/leads/<int:lead_id>/advance-node", methods=["POST"])
+def advance_lead_node(lead_id: int):
+    """
+    Avança manualmente o nó atual do funil estático para um nó alvo.
+    """
+    db = SessionLocal()
+    try:
+        lead = db.get(models.Lead, lead_id)
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+        if str(getattr(lead, "tenant_id", "default") or "default") != get_request_tenant_id():
+            return jsonify({"error": "not_found"}), 404
+        body = request.get_json(silent=True) or {}
+        target_node = _normalizar_static_target_node(str(body.get("target_node") or "").strip())
+        allowed = {
+            "static_meumisterio_b1",
+            "static_meumisterio_b2",
+            "static_meumisterio_b3",
+            "static_meumisterio_b4",
+            "static_meumisterio_b5",
+            "static_meumisterio_b6",
+        }
+        if target_node not in allowed:
+            return jsonify({"error": "invalid_target_node"}), 400
+        prev = str(getattr(lead, "node_atual", "") or "")
+        if target_node == prev:
+            maybe_next = _next_static_node(prev)
+            if bool(body.get("auto_next")) and maybe_next:
+                target_node = maybe_next
+            else:
+                return jsonify({"error": "same_target_node", "node": prev}), 400
+        md = _lead_metadata_as_dict(getattr(lead, "metadata_json", None))
+        reset_map = {
+            "static_meumisterio_b1": ["static_mm_b1_phase", "static_mm_b1_entregue"],
+            "static_meumisterio_b2": ["static_mm_b2_phase", "static_mm_b2_seq_dispatched", "static_mm_b2_entregue"],
+            "static_meumisterio_b3": ["static_mm_b3_phase", "static_mm_b3_seq_dispatched", "static_mm_b3_entregue"],
+            "static_meumisterio_b4": ["static_mm_b4_phase", "static_mm_b4_seq_dispatched", "static_mm_b4_entregue"],
+            "static_meumisterio_b5": ["static_mm_b5_phase", "static_mm_b5_seq_dispatched", "static_mm_b5_entregue"],
+            "static_meumisterio_b6": ["static_mm_b6_seq_dispatched"],
+        }
+        for k in reset_map.get(target_node, []):
+            md.pop(k, None)
+        lead.metadata_json = md
+        lead.node_atual = target_node
+        lead.bot_pausado = False
+        db.add(
+            models.EventoAudit(
+                lead_id=lead.id,
+                evento="manual_node_advance",
+                dados={"from": prev, "to": target_node},
+            )
+        )
+        db.commit()
+        default_text = "quero minha consulta" if target_node == "static_meumisterio_b1" else "ok"
+        out = motor.processar_mensagem(str(getattr(lead, "telefone", "") or ""), default_text, tipo_mensagem="text")
+        return jsonify({"ok": True, "from": prev, "to": target_node, "result": out or {"status": "ok"}}), 200
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
 @app.route("/api/leads/<int:lead_id>/send", methods=["POST"])
 def send_manual(lead_id):
     """Envia mensagem manual do atendente via Meta API."""
     data = request.get_json()
-    texto = data.get("texto", "").strip()
+    texto = (data.get("texto") or data.get("text") or "").strip()
     if not texto: return jsonify({"error": "Mensagem vazia"}), 400
 
     db = SessionLocal()
@@ -3028,6 +3666,14 @@ def send_manual(lead_id):
             # Ao intervir manualmente, pausamos o bot por segurança
             lead.bot_pausado = True 
             db.commit()
+            # Notificar browsers via SSE
+            try:
+                from api.saas.realtime_hooks import notify_message_created, notify_lead_updated
+                tid = str(getattr(lead, "tenant_id", "default") or "default")
+                notify_message_created(tid, lead.id, m.id, texto, "bot")
+                notify_lead_updated(tid, lead.id, {"bot_pausado": True})
+            except Exception:
+                pass
             return jsonify({"status": "ok", "whatsapp_meta": _json_safe_for_api(wa_before)}), 200
         return jsonify({"error": "Falha no envio via Meta"}), 500
     except Exception as e:
@@ -3129,10 +3775,34 @@ def send_whatsapp_template(lead_id):
         db.close()
 
 
+def _get_dlq_info() -> dict:
+    """Retorna info da Dead Letter Queue (mensagens falhadas para reprocessamento)."""
+    try:
+        from reliability.redis_inbound import _client as _dlq_r
+        r = _dlq_r()
+        if r:
+            depth = r.llen("meumisterio:wa:dlq")
+            return {"key": "meumisterio:wa:dlq", "depth": int(depth)}
+    except Exception:
+        pass
+    return {"key": "meumisterio:wa:dlq", "depth": None}
+
+
 @app.route("/api/integrations/summary", methods=["GET"])
 def integrations_summary():
     """URLs públicas e estado de configuração para o painel Integrações (sem expor segredos)."""
     base = (request.url_root or "").rstrip("/")
+    redis_inbound = {"configured": False, "ready": False, "queue_key": None, "depth": None}
+    if (os.getenv("REDIS_URL") or "").strip():
+        redis_inbound["configured"] = True
+        try:
+            from reliability.redis_inbound import QUEUE_KEY, queue_depth, redis_inbound_ready
+
+            redis_inbound["queue_key"] = QUEUE_KEY
+            redis_inbound["ready"] = redis_inbound_ready()
+            redis_inbound["depth"] = queue_depth()
+        except Exception:
+            pass
     return jsonify({
         "base_url": base,
         "webhooks": [
@@ -3155,6 +3825,8 @@ def integrations_summary():
             "token_configured": bool(WEBAPP_TOKEN),
             "verify_token_configured": bool(VERIFY_TOKEN),
         },
+        "redis_inbound": redis_inbound,
+        "redis_dlq": _get_dlq_info(),
         "docs": {
             "whatsapp_cloud": "https://developers.facebook.com/docs/whatsapp/cloud-api",
             "webhooks_graph": "https://developers.facebook.com/docs/graph-api/webhooks/getting-started",
@@ -3166,6 +3838,85 @@ def integrations_summary():
 # WEBHOOKS (META WHATSAPP)
 # ─────────────────────────────────────────────────────────────────────
 
+@app.route("/webhook/<webhook_path>", methods=["GET", "POST"])
+def webhook_meta_per_tenant(webhook_path: str):
+    """
+    Per-tenant webhook URL — defesa em profundidade (Frente 1).
+
+    Path nao-adivinhavel + verify_token + app_secret = 3 camadas de
+    defesa. Mesma logica do /webhook global, mas resolve binding pelo
+    path antes do payload chegar.
+    """
+    try:
+        from wa_tenant_resolver import resolve_binding_by_webhook_path
+        binding = resolve_binding_by_webhook_path(webhook_path)
+    except Exception as exc:
+        logger.warning("⚠️ [WEBHOOK-PATH] resolver falhou: %s", exc)
+        return "Forbidden", 403
+
+    if binding is None:
+        # Path desconhecido — log defensivo e 403
+        try:
+            from db.database import SessionLocal as _SS
+            from db import models as _models
+            _db = _SS()
+            try:
+                _db.add(_models.WaInboundLog(
+                    tenant_id=None,
+                    phone_number_id=None,
+                    event_type="webhook_path_unknown",
+                    message=f"Path desconhecido: {webhook_path[:80]}",
+                ))
+                _db.commit()
+            finally:
+                _db.close()
+        except Exception:
+            pass
+        return "Forbidden", 403
+
+    # GET: verifica verify_token (ou global)
+    if request.method == "GET":
+        mode = request.args.get("hub.mode")
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
+        if mode == "subscribe":
+            expected_token = binding.get("verify_token") or VERIFY_TOKEN
+            if token == expected_token:
+                logger.info(
+                    "✅ [WEBHOOK-PATH] Token validado tenant=%s phone_id=%s",
+                    binding["tenant_id"], binding["phone_number_id"],
+                )
+                return challenge, 200
+        return "Forbidden", 403
+
+    # POST: HMAC com app_secret per-tenant ou global
+    corpo_raw = request.get_data()
+    secret_to_use = binding.get("app_secret") or APP_SECRET
+    if secret_to_use:
+        assinatura = request.headers.get("X-Hub-Signature-256", "")
+        mac = hmac.new(secret_to_use.encode(), corpo_raw, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(f"sha256={mac}", assinatura):
+            logger.warning("🚫 [WEBHOOK-PATH] HMAC invalido tenant=%s",
+                           binding["tenant_id"])
+            return "Invalid Signature", 403
+
+    data = request.get_json(silent=True)
+    if not data:
+        return "NO_DATA", 400
+
+    enqueued = False
+    try:
+        from reliability.redis_inbound import enqueue_inbound_webhook, redis_inbound_ready
+
+        if redis_inbound_ready():
+            enqueued = enqueue_inbound_webhook(data)
+    except Exception as e:
+        logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
+    if not enqueued:
+        _safe_thread(_triagem_meta, args=(data,), name="triagem-meta")
+    return "EVENT_RECEIVED", 200
+
+
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook_meta():
     """Ponto de entrada oficial para mensagens do WhatsApp."""
@@ -3173,26 +3924,158 @@ def webhook_meta():
         mode = request.args.get("hub.mode")
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
-        if mode == "subscribe" and token == VERIFY_TOKEN:
-            logger.info("✅ [WEBHOOK] Token Meta validado.")
-            return challenge, 200
+        if mode == "subscribe":
+            # Token global (single-tenant) ou per-tenant binding
+            if token == VERIFY_TOKEN:
+                logger.info("✅ [WEBHOOK] Token Meta validado (global).")
+                return challenge, 200
+            try:
+                from wa_tenant_resolver import resolve_tenant_for_verify_token
+                resolved = resolve_tenant_for_verify_token(token)
+                if resolved is not None:
+                    tenant_id, phone_id = resolved
+                    logger.info(
+                        "✅ [WEBHOOK] Token Meta validado (per-tenant) tenant=%s phone_id=%s",
+                        tenant_id, phone_id,
+                    )
+                    return challenge, 200
+            except Exception as exc:
+                logger.warning("⚠️ [WEBHOOK] resolver per-tenant falhou: %s", exc)
         return "Forbidden", 403
 
-    # Verificação HMAC SHA256 (Segurança Magno)
-    if APP_SECRET:
-        corpo_raw = request.get_data()
+    # Verificação HMAC SHA256 — usa app_secret per-tenant se houver binding
+    corpo_raw = request.get_data()
+    data_preview = request.get_json(silent=True) or {}
+    secret_to_use = APP_SECRET
+    try:
+        from wa_tenant_resolver import (
+            extract_phone_number_id_from_payload,
+            get_app_secret_for_phone_id,
+        )
+        pid = extract_phone_number_id_from_payload(data_preview)
+        if pid:
+            per_tenant_secret = get_app_secret_for_phone_id(pid)
+            if per_tenant_secret:
+                secret_to_use = per_tenant_secret
+    except Exception as exc:
+        logger.warning("⚠️ [WEBHOOK] secret per-tenant lookup falhou: %s", exc)
+
+    if secret_to_use:
         assinatura = request.headers.get("X-Hub-Signature-256", "")
-        mac = hmac.new(APP_SECRET.encode(), corpo_raw, hashlib.sha256).hexdigest()
+        mac = hmac.new(secret_to_use.encode(), corpo_raw, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(f"sha256={mac}", assinatura):
             logger.warning("🚫 [SECURITY] Assinatura inválida detectada.")
+            try:
+                _log_wa_inbound(
+                    event_type="hmac_invalid",
+                    phone_number_id=None,
+                    tenant_id=None,
+                    message="Assinatura HMAC nao bate (possivel ataque ou config errada)",
+                )
+            except Exception:
+                pass
             return "Invalid Signature", 403
 
-    data = request.get_json(silent=True)
-    if not data: return "NO_DATA", 400
+    data = data_preview
+    if not data:
+        return "NO_DATA", 400
 
-    # Descarrega para thread de triagem para responder 200 OK imediatamente
-    threading.Thread(target=_triagem_meta, args=(data,), daemon=True).start()
+    # Com REDIS_URL: fila durável (LPUSH) + worker BRPOP → mesma _triagem_meta. Senão: thread in-process.
+    enqueued = False
+    try:
+        from reliability.redis_inbound import enqueue_inbound_webhook, redis_inbound_ready
+
+        if redis_inbound_ready():
+            enqueued = enqueue_inbound_webhook(data)
+    except Exception as e:
+        logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
+    if not enqueued:
+        _safe_thread(_triagem_meta, args=(data,), name="triagem-meta-global")
     return "EVENT_RECEIVED", 200
+
+def _log_wa_inbound(
+    *,
+    event_type: str,
+    phone_number_id: str | None,
+    tenant_id: str | None,
+    message: str | None = None,
+    payload_excerpt: str | None = None,
+) -> None:
+    """Persiste evento no WaInboundLog. Best-effort — falha aqui nao propaga."""
+    try:
+        from db.database import SessionLocal as _SS
+        from db import models as _models
+        _db = _SS()
+        try:
+            _db.add(_models.WaInboundLog(
+                tenant_id=tenant_id,
+                phone_number_id=phone_number_id,
+                event_type=event_type,
+                message=(message or "")[:2000] or None,
+                payload_excerpt=(payload_excerpt or "")[:2000] or None,
+            ))
+            _db.commit()
+        finally:
+            _db.close()
+    except Exception as exc:
+        logger.warning("⚠️ [TRIAGEM] log_wa_inbound falhou: %s", exc)
+
+
+def _process_status_events(value: dict, phone_number_id: str | None) -> None:
+    """
+    Processa value.statuses (delivery receipts da Meta).
+    Cada status tem: {id (wamid), status (sent|delivered|read|failed),
+                      timestamp, recipient_id}.
+
+    Atualiza Mensagem.delivery_status pelo wamid.
+    """
+    statuses = value.get("statuses") or []
+    if not isinstance(statuses, list) or not statuses:
+        return
+
+    from db.database import SessionLocal as _SS
+    from db import models as _models
+    from datetime import datetime as _dt, timezone as _tz
+
+    # Status priority: failed > read > delivered > sent
+    rank = {"sent": 1, "delivered": 2, "read": 3, "failed": 4}
+    db = _SS()
+    updated = 0
+    try:
+        for s in statuses:
+            if not isinstance(s, dict):
+                continue
+            wamid = s.get("id")
+            new_status = (s.get("status") or "").strip().lower()
+            ts = s.get("timestamp")
+            if not wamid or new_status not in rank:
+                continue
+            try:
+                ts_dt = _dt.fromtimestamp(int(ts), tz=_tz.utc) if ts else _dt.now(_tz.utc)
+            except Exception:
+                ts_dt = _dt.now(_tz.utc)
+
+            msg = db.query(_models.Mensagem).filter_by(wamid=wamid).first()
+            if msg is None:
+                continue
+
+            cur = (msg.delivery_status or "").lower()
+            if cur and rank.get(cur, 0) >= rank[new_status]:
+                continue
+            msg.delivery_status = new_status
+            msg.delivery_status_at = ts_dt
+            updated += 1
+        if updated:
+            db.commit()
+            logger.info(
+                "📬 [DELIVERY] %d mensagens atualizadas (phone_id=%s)",
+                updated, phone_number_id or "unknown",
+            )
+    except Exception as exc:
+        logger.warning("⚠️ [DELIVERY] processamento falhou: %s", exc)
+    finally:
+        db.close()
+
 
 def _triagem_meta(data):
     """Extrai informações do JSON da Meta e gerencia Idempotência."""
@@ -3200,24 +4083,121 @@ def _triagem_meta(data):
         entry = data.get("entry", [{}])[0]
         changes = entry.get("changes", [{}])[0]
         value = changes.get("value", {})
-        
+
+        # Delivery receipts (Frente 4 ext): processa antes de checar messages
+        if "statuses" in value:
+            meta_dict_d = value.get("metadata") or {}
+            phone_id_d = meta_dict_d.get("phone_number_id") or ""
+            try:
+                _process_status_events(value, phone_id_d)
+            except Exception as _ds_exc:
+                logger.warning("⚠️ [DELIVERY] falha: %s", _ds_exc)
+
         if "messages" not in value: return
+
+        # Multi-tenant: resolve tenant a partir do phone_number_id antes de tudo
+        meta_dict = value.get("metadata") or {}
+        phone_number_id = meta_dict.get("phone_number_id") or ""
+        try:
+            from wa_tenant_resolver import resolve_tenant_for_phone_id
+            resolved_tenant = resolve_tenant_for_phone_id(phone_number_id)
+        except Exception as _resolve_exc:
+            logger.warning("⚠️ [TRIAGEM] resolver tenant falhou: %s", _resolve_exc)
+            resolved_tenant = None
+
+        # Rate limit per phone_number_id (Frente 1 — anti-flood)
+        if phone_number_id:
+            try:
+                from wa_rate_limiter import allow_inbound
+                if not allow_inbound(phone_number_id):
+                    logger.warning(
+                        "⚠️ [RATE-LIMIT] inbound dropado tenant=%s phone_id=%s",
+                        resolved_tenant, phone_number_id,
+                    )
+                    _log_wa_inbound(
+                        event_type="rate_limited",
+                        phone_number_id=phone_number_id,
+                        tenant_id=resolved_tenant,
+                        message=f"Rate limit excedido para phone_id={phone_number_id}",
+                    )
+                    return
+            except Exception as _rl_exc:
+                logger.warning("⚠️ [RATE-LIMIT] check falhou (fail open): %s", _rl_exc)
+
+        # Telemetria inbound: first_inbound_at / last_inbound_at / inbound_count
+        # Best-effort — falha aqui nao deve interromper o pipeline de mensagem.
+        if phone_number_id:
+            try:
+                from db.database import SessionLocal as _SS
+                from db import models as _models
+                from datetime import datetime as _dt, timezone as _tz
+                _db_t = _SS()
+                try:
+                    _binding = _db_t.query(_models.WaPhoneTenantBinding).filter_by(
+                        phone_number_id=phone_number_id,
+                    ).first()
+                    if _binding is None:
+                        # Phone desconhecido → loga e continua processamento no tenant default
+                        _log_wa_inbound(
+                            event_type="tenant_resolve_miss",
+                            phone_number_id=phone_number_id,
+                            tenant_id=None,
+                            message=f"phone_id={phone_number_id} sem binding — caindo em {resolved_tenant}",
+                        )
+                    if _binding is not None:
+                        _now_t = _dt.now(_tz.utc)
+                        _is_first = _binding.first_inbound_at is None
+                        if _is_first:
+                            _binding.first_inbound_at = _now_t
+                        _binding.last_inbound_at = _now_t
+                        _binding.inbound_count = (_binding.inbound_count or 0) + 1
+                        _db_t.commit()
+                        if _is_first:
+                            logger.info(
+                                "🎉 [WEBHOOK] Primeira mensagem inbound tenant=%s phone_id=%s",
+                                _binding.tenant_id, phone_number_id,
+                            )
+                            try:
+                                _db_t.add(_models.AuditEvent(
+                                    tenant_id=_binding.tenant_id,
+                                    actor_user_id=None,
+                                    event_type="integrations.whatsapp.first_inbound",
+                                    target_type="phone_number_id",
+                                    target_id=phone_number_id,
+                                    payload={"at": _now_t.isoformat()},
+                                ))
+                                _db_t.commit()
+                            except Exception:
+                                _db_t.rollback()
+                finally:
+                    _db_t.close()
+            except Exception as _telemetry_exc:
+                logger.warning("⚠️ [TRIAGEM] telemetria inbound falhou: %s", _telemetry_exc)
 
         msg = value["messages"][0]
         msg_id = msg.get("id")
-        
-        # 🚨 IDEMPOTÊNCIA: Bloqueia reprocessamento da mesma mensagem
+
+        # IDEMPOTÊNCIA (memória + SQLite): Meta pode reentregar o mesmo wamid após restart
         with LOCK_IDEMPOTENCIA:
-            if msg_id in CACHE_MENSAGENS:
-                logger.debug(f"♻️ [TRAVA] Ignorando duplicata: {msg_id}")
+            if msg_id and msg_id in CACHE_MENSAGENS:
+                logger.debug("♻️ [TRAVA] Ignorando duplicata em memória: %s", msg_id)
                 return
-            CACHE_MENSAGENS.append(msg_id)
+        if msg_id and not _try_claim_wamid_db(msg_id):
+            with LOCK_IDEMPOTENCIA:
+                if msg_id not in CACHE_MENSAGENS:
+                    CACHE_MENSAGENS.append(msg_id)
+            logger.info("♻️ [WEBHOOK] Duplicata durável ignorada (wamid já processado): %s", msg_id)
+            return
+        with LOCK_IDEMPOTENCIA:
+            if msg_id:
+                CACHE_MENSAGENS.append(msg_id)
 
         telefone = msg.get("from")
         tipo = msg.get("type")
         texto_recebido = ""
         img_url = ""
         media_url = ""
+        media_id = ""
         nome_perfil_whatsapp = ""
 
         # Nome de perfil enviado pela Meta (quando disponível em contacts[*].profile.name)
@@ -3239,23 +4219,71 @@ def _triagem_meta(data):
         elif tipo == "image":
             media_id = msg.get("image", {}).get("id")
             caption = msg.get("image", {}).get("caption", "")
-            logger.info(f"🖼️ [MÍDIA] Imagem de {telefone}. Media ID: {media_id}")
-            fp, _ = _baixar_midia(media_id)
-            if fp:
-                # Mesmo host do dashboard + absoluto via PUBLIC_URL no motor
-                bn = os.path.basename(fp)
-                img_url = f"/media/{bn}"
-                media_url = img_url
+            logger.info("🖼️ [MÍDIA] Imagem de %s (deferred→worker). Media ID: %s", telefone, media_id)
+            # NÃO baixa aqui — defer para o InboxManager worker (Fix B: anti head-of-line blocking)
             texto_recebido = caption
+            # Flags para o media_resolver processar no worker
+            # _media_pending = True sinaliza que o download deve ser feito no worker
 
         elif tipo == "audio":
             media_id = msg.get("audio", {}).get("id")
             mime = msg.get("audio", {}).get("mime_type", "audio/ogg")
-            logger.info(f"🎙️ [MÍDIA] Áudio de {telefone}. Transcrevendo...")
-            fp, mime_real = _baixar_midia(media_id)
-            if fp:
-                media_url = f"/media/{os.path.basename(fp)}"
-                texto_recebido = _transcrever_audio(fp, mime_real or mime)
+            logger.info("🎙️ [MÍDIA] Áudio de %s (deferred→worker). Media ID: %s", telefone, media_id)
+            # NÃO baixa nem transcreve aqui — defer para o InboxManager worker
+
+        # LGPD opt-out detection (Frente 8.17): se lead pediu STOP, marca opt-out
+        # automaticamente (sem entrar na fila do bot, evitando resposta automática).
+        if tipo == "text" and texto_recebido:
+            try:
+                from api.saas.privacy import detect_opt_out
+                if detect_opt_out(texto_recebido):
+                    from db.database import SessionLocal
+                    from db import models as _models
+                    from datetime import datetime as _dt, timezone as _tz
+                    from tenant_context import get_request_tenant_id
+                    _db = SessionLocal()
+                    try:
+                        # Multi-tenant: prefere o tenant resolvido do phone_number_id
+                        if resolved_tenant:
+                            _tid = resolved_tenant
+                        else:
+                            try:
+                                _tid = get_request_tenant_id()
+                            except Exception:
+                                _tid = "default"
+                        lead = _db.query(_models.Lead).filter_by(
+                            tenant_id=_tid, telefone=telefone,
+                        ).first()
+                        if lead:
+                            tags = list(lead.tags or [])
+                            if "opted_out" not in tags:
+                                tags.append("opted_out")
+                            lead.tags = tags
+                            meta = dict(lead.metadata_json or {})
+                            meta["opted_out"] = True
+                            meta["opted_out_at"] = _dt.now(_tz.utc).isoformat()
+                            meta["opted_out_reason"] = "auto_detected_keyword"
+                            lead.metadata_json = meta
+                            _db.commit()
+                            logger.warning(
+                                "[privacy.opt_out.auto] tenant=%s telefone=%s keyword detected",
+                                _tid, telefone,
+                            )
+                            return  # NÃO entra na fila — não responde automaticamente
+                    finally:
+                        _db.close()
+            except Exception as exc:
+                logger.warning("[privacy.opt_out.detect] falha (fail open): %s", exc)
+
+            # ── INTERCEPTAÇÃO DE COMANDOS BOT (.cartadodia, .convocar) ──
+            if texto_recebido.startswith("."):
+                try:
+                    from api.saas.bot_commands import intercept_bot_command
+                    # Se for um comando conhecido, ele já envia a resposta e retorna True.
+                    if intercept_bot_command(texto_recebido, telefone, resolved_tenant, phone_number_id, value):
+                        return  # Interceptado! Não precisa ir para o motor de IA (InboxManager).
+                except Exception as exc:
+                    logger.warning("[bot_commands.intercept] falhou: %s", exc)
 
         # Envia para a Fila do Lead via Manager
         payload = {
@@ -3264,12 +4292,95 @@ def _triagem_meta(data):
             "tipo_mensagem": tipo,
             "imagem_url": img_url,
             "media_url": media_url,
+            "meta_msg_id": msg_id,
+            "meta_media_id": media_id,
             "nome_perfil_whatsapp": nome_perfil_whatsapp,
+            "phone_number_id": phone_number_id,
+            "tenant_id": resolved_tenant,
         }
+        # Fix B: sinalizar mídia pendente para resolução no worker (anti head-of-line blocking)
+        if tipo in ("image", "audio") and media_id:
+            payload["_media_pending"] = True
+            if tipo == "image":
+                payload["_media_caption"] = msg.get("image", {}).get("caption", "")
+            elif tipo == "audio":
+                payload["_media_mime"] = msg.get("audio", {}).get("mime_type", "audio/ogg")
         inbox_manager.enqueue(telefone, payload)
+
+        # ── SSE: notificar browsers em real-time ──
+        try:
+            from api.saas.realtime_hooks import notify_message_created
+            _sse_tid = resolved_tenant or "default"
+            # Resolver lead_id pelo telefone para o evento SSE
+            from db.database import SessionLocal as _SL
+            from db import models as _mdl
+            _dbs = _SL()
+            try:
+                _lead = _dbs.query(_mdl.Lead).filter_by(
+                    tenant_id=_sse_tid, telefone=telefone
+                ).first()
+                if _lead:
+                    notify_message_created(
+                        _sse_tid, _lead.id, None,
+                        texto_recebido[:120] if texto_recebido else "(mídia)",
+                        "lead",
+                    )
+            finally:
+                _dbs.close()
+        except Exception:
+            pass  # SSE é best-effort, nunca bloqueia o fluxo
 
     except Exception as e:
         logger.error(f"🚨 [TRIAGEM] Erro crítico na extração: {e}", exc_info=True)
+        # DLQ: salvar payload para reprocessamento posterior
+        try:
+            import json as _json_dlq
+            from reliability.redis_inbound import _client as _dlq_redis
+            r = _dlq_redis()
+            if r:
+                dlq_entry = _json_dlq.dumps({
+                    "payload": data,
+                    "error": str(e)[:500],
+                    "ts": time.time(),
+                }, ensure_ascii=False)
+                r.lpush("meumisterio:wa:dlq", dlq_entry)
+                logger.info("📮 [DLQ] Payload salvo para reprocessamento (%d bytes)", len(dlq_entry))
+        except Exception:
+            pass
+        try:
+            # Tenta extrair phone_id do payload pra contextualizar o erro
+            _pid = ""
+            _tid = None
+            try:
+                from wa_tenant_resolver import (
+                    extract_phone_number_id_from_payload,
+                    resolve_tenant_for_phone_id,
+                )
+                _pid = extract_phone_number_id_from_payload(data) or ""
+                _tid = resolve_tenant_for_phone_id(_pid) if _pid else None
+            except Exception:
+                pass
+            _log_wa_inbound(
+                event_type="error",
+                phone_number_id=_pid or None,
+                tenant_id=_tid,
+                message=str(e)[:500],
+                payload_excerpt=str(data)[:1000] if data else None,
+            )
+        except Exception:
+            pass
+
+
+def _bootstrap_redis_inbound_consumer():
+    try:
+        from reliability.redis_inbound import start_consumer_if_configured
+
+        start_consumer_if_configured(_triagem_meta)
+    except Exception as e:
+        logger.warning("⚠️ [REDIS] Worker inbound não iniciado: %s", e)
+
+
+_bootstrap_redis_inbound_consumer()
 
 # ─────────────────────────────────────────────────────────────────────
 # WEBHOOK (CAKTO) - GESTÃO DE VENDAS
@@ -3325,6 +4436,7 @@ def webhook_cakto():
     if not lead:
         lead = db.query(models.Lead).filter_by(telefone=f"+55{telefone}", tenant_id=_tid).first()
 
+    node_para_gate = None
     if lead:
         pedido_ref = (
             str(data.get("id") or "")
@@ -3355,135 +4467,91 @@ def webhook_cakto():
             lead.convertido = True
             if produto:
                 lead.produto_comprado = produto[:200]
+        node_para_gate = str(lead.node_atual or "")
         db.commit()
     db.close()
 
     # ── CENÁRIO A: Venda Aprovada ──────────
     if status in ["paid", "approved", "completed"]:
-        logger.info(f"💰 [CAKTO] Venda Aprovada para {telefone}. Iniciando Entrega.")
+        logger.info(f"💰 [CAKTO] Venda aprovada para {telefone}.")
         _emit_meta_event("Purchase", telefone, value=float((data.get("order") or {}).get("amount") or 0.0))
-        threading.Thread(target=motor.iniciar_fluxo_post_venda, args=(telefone,)).start()
+        
+        # Emissão Automática de Nota Fiscal
+        try:
+            from api.saas.fiscal import emitir_nota_automatica_webhook
+            _nome_cliente = (data.get("customer") or {}).get("name") or (data.get("data") or {}).get("customer", {}).get("name") or "Cliente não identificado"
+            _cpf_cliente = (data.get("customer") or {}).get("cpf") or (data.get("data") or {}).get("customer", {}).get("cpf") or (data.get("customer") or {}).get("document") or "00000000000"
+            _amount_nf = float((data.get("order") or {}).get("amount") or (data.get("data") or {}).get("amount") or data.get("amount") or 0.0)
+            _produto_nf = str((data.get("order") or {}).get("product_name") or (data.get("data") or {}).get("product_name") or "Serviço Prestado")
+            if lead and _tid and _amount_nf > 0:
+                _safe_thread(
+                    emitir_nota_automatica_webhook, 
+                    args=(_tid, lead.id, _amount_nf, _cpf_cliente, _nome_cliente, _produto_nf),
+                    name=f"nf-{telefone[-4:]}"
+                )
+                logger.info(f"🧾 [CAKTO] Emissão de NF agendada para {telefone}.")
+        except Exception as e:
+            logger.error(f"Erro ao tentar disparar emissão de NF: {e}")
+
+        _cakto = CONFIG_CLIENTE.get("cakto") or {}
+        if cakto_webhook_deve_iniciar_pos_venda(node_para_gate, _cakto):
+            logger.info("💰 [CAKTO] Disparando pós-venda (motor) para %s node_atual=%s", telefone, node_para_gate)
+            _safe_thread(motor.iniciar_fluxo_post_venda, args=(telefone,), name=f"pos-venda-{telefone[-4:]}")
+        else:
+            logger.info(
+                "event=cakto_pos_venda_motor_skipped telefone=%s node_atual=%s "
+                "webhook_dispara_pos_venda_ia=%s webhook_dispara_pos_venda_funil_estatico=%s",
+                telefone,
+                node_para_gate,
+                _cakto.get("webhook_dispara_pos_venda_ia"),
+                _cakto.get("webhook_dispara_pos_venda_funil_estatico"),
+            )
 
     # ── CENÁRIO B: Abandono de Checkout ──────────
     elif status in ["abandoned", "checkout_abandoned"]:
         logger.info(f"🚪 [CAKTO] Abandono detectado: {telefone}. Recuperação pendente.")
         _emit_meta_event("InitiateCheckout", telefone, value=float((data.get("order") or {}).get("amount") or 0.0))
         # O motor de recuperação assumirá o lead no próximo ciclo
-        threading.Thread(target=motor.iniciar_fluxo_recuperacao_abandono, args=(telefone, "abandonou")).start()
+        _safe_thread(motor.iniciar_fluxo_recuperacao_abandono, args=(telefone, "abandonou"), name=f"recovery-{telefone[-4:]}")
 
     return "OK", 200
 
 # ─────────────────────────────────────────────────────────────────────
-# UTILITÁRIOS: DOWNLOAD, STT E MANUTENÇÃO
+# UTILITÁRIOS: DOWNLOAD, STT E MANUTENÇÃO (extraídos → webhooks/media.py)
 # ─────────────────────────────────────────────────────────────────────
 
-def _is_simulator_graph_media_id(media_id) -> bool:
-    """True para IDs do `simulador_fantasmas.py` — não existem na Graph API."""
-    if media_id is None:
-        return False
-    s = str(media_id).strip()
-    return s in ("ID_IMAGEM_TESTE", "ID_AUDIO_TESTE") or (
-        s.startswith("ID_") and "TESTE" in s.upper()
-    )
-
-
-def _baixar_midia(media_id):
-    """Descarrega mídia da Meta via Graph API."""
-    try:
-        if _is_simulator_graph_media_id(media_id):
-            logger.info(
-                "🧪 [DOWNLOAD] Ignorado (media_id de simulador local, sem objeto na Meta): %s",
-                media_id,
-            )
-            return None, None
-        headers = {"Authorization": f"Bearer {WEBAPP_TOKEN}"}
-        # 1. Obtém URL temporária de download
-        r1 = requests.get(f"https://graph.facebook.com/v19.0/{media_id}", headers=headers, timeout=12)
-        if r1.status_code != 200: 
-            logger.error(f"❌ [DOWNLOAD] Erro Meta URL: {r1.text}")
-            return None, None
-            
-        url = r1.json().get("url")
-        mime = r1.json().get("mime_type", "")
-        
-        # 2. Descarrega o conteúdo binário real
-        r2 = requests.get(url, headers=headers, timeout=30)
-        if r2.status_code != 200: return None, None
-        
-        # Define extensão baseada no MIME
-        ext = mime.split("/")[-1].split(";")[0] or "bin"
-        filename = f"{media_id}.{ext}"
-        filepath = os.path.join(DOWNLOAD_DIR, filename)
-        
-        with open(filepath, "wb") as f:
-            f.write(r2.content)
-            
-        return filepath, mime
-    except Exception as e:
-        logger.error(f"❌ [DOWNLOAD] Falha fatal: {e}")
-        return None, None
-
-def _transcrever_audio(filepath, mime):
-    """Usa o Gemini Pro como motor de Speech-to-Text de alta precisão."""
-    if not os.path.exists(filepath): return "[Áudio ausente]"
-    try:
-        with open(filepath, "rb") as f:
-            audio_b64 = base64.b64encode(f.read()).decode("utf-8")
-        
-        # Endpoint de geração de conteúdo do Gemini (Flash ou Pro)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{STT_MODEL}:generateContent?key={GEMINI_API_KEY}"
-        
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"inline_data": {"mime_type": mime.split(";")[0], "data": audio_b64}},
-                    {"text": "Transcreva o áudio literalmente em português, sem adicionar comentários ou introduções."}
-                ]
-            }],
-            "generationConfig": {
-                "temperature": 0.0, # Zero para máxima fidelidade
-                "max_output_tokens": 1024
-            }
-        }
-        
-        resp = requests.post(url, json=payload, timeout=40)
-        if resp.status_code == 200:
-            res_json = resp.json()
-            text = res_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-            return text.strip() or "[Áudio inaudível]"
-            
-        logger.error(f"❌ [STT] Erro Gemini API: {resp.text}")
-        return "[Áudio recebido]"
-    except Exception as e:
-        logger.error(f"❌ [STT] Erro na transcrição: {e}")
-        return "[Falha no processamento de voz]"
-
-def _limpeza_automatica():
-    """Tarefa de background para manter o disco limpo de mídias temporárias."""
-    while True:
-        try:
-            # Limite de 2 horas para mídias (tempo suficiente para a IA processar e o dashboard exibir)
-            limite = time.time() - 7200 
-            for f in glob.glob(os.path.join(DOWNLOAD_DIR, "*")):
-                if os.path.getmtime(f) < limite:
-                    os.remove(f)
-            logger.debug("🧹 [CLEANUP] Ciclo de limpeza concluído.")
-        except Exception: pass
-        # Executa a limpeza a cada 1 hora
-        time.sleep(3600)
+from webhooks.media import (
+    is_simulator_media_id as _is_simulator_graph_media_id,
+    baixar_midia as _baixar_midia,
+    transcrever_audio as _transcrever_audio,
+)
 
 # ─────────────────────────────────────────────────────────────────────
 # BOOT DO SERVIDOR (PRODUCTION READY)
 # ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Inicia tarefa de limpeza de mídias em thread separada
-    threading.Thread(target=_limpeza_automatica, daemon=True, name="CleanupThread").start()
+    # Nota: limpeza de mídia movida para cron_jobs.hourly_cleanup_media()
+    # (executa em Gunicorn via cron; antes só rodava em __main__)
 
     logger.info(
-        "🚀 [SYSTEM] AcassIA v8.7 — plataforma de funil (ex.: fluxo Cigana Esmeralda no motor de nós)."
+        "🚀 [SYSTEM] Meu Mistério v8.7 — plataforma de funil (ex.: fluxo Meu Mistério Esmeralda no motor de nós)."
     )
-    logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
-    
-    # Execução com suporte a multithreading nativo do Flask para melhor performance
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+
+    use_waitress = os.environ.get("USE_WAITRESS", "1").strip() in ("1", "true", "yes")
+
+    if use_waitress:
+        try:
+            from waitress import serve
+            _threads = int(os.environ.get("WAITRESS_THREADS", "8"))
+            logger.info("🏭 [SERVER] Waitress production server — %d threads — port 5000", _threads)
+            logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
+            serve(app, host="0.0.0.0", port=5000, threads=_threads,
+                  channel_timeout=120, recv_bytes=65536,
+                  url_scheme="https" if os.getenv("FORCE_HTTPS") else "http")
+        except ImportError:
+            logger.warning("⚠️ Waitress não instalado, caindo pro Flask dev server")
+            app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+    else:
+        logger.info("🔗 [DASHBOARD] Acesse em: http://localhost:5000/dashboard")
+        app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

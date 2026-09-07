@@ -1,5 +1,5 @@
 """
-Runtime avançado do Flow Builder AcassIA.
+Runtime avançado do Flow Builder Meu Mistério.
 
 - Catálogo de blocos (schema por tipo)
 - Validação estrutural + por config
@@ -29,12 +29,16 @@ ALLOWED_NODE_TYPES = frozenset(
         "condicao",
         "expediente",
         "notificar",
+        "notificar_atendente",
         "divisao",
         "api",
         "gpt",
         "agente_ia",
         "voice_studio",
         "anotacao",
+        "ab_split",
+        "integration",
+        "menu",
         "generic",
         "end",
     }
@@ -47,7 +51,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Gatilho",
         "runtime": "entry",
         "required_config": [],
-        "optional_keys": ("event", "integration", "keyword", "step_name"),
+        "optional_keys": ("event", "integration", "api_type", "keyword", "step_name"),
     },
     "webhook": {
         "label": "Webhook",
@@ -94,19 +98,44 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Pergunta",
         "runtime": "message",
         "required_config": (),
-        "optional_keys": ("body", "question", "reply_mode"),
+        "optional_keys": (
+            "body",
+            "question",
+            "reply_mode",
+            "save_to_flow_field",
+            "question_timeout_seconds",
+        ),
     },
     "acao": {
         "label": "Ação",
         "runtime": "action",
         "required_config": (),
-        "optional_keys": ("step_name", "action_kind", "payload", "body"),
+        "optional_keys": (
+            "step_name",
+            "action_kind",
+            "payload",
+            "body",
+            "acao_etiqueta_catalog",
+            "acao_stack",
+            "actions",
+        ),
     },
     "delay": {
         "label": "Delay",
         "runtime": "delay",
         "required_config": (),
-        "optional_keys": ("seconds", "body"),
+        "optional_keys": (
+            "seconds",
+            "body",
+            "step_name",
+            "delay_mode",
+            "delay_amount",
+            "delay_unit",
+            "delay_smart_min",
+            "delay_smart_max",
+            "send_status_typing",
+            "send_status_recording",
+        ),
     },
     "condicao": {
         "label": "Condição",
@@ -118,7 +147,7 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Expediente",
         "runtime": "schedule",
         "required_config": (),
-        "optional_keys": ("timezone", "windows"),
+        "optional_keys": ("timezone", "windows", "days", "scheduleNext"),
     },
     "notificar": {
         "label": "Notificar",
@@ -126,11 +155,35 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "required_config": (),
         "optional_keys": ("channel", "message"),
     },
+    "notificar_atendente": {
+        "label": "Notificar Atendente",
+        "runtime": "notify",
+        "required_config": (),
+        "optional_keys": ("channel", "message"),
+    },
+    "integration": {
+        "label": "Integração",
+        "runtime": "integration",
+        "required_config": (),
+        "optional_keys": ("service", "action", "credential_id", "save_as", "payload"),
+    },
+    "menu": {
+        "label": "Menu",
+        "runtime": "message",
+        "required_config": (),
+        "optional_keys": ("body", "message", "options", "save_to_flow_field"),
+    },
     "divisao": {
         "label": "Divisão A/B",
         "runtime": "split",
         "required_config": (),
         "optional_keys": ("weights",),
+    },
+    "ab_split": {
+        "label": "Teste A/B",
+        "runtime": "split",
+        "required_config": (),
+        "optional_keys": ("weight_a", "weight_b"),
     },
     "api": {
         "label": "API HTTP",
@@ -143,6 +196,8 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
             "body",
             "query_string",
             "step_name",
+            "save_as",
+            "output_var",
             "api_method",
             "api_url",
             "api_headers",
@@ -169,13 +224,29 @@ NODE_SPECS: Dict[str, Dict[str, Any]] = {
         "label": "Agente IA",
         "runtime": "llm",
         "required_config": (),
-        "optional_keys": ("instructions", "model", "temperature"),
+        "optional_keys": ("instructions", "context_prompt", "control_mode", "model", "temperature"),
     },
     "voice_studio": {
         "label": "Voice",
         "runtime": "tts",
         "required_config": (),
-        "optional_keys": ("script", "voice_profile"),
+        "optional_keys": (
+            "script",
+            "voice_profile",
+            "voice_stability",
+            "voice_similarity",
+            "voice_accent",
+            "voice_speed",
+            "send_as_voice_note",
+            "cloned_voice_id",
+            "audio_model",
+            "voice_id",
+            "stability",
+            "similarity",
+            "style",
+            "speed",
+            "send_as_voice",
+        ),
     },
     "anotacao": {
         "label": "Anotação",
@@ -264,7 +335,21 @@ def _normalize_graph_payload(graph: Any) -> Dict[str, List[Dict[str, Any]]]:
             eid = _safe_text(e.get("id"), 80)
             src = _safe_text(e.get("from"), 120)
             dst = _safe_text(e.get("to"), 120)
-            out_edges.append({"id": eid or None, "from": src, "to": dst})
+            edge = {
+                "id": eid or None,
+                "from": src,
+                "to": dst,
+            }
+            source_handle = _safe_text(e.get("sourceHandle"), 80)
+            target_handle = _safe_text(e.get("targetHandle"), 80)
+            label = _safe_text(e.get("label"), 160)
+            if source_handle:
+                edge["sourceHandle"] = source_handle
+            if target_handle:
+                edge["targetHandle"] = target_handle
+            if label:
+                edge["label"] = label
+            out_edges.append(edge)
     return {"nodes": out_nodes, "edges": out_edges}
 
 
@@ -521,14 +606,14 @@ def simulate_flow(doc: Mapping[str, Any], *, max_steps: int = 40) -> Dict[str, A
     }
 
 
-def validate_flow_document(doc: Mapping[str, Any]) -> Dict[str, Any]:
+def validate_flow_document(doc: Mapping[str, Any], *, strict: bool = False) -> Dict[str, Any]:
     issues: List[ValidationIssue] = []
     title = _safe_text(doc.get("title"), 200)
     if not title:
         issues.append(ValidationIssue("error", "missing_title", "Título do fluxo é obrigatório."))
 
-    if doc.get("format") != "acassia-flow":
-        issues.append(ValidationIssue("error", "invalid_format", "Formato inválido; esperado 'acassia-flow'."))
+    if doc.get("format") != "meumisterio-flow":
+        issues.append(ValidationIssue("error", "invalid_format", "Formato inválido; esperado 'meumisterio-flow'."))
     try:
         ver = int(doc.get("version") or 0)
     except (TypeError, ValueError):
@@ -575,7 +660,11 @@ def validate_flow_document(doc: Mapping[str, Any]) -> Dict[str, Any]:
 
     if trigger_count == 0:
         issues.append(
-            ValidationIssue("warning", "missing_trigger", "Fluxo sem nó de gatilho (trigger/webhook).")
+            ValidationIssue(
+                "error" if strict else "warning",
+                "missing_trigger",
+                "Fluxo sem nó de gatilho (trigger/webhook).",
+            )
         )
     elif trigger_count > 1:
         issues.append(
@@ -591,6 +680,101 @@ def validate_flow_document(doc: Mapping[str, Any]) -> Dict[str, Any]:
                     f"Conexão inválida: {e['from']} -> {e['to']}.",
                 )
             )
+
+    node_by_id = {str(n.get("id") or ""): n for n in nodes if str(n.get("id") or "")}
+    outgoing: Dict[str, List[Dict[str, Any]]] = {nid: [] for nid in ids}
+    adjacency: Dict[str, List[str]] = {nid: [] for nid in ids}
+    for edge in edges:
+        source = str(edge.get("from") or "")
+        target = str(edge.get("to") or "")
+        if source in ids and target in ids:
+            outgoing[source].append(edge)
+            adjacency[source].append(target)
+
+    trigger_ids = [
+        nid
+        for nid, node in node_by_id.items()
+        if str(node.get("type") or "").lower() in ("trigger", "webhook")
+    ]
+    reachable: Set[str] = set()
+    pending = deque(trigger_ids)
+    while pending:
+        node_id = pending.popleft()
+        if node_id in reachable:
+            continue
+        reachable.add(node_id)
+        pending.extend(adjacency.get(node_id, []))
+    disconnected = ids - reachable if trigger_ids else set()
+    if disconnected:
+        issues.append(
+            ValidationIssue(
+                "error" if strict else "warning",
+                "nodes_disconnected_from_trigger",
+                "Blocos fora do caminho do gatilho: "
+                + ", ".join(sorted(disconnected)[:8])
+                + ("…" if len(disconnected) > 8 else ""),
+            )
+        )
+
+    def _handles(node_id: str) -> Set[str]:
+        return {
+            str(edge.get("sourceHandle") or "").strip().lower()
+            for edge in outgoing.get(node_id, [])
+            if str(edge.get("sourceHandle") or "").strip()
+        }
+
+    def _require_handles(node_id: str, node_type: str, required: Set[str]) -> None:
+        missing = required - _handles(node_id)
+        if missing:
+            issues.append(
+                ValidationIssue(
+                    "error" if strict else "warning",
+                    "missing_branch_connection",
+                    f"Nó '{node_id}' ({node_type}) sem conexão para: {', '.join(sorted(missing))}.",
+                )
+            )
+
+    for node_id, node in node_by_id.items():
+        node_type = str(node.get("type") or "generic").lower()
+        cfg = node.get("config") if isinstance(node.get("config"), dict) else {}
+        if node_type == "condicao":
+            _require_handles(node_id, node_type, {"true", "false"})
+        elif node_type == "pergunta":
+            _require_handles(node_id, node_type, {"resposta", "timeout"})
+        elif node_type == "expediente":
+            _require_handles(node_id, node_type, {"sucesso", "erro"})
+        elif node_type in ("gpt", "voice_studio", "api", "integration"):
+            _require_handles(node_id, node_type, {"sucesso", "erro"})
+        elif node_type == "agente_ia":
+            node_handles = _handles(node_id)
+            if "erro" not in node_handles or not ({"avancar", "sucesso"} & node_handles):
+                issues.append(
+                    ValidationIssue(
+                        "error" if strict else "warning",
+                        "missing_branch_connection",
+                        f"Nó '{node_id}' (agente_ia) precisa das saídas avançar e erro.",
+                    )
+                )
+        elif node_type in ("ab_split", "divisao"):
+            raw_weights = cfg.get("weights")
+            branch_count = len(raw_weights) if isinstance(raw_weights, list) and len(raw_weights) >= 2 else 2
+            _require_handles(
+                node_id,
+                node_type,
+                {chr(ord("a") + index) for index in range(min(branch_count, 10))},
+            )
+        elif node_type == "menu":
+            options = cfg.get("options") if isinstance(cfg.get("options"), list) else []
+            if not options:
+                issues.append(
+                    ValidationIssue(
+                        "error" if strict else "warning",
+                        "menu_without_options",
+                        f"Nó '{node_id}' (menu) sem opções.",
+                    )
+                )
+            else:
+                _require_handles(node_id, node_type, {f"opt_{index}" for index in range(len(options))})
 
     if nodes and not edges:
         issues.append(
@@ -628,7 +812,7 @@ def validate_flow_document(doc: Mapping[str, Any]) -> Dict[str, Any]:
         )
 
     normalized = {
-        "format": "acassia-flow",
+        "format": "meumisterio-flow",
         "version": 1,
         "title": title,
         "graph": {"nodes": norm_nodes, "edges": [e for e in edges_raw if e.get("from") and e.get("to")]},

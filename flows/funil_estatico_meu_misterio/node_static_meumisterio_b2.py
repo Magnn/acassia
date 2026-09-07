@@ -17,6 +17,15 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
     cfg = R.cfg(ctx)
 
     if (meta.get(R.META_B2_PHASE) or "").strip() == "awaiting_nome_amado":
+        if not bool(meta.get("static_mm_b2_entregue")):
+            if R.lead_respondeu_texto_ou_midia(ctx) and R.dispatch_em_andamento_recente(meta, "static_mm_b2"):
+                nome = (ctx.texto_recebido or "").strip()
+                if nome:
+                    meta[R.META_NOME_AMADO] = nome[:200]
+                logger.info("event=static_mm_b2_reply_durante_dispatch lead=%s", getattr(ctx, "lead_id", "?"))
+                return [], "static_meumisterio_b3"
+            meta[R.META_B2_PHASE] = "awaiting_nome_amado"
+            return R.montar_acoes_bloco2(cfg), "static_meumisterio_b2"
         if not R.lead_respondeu_texto_ou_midia(ctx):
             return [], "static_meumisterio_b2"
         nome = (ctx.texto_recebido or "").strip()

@@ -1,12 +1,30 @@
 """
 Heurísticas de copy personalizada (sem LLM extra): perfil de tom, nome do trabalho espiritual,
 entregáveis da oferta para injeção em prompts dos nodes 6–8.
+
+Integração DARE: re-exporta funções do dare_copy_engine para uso nos nodes existentes
+sem quebrar importações já existentes.
 """
 
 from __future__ import annotations
 
 import re
 from typing import Any, Dict, Mapping, Optional
+
+# Re-exporta o framework DARE para nodes que já importam deste módulo
+from analytics.dare_copy_engine import (  # noqa: F401
+    classificar_desejo_tipo,
+    contexto_dare_para_prompt,
+    calcular_intensidade_ressonancia,
+    hook_abertura_para_prompt,
+    instrucao_diagnostico_para_prompt,
+    revelacao_padrao_para_prompt,
+    ressonancia_para_prompt,
+    oferta_dare_para_prompt,
+    medo_oculto,
+    sonho_declarado,
+    nome_padrao_invisivel,
+)
 
 _DEFAULT_MECANISMO = "Trabalho de Firmação e Resgate nas Linhas"
 
@@ -32,6 +50,16 @@ def perfil_copy_para_prompt(meta: Mapping[str, Any], msg_lead: str) -> str:
     arq = str(meta.get("arquetipo_lead") or "").strip()
     if arq and arq.lower() not in ("o ferido", "ferido"):
         partes.append(f"Arquétipo percebido: {arq}.")
+
+    cet = str(meta.get("ceticismo_lead") or "").strip().lower()
+    if cet == "alto":
+        partes.append("Ceticismo alto: ancore em prova social concreta, evite linguagem mística abstrata.")
+    elif cet == "baixo":
+        partes.append("Ceticismo baixo: pode usar linguagem simbólica e espiritual com mais profundidade.")
+
+    sof = str(meta.get("sofisticacao_lead") or "").strip()
+    if sof in ("2", "3"):
+        partes.append("Sofisticação elevada: lead conhece o mercado — evite clichês, seja preciso e direto.")
 
     return " ".join(partes) if partes else "Tom padrão: acolhimento firme, sem telemarketing."
 

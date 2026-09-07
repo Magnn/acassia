@@ -5,7 +5,7 @@ Validador de segurança e qualidade otimizado para evitar cortes de texto.
 
 🔥 UPGRADES DE ELITE (v2.4):
   1. EXPANSÃO DE LIMITE (Fix image_da1d7f): Aumento do limite de 350 para 
-     500 caracteres, permitindo que a Cigana seja mais eloquente sem ser podada.
+     500 caracteres, permitindo que o Meu Mistério seja mais eloquente sem ser podada.
   2. SENTENCE INTEGRITY: Instrução reforçada para NUNCA cortar palavras ou 
      deixar frases pendentes durante a correção de tom ou tamanho.
   3. BALAO LOGIC: Preferência por quebrar em blocos [BALAO] em vez de resumir 
@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Union, List, Dict, Any
 from google import genai
 from config_cliente import CONFIG_CLIENTE
@@ -25,7 +26,7 @@ from schema import Acao
 logger = logging.getLogger(__name__)
 
 # Persona fixa e Leis de Validação
-SYSTEM_PROMPT = """Você é o Guardião da Qualidade da Cigana Esmeralda.
+SYSTEM_PROMPT = """Você é o Guardião da Qualidade do Meu Mistério Esmeralda.
 Sua missão é garantir que a resposta seja mística, segura e perfeitamente formatada para o WhatsApp.
 
 REGRAS DE OURO PARA CORREÇÃO:
@@ -61,7 +62,7 @@ class ResponseValidator:
             logger.error("🚨 ERRO: GEMINI_API_KEY ausente.")
             return None
         try:
-            client = genai.Client(api_key=self.api_key)
+            client = genai.Client(api_key=self.api_key, http_options={"timeout": 90})
             logger.info(f"🛡️ Validador Sovereign Ativo: {self.model_name}")
             return client
         except Exception as e:
@@ -106,27 +107,37 @@ class ResponseValidator:
                 f"Resposta a validar:\n{texto_para_validar}"
             )
 
-            # Validação com temperatura baixa para precisão
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt_completo,
-                config={"temperature": 0.1, "response_mime_type": "application/json"}
-            )
-            
-            data = json.loads(self._limpar_saida_ia(response.text))
-            aprovada = data.get("aprovada", True)
-            resposta_corrigida = data.get("resposta_corrigida", texto_para_validar)
+            for tentativa in range(3):
+                try:
+                    # Validação com temperatura baixa para precisão
+                    response = self.client.models.generate_content(
+                        model=self.model_name,
+                        contents=prompt_completo,
+                        config={"temperature": 0.1, "response_mime_type": "application/json"}
+                    )
+                    
+                    data = json.loads(self._limpar_saida_ia(response.text))
+                    aprovada = data.get("aprovada", True)
+                    resposta_corrigida = data.get("resposta_corrigida", texto_para_validar)
 
-            if not aprovada:
-                logger.warning("🚫 [VALIDATOR] Resposta insegura rejeitada.")
-                return "🙏 A visão das suas linhas está confusa agora... me dê um instante."
+                    if not aprovada:
+                        logger.warning("🚫 [VALIDATOR] Resposta insegura rejeitada.")
+                        return "🙏 A visão das suas linhas está confusa agora... me dê um instante."
 
-            # Se a resposta foi corrigida (ex: pontuação adicionada ou quebra de balão)
-            if resposta_corrigida != texto_para_validar:
-                logger.info("✏️ [VALIDATOR] Resposta ajustada para integridade total.")
-                return [Acao(tipo="text", conteudo=balao) for balao in self._quebrar_em_baloes(resposta_corrigida)]
-            
-            return resposta
+                    # Se a resposta foi corrigida (ex: pontuação adicionada ou quebra de balão)
+                    if resposta_corrigida != texto_para_validar:
+                        logger.info("✏️ [VALIDATOR] Resposta ajustada para integridade total.")
+                        return [Acao(tipo="text", conteudo=balao) for balao in self._quebrar_em_baloes(resposta_corrigida)]
+                    
+                    return resposta
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if "timeout" in err_str or "ssl" in err_str or "handshake" in err_str or "503" in err_str:
+                        if tentativa < 2:
+                            logger.warning(f"⚠️ [VALIDATOR] Timeout/SSL Gemini (tentativa {tentativa+1}/3). Retentando sem recriar cliente...")
+                            time.sleep(1.5)
+                            continue
+                    raise e
 
         except Exception as e:
             logger.error(f"🚨 [VALIDATOR] Erro inesperado: {e}")

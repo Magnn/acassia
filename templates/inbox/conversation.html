@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.nome or lead.telefone }} — Inbox{% endblock %}
+{% block main_class %}max-w-3xl mx-auto py-8 px-6{% endblock %}
+{% block content %}
+
+<div class="mb-4">
+  <a href="{{ url_for('saas_inbox.list_view') }}" class="text-sm text-slate-400 hover:text-slate-200">← Voltar</a>
+</div>
+
+<div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-4 mb-4">
+  <div class="flex justify-between items-start gap-4">
+    <div>
+      <h1 class="text-xl font-bold">{{ lead.nome or '(sem nome)' }}</h1>
+      <p class="text-sm text-slate-400 font-mono">{{ lead.telefone }}</p>
+      <div class="flex gap-2 mt-2 text-xs">
+        <span class="px-2 py-0.5 rounded bg-meumisterio-bg border border-meumisterio-border">node: {{ lead.node_atual or '—' }}</span>
+        {% if lead.convertido %}<span class="px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300">convertido</span>{% endif %}
+        {% if lead.bot_pausado %}<span class="px-2 py-0.5 rounded bg-amber-900/40 text-amber-300">bot pausado</span>{% endif %}
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('saas_inbox.takeover', lead_id=lead.id) }}">
+      <button type="submit"
+              class="text-xs px-3 py-2 rounded-lg
+                     {% if lead.bot_pausado %}bg-meumisterio-purple hover:bg-purple-600{% else %}bg-amber-700 hover:bg-amber-600{% endif %}
+                     transition">
+        {% if lead.bot_pausado %}↻ Liberar bot{% else %}✋ Eu assumo{% endif %}
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="bg-meumisterio-surface border border-meumisterio-border rounded-lg p-4 max-h-[60vh] overflow-y-auto">
+  {% if not messages %}
+    <p class="text-center text-slate-500 text-sm py-8">Sem mensagens ainda.</p>
+  {% else %}
+    <div class="space-y-3">
+      {% for m in messages %}
+        <div class="flex {% if m.remetente == 'bot' %}justify-end{% endif %}">
+          <div class="max-w-[75%] rounded-lg px-3 py-2 text-sm
+                      {% if m.remetente == 'bot' %}bg-meumisterio-purple/30 border border-meumisterio-purple/40{% else %}bg-meumisterio-bg border border-meumisterio-border{% endif %}">
+            <div class="whitespace-pre-wrap">{{ m.texto }}</div>
+            {% if m.media_url %}
+              <div class="mt-1 text-xs text-slate-400">📎 {{ m.tipo }}</div>
+            {% endif %}
+            <div class="text-xs text-slate-500 mt-1">{{ m.timestamp.strftime('%d/%m %H:%M') }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+{% endblock %}

@@ -87,7 +87,7 @@ _RE_SINAL_RELEVANTE_LEITURA = re.compile(
 )
 
 # ── PROMPTS DE IA ──
-_SYSTEM_PROFILER = """Você é o analista silencioso que prepara a leitura para Esmeralda Ácassia (Cigana Esmeralda), quiromancia no WhatsApp.
+_SYSTEM_PROFILER = """Você é o analista silencioso que prepara a leitura para Esmeralda Ácassia (Meu Mistério Esmeralda), quiromancia no WhatsApp.
 Sua saída NÃO vai para o lead; só alimenta estratégia interna (Hive Mind).
 
 EXTRAIA EM FORMATO CHAVE::VALOR:
@@ -111,7 +111,7 @@ Se a mensagem do analista trouxer o bloco ANCORAS_DA_COLETA_NODE3, são percepç
 IMPORTANTE: tudo ancora em quiromancia e linhas da mão, não em cartas ou outros oráculos.
 """
 
-_SYSTEM_REDIRECT = """Você é Esmeralda Ácassia (Cigana Esmeralda), mesma voz dos passos anteriores: calma e presença, como no templo.
+_SYSTEM_REDIRECT = """Você é Esmeralda Ácassia (Meu Mistério Esmeralda), mesma voz dos passos anteriores: calma e presença, como no templo.
 
 O lead mandou algo raso, ou só confirmação, ou puxou preço/medo sem abrir o fundo.
 GÊNERO PARA CONCORDÂNCIA: {genero_hint}
@@ -465,7 +465,7 @@ def executar_v2(ctx) -> Tuple[List[Acao], str]:
         )
         try:
             p_inv = (
-                "Você é Esmeralda Ácassia (Cigana Esmeralda). O relato veio fino demais para fechar a leitura das linhas.\n"
+                "Você é Esmeralda Ácassia (Meu Mistério Esmeralda). O relato veio fino demais para fechar a leitura das linhas.\n"
                 f"GÊNERO PARA CONCORDÂNCIA: {genero_hint}\n"
                 "Faça UMA pergunta curta, com tom de templo, que aprofunde: quem está no centro, "
                 "há quanto tempo isso pesa, ou o momento em que piorou. Máximo duas linhas. "

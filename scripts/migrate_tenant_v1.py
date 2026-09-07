@@ -19,7 +19,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-DB_PATH = os.path.join(_ROOT, "cigana.db")
+DB_PATH = os.path.join(_ROOT, "meumisterio.db")
 
 
 def _colunas(conn, tabela: str) -> set[str]:

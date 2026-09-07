@@ -46,15 +46,33 @@ class AudioEngine:
         self.public_url_base = os.getenv("PUBLIC_URL", "http://127.0.0.1:5000").rstrip('/')
 
     # ── INTERFACE PRINCIPAL ──────────────────────────────────────────────
-    def gerar(self, texto: str) -> str:
+    def gerar(
+        self,
+        texto: str,
+        *,
+        voice_name: Optional[str] = None,
+        style: float = 0.5,
+        speed: float = 1.0,
+    ) -> str:
         """Interface simplificada para o engine principal."""
-        return self.gerar_audio_url(texto, {}, e_template_fixo=False) or ""
+        return self.gerar_audio_url(
+            texto,
+            {},
+            e_template_fixo=False,
+            voice_name=voice_name,
+            style=style,
+            speed=speed,
+        ) or ""
 
     def gerar_audio_url(
         self,
         template: str,
         variaveis: dict,
-        e_template_fixo: bool = True
+        e_template_fixo: bool = True,
+        *,
+        voice_name: Optional[str] = None,
+        style: float = 0.5,
+        speed: float = 1.0,
     ) -> Optional[str]:
         """
         Substitui variáveis, aplica pacing dramático e gera o áudio WAV.
@@ -77,7 +95,11 @@ class AudioEngine:
         if not texto_dramatico: return None
 
         # 3. Cache Check (Baseado no texto limpo, não no dramático)
-        cache_key = hashlib.sha256(texto_limpo.encode("utf-8")).hexdigest()[:32]
+        selected_voice = str(voice_name or self.voice_name).strip() or self.voice_name
+        if selected_voice not in {"Leda", "Kore", "Aoede"}:
+            selected_voice = self.voice_name if self.voice_name in {"Leda", "Kore", "Aoede"} else "Leda"
+        cache_material = f"{selected_voice}|{style:.2f}|{speed:.2f}|{texto_limpo}"
+        cache_key = hashlib.sha256(cache_material.encode("utf-8")).hexdigest()[:32]
         url_cacheada = self._buscar_cache(cache_key)
         if url_cacheada:
             logger.info(f"🎯 [TTS] Cache hit: {cache_key[:10]}")
@@ -85,7 +107,12 @@ class AudioEngine:
 
         # 4. Geração via Gemini API
         logger.info(f"🎙️ [TTS] Gerando voz ({self.voice_name}) para: '%.50s...'", texto_limpo)
-        audio_raw_pcm = self._chamar_gemini_tts(texto_dramatico)
+        audio_raw_pcm = self._chamar_gemini_tts(
+            texto_dramatico,
+            voice_name=selected_voice,
+            style=style,
+            speed=speed,
+        )
         if not audio_raw_pcm or len(audio_raw_pcm) < 100: 
             logger.error("🚨 [TTS] Gemini retornou áudio vazio ou corrompido.")
             return None
@@ -109,25 +136,35 @@ class AudioEngine:
         return None
 
     # ── MÉTODOS DE API E PROCESSAMENTO ───────────────────────────────────
-    def _chamar_gemini_tts(self, texto: str) -> Optional[bytes]:
+    def _chamar_gemini_tts(
+        self,
+        texto: str,
+        *,
+        voice_name: Optional[str] = None,
+        style: float = 0.5,
+        speed: float = 1.0,
+    ) -> Optional[bytes]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_tts}:generateContent?key={self.api_key}"
         
         # Prompt de Sistema Refinado para Entonação
+        expressividade = "expressivo" if style >= 0.67 else "sutil" if style <= 0.33 else "natural"
+        ritmo = "mais rápido" if speed >= 1.25 else "lento" if speed <= 0.8 else "natural"
+        modificador_voz = f"Adote um tom {expressividade} e um ritmo {ritmo}."
         instrucao_voz = (
-            "Diga este texto como uma Cigana Quiromante experiente. "
+            "Diga este texto como umo Meu Mistério Quiromante experiente. "
             "Use um tom de voz calmo, acolhedor, místico e com pausas naturais. "
             "O texto é: "
         )
 
         payload = {
             "contents": [{
-                "parts": [{"text": f"{instrucao_voz} {texto}"}]
+                "parts": [{"text": f"{instrucao_voz} {modificador_voz} {texto}"}]
             }],
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
                 "speechConfig": {
                     "voiceConfig": {
-                        "prebuiltVoiceConfig": {"voiceName": self.voice_name}
+                        "prebuiltVoiceConfig": {"voiceName": voice_name or self.voice_name}
                     }
                 }
             }
