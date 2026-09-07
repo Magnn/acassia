@@ -5,8 +5,6 @@
 # Se SKIP_MIGRATIONS=1, pula (útil para CI/debug).
 # Se falhar, loga mas não impede o startup (sync_database() faz CREATE IF NOT EXISTS).
 
-set -e
-
 echo "🚀 [ENTRYPOINT] Starting Acássia SaaS..."
 
 # ── Migrations ──────────────────────────────────────────────
