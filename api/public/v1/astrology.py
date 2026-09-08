@@ -42,11 +42,11 @@ def require_api_key(f):
     """Decorator: valida API key no header X-API-Key ou query ?api_key=."""
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        key = request.headers.get("X-API-Key") or request.args.get("api_key")
+        key = request.headers.get("X-API-Key")
         if not key:
             return jsonify({
                 "error": "api_key_required",
-                "message": "Inclua sua API key no header X-API-Key ou query ?api_key=",
+                "message": "Inclua sua API key no header X-API-Key.",
                 "docs": "https://meumisterio.com/docs/api",
             }), 401
 

@@ -26,6 +26,7 @@ from db.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 api_keys_bp = Blueprint("saas_api_keys", __name__, url_prefix="/saas/api-keys")
+ALLOWED_SCOPES = {"contacts:read", "contacts:write", "messages:write", "sequences:write"}
 
 
 def _generate_key() -> tuple[str, str, str]:
@@ -52,6 +53,7 @@ def list_keys():
                     "label": k.label,
                     "prefix": k.key_prefix,
                     "tier": k.tier,
+                    "scopes": k.scopes or [],
                     "is_active": k.is_active,
                     "total_requests": k.total_requests or 0,
                     "last_used_at": k.last_used_at.isoformat() if k.last_used_at else None,
@@ -70,6 +72,9 @@ def create_key():
     label = (body.get("label") or "").strip()
     if not label:
         return jsonify({"error": "label_required"}), 422
+    scopes = body.get("scopes") or sorted(ALLOWED_SCOPES)
+    if not isinstance(scopes, list) or not set(scopes).issubset(ALLOWED_SCOPES):
+        return jsonify({"error": "invalid_scopes", "allowed": sorted(ALLOWED_SCOPES)}), 422
 
     # Limite: max 5 keys por tenant (free)
     db = SessionLocal()
@@ -87,6 +92,7 @@ def create_key():
             key_hash=key_hash,
             key_prefix=prefix,
             tier="free",
+            scopes=scopes,
         )
         db.add(key_obj)
         db.commit()
@@ -97,6 +103,7 @@ def create_key():
             "key": raw,  # MOSTRADO APENAS UMA VEZ
             "prefix": prefix,
             "id": key_obj.id,
+            "scopes": scopes,
             "warning": "Guarde esta chave — ela não será exibida novamente.",
         }), 201
     finally:

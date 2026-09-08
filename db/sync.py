@@ -122,6 +122,7 @@ def sync_database():
         _ensure_leads_metadata_version_column(inspector)
         _ensure_lead_extended_columns(inspector)
         _add_column_if_missing(inspector, "sequences", "trigger_tag", "VARCHAR(100)")
+        _add_column_if_missing(inspector, "public_api_keys", "scopes", "TEXT NOT NULL DEFAULT '[]'")
 
         logger.info("✅ [DATABASE] Tabelas sincronizadas (%s).", DB_DRIVER)
     except Exception as e:

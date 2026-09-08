@@ -1983,6 +1983,7 @@ class PublicApiKey(Base):
     key_hash = Column(String(128), nullable=False, unique=True, index=True)
     key_prefix = Column(String(12), nullable=False)  # "mm_pk_a3b2" (para identificação visual)
     tier = Column(String(16), nullable=False, default="free")  # free, pro, scale
+    scopes = Column(JSON, default=list, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     daily_usage = Column(JSON, default=dict)  # {"2027-01-15": 42}
     total_requests = Column(Integer, default=0)

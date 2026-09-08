@@ -14,13 +14,13 @@ v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
 
 @v1_bp.route("/ping", methods=["GET"])
-@require_api_key
+@require_api_key("contacts:read")
 def ping():
     return jsonify({"ok": True, "tenant_id": g.tenant_id, "timestamp": datetime.now(timezone.utc).isoformat()})
 
 
 @v1_bp.route("/messages/send", methods=["POST"])
-@require_api_key
+@require_api_key("messages:write")
 def send_message():
     """
     Envia mensagem para um contato via WhatsApp, Webchat ou Telegram.
@@ -61,7 +61,7 @@ def send_message():
 
 
 @v1_bp.route("/contacts", methods=["POST"])
-@require_api_key
+@require_api_key("contacts:write")
 def create_or_update_contact():
     """
     Cria ou atualiza contato (lead).
@@ -126,7 +126,7 @@ def create_or_update_contact():
 
 
 @v1_bp.route("/contacts/<phone_or_id>", methods=["GET"])
-@require_api_key
+@require_api_key("contacts:read")
 def get_contact(phone_or_id: str):
     """Retorna detalhes do contato pelo ID ou número de telefone."""
     db = SessionLocal()
@@ -158,7 +158,7 @@ def get_contact(phone_or_id: str):
 
 
 @v1_bp.route("/contacts/<phone_or_id>/tags", methods=["POST"])
-@require_api_key
+@require_api_key("contacts:write")
 def add_contact_tags(phone_or_id: str):
     """Adiciona tags ao contato."""
     body = request.get_json(silent=True) or {}
@@ -191,7 +191,7 @@ def add_contact_tags(phone_or_id: str):
 
 
 @v1_bp.route("/sequences/enroll", methods=["POST"])
-@require_api_key
+@require_api_key("sequences:write")
 def enroll_sequence():
     """
     Inscreve contato em uma sequência.

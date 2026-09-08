@@ -48,6 +48,23 @@ def test_ping_no_auth(client):
     assert rv.status_code == 401
     assert "error" in rv.json
 
+def test_api_key_in_query_string_is_rejected(client, test_data):
+    rv = client.get('/api/v1/ping', query_string={"api_key": test_data["raw_key"]})
+    assert rv.status_code == 401
+
+def test_api_key_scope_is_enforced(client, db_session):
+    raw_key = f"limited_{uuid.uuid4().hex}"
+    db_session.add(PublicApiKey(
+        tenant_id=f"limited_{uuid.uuid4().hex[:8]}",
+        key_hash=hashlib.sha256(raw_key.encode()).hexdigest(), key_prefix="limited",
+        label="Read only", tier="free", is_active=True, scopes=["contacts:read"],
+    ))
+    db_session.commit()
+    rv = client.post('/api/v1/messages/send', json={"recipient": "1", "text": "oi"},
+                     headers={"X-API-Key": raw_key})
+    assert rv.status_code == 403
+    assert rv.json["required_scope"] == "messages:write"
+
 def test_ping_with_auth(client, test_data):
     rv = client.get('/api/v1/ping', headers={"X-API-Key": test_data["raw_key"]})
     assert rv.status_code == 200
