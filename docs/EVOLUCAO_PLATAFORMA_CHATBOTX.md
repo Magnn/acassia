@@ -83,9 +83,9 @@ Aceite: novo canal reutiliza conversa e funil onde compatíveis e passa testes d
 
 ## Verificação e limites deste lote
 
-Antes do último ajuste de handoff, 76 testes selecionados passaram, cobrindo onboarding, runtime publicado, integração com o motor, grafo e variáveis. Build de produção do frontend passou. A validação visual local confirmou seleção do modelo e preservação da instrução de webhook após uma única gravação. Dados e credenciais usados no teste visual eram fictícios; Meta foi simulada.
+Após o ajuste de handoff, 77 testes selecionados passaram, cobrindo onboarding, runtime publicado, integração com o motor, pausa para atendente, grafo e variáveis. O build do lote havia passado antes de alterações paralelas na tela de Sequências; a execução final ficou bloqueada por dois erros TypeScript dessa tela, fora deste lote. A validação visual local confirmou seleção do modelo e preservação da instrução de webhook após uma única gravação. Dados e credenciais usados no teste visual eram fictícios; Meta foi simulada.
 
-- [ ] Atualizar resultado final de testes após o ajuste de handoff.
+- [x] Atualizar resultado final de testes após o ajuste de handoff.
 - [ ] Confirmar visualmente checklist do painel com a sessão de teste.
 - [ ] Homologação com Meta, IA e gateway reais permanece pendente.
 - [ ] Implantação destas mudanças em produção e acompanhamento de conversão não foram comprovados por este trabalho.

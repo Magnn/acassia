@@ -23,7 +23,15 @@ export default function LaunchChecklist() {
   }
 
   if (error || !data) {
-    return null;
+    return (
+      <section aria-labelledby="launch-error-title" className="bg-bg-surface border border-border rounded-3xl p-5">
+        <h3 id="launch-error-title" className="text-sm font-bold text-primary">Checklist de ativação indisponível</h3>
+        <p role="alert" className="mt-1 text-xs text-secondary">Não foi possível verificar sua configuração agora.</p>
+        <button type="button" onClick={() => void refetch()} className="mt-3 text-xs font-bold text-indigo-400 hover:underline focus-visible:outline focus-visible:outline-2 rounded">
+          Tentar novamente
+        </button>
+      </section>
+    );
   }
 
   const percent = data.total > 0 ? Math.round((data.completed_count / data.total) * 100) : 0;
@@ -51,7 +59,7 @@ export default function LaunchChecklist() {
             <div>
               <div className="flex items-center gap-2">
                 <h3 id="launch-title" className="text-base font-bold text-primary">
-                  {isComplete ? 'Operação Pronta para Vendas' : 'Checklist de Ativação'}
+                  {isComplete ? 'Configuração técnica concluída' : 'Checklist de Ativação'}
                 </h3>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                   isComplete
@@ -64,7 +72,7 @@ export default function LaunchChecklist() {
               <p className="text-xs text-secondary mt-0.5">
                 {data.completed_count} de {data.total} etapas finalizadas.
                 {isComplete
-                  ? ' Seu número WhatsApp oficial está pronto e recebendo leads.'
+                  ? ' Os sinais técnicos básicos foram confirmados; continue acompanhando conversas e entregas.'
                   : ' Complete as etapas pendentes para garantir o atendimento automatizado.'}
               </p>
             </div>
@@ -81,6 +89,9 @@ export default function LaunchChecklist() {
               </Link>
             )}
             <button
+              type="button"
+              aria-label={collapsed ? 'Expandir checklist de ativação' : 'Recolher checklist de ativação'}
+              aria-expanded={!collapsed}
               onClick={() => setCollapsed(!collapsed)}
               className="p-1.5 rounded-xl hover:bg-bg-primary text-secondary hover:text-primary transition-colors"
               title={collapsed ? 'Expandir' : 'Recolher'}

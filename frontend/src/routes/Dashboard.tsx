@@ -88,8 +88,8 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <div className="px-3.5 py-1.5 rounded-xl bg-bg-surface border border-border text-xs flex items-center gap-2">
             <PhoneCall className="w-3.5 h-3.5 text-[#25D366]" />
-            <span className="text-secondary">Meta Cloud API:</span>
-            <strong className="text-emerald-400 font-medium">Ativa</strong>
+            <span className="text-secondary">Canal principal:</span>
+            <strong className="text-primary font-medium">WhatsApp</strong>
           </div>
         </div>
       </div>

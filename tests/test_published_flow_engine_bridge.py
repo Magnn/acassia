@@ -74,3 +74,42 @@ def test_engine_reads_published_blueprint_and_executes_canvas_path():
         db.query(Lead).filter_by(tenant_id=tenant_id).delete()
         db.commit()
         db.close()
+
+
+def test_notify_attendant_effect_pauses_bot_and_preserves_context():
+    tenant_id = "tenant-handoff-engine-bridge"
+    db = SessionLocal()
+    try:
+        lead = Lead(tenant_id=tenant_id, telefone="5592999990002", metadata_json={})
+        db.add(lead)
+        db.flush()
+        ctx = ContextoConversa(
+            lead_id=lead.id,
+            telefone=lead.telefone,
+            node_atual=lead.node_atual,
+            texto_recebido="Quero falar com alguém",
+        )
+        flow_engine = object.__new__(Engine)
+        flow_engine._tenant_id_static = tenant_id
+
+        flow_engine._apply_published_flow_effects(
+            db,
+            lead,
+            ctx,
+            [{"kind": "notify_attendant", "payload": "Dúvida: Como agendar?"}],
+        )
+
+        assert lead.bot_pausado is True
+        assert ctx.metadata["flow_chat_status"] == "waiting_attendant"
+        db.flush()
+        event = db.query(EventoAudit).filter_by(lead_id=lead.id, evento="flow_builder_side_effect").one()
+        assert event.dados["kind"] == "notify_attendant"
+        assert "Como agendar?" in event.dados["payload"]
+    finally:
+        db.rollback()
+        lead_ids = [row[0] for row in db.query(Lead.id).filter_by(tenant_id=tenant_id).all()]
+        if lead_ids:
+            db.query(EventoAudit).filter(EventoAudit.lead_id.in_(lead_ids)).delete(synchronize_session=False)
+        db.query(Lead).filter_by(tenant_id=tenant_id).delete()
+        db.commit()
+        db.close()
