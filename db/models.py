@@ -2706,6 +2706,7 @@ class WADevice(Base):
     connection_state = Column(String(30), nullable=True)  # open, close, connecting
     is_primary = Column(Boolean, default=False)
     active = Column(Boolean, default=True)
+    flow_mode = Column(String(30), nullable=False, default="static_funnel")  # static_funnel, ai_agent, flow_builder
 
     created_at = Column(DateTime(timezone=True), default=_agora_utc)
     last_seen_at = Column(DateTime(timezone=True), nullable=True)

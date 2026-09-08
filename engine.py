@@ -3227,7 +3227,15 @@ class Engine:
             except Exception as exc:
                 logger.warning("[quota.leads] check falhou (fail open): %s", exc)
             _validos = frozenset({"1_apresentacao", "static_meumisterio_b1"})
-            _ini = (CONFIG_CLIENTE.get("funil_entrada_inicial") or "").strip()
+            _ini = ""
+            try:
+                from api.tenant_config import get_tenant_config
+                _t_cfg = get_tenant_config(tid)
+                _ini = (_t_cfg.get("funil_entrada_inicial") or "").strip()
+            except Exception:
+                pass
+            if not _ini:
+                _ini = (CONFIG_CLIENTE.get("funil_entrada_inicial") or "").strip()
             _node0 = _ini if _ini in _validos else "1_apresentacao"
             lead = Lead(
                 telefone=telefone,

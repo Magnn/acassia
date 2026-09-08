@@ -16,7 +16,7 @@ const MetaLogo = ({ className = 'w-4 h-4' }: { className?: string }) => (
   </svg>
 );
 
-interface Device { id: number; nickname: string; provider: string; phone_display: string | null; connected: boolean; connection_state: string | null; is_primary: boolean; groups_count: number; created_at: string | null; }
+interface Device { id: number; nickname: string; provider: string; phone_display: string | null; connected: boolean; connection_state: string | null; is_primary: boolean; groups_count: number; created_at: string | null; flow_mode?: 'static_funnel' | 'ai_agent' | 'flow_builder'; }
 
 export default function WAConnection() {
   const qc = useQueryClient();
@@ -44,6 +44,19 @@ export default function WAConnection() {
   const primaryMut = useMutation({
     mutationFn: (id: number) => api.post(`/saas/devices/${id}/set-primary`, {}),
     onSuccess: () => { toast.success('Dispositivo principal definido!'); qc.invalidateQueries({ queryKey: ['devices'] }); },
+  });
+  const flowModeMut = useMutation({
+    mutationFn: ({ id, mode }: { id: number; mode: string }) =>
+      api.post(`/saas/devices/${id}/flow-mode`, { flow_mode: mode }),
+    onSuccess: (_, vars) => {
+      toast.success(
+        vars.mode === 'static_funnel'
+          ? '⚡ Modo definido: Funil Estático (Meu Mistério)!'
+          : '🤖 Modo definido: Agente de IA Conversacional!'
+      );
+      qc.invalidateQueries({ queryKey: ['devices'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Erro ao alterar modo'),
   });
 
   return (
@@ -85,7 +98,15 @@ export default function WAConnection() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {devices.map(d => <DeviceCard key={d.id} device={d} onDelete={() => deleteMut.mutate(d.id)} onSetPrimary={() => primaryMut.mutate(d.id)} />)}
+        {devices.map(d => (
+          <DeviceCard
+            key={d.id}
+            device={d}
+            onDelete={() => deleteMut.mutate(d.id)}
+            onSetPrimary={() => primaryMut.mutate(d.id)}
+            onSetFlowMode={(mode) => flowModeMut.mutate({ id: d.id, mode })}
+          />
+        ))}
       </div>
 
       {/* Modal Novo Dispositivo */}
@@ -166,7 +187,17 @@ export default function WAConnection() {
 }
 
 /* ── Device Card ─────────────────────────────── */
-function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onDelete: () => void; onSetPrimary: () => void }) {
+function DeviceCard({
+  device: d,
+  onDelete,
+  onSetPrimary,
+  onSetFlowMode,
+}: {
+  device: Device;
+  onDelete: () => void;
+  onSetPrimary: () => void;
+  onSetFlowMode: (mode: string) => void;
+}) {
   const qc = useQueryClient();
   const { data: liveStatus, refetch } = useQuery({
     queryKey: ['device-status', d.id],
@@ -176,6 +207,7 @@ function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onD
 
   const isConnected = liveStatus?.connected ?? d.connected;
   const isMeta = d.provider === 'meta_cloud' || d.provider === 'coex';
+  const currentMode = d.flow_mode || 'static_funnel';
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border transition-all ${isConnected
@@ -264,6 +296,73 @@ function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onD
             </div>
           </div>
         )}
+
+        {/* Flow Mode Switcher: Static Funnel vs AI Agent */}
+        <div className={`mt-5 pt-4 border-t ${isConnected ? 'border-white/10' : 'border-border'}`}>
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-1.5">
+              <Zap className={`w-3.5 h-3.5 ${isConnected ? 'text-emerald-400' : 'text-emerald-600'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-wider ${isConnected ? 'text-white/70' : 'text-secondary'}`}>
+                Modo de Atendimento
+              </span>
+            </div>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              isConnected ? 'bg-white/10 text-white border-white/15' : 'bg-bg-primary text-primary border-border'
+            }`}>
+              {currentMode === 'ai_agent' ? '🤖 Agente de IA' : '⚡ Funil Estático'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onSetFlowMode('static_funnel')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                currentMode === 'static_funnel'
+                  ? 'bg-emerald-500/20 border-emerald-500/60 ring-1 ring-emerald-500/30'
+                  : isConnected
+                    ? 'bg-white/5 border-white/10 hover:border-white/20 text-white/60 hover:text-white'
+                    : 'bg-bg-primary border-border hover:border-emerald-500/30 text-secondary hover:text-primary'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`font-bold text-xs flex items-center gap-1 ${isConnected ? 'text-white' : 'text-primary'}`}>
+                  ⚡ Funil Estático
+                </span>
+                {currentMode === 'static_funnel' && (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                )}
+              </div>
+              <p className={`text-[10px] mt-0.5 leading-snug ${isConnected ? 'text-white/50' : 'text-secondary'}`}>
+                7 etapas Meu Mistério (áudios, tarot e checkout).
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSetFlowMode('ai_agent')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                currentMode === 'ai_agent'
+                  ? 'bg-purple-500/20 border-purple-500/60 ring-1 ring-purple-500/30'
+                  : isConnected
+                    ? 'bg-white/5 border-white/10 hover:border-white/20 text-white/60 hover:text-white'
+                    : 'bg-bg-primary border-border hover:border-purple-500/30 text-secondary hover:text-primary'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`font-bold text-xs flex items-center gap-1 ${isConnected ? 'text-white' : 'text-primary'}`}>
+                  🤖 Agente de IA
+                </span>
+                {currentMode === 'ai_agent' && (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
+                )}
+              </div>
+              <p className={`text-[10px] mt-0.5 leading-snug ${isConnected ? 'text-white/50' : 'text-secondary'}`}>
+                IA autônoma Gemini: conversa livre e fechamento.
+              </p>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Bottom actions */}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, CheckCircle2, ExternalLink, Phone, Plus, QrCode,
-  RefreshCw, Save, ShieldCheck, Star, Trash2, Unplug, X,
+  RefreshCw, Save, ShieldCheck, Star, Trash2, Unplug, X, Zap,
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { toast } from '../../lib/toast';
@@ -25,7 +25,7 @@ interface Device {
   id: number; nickname: string; provider: string;
   phone_display: string | null; connected: boolean;
   connection_state: string | null; is_primary: boolean;
-  groups_count: number;
+  groups_count: number; flow_mode?: 'static_funnel' | 'ai_agent' | 'flow_builder';
 }
 
 export default function Devices() {
@@ -49,6 +49,19 @@ export default function Devices() {
   const primaryMut = useMutation({
     mutationFn: (id: number) => api.post(`/saas/devices/${id}/set-primary`, {}),
     onSuccess: () => { toast.success('Principal definido'); qc.invalidateQueries({ queryKey: ['devices'] }); },
+  });
+  const flowModeMut = useMutation({
+    mutationFn: ({ id, mode }: { id: number; mode: string }) =>
+      api.post(`/saas/devices/${id}/flow-mode`, { flow_mode: mode }),
+    onSuccess: (_, vars) => {
+      toast.success(
+        vars.mode === 'static_funnel'
+          ? '⚡ Modo definido: Funil Estático (Meu Mistério)!'
+          : '🤖 Modo definido: Agente de IA Conversacional!'
+      );
+      qc.invalidateQueries({ queryKey: ['devices'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Erro ao alterar modo'),
   });
 
   return (
@@ -88,7 +101,8 @@ export default function Devices() {
         {devices.map(d => (
           <DeviceCard key={d.id} device={d}
             onDelete={() => deleteMut.mutate(d.id)}
-            onSetPrimary={() => primaryMut.mutate(d.id)} />
+            onSetPrimary={() => primaryMut.mutate(d.id)}
+            onSetFlowMode={(mode) => flowModeMut.mutate({ id: d.id, mode })} />
         ))}
       </div>
 
@@ -124,7 +138,17 @@ function ProviderBtn({ label, sub, active, onClick, color }: { id: string; label
   );
 }
 
-function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onDelete: () => void; onSetPrimary: () => void }) {
+function DeviceCard({
+  device: d,
+  onDelete,
+  onSetPrimary,
+  onSetFlowMode,
+}: {
+  device: Device;
+  onDelete: () => void;
+  onSetPrimary: () => void;
+  onSetFlowMode: (mode: string) => void;
+}) {
   const { data: liveStatus, refetch } = useQuery({
     queryKey: ['device-status', d.id],
     queryFn: () => api.get<any>(`/saas/devices/${d.id}/status`),
@@ -132,6 +156,7 @@ function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onD
   });
   const isConnected = liveStatus?.connected ?? d.connected;
   const isMeta = d.provider === 'meta_cloud' || d.provider === 'coex';
+  const currentMode = d.flow_mode || 'static_funnel';
 
   return (
     <div className="relative rounded-[24px] bg-[#F2F4F7] p-8 shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all group overflow-hidden max-w-[600px]">
@@ -158,7 +183,7 @@ function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onD
       </div>
 
       {/* Middle: Status + Disconnect */}
-      <div className="flex items-center justify-between mb-10">
+      <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           {isConnected ? (
             <>
@@ -177,6 +202,67 @@ function DeviceCard({ device: d, onDelete, onSetPrimary }: { device: Device; onD
           className="flex items-center gap-2.5 px-6 py-3 bg-white border border-gray-200 rounded-[12px] text-[16px] font-medium text-[#1D2B36] hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
           <Unplug className="w-5 h-5 text-gray-800" strokeWidth={2} /> Desconectar
         </button>
+      </div>
+
+      {/* Flow Mode Switcher: Static Funnel vs AI Agent */}
+      <div className="mt-4 pt-5 border-t border-gray-300/80 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-black uppercase tracking-wider text-gray-700">
+              Modo de Atendimento deste Número
+            </span>
+          </div>
+          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white border border-gray-200 text-gray-800 shadow-sm">
+            {currentMode === 'ai_agent' ? '🤖 Agente de IA' : '⚡ Funil Estático'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => onSetFlowMode('static_funnel')}
+            className={`p-3.5 rounded-xl border text-left transition-all ${
+              currentMode === 'static_funnel'
+                ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                : 'bg-white border-gray-200 hover:border-gray-300 text-gray-600'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-sm text-[#1D2B36] flex items-center gap-1.5">
+                ⚡ Funil Estático
+              </span>
+              {currentMode === 'static_funnel' && (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+              7 etapas fixas estruturadas (áudios, tarot, quiz e checkout).
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSetFlowMode('ai_agent')}
+            className={`p-3.5 rounded-xl border text-left transition-all ${
+              currentMode === 'ai_agent'
+                ? 'bg-purple-500/10 border-purple-500 ring-2 ring-purple-500/20 shadow-sm'
+                : 'bg-white border-gray-200 hover:border-gray-300 text-gray-600'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-sm text-[#1D2B36] flex items-center gap-1.5">
+                🤖 Agente de IA
+              </span>
+              {currentMode === 'ai_agent' && (
+                <CheckCircle2 className="w-4 h-4 text-purple-600" />
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+              IA autônoma Gemini: conversa livre, tira dúvidas e qualifica.
+            </p>
+          </button>
+        </div>
       </div>
 
       {/* Bottom Right: Meta / Evolution Logo */}

@@ -34,6 +34,7 @@ def list_devices():
             "connected": d.connected,
             "connection_state": d.connection_state,
             "is_primary": d.is_primary,
+            "flow_mode": getattr(d, "flow_mode", "static_funnel") or "static_funnel",
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "last_seen_at": d.last_seen_at.isoformat() if d.last_seen_at else None,
             "groups_count": db.query(models.WAGroup).filter_by(device_id=d.id).count(),
@@ -210,6 +211,63 @@ def device_qr_code(device_id):
                 "qr_code": result.raw.get("code") if result.raw else None,
             })
         return jsonify({"ok": False, "error": result.error}), 500
+    finally:
+        db.close()
+
+
+@devices_bp.route("/<int:device_id>/flow-mode", methods=["POST"])
+@login_required
+def set_device_flow_mode(device_id: int):
+    """Alterna o modo de automação do dispositivo: static_funnel, ai_agent ou flow_builder."""
+    db = SessionLocal()
+    try:
+        data = request.json or {}
+        new_mode = (data.get("flow_mode") or "").strip().lower()
+        if new_mode not in ("static_funnel", "ai_agent", "flow_builder"):
+            return jsonify({
+                "error": "invalid_mode",
+                "allowed": ["static_funnel", "ai_agent", "flow_builder"],
+            }), 400
+
+        dev = db.query(models.WADevice).filter_by(
+            id=device_id, tenant_id=current_user.tenant_id, active=True
+        ).first()
+        if not dev:
+            return jsonify({"error": "device_not_found"}), 404
+
+        dev.flow_mode = new_mode
+
+        is_static = (new_mode == "static_funnel")
+        ini_node = "static_meumisterio_b1" if is_static else "1_apresentacao"
+
+        def _set_tv(k: str, val):
+            row = db.query(models.TenantFlowVariable).filter_by(
+                tenant_id=current_user.tenant_id, key=k
+            ).first()
+            if row:
+                row.value_json = val
+            else:
+                db.add(models.TenantFlowVariable(tenant_id=current_user.tenant_id, key=k, value_json=val))
+
+        _set_tv("funnel_mode", new_mode)
+        _set_tv("funil_estatico_meu_misterio_ativo", is_static)
+        _set_tv("funil_entrada_inicial", ini_node)
+
+        db.commit()
+
+        # Invalida o cache de tenant_config
+        try:
+            from api.tenant_config import clear_cache
+            clear_cache(current_user.tenant_id)
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": True,
+            "device_id": dev.id,
+            "flow_mode": dev.flow_mode,
+            "funil_entrada_inicial": ini_node,
+        })
     finally:
         db.close()
 
