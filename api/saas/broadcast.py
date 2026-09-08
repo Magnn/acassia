@@ -168,6 +168,7 @@ def list_available_tags():
         db.close()
 
 
+@broadcast_bp.route("", methods=["GET"])
 @broadcast_bp.route("/", methods=["GET"])
 @login_required
 def list_campaigns():
@@ -208,6 +209,7 @@ def list_campaigns():
         db.close()
 
 
+@broadcast_bp.route("", methods=["POST"])
 @broadcast_bp.route("/", methods=["POST"])
 @login_required
 @limiter.limit("20/hour")
@@ -243,7 +245,17 @@ def create_campaign():
         db.commit()
         db.refresh(campaign)
 
-        return jsonify({"ok": True, "id": campaign.id, "status": campaign.status}), 201
+        return jsonify({
+            "ok": True,
+            "id": campaign.id,
+            "status": campaign.status,
+            "campaign": {
+                "id": campaign.id,
+                "title": campaign.title,
+                "name": campaign.title,
+                "status": campaign.status,
+            },
+        }), 201
     finally:
         db.close()
 
@@ -368,7 +380,18 @@ def duplicate_campaign(campaign_id: int):
         db.add(new_campaign)
         db.commit()
         db.refresh(new_campaign)
-        return jsonify({"ok": True, "id": new_campaign.id, "title": new_campaign.title}), 201
+        return jsonify({
+            "ok": True,
+            "id": new_campaign.id,
+            "title": new_campaign.title,
+            "name": new_campaign.title,
+            "campaign": {
+                "id": new_campaign.id,
+                "title": new_campaign.title,
+                "name": new_campaign.title,
+                "status": new_campaign.status,
+            },
+        }), 201
     finally:
         db.close()
 
@@ -414,7 +437,110 @@ def resend_failed_campaign(campaign_id: int):
         return jsonify({
             "ok": True,
             "total_retrying": len(failed_recs),
+            "requeued_count": len(failed_recs),
             "message": f"Reenvio iniciado para {len(failed_recs)} contatos que falharam.",
+        })
+    finally:
+        db.close()
+
+
+@broadcast_bp.route("/<int:campaign_id>/pause", methods=["POST"])
+@login_required
+def pause_campaign(campaign_id: int):
+    """Pausa uma campanha em andamento."""
+    db = SessionLocal()
+    try:
+        c = db.query(models.BroadcastCampaign).filter_by(
+            id=campaign_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not c:
+            return jsonify({"error": "not_found"}), 404
+        if c.status != "sending":
+            return jsonify({"error": "only_sending_can_be_paused", "status": c.status}), 409
+
+        c.status = "paused"
+        db.commit()
+        return jsonify({"ok": True, "status": "paused", "message": "Disparo pausado.", "campaign": {"id": c.id, "status": "paused"}})
+    finally:
+        db.close()
+
+
+@broadcast_bp.route("/<int:campaign_id>/resume", methods=["POST"])
+@login_required
+def resume_campaign(campaign_id: int):
+    """Retoma o envio de uma campanha pausada."""
+    db = SessionLocal()
+    try:
+        c = db.query(models.BroadcastCampaign).filter_by(
+            id=campaign_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not c:
+            return jsonify({"error": "not_found"}), 404
+        if c.status not in ("paused", "draft"):
+            return jsonify({"error": "only_paused_can_be_resumed", "status": c.status}), 409
+
+        c.status = "sending"
+        db.commit()
+
+        tenant_id = current_user.tenant_id
+        t = threading.Thread(
+            target=_send_campaign_worker,
+            args=(c.id, tenant_id),
+            daemon=True,
+        )
+        t.start()
+        return jsonify({"ok": True, "status": "sending", "message": "Disparo retomado.", "campaign": {"id": c.id, "status": "sending"}})
+    finally:
+        db.close()
+
+
+@broadcast_bp.route("/<int:campaign_id>/move-to-draft", methods=["POST"])
+@login_required
+def move_to_draft(campaign_id: int):
+    """Move uma campanha agendada ou pausada de volta para rascunho."""
+    db = SessionLocal()
+    try:
+        c = db.query(models.BroadcastCampaign).filter_by(
+            id=campaign_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not c:
+            return jsonify({"error": "not_found"}), 404
+        if c.status not in ("scheduled", "paused", "cancelled"):
+            return jsonify({"error": "cannot_move_to_draft", "status": c.status}), 409
+
+        c.status = "draft"
+        c.scheduled_at = None
+        db.commit()
+        return jsonify({"ok": True, "status": "draft", "message": "Campanha movida para rascunho.", "campaign": {"id": c.id, "status": "draft"}})
+    finally:
+        db.close()
+
+
+@broadcast_bp.route("/<int:campaign_id>/rename", methods=["PATCH"])
+@login_required
+def rename_campaign(campaign_id: int):
+    """Renomeia uma campanha rapidamente."""
+    body = request.get_json(silent=True) or {}
+    new_title = (body.get("title") or body.get("name") or "").strip()
+    if not new_title or len(new_title) < 2:
+        return jsonify({"error": "title_required"}), 422
+
+    db = SessionLocal()
+    try:
+        c = db.query(models.BroadcastCampaign).filter_by(
+            id=campaign_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not c:
+            return jsonify({"error": "not_found"}), 404
+
+        c.title = new_title[:200]
+        db.commit()
+        return jsonify({
+            "ok": True,
+            "id": c.id,
+            "title": c.title,
+            "name": c.title,
+            "campaign": {"id": c.id, "title": c.title, "name": c.title, "status": c.status},
         })
     finally:
         db.close()
@@ -605,7 +731,11 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
                 leads_cache[l.id] = l
 
         for rec in recipients:
-            if campaign.status == "cancelled":
+            try:
+                db.refresh(campaign)
+            except Exception:
+                pass
+            if campaign.status in ("cancelled", "paused"):
                 break
 
             lead = leads_cache.get(rec.lead_id)
@@ -662,8 +792,9 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
             # Throttle dinâmico anti-ban
             time.sleep(throttle_secs)
 
-        campaign.status = "completed"
-        campaign.completed_at = datetime.now(timezone.utc)
+        if campaign.status not in ("cancelled", "paused"):
+            campaign.status = "completed"
+            campaign.completed_at = datetime.now(timezone.utc)
         campaign.sent_count = sent
         campaign.failed_count = failed
         db.commit()

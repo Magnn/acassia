@@ -211,6 +211,14 @@ export const broadcastApi = {
     api.post<{ ok: boolean; id: number; title: string }>(`/saas/broadcast/${id}/duplicate`),
   resendFailed: (id: number) =>
     api.post<{ ok: boolean; total_retrying: number; message: string }>(`/saas/broadcast/${id}/resend-failed`),
+  pause: (id: number) =>
+    api.post<{ ok: boolean; status: string; message: string }>(`/saas/broadcast/${id}/pause`),
+  resume: (id: number) =>
+    api.post<{ ok: boolean; status: string; message: string }>(`/saas/broadcast/${id}/resume`),
+  moveToDraft: (id: number) =>
+    api.post<{ ok: boolean; status: string; message: string }>(`/saas/broadcast/${id}/move-to-draft`),
+  rename: (id: number, title: string) =>
+    api.patch<{ ok: boolean; id: number; title: string }>(`/saas/broadcast/${id}/rename`, { title }),
   tags: () => api.get<{ tags: string[] }>('/saas/broadcast/tags'),
 };
 

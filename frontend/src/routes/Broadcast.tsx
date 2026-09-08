@@ -27,6 +27,13 @@ import {
   RotateCcw,
   Workflow,
   Info,
+  Pause,
+  Play,
+  Pencil,
+  Download,
+  Calendar as CalendarIcon,
+  List as ListIcon,
+  Undo2,
 } from 'lucide-react';
 import { broadcastApi, type Campaign } from '../api/saas';
 import { blueprintsApi } from '../api/blueprints';
@@ -35,16 +42,19 @@ import { toast } from '../lib/toast';
 
 export default function Broadcast() {
   const qc = useQueryClient();
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [showWizard, setShowWizard] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [selectedStatusTab, setSelectedStatusTab] = useState<string>('all');
   const [inspectCampaignId, setInspectCampaignId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteCandidateId, setDeleteCandidateId] = useState<number | null>(null);
+  const [renamingCampaign, setRenamingCampaign] = useState<{ id: number; title: string } | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['broadcast-campaigns'],
     queryFn: broadcastApi.campaigns,
-    refetchInterval: 10000, // Atualiza a cada 10s caso haja envios ativos
+    refetchInterval: 8000, // Atualiza dinamicamente caso haja envios ativos
   });
 
   const campaigns = data?.campaigns ?? [];
@@ -61,6 +71,7 @@ export default function Broadcast() {
     if (selectedStatusTab === 'draft') list = list.filter(c => c.status === 'draft');
     else if (selectedStatusTab === 'scheduled') list = list.filter(c => c.status === 'scheduled');
     else if (selectedStatusTab === 'sending') list = list.filter(c => c.status === 'sending');
+    else if (selectedStatusTab === 'paused') list = list.filter(c => c.status === 'paused');
     else if (selectedStatusTab === 'completed') list = list.filter(c => c.status === 'completed' || c.status === 'sent');
 
     if (searchQuery.trim()) {
@@ -90,7 +101,27 @@ export default function Broadcast() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* View Mode Toggle: List vs Calendar */}
+          <div className="flex items-center bg-bg-surface border border-border rounded-2xl p-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                viewMode === 'list' ? 'bg-accent-amethyst text-white' : 'text-secondary hover:text-white'
+              }`}
+            >
+              <ListIcon className="w-3.5 h-3.5" /> Lista
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                viewMode === 'calendar' ? 'bg-accent-amethyst text-white' : 'text-secondary hover:text-white'
+              }`}
+            >
+              <CalendarIcon className="w-3.5 h-3.5" /> Calendário
+            </button>
+          </div>
+
           <button
             onClick={() => refetch()}
             className="p-3 bg-bg-surface hover:bg-bg-surface/80 border border-border rounded-2xl text-secondary hover:text-white transition-all"
@@ -99,7 +130,10 @@ export default function Broadcast() {
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setShowWizard(true)}
+            onClick={() => {
+              setEditingCampaign(null);
+              setShowWizard(true);
+            }}
             className="flex items-center gap-2 px-5 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-accent-amethyst/20"
           >
             <Plus className="w-4 h-4" /> Nova Campanha
@@ -133,96 +167,120 @@ export default function Broadcast() {
         </div>
       </div>
 
-      {/* Filters & Search Toolbar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-border pb-3">
-        {/* Status Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
-          {[
-            { id: 'all', label: 'Todas', count: campaigns.length },
-            { id: 'draft', label: 'Rascunhos', count: campaigns.filter(c => c.status === 'draft').length },
-            { id: 'scheduled', label: 'Agendadas', count: campaigns.filter(c => c.status === 'scheduled').length },
-            { id: 'sending', label: 'Em Envio', count: campaigns.filter(c => c.status === 'sending').length },
-            { id: 'completed', label: 'Concluídas', count: campaigns.filter(c => c.status === 'completed' || c.status === 'sent').length },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedStatusTab(tab.id)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap ${
-                selectedStatusTab === tab.id
-                  ? 'bg-accent-amethyst text-white shadow-sm'
-                  : 'text-secondary hover:text-white hover:bg-bg-surface'
-              }`}
-            >
-              {tab.label}
-              <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                selectedStatusTab === tab.id ? 'bg-white/20 text-white' : 'bg-bg-surface border border-border text-secondary'
-              }`}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
+      {viewMode === 'list' ? (
+        <>
+          {/* Filters & Search Toolbar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-border pb-3">
+            {/* Status Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+              {[
+                { id: 'all', label: 'Todas', count: campaigns.length },
+                { id: 'draft', label: 'Rascunhos', count: campaigns.filter(c => c.status === 'draft').length },
+                { id: 'scheduled', label: 'Agendadas', count: campaigns.filter(c => c.status === 'scheduled').length },
+                { id: 'sending', label: 'Em Envio', count: campaigns.filter(c => c.status === 'sending').length },
+                { id: 'paused', label: 'Pausadas', count: campaigns.filter(c => c.status === 'paused').length },
+                { id: 'completed', label: 'Concluídas', count: campaigns.filter(c => c.status === 'completed' || c.status === 'sent').length },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedStatusTab(tab.id)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap ${
+                    selectedStatusTab === tab.id
+                      ? 'bg-accent-amethyst text-white shadow-sm'
+                      : 'text-secondary hover:text-white hover:bg-bg-surface'
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                    selectedStatusTab === tab.id ? 'bg-white/20 text-white' : 'bg-bg-surface border border-border text-secondary'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
 
-        {/* Search Box */}
-        <div className="relative w-full sm:w-64">
-          <Search className="w-4 h-4 text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar campanhas..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-bg-surface border border-border rounded-xl text-xs text-white focus:border-accent-amethyst outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Campaigns List */}
-      {isLoading ? (
-        <div className="space-y-4 animate-pulse">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-32 bg-bg-surface border border-border rounded-2xl" />
-          ))}
-        </div>
-      ) : filteredCampaigns.length === 0 ? (
-        <div className="bg-bg-surface border border-dashed border-border rounded-3xl p-16 text-center max-w-lg mx-auto">
-          <div className="w-16 h-16 rounded-3xl bg-accent-amethyst/10 flex items-center justify-center mx-auto mb-4 text-accent-amethyst">
-            <Megaphone className="w-8 h-8" />
+            {/* Search Box */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar campanhas..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 bg-bg-surface border border-border rounded-xl text-xs text-white focus:border-accent-amethyst outline-none"
+              />
+            </div>
           </div>
-          <h3 className="font-black text-lg mb-2">Nenhuma campanha encontrada</h3>
-          <p className="text-secondary text-sm mb-6">
-            {searchQuery
-              ? 'Nenhuma campanha corresponde ao termo de busca informado.'
-              : selectedStatusTab === 'all'
-              ? 'Você ainda não possui disparos criados. Crie sua primeira campanha com segmentação e agendamento inteligente.'
-              : 'Nenhuma campanha com o status selecionado.'}
-          </p>
-          <button
-            onClick={() => setShowWizard(true)}
-            className="px-6 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-accent-amethyst/20"
-          >
-            Criar Nova Campanha
-          </button>
-        </div>
+
+          {/* Campaigns List */}
+          {isLoading ? (
+            <div className="space-y-4 animate-pulse">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-32 bg-bg-surface border border-border rounded-2xl" />
+              ))}
+            </div>
+          ) : filteredCampaigns.length === 0 ? (
+            <div className="bg-bg-surface border border-dashed border-border rounded-3xl p-16 text-center max-w-lg mx-auto">
+              <div className="w-16 h-16 rounded-3xl bg-accent-amethyst/10 flex items-center justify-center mx-auto mb-4 text-accent-amethyst">
+                <Megaphone className="w-8 h-8" />
+              </div>
+              <h3 className="font-black text-lg mb-2">Nenhuma campanha encontrada</h3>
+              <p className="text-secondary text-sm mb-6">
+                {searchQuery
+                  ? 'Nenhuma campanha corresponde ao termo de busca informado.'
+                  : selectedStatusTab === 'all'
+                  ? 'Você ainda não possui disparos criados. Crie sua primeira campanha com segmentação e agendamento inteligente.'
+                  : 'Nenhuma campanha com o status selecionado.'}
+              </p>
+              <button
+                onClick={() => {
+                  setEditingCampaign(null);
+                  setShowWizard(true);
+                }}
+                className="px-6 py-3 bg-accent-amethyst hover:bg-accent-amethyst/90 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-accent-amethyst/20"
+              >
+                Criar Nova Campanha
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredCampaigns.map(c => (
+                <CampaignItemCard
+                  key={c.id}
+                  campaign={c}
+                  onInspect={() => setInspectCampaignId(c.id)}
+                  onEdit={() => {
+                    setEditingCampaign(c);
+                    setShowWizard(true);
+                  }}
+                  onRename={() => setRenamingCampaign({ id: c.id, title: c.title || c.name || '' })}
+                  onRequestDelete={() => setDeleteCandidateId(c.id)}
+                  onRefresh={() => qc.invalidateQueries({ queryKey: ['broadcast-campaigns'] })}
+                />
+              ))}
+            </div>
+          )}
+        </>
       ) : (
-        <div className="space-y-4">
-          {filteredCampaigns.map(c => (
-            <CampaignItemCard
-              key={c.id}
-              campaign={c}
-              onInspect={() => setInspectCampaignId(c.id)}
-              onRequestDelete={() => setDeleteCandidateId(c.id)}
-              onRefresh={() => qc.invalidateQueries({ queryKey: ['broadcast-campaigns'] })}
-            />
-          ))}
-        </div>
+        /* Calendar View of Scheduled Broadcasts */
+        <BroadcastsCalendarView
+          campaigns={campaigns}
+          onSelectCampaign={c => setInspectCampaignId(c.id)}
+        />
       )}
 
-      {/* Wizard Modal */}
+      {/* Wizard Modal (Create / Edit) */}
       {showWizard && (
         <CreateCampaignWizardModal
-          onClose={() => setShowWizard(false)}
+          editDraft={editingCampaign}
+          onClose={() => {
+            setShowWizard(false);
+            setEditingCampaign(null);
+          }}
           onCreated={() => {
             setShowWizard(false);
+            setEditingCampaign(null);
             qc.invalidateQueries({ queryKey: ['broadcast-campaigns'] });
           }}
         />
@@ -248,6 +306,19 @@ export default function Broadcast() {
           }}
         />
       )}
+
+      {/* Quick Rename Modal */}
+      {renamingCampaign !== null && (
+        <RenameCampaignModal
+          campaignId={renamingCampaign.id}
+          initialTitle={renamingCampaign.title}
+          onClose={() => setRenamingCampaign(null)}
+          onRenamed={() => {
+            setRenamingCampaign(null);
+            qc.invalidateQueries({ queryKey: ['broadcast-campaigns'] });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -258,11 +329,15 @@ export default function Broadcast() {
 function CampaignItemCard({
   campaign: c,
   onInspect,
+  onEdit,
+  onRename,
   onRequestDelete,
   onRefresh,
 }: {
   campaign: Campaign;
   onInspect: () => void;
+  onEdit: () => void;
+  onRename: () => void;
   onRequestDelete: () => void;
   onRefresh: () => void;
 }) {
@@ -273,6 +348,33 @@ function CampaignItemCard({
       onRefresh();
     },
     onError: handleApiError('Erro ao iniciar disparo'),
+  });
+
+  const pauseMut = useMutation({
+    mutationFn: () => broadcastApi.pause(c.id),
+    onSuccess: res => {
+      toast.success(res.message || 'Disparo pausado.');
+      onRefresh();
+    },
+    onError: handleApiError('Erro ao pausar disparo'),
+  });
+
+  const resumeMut = useMutation({
+    mutationFn: () => broadcastApi.resume(c.id),
+    onSuccess: res => {
+      toast.success(res.message || 'Disparo retomado.');
+      onRefresh();
+    },
+    onError: handleApiError('Erro ao retomar disparo'),
+  });
+
+  const moveToDraftMut = useMutation({
+    mutationFn: () => broadcastApi.moveToDraft(c.id),
+    onSuccess: res => {
+      toast.success(res.message || 'Campanha movida para rascunho.');
+      onRefresh();
+    },
+    onError: handleApiError('Erro ao mover para rascunho'),
   });
 
   const duplicateMut = useMutation({
@@ -304,6 +406,7 @@ function CampaignItemCard({
     draft: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/30', label: 'Rascunho', Icon: Clock },
     scheduled: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/30', label: 'Agendado', Icon: CalendarClock },
     sending: { color: 'text-purple-400 bg-purple-500/10 border-purple-500/30 animate-pulse', label: 'Enviando...', Icon: Send },
+    paused: { color: 'text-amber-300 bg-amber-500/15 border-amber-500/40', label: 'Pausada', Icon: Pause },
     sent: { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', label: 'Concluído', Icon: CheckCircle2 },
     completed: { color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', label: 'Concluído', Icon: CheckCircle2 },
     cancelled: { color: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30', label: 'Cancelado', Icon: XCircle },
@@ -350,8 +453,55 @@ function CampaignItemCard({
             className="flex items-center gap-1.5 px-3 py-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-secondary hover:text-white transition-all"
             title="Ver destinatários e logs"
           >
-            <Eye className="w-3.5 h-3.5 text-accent-amethyst" /> Destinatários & Logs
+            <Eye className="w-3.5 h-3.5 text-accent-amethyst" /> Destinatários
           </button>
+
+          {/* Pausar Envio */}
+          {c.status === 'sending' && (
+            <button
+              onClick={() => pauseMut.mutate()}
+              disabled={pauseMut.isPending}
+              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-xl text-xs font-bold transition-all"
+              title="Pausar envio da fila"
+            >
+              <Pause className="w-3.5 h-3.5" /> Pausar
+            </button>
+          )}
+
+          {/* Retomar Envio */}
+          {c.status === 'paused' && (
+            <button
+              onClick={() => resumeMut.mutate()}
+              disabled={resumeMut.isPending}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold transition-all"
+              title="Retomar envio da fila de pendentes"
+            >
+              <Play className="w-3.5 h-3.5" /> Retomar
+            </button>
+          )}
+
+          {/* Mover para Rascunho se agendada */}
+          {(c.status === 'scheduled' || c.status === 'paused') && (
+            <button
+              onClick={() => moveToDraftMut.mutate()}
+              disabled={moveToDraftMut.isPending}
+              className="flex items-center gap-1.5 px-3 py-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-secondary hover:text-white transition-all"
+              title="Mover para Rascunho para editar"
+            >
+              <Undo2 className="w-3.5 h-3.5" /> Rascunho
+            </button>
+          )}
+
+          {/* Editar Rascunho */}
+          {(c.status === 'draft' || c.status === 'scheduled') && (
+            <button
+              onClick={onEdit}
+              className="flex items-center gap-1.5 px-3 py-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-secondary hover:text-white transition-all"
+              title="Editar campanha"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Editar
+            </button>
+          )}
 
           {/* Reenviar falhas se houver */}
           {failed > 0 && c.status !== 'sending' && (
@@ -366,6 +516,15 @@ function CampaignItemCard({
             </button>
           )}
 
+          {/* Renomear rápido */}
+          <button
+            onClick={onRename}
+            className="p-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-secondary hover:text-white transition-all"
+            title="Renomear Campanha"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+
           {/* Duplicar campanha */}
           <button
             onClick={() => duplicateMut.mutate()}
@@ -373,7 +532,7 @@ function CampaignItemCard({
             className="p-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-secondary hover:text-white transition-all"
             title="Duplicar Campanha"
           >
-            <Copy className="w-4 h-4" />
+            <Copy className="w-3.5 h-3.5" />
           </button>
 
           {/* Enviar agora */}
@@ -424,7 +583,7 @@ function CampaignItemCard({
       </div>
 
       {/* Progress Bar if active or done */}
-      {(c.status === 'sending' || c.status === 'completed' || c.status === 'sent') && total > 0 && (
+      {(c.status === 'sending' || c.status === 'completed' || c.status === 'sent' || c.status === 'paused') && total > 0 && (
         <div className="mt-3 space-y-1.5">
           <div className="flex justify-between text-[10px] font-bold text-secondary">
             <span>Progresso da entrega</span>
@@ -433,7 +592,7 @@ function CampaignItemCard({
           <div className="w-full bg-bg-primary rounded-full h-2 overflow-hidden border border-border/30">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
-                c.status === 'sending' ? 'bg-gradient-to-r from-accent-amethyst to-purple-400' : 'bg-emerald-500'
+                c.status === 'sending' ? 'bg-gradient-to-r from-accent-amethyst to-purple-400' : c.status === 'paused' ? 'bg-amber-400' : 'bg-emerald-500'
               }`}
               style={{ width: `${progressPercent}%` }}
             />
@@ -446,12 +605,156 @@ function CampaignItemCard({
         <div className="flex items-center gap-1.5 mt-3 flex-wrap">
           <span className="text-[10px] uppercase tracking-wider text-secondary font-bold">Filtros:</span>
           {filterTags.map(t => (
-            <span key={t} className="text-[10px] px-2 py-0.5 rounded-md bg-accent-amethyst/10 border border-accent-amethyst/20 text-accent-amethyst font-semibold">
-              #{t}
+            <span key={String(t)} className="text-[10px] px-2 py-0.5 rounded-md bg-accent-amethyst/10 border border-accent-amethyst/20 text-accent-amethyst font-semibold">
+              #{String(t)}
             </span>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BROADCASTS CALENDAR VIEW (CHATBOTX PATTERN)
+   ───────────────────────────────────────────────────────────────────────────── */
+function BroadcastsCalendarView({
+  campaigns,
+  onSelectCampaign,
+}: {
+  campaigns: Campaign[];
+  onSelectCampaign: (c: Campaign) => void;
+}) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  // Dias do mês
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+
+  // Mapear campanhas por data ISO (YYYY-MM-DD)
+  const campaignsByDate = useMemo(() => {
+    const map: Record<string, Campaign[]> = {};
+    for (const c of campaigns) {
+      const dateStr = c.scheduled_at || c.created_at;
+      if (dateStr) {
+        const d = new Date(dateStr);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (!map[key]) map[key] = [];
+        map[key].push(c);
+      }
+    }
+    return map;
+  }, [campaigns]);
+
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  return (
+    <div className="bg-bg-surface border border-border rounded-3xl p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-black text-white">
+            {monthNames[month]} {year}
+          </h2>
+          <span className="text-xs text-secondary font-medium">Visualização de agendamentos e envios</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+            className="p-2 hover:bg-bg-primary border border-border rounded-xl text-secondary hover:text-white"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setCurrentDate(new Date())}
+            className="px-3 py-1.5 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-white"
+          >
+            Hoje
+          </button>
+          <button
+            onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+            className="p-2 hover:bg-bg-primary border border-border rounded-xl text-secondary hover:text-white"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="grid grid-cols-7 gap-2">
+        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+          <div key={day} className="text-center text-[10px] font-black uppercase tracking-widest text-secondary pb-2">
+            {day}
+          </div>
+        ))}
+
+        {/* Empty slots for previous month offset */}
+        {Array.from({ length: firstDayIndex }).map((_, i) => (
+          <div key={`empty-${i}`} className="min-h-[100px] rounded-2xl bg-bg-primary/20 border border-border/30 opacity-30" />
+        ))}
+
+        {/* Days of current month */}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const dayNum = i + 1;
+          const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+          const dayCampaigns = campaignsByDate[dateKey] || [];
+          const isToday =
+            new Date().getDate() === dayNum &&
+            new Date().getMonth() === month &&
+            new Date().getFullYear() === year;
+
+          return (
+            <div
+              key={dayNum}
+              className={`min-h-[110px] p-2 rounded-2xl border transition-all flex flex-col justify-between ${
+                isToday
+                  ? 'bg-accent-amethyst/10 border-accent-amethyst/40'
+                  : 'bg-bg-primary/50 border-border/60 hover:border-border'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold ${isToday ? 'text-accent-amethyst font-black' : 'text-secondary'}`}>
+                  {dayNum}
+                </span>
+                {dayCampaigns.length > 0 && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/10 text-white font-bold">
+                    {dayCampaigns.length}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1 mt-1 overflow-y-auto max-h-[70px]">
+                {dayCampaigns.map(c => {
+                  const isDone = c.status === 'completed' || c.status === 'sent';
+                  const isSched = c.status === 'scheduled';
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => onSelectCampaign(c)}
+                      className={`w-full text-left px-1.5 py-1 rounded-lg text-[9px] font-bold truncate block border transition-all ${
+                        isDone
+                          ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                          : isSched
+                          ? 'bg-blue-500/15 border-blue-500/30 text-blue-300'
+                          : 'bg-accent-amethyst/15 border-accent-amethyst/30 text-accent-amethyst'
+                      }`}
+                      title={c.title || c.name || ''}
+                    >
+                      {c.scheduled_at && `[${new Date(c.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}] `}
+                      {c.title || c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -511,7 +814,69 @@ function DeleteConfirmModal({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   RECIPIENTS AUDIT DRAWER / MODAL
+   RENAME CAMPAIGN MODAL (ZERO BROWSER DIALOGS)
+   ───────────────────────────────────────────────────────────────────────────── */
+function RenameCampaignModal({
+  campaignId,
+  initialTitle,
+  onClose,
+  onRenamed,
+}: {
+  campaignId: number;
+  initialTitle: string;
+  onClose: () => void;
+  onRenamed: () => void;
+}) {
+  const [title, setTitle] = useState(initialTitle);
+
+  const renameMut = useMutation({
+    mutationFn: () => broadcastApi.rename(campaignId, title),
+    onSuccess: () => {
+      toast.success('Campanha renomeada com sucesso!');
+      onRenamed();
+    },
+    onError: handleApiError('Erro ao renomear campanha'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+      <div className="bg-bg-surface border border-border rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h3 className="font-black text-base text-white">Renomear Campanha</h3>
+          <button onClick={onClose} className="p-1 hover:bg-bg-primary rounded-lg text-secondary hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-widest text-secondary block mb-1.5">
+            Novo Nome da Campanha
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="w-full px-3 py-2 bg-bg-primary border border-border rounded-xl text-xs text-white outline-none focus:border-accent-amethyst"
+          />
+        </div>
+        <div className="flex gap-2 pt-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-white">
+            Cancelar
+          </button>
+          <button
+            onClick={() => renameMut.mutate()}
+            disabled={renameMut.isPending || !title.trim()}
+            className="px-4 py-2 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider"
+          >
+            {renameMut.isPending ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   RECIPIENTS AUDIT DRAWER / MODAL WITH CSV EXPORT
    ───────────────────────────────────────────────────────────────────────────── */
 function RecipientsDrawer({
   campaignId,
@@ -553,6 +918,24 @@ function RecipientsDrawer({
     });
   }, [recipients, searchTerm, filterStatus]);
 
+  // Download CSV client-side
+  const downloadCSV = () => {
+    if (recipients.length === 0) return;
+    const header = 'Nome,Telefone,Status,Horário,Motivo Erro\n';
+    const rows = recipients.map(r =>
+      `"${r.lead_name || ''}","${r.lead_phone || ''}","${r.status}","${r.sent_at || ''}","${r.error_reason || ''}"`
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `destinatarios_campanha_${campaignId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Arquivo CSV baixado com sucesso!');
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 md:p-6 animate-in fade-in duration-200">
       <div className="bg-bg-surface border border-border rounded-3xl max-w-3xl w-full flex flex-col max-h-[85vh] shadow-2xl overflow-hidden">
@@ -570,6 +953,14 @@ function RecipientsDrawer({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={downloadCSV}
+              disabled={recipients.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-secondary hover:text-white transition-all disabled:opacity-40"
+              title="Exportar lista de destinatários em CSV"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
             {failedCount > 0 && (
               <button
                 onClick={() => resendFailedMut.mutate()}
@@ -672,36 +1063,58 @@ function RecipientsDrawer({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CREATE CAMPAIGN 4-STEP WIZARD (CHATBOTX PATTERN)
+   CREATE / EDIT CAMPAIGN 4-STEP WIZARD (CHATBOTX PATTERN)
    ───────────────────────────────────────────────────────────────────────────── */
 function CreateCampaignWizardModal({
+  editDraft,
   onClose,
   onCreated,
 }: {
+  editDraft?: Campaign | null;
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const isEditing = Boolean(editDraft);
+
   // Wizard Step: 1 = Audiência, 2 = Mensagem & Preview, 3 = Agendamento & Anti-Ban, 4 = Revisão
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
-  // Form State
-  const [name, setName] = useState('');
-  const [messageType, setMessageType] = useState<'text' | 'flow'>('text');
-  const [selectedBlueprintId, setSelectedBlueprintId] = useState<number | null>(null);
-  const [message, setMessage] = useState('');
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [mediaType, setMediaType] = useState<'image' | 'video' | 'document'>('image');
+  // Form State prefilled if editing
+  const [name, setName] = useState(editDraft?.title || editDraft?.name || '');
+  const [messageType, setMessageType] = useState<'text' | 'flow'>(
+    editDraft?.segment_filters?.flow_blueprint_id ? 'flow' : 'text'
+  );
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState<number | null>(
+    (editDraft?.segment_filters?.flow_blueprint_id as number) || null
+  );
+  const [message, setMessage] = useState(editDraft?.message_text || editDraft?.message_template || '');
+  const [mediaUrl, setMediaUrl] = useState(editDraft?.message_media_url || '');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'document'>(
+    (editDraft?.message_media_type as 'image' | 'video' | 'document') || 'image'
+  );
 
   // Segmentation Filters
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>(
+    (editDraft?.segment_filters?.tags as string[]) || []
+  );
   const [customTagInput, setCustomTagInput] = useState('');
-  const [scoreBand, setScoreBand] = useState<string>('all'); // all, hot, warm, cold
-  const [excludeOptedOut, setExcludeOptedOut] = useState(true);
+  const [scoreBand, setScoreBand] = useState<string>(
+    ((editDraft?.segment_filters?.score_band as string[]) || [])[0] || 'all'
+  );
+  const [excludeOptedOut, setExcludeOptedOut] = useState(
+    editDraft ? editDraft.segment_filters?.include_opted_out === false : true
+  );
 
   // Scheduling & Anti-Ban
-  const [sendMode, setSendMode] = useState<'immediate' | 'scheduled'>('immediate');
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [antiBanDelaySeconds, setAntiBanDelaySeconds] = useState<number>(5); // 5s recomendado Meta
+  const [sendMode, setSendMode] = useState<'immediate' | 'scheduled'>(
+    editDraft?.scheduled_at ? 'scheduled' : 'immediate'
+  );
+  const [scheduledAt, setScheduledAt] = useState(
+    editDraft?.scheduled_at ? editDraft.scheduled_at.slice(0, 16) : ''
+  );
+  const [antiBanDelaySeconds, setAntiBanDelaySeconds] = useState<number>(
+    (editDraft?.segment_filters?.anti_ban_delay_seconds as number) || 5
+  );
 
   // Live audience estimation state
   const [audienceCount, setAudienceCount] = useState<number | null>(null);
@@ -764,21 +1177,29 @@ function CreateCampaignWizardModal({
     };
   }, [currentFilters]);
 
-  // Submit Mutation
-  const createMut = useMutation({
-    mutationFn: (asDraft: boolean) =>
-      broadcastApi.create({
+  // Submit Mutation (Create or Update)
+  const submitMut = useMutation({
+    mutationFn: async (asDraft: boolean) => {
+      const payload = {
         title: name,
         message_text: message,
         message_media_url: mediaUrl ? mediaUrl : null,
         message_media_type: mediaUrl ? mediaType : null,
         segment_filters: currentFilters,
         status: asDraft ? 'draft' : sendMode === 'scheduled' && scheduledAt ? 'scheduled' : 'draft',
-        scheduled_at: !asDraft && sendMode === 'scheduled' && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
-      }),
+        scheduled_at: !asDraft && sendMode === 'scheduled' && scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      };
+
+      if (isEditing && editDraft) {
+        await broadcastApi.update(editDraft.id, payload);
+        return { ok: true, id: editDraft.id, isEdit: true };
+      } else {
+        const res = await broadcastApi.create(payload);
+        return { ok: true, id: res.id, isEdit: false };
+      }
+    },
     onSuccess: (res, asDraft) => {
-      if (!asDraft && sendMode === 'immediate') {
-        // Disparar imediatamente se solicitado
+      if (!asDraft && sendMode === 'immediate' && !isEditing) {
         broadcastApi.send(res.id).then(() => {
           toast.success('🚀 Campanha criada e disparo iniciado com sucesso!');
           onCreated();
@@ -788,14 +1209,16 @@ function CreateCampaignWizardModal({
         });
       } else {
         toast.success(
-          asDraft
+          isEditing
+            ? 'Campanha atualizada com sucesso!'
+            : asDraft
             ? 'Campanha salva como rascunho!'
             : `Campanha agendada com sucesso para ${new Date(scheduledAt).toLocaleString('pt-BR')}!`
         );
         onCreated();
       }
     },
-    onError: handleApiError('Erro ao criar campanha'),
+    onError: handleApiError(isEditing ? 'Erro ao atualizar campanha' : 'Erro ao criar campanha'),
   });
 
   const toggleTag = (tag: string) => {
@@ -836,7 +1259,9 @@ function CreateCampaignWizardModal({
                 {step}
               </div>
               <div>
-                <h2 className="text-lg font-black tracking-tight">Nova Campanha de Broadcast</h2>
+                <h2 className="text-lg font-black tracking-tight">
+                  {isEditing ? `Editar Campanha #${editDraft?.id}` : 'Nova Campanha de Broadcast'}
+                </h2>
                 <p className="text-xs text-secondary">
                   {step === 1 && 'Etapa 1 de 4 — Defina a audiência e filtros de segmentação'}
                   {step === 2 && 'Etapa 2 de 4 — Redija a mensagem e veja o preview do WhatsApp'}
@@ -1399,8 +1824,8 @@ function CreateCampaignWizardModal({
             {step === 4 && (
               <button
                 type="button"
-                onClick={() => createMut.mutate(true)}
-                disabled={createMut.isPending}
+                onClick={() => submitMut.mutate(true)}
+                disabled={submitMut.isPending}
                 className="px-4 py-2.5 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-secondary hover:text-white transition-all"
               >
                 Salvar Rascunho
@@ -1424,12 +1849,16 @@ function CreateCampaignWizardModal({
             ) : (
               <button
                 type="button"
-                onClick={() => createMut.mutate(false)}
-                disabled={createMut.isPending || !name.trim() || !message.trim()}
+                onClick={() => submitMut.mutate(false)}
+                disabled={submitMut.isPending || !name.trim() || !message.trim()}
                 className="flex items-center gap-2 px-6 py-2.5 bg-accent-amethyst hover:bg-accent-amethyst/90 disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-accent-amethyst/25"
               >
-                {createMut.isPending ? (
+                {submitMut.isPending ? (
                   'Processando...'
+                ) : isEditing ? (
+                  <>
+                    <Check className="w-4 h-4" /> Salvar Alterações
+                  </>
                 ) : sendMode === 'scheduled' ? (
                   <>
                     <CalendarClock className="w-4 h-4" /> Confirmar Agendamento
