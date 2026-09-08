@@ -72,6 +72,28 @@ services:
       - ./media:/app/media
       - ./scripts/reports:/app/scripts/reports
 
+  # ── Background Task Worker (Broadcasts & Sequences) ──
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meumisterio-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://meumisterio:${POSTGRES_PASSWORD:-meumisterio_2026_secure}@db:5432/meumisterio
+    command: python task_worker.py
+    volumes:
+      - ./downloads:/app/downloads
+      - ./media:/app/media
+      - ./scripts/reports:/app/scripts/reports
+
   # ── Alembic Migration Runner (one-shot) ──
   migrate:
     build:

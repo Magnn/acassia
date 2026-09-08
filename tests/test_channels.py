@@ -88,3 +88,21 @@ def test_send_message_webchat(mock_session_local):
     assert res.ok is True
     assert mock_db.add.called
     assert mock_db.commit.called
+
+
+def test_channel_capabilities():
+    wa = WhatsAppChannelAdapter("tenant_1")
+    assert wa.get_capabilities().supports_buttons is True
+    assert wa.get_capabilities().supports_media is True
+    assert wa.get_capabilities().supports_templates is True
+
+    wc = WebchatChannelAdapter("tenant_1")
+    assert wc.get_capabilities().supports_buttons is False
+    assert wc.get_capabilities().supports_media is False
+    assert wc.get_capabilities().supports_markdown is True
+
+    tg = TelegramChannelAdapter("tenant_1")
+    assert tg.get_capabilities().supports_buttons is True
+    assert tg.get_capabilities().supports_media is True
+    assert tg.get_capabilities().supports_templates is False
+

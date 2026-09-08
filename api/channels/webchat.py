@@ -1,7 +1,14 @@
 """api/channels/webchat.py — Adaptador para canal Webchat."""
 import logging
 from datetime import datetime, timezone
-from api.channels.base import ChannelAdapter, ChannelType, ChannelResult, OutboundMessage, InboundMessage
+from api.channels.base import (
+    ChannelAdapter,
+    ChannelCapabilities,
+    ChannelType,
+    ChannelResult,
+    OutboundMessage,
+    InboundMessage,
+)
 from db.database import SessionLocal
 from db import models
 
@@ -9,6 +16,16 @@ logger = logging.getLogger(__name__)
 
 class WebchatChannelAdapter(ChannelAdapter):
     channel_type = ChannelType.WEBCHAT
+
+    def get_capabilities(self) -> ChannelCapabilities:
+        return ChannelCapabilities(
+            supports_buttons=False,
+            supports_media=False,
+            supports_templates=False,
+            supports_reactions=False,
+            supports_audio=False,
+            supports_markdown=True,
+        )
 
     def send_message(self, message: OutboundMessage) -> ChannelResult:
         db = SessionLocal()

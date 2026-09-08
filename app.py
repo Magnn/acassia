@@ -471,6 +471,14 @@ motor = Engine(
 )
 app.extensions["flow_engine"] = motor
 
+# Inicialização de workers da fila durável (quando TASK_WORKERS_IN_WEB=1)
+try:
+    from api.utils.task_queue import start_workers
+    start_workers()
+except Exception as _tq_err:
+    logger.warning("⚠️ [TASK_QUEUE] Falha ao iniciar workers: %s", _tq_err)
+
+
 # ─────────────────────────────────────────────────────────────────────
 # GESTÃO DE FILA POR LEAD (LeadInboxManager)
 # ─────────────────────────────────────────────────────────────────────
@@ -1149,9 +1157,17 @@ def api_health_deep():
     else:
         checks["gemini"] = {"status": "disabled", "reason": "GEMINI_API_KEY not set"}
 
+    # ── Filas de background (broadcast + sequences) ──────────────────
+    try:
+        from api.utils.task_queue import get_queue_metrics
+        checks["task_queues"] = get_queue_metrics()
+    except Exception as exc:
+        checks["task_queues"] = {"available": False, "error": str(exc)[:200]}
+
     # DB é o único check obrigatório — Redis e Gemini podem estar "disabled".
     overall_ok = db_ok and all(
-        c.get("status") in ("ok", "disabled") for c in checks.values()
+        c.get("status") in ("ok", "disabled") or c.get("available") is not False
+        for c in checks.values()
     )
     elapsed_ms = int((time.perf_counter() - started) * 1000)
 
@@ -1162,6 +1178,17 @@ def api_health_deep():
         "elapsed_ms": elapsed_ms,
         "checks": checks,
     }), (200 if overall_ok else 503)
+
+
+@app.route("/api/health/queues", methods=["GET"])
+def api_health_queues():
+    """Métricas operacionais das filas de tarefas duráveis (lag, DLQ, processing)."""
+    try:
+        from api.utils.task_queue import get_queue_metrics
+        metrics = get_queue_metrics()
+        return jsonify(metrics), (200 if metrics.get("available") else 503)
+    except Exception as exc:
+        return jsonify({"available": False, "error": str(exc)[:200]}), 500
 
 
 def _scan_flows_motor_nodes():

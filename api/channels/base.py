@@ -24,6 +24,18 @@ class ChannelType(str, Enum):
 
 
 @dataclass
+class ChannelCapabilities:
+    """Capacidades e recursos suportados pelo canal."""
+    supports_buttons: bool = False
+    supports_media: bool = False
+    supports_templates: bool = False
+    supports_reactions: bool = False
+    supports_audio: bool = False
+    supports_markdown: bool = True
+
+
+
+@dataclass
 class OutboundMessage:
     """Mensagem enviada da plataforma para o destinatário."""
     recipient_id: str  # telefone, chat_id, ig_scoped_id, email, etc.
@@ -80,3 +92,9 @@ class ChannelAdapter(ABC):
     def is_configured(self) -> bool:
         """Indica se as credenciais do canal estão configuradas para o tenant."""
         pass
+
+    @abstractmethod
+    def get_capabilities(self) -> ChannelCapabilities:
+        """Retorna as capacidades suportadas por este adaptador."""
+        pass
+

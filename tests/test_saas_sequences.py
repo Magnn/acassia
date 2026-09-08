@@ -155,3 +155,64 @@ def test_sequence_lifecycle_and_chatbotx_parity(auth_client):
     # 9. Delete sequence
     res_del = client.delete(f"/saas/sequences/{seq_id}")
     assert res_del.status_code == 200
+
+
+def test_sequence_dispatch_idempotency_and_transactional_claim(auth_client):
+    client, user = auth_client
+    db = SessionLocal()
+    seq = models.Sequence(tenant_id=user.tenant_id, name="Drip Idempotente", active=True)
+    db.add(seq)
+    db.commit()
+    step = models.SequenceStep(
+        sequence_id=seq.id, tenant_id=user.tenant_id, order=0,
+        delay_days=0, is_active=True, message_template="Olá {{nome}}",
+    )
+    lead = models.Lead(tenant_id=user.tenant_id, nome="Idem Lead", telefone="5511999990001")
+    db.add(step)
+    db.add(lead)
+    db.commit()
+
+    now = datetime.now(timezone.utc)
+    enrollment = models.ContactOnSequence(
+        tenant_id=user.tenant_id,
+        sequence_id=seq.id,
+        lead_id=lead.id,
+        current_step=0,
+        status="active",
+        next_run_at=now - timedelta(minutes=5),
+        enrolled_at=now - timedelta(days=1),
+    )
+    db.add(enrollment)
+    db.commit()
+    enrollment_id = enrollment.id
+    db.close()
+
+    from api.channels.base import ChannelResult
+    from unittest.mock import patch
+    with patch("api.saas.sequences.WhatsAppChannelAdapter.send_message", return_value=ChannelResult(ok=True, message_id="wamid.test.456")) as mock_send:
+        # First execution
+        count1 = process_due_sequence_steps(tenant_id=user.tenant_id)
+        assert count1 == 1
+        assert mock_send.call_count == 1
+
+        db = SessionLocal()
+        dispatch = db.query(models.SequenceDispatch).filter_by(
+            sequence_id=seq.id, step_id=step.id, lead_id=lead.id
+        ).first()
+        assert dispatch is not None
+        assert dispatch.status == "sent"
+        assert dispatch.provider_message_id == "wamid.test.456"
+        assert dispatch.attempt == 1
+        assert dispatch.enrollment_id == enrollment_id
+        assert dispatch.idempotency_key == f"seq:{seq.id}:step:{step.id}:lead:{lead.id}:attempt:1"
+
+        # If next_run_at is somehow still in the past or reset, a second run must be idempotent
+        en_after = db.query(models.ContactOnSequence).filter_by(id=enrollment_id).first()
+        en_after.current_step = 0
+        en_after.next_run_at = now - timedelta(minutes=1)
+        db.commit()
+
+        count2 = process_due_sequence_steps(tenant_id=user.tenant_id)
+        # Should not send again because already_sent exists
+        assert mock_send.call_count == 1
+        db.close()

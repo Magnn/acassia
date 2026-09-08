@@ -1,7 +1,14 @@
 """api/channels/telegram.py — Adaptador para canal Telegram."""
 import logging
 import requests
-from api.channels.base import ChannelAdapter, ChannelType, ChannelResult, OutboundMessage, InboundMessage
+from api.channels.base import (
+    ChannelAdapter,
+    ChannelCapabilities,
+    ChannelType,
+    ChannelResult,
+    OutboundMessage,
+    InboundMessage,
+)
 from db.database import SessionLocal
 from db import models
 from api.utils.tenant_secrets import decrypt_tenant_secret
@@ -10,6 +17,16 @@ logger = logging.getLogger(__name__)
 
 class TelegramChannelAdapter(ChannelAdapter):
     channel_type = ChannelType.TELEGRAM
+
+    def get_capabilities(self) -> ChannelCapabilities:
+        return ChannelCapabilities(
+            supports_buttons=True,
+            supports_media=True,
+            supports_templates=False,
+            supports_reactions=False,
+            supports_audio=True,
+            supports_markdown=True,
+        )
 
     def _get_token(self) -> str:
         db = SessionLocal()

@@ -2155,8 +2155,14 @@ class SequenceDispatch(Base):
     sequence_id = Column(Integer, ForeignKey("sequences.id"), nullable=False, index=True)
     step_id = Column(Integer, ForeignKey("sequence_steps.id"), nullable=False, index=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    enrollment_id = Column(Integer, ForeignKey("contacts_on_sequences.id"), nullable=True, index=True)
 
-    status = Column(String(20), default="sent", nullable=False)  # sent, delivered, seen, failed
+    idempotency_key = Column(String(128), nullable=True, unique=True, index=True)
+    attempt = Column(Integer, default=1, nullable=False)
+    run_at = Column(DateTime(timezone=True), nullable=True)
+    provider_message_id = Column(String(128), nullable=True)
+
+    status = Column(String(20), default="sent", nullable=False)  # pending, claimed, sent, delivered, seen, failed
     error_reason = Column(String(255), nullable=True)
     dispatched_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 

@@ -648,35 +648,54 @@ def process_due_sequence_steps(tenant_id: Optional[str] = None) -> int:
                 continue
 
             # A sent dispatch is the durable idempotency marker for this step.
-            already_sent = db.query(models.SequenceDispatch).filter_by(
+            previous_dispatches = db.query(models.SequenceDispatch).filter_by(
                 tenant_id=en.tenant_id, sequence_id=en.sequence_id,
-                step_id=step.id, lead_id=en.lead_id, status="sent",
-            ).first()
+                step_id=step.id, lead_id=en.lead_id,
+            ).all()
+
+            already_sent = next((d for d in previous_dispatches if d.status == "sent"), None)
 
             dispatch_status = "sent"
             error_msg = None
             if not already_sent:
+                attempt = len(previous_dispatches) + 1
+                idem_key = f"seq:{en.sequence_id}:step:{step.id}:lead:{en.lead_id}:attempt:{attempt}"
+                dispatch = models.SequenceDispatch(
+                    tenant_id=en.tenant_id,
+                    sequence_id=en.sequence_id,
+                    step_id=step.id,
+                    lead_id=en.lead_id,
+                    enrollment_id=en.id,
+                    idempotency_key=idem_key,
+                    attempt=attempt,
+                    run_at=now,
+                    status="claimed",
+                    dispatched_at=now,
+                )
+                db.add(dispatch)
+                db.commit()
+                db.refresh(dispatch)
+
                 try:
                     msg = step.message_template or f"Olá {lead.nome or ''}, novidades na sua jornada!"
                     msg = msg.replace("{{nome}}", lead.nome or "").replace("{{telefone}}", lead.telefone or "")
                     result = WhatsAppChannelAdapter(en.tenant_id).send_message(OutboundMessage(
                         recipient_id=lead.telefone, text=msg,
-                        metadata={"idempotency_key": f"sequence:{en.id}:step:{step.id}"},
+                        metadata={"idempotency_key": idem_key},
                     ))
                     if not result.ok:
                         raise RuntimeError(result.error or "channel_send_failed")
-                    logger.info("[SEQUENCE] Sent step=%s sequence=%s lead=%s", step.order, en.sequence_id, lead.id)
+                    dispatch.status = "sent"
+                    dispatch.provider_message_id = result.message_id
+                    dispatch.dispatched_at = _agora_utc()
+                    dispatch_status = "sent"
+                    logger.info("[SEQUENCE] Sent step=%s sequence=%s lead=%s msg_id=%s", step.order, en.sequence_id, lead.id, result.message_id)
                 except Exception as ex:
+                    dispatch.status = "failed"
+                    dispatch.error_reason = str(ex)[:200]
                     dispatch_status = "failed"
                     error_msg = str(ex)[:200]
-
-            # Registrar histórico
-            if not already_sent:
-                db.add(models.SequenceDispatch(
-                    tenant_id=en.tenant_id, sequence_id=en.sequence_id,
-                    step_id=step.id, lead_id=en.lead_id, status=dispatch_status,
-                    error_reason=error_msg, dispatched_at=now,
-                ))
+                db.commit()
 
             if dispatch_status == "sent":
                 step.sent_count = (step.sent_count or 0) + 1

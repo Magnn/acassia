@@ -63,3 +63,42 @@ def test_lease_heartbeat_renews_processing_lease():
         time.sleep(0.12)
     assert redis.zadd.call_count >= 1
 
+
+def test_get_queue_metrics():
+    redis = MagicMock()
+    pipe = redis.pipeline.return_value
+    pipe.execute.return_value = [2, 1, 0, 0, 3]
+    with patch.object(task_queue, "_get_redis", return_value=redis):
+        metrics = task_queue.get_queue_metrics()
+        assert metrics["available"] is True
+        assert "broadcast" in metrics["queues"]
+        assert metrics["queues"]["broadcast"]["ready"] == 2
+        assert metrics["queues"]["broadcast"]["processing"] == 1
+        assert metrics["queues"]["broadcast"]["total_jobs"] == 3
+
+
+def test_get_queue_metrics_redis_unavailable():
+    with patch.object(task_queue, "_get_redis", return_value=None):
+        metrics = task_queue.get_queue_metrics()
+        assert metrics["available"] is False
+        assert metrics["reason"] == "redis_unavailable"
+
+
+def test_api_health_queues_endpoint():
+    from flask import Flask
+    import app as flask_module
+    client = flask_module.app.test_client()
+
+    with patch.object(task_queue, "get_queue_metrics", return_value={"available": True, "queues": {"broadcast": {"ready": 0}}}):
+        resp = client.get("/api/health/queues")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["available"] is True
+        assert "broadcast" in data["queues"]
+
+    with patch.object(task_queue, "get_queue_metrics", return_value={"available": False, "reason": "redis_unavailable"}):
+        resp = client.get("/api/health/queues")
+        assert resp.status_code == 503
+
+
+

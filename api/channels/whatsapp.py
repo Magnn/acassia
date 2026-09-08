@@ -1,6 +1,13 @@
 """api/channels/whatsapp.py — Adaptador para canal WhatsApp."""
 import logging
-from api.channels.base import ChannelAdapter, ChannelType, ChannelResult, OutboundMessage, InboundMessage
+from api.channels.base import (
+    ChannelAdapter,
+    ChannelCapabilities,
+    ChannelType,
+    ChannelResult,
+    OutboundMessage,
+    InboundMessage,
+)
 
 try:
     import horoscope
@@ -11,6 +18,16 @@ logger = logging.getLogger(__name__)
 
 class WhatsAppChannelAdapter(ChannelAdapter):
     channel_type = ChannelType.WHATSAPP
+
+    def get_capabilities(self) -> ChannelCapabilities:
+        return ChannelCapabilities(
+            supports_buttons=True,
+            supports_media=True,
+            supports_templates=True,
+            supports_reactions=True,
+            supports_audio=True,
+            supports_markdown=True,
+        )
 
     def send_message(self, message: OutboundMessage) -> ChannelResult:
         try:
@@ -31,7 +48,15 @@ class WhatsAppChannelAdapter(ChannelAdapter):
                     message.text,
                     formato="texto",
                 )
-            return ChannelResult(ok=bool(ok))
+
+            wamid = None
+            try:
+                from api.whatsapp_providers.meta_cloud import pop_last_wamid
+                wamid = pop_last_wamid()
+            except Exception:
+                pass
+
+            return ChannelResult(ok=bool(ok), message_id=wamid)
         except Exception as exc:
             logger.exception("[WHATSAPP_ADAPTER] Erro ao enviar: %s", exc)
             return ChannelResult(ok=False, error=str(exc))

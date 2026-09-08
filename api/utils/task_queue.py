@@ -216,3 +216,32 @@ def run_workers() -> None:
         thread.start()
     for thread in threads:
         thread.join()
+
+
+def get_queue_metrics() -> dict:
+    """Retorna métricas de profundidade, jobs ativos, retentativas e DLQ por tipo de fila."""
+    r = _get_redis()
+    if not r:
+        return {"available": False, "reason": "redis_unavailable", "queues": {}}
+
+    metrics = {"available": True, "queues": {}}
+    for kind in _KINDS:
+        try:
+            pipe = r.pipeline()
+            pipe.llen(_key(kind, "ready"))
+            pipe.zcard(_key(kind, "processing"))
+            pipe.zcard(_key(kind, "delayed"))
+            pipe.llen(_key(kind, "dead"))
+            pipe.hlen(_key(kind, "jobs"))
+            ready, processing, delayed, dead, jobs = pipe.execute()
+            metrics["queues"][kind] = {
+                "ready": ready,
+                "processing": processing,
+                "delayed": delayed,
+                "dead": dead,
+                "total_jobs": jobs,
+            }
+        except Exception as exc:
+            metrics["queues"][kind] = {"error": str(exc)[:100]}
+    return metrics
+
