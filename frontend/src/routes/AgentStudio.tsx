@@ -26,24 +26,36 @@ import {
   ArrowRight,
   Wand2,
   Zap,
+  Globe,
+  Headphones,
+  Mic,
+  UploadCloud,
+  FileSpreadsheet,
+  ExternalLink,
+  Copy,
+  FileCheck,
 } from 'lucide-react';
-import { agentsApi, type AgentDraft, type AgentSummary } from '../api/agents';
+import { agentsApi, type AgentDraft, type AgentSummary, type DocumentFile } from '../api/agents';
 import { toast } from '../lib/toast';
 
 type Tab = 'personalidade' | 'instrucoes' | 'base' | 'exemplos' | 'versoes';
 
 const TABS: { id: Tab; label: string; Icon: typeof Sparkles }[] = [
-  { id: 'personalidade', label: 'Identidade & Modelo', Icon: Sparkles },
+  { id: 'personalidade', label: 'Identidade & Motor', Icon: Sparkles },
   { id: 'instrucoes', label: 'Instruções & Regras', Icon: FileText },
-  { id: 'base', label: 'Base de Conhecimento', Icon: Library },
+  { id: 'base', label: 'Base de Conhecimento & Arquivos', Icon: Library },
   { id: 'exemplos', label: 'FAQ & Exemplos', Icon: HelpCircle },
   { id: 'versoes', label: 'Versões & WhatsApp', Icon: Rocket },
 ];
 
-const AI_MODELS = [
+export const AI_MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', badge: 'Recomendado', speed: 'Ultrarrápido (500ms)' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google', badge: 'Raciocínio Profundo', speed: 'Rápido (1.2s)' },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI', badge: 'Alta Precisão', speed: 'Rápido (900ms)' },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', badge: 'Flagship Multimodal', speed: 'Moderado (1.5s)' },
   { id: 'claude-3-5-haiku', name: 'Claude 3.5 Haiku', provider: 'Anthropic', badge: 'Raciocínio Fluido', speed: 'Rápido (800ms)' },
+  { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', badge: 'Superior em Redação', speed: 'Moderado (1.4s)' },
+  { id: 'deepseek-v3', name: 'DeepSeek V3', provider: 'DeepSeek', badge: 'Custo-Benefício', speed: 'Rápido (700ms)' },
   { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', provider: 'Groq', badge: 'Open Source', speed: 'Instantâneo (350ms)' },
 ];
 
@@ -77,6 +89,9 @@ const AGENT_PRESETS: AgentPreset[] = [
       model: 'gemini-2.5-flash',
       temperature: 0.4,
       delay_seconds: 3,
+      web_search_enabled: false,
+      human_handoff_enabled: true,
+      audio_response_enabled: true,
       personalidade:
         'Você é a Cigana Spanda, conselheira espiritual oficial do Meu Mistério. Fale com voz calorosa, compassiva, misteriosa e acolhedora. Trate o consulente carinhosamente como "meu bem", "minha flor" ou "meu querido". Crie um ambiente seguro, sem julgamentos morais e com profundo respeito às dores do coração.',
       instrucoes: `# IDENTIDADE E MISSÃO
@@ -112,6 +127,7 @@ Você é a Cigana Spanda, oraculista e conselheira do Meu Mistério. Você atend
           a: 'As cartas mostram as energias que estão ao seu redor agora: suas raízes, os desafios de hoje e o que está por vir. Me conte seu nome e o que mais preocupa seu coração!',
         },
       ],
+      arquivos: [],
     },
   },
   {
@@ -128,6 +144,9 @@ Você é a Cigana Spanda, oraculista e conselheira do Meu Mistério. Você atend
       model: 'gpt-4o-mini',
       temperature: 0.2,
       delay_seconds: 2,
+      web_search_enabled: false,
+      human_handoff_enabled: true,
+      audio_response_enabled: false,
       personalidade:
         'Você é a Bia, especialista em atendimento comercial e vendas. Fale com dinamismo, simpatia, objetividade e clareza. Use frases curtas (máximo 2 ou 3 linhas por bloco). Jamais envie textos gigantescos. Demonstre segurança e conduza o cliente para a decisão de compra.',
       instrucoes: `# OBJETIVO DO AGENTE
@@ -162,6 +181,7 @@ Seu papel é identificar o interesse do lead, esclarecer dúvidas pontuais e fec
           a: 'Sim! Parcelamos em até 12x no cartão de crédito com aprovação na hora.',
         },
       ],
+      arquivos: [],
     },
   },
   {
@@ -178,6 +198,9 @@ Seu papel é identificar o interesse do lead, esclarecer dúvidas pontuais e fec
       model: 'gemini-2.5-flash',
       temperature: 0.1,
       delay_seconds: 2,
+      web_search_enabled: false,
+      human_handoff_enabled: true,
+      audio_response_enabled: false,
       personalidade:
         'Você é o Carlos, especialista do time de suporte ao cliente. Fale com muita educação, respeito, empatia e clareza. Use uma linguagem simples, acolhedora e sem termos técnicos desnecessários.',
       instrucoes: `# DIRETRIZES DO SUPORTE
@@ -204,6 +227,7 @@ Seu papel é identificar o interesse do lead, esclarecer dúvidas pontuais e fec
           a: 'Os reembolsos dentro da garantia de 7 dias são processados em até 24 horas úteis para a mesma chave Pix ou fatura do cartão.',
         },
       ],
+      arquivos: [],
     },
   },
   {
@@ -220,10 +244,14 @@ Seu papel é identificar o interesse do lead, esclarecer dúvidas pontuais e fec
       model: 'gemini-2.5-flash',
       temperature: 0.3,
       delay_seconds: 3,
+      web_search_enabled: false,
+      human_handoff_enabled: true,
+      audio_response_enabled: false,
       personalidade: '',
       instrucoes: '',
       base_conhecimento: '',
       faqs: [],
+      arquivos: [],
     },
   },
 ];
@@ -634,7 +662,7 @@ function CreateAgentModal({
           {/* Motor de IA */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
-              3. Motor de Inteligência Artificial
+              3. Motor de Inteligência Artificial (ChatbotX Registry)
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {AI_MODELS.map((m) => {
@@ -683,7 +711,7 @@ function CreateAgentModal({
   );
 }
 
-// ── MODAL: EXCLUIR AGENTE (SUBSTITUTO SLEEK DE CONFIRM) ─────────────────
+// ── MODAL: EXCLUIR AGENTE ─────────────────────────────────────────────
 
 function DeleteAgentModal({
   agent,
@@ -732,7 +760,7 @@ function DeleteAgentModal({
   );
 }
 
-// ── MODAL: CONGELAR VERSÃO (SUBSTITUTO SLEEK DE WINDOW.PROMPT) ─────────
+// ── MODAL: CONGELAR VERSÃO ────────────────────────────────────────────
 
 function FreezeVersionModal({
   onClose,
@@ -747,6 +775,7 @@ function FreezeVersionModal({
 
   const quickTags = [
     'Prompt ajustado para fechar mais vendas',
+    'Documentos PDF indexados na base',
     'Atualização de preços Pix',
     'Ajuste no acolhimento de Tarot',
     'Versão estável validada',
@@ -785,7 +814,7 @@ function FreezeVersionModal({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onConfirm(note)}
-            placeholder="Ex: Prompt ajustado para fechar vendas no WhatsApp..."
+            placeholder="Ex: Prompt ajustado com PDF de produtos..."
             className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500 transition-all font-medium"
           />
 
@@ -809,14 +838,14 @@ function FreezeVersionModal({
         <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+            className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
           >
             Cancelar
           </button>
           <button
             onClick={() => onConfirm(note)}
             disabled={isPending}
-            className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center gap-1.5"
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center gap-1.5"
           >
             <Camera className="w-3.5 h-3.5" />
             {isPending ? 'Congelando…' : 'Salvar & Congelar'}
@@ -827,7 +856,7 @@ function FreezeVersionModal({
   );
 }
 
-// ── MODAL: PUBLICAR NO WHATSAPP (SUBSTITUTO SLEEK DE CONFIRM) ──────────
+// ── MODAL: PUBLICAR NO WHATSAPP ───────────────────────────────────────
 
 function PublishVersionModal({
   version,
@@ -899,6 +928,8 @@ function AgentEditor({
   const [name, setName] = useState(agent.name);
   const [dirty, setDirty] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Estados dos novos modais elegantes
   const [isFreezeOpen, setIsFreezeOpen] = useState(false);
@@ -958,6 +989,41 @@ function AgentEditor({
 
   const selectedModelId = (draft.model as string) || 'gemini-2.5-flash';
   const selectedModel = AI_MODELS.find((m) => m.id === selectedModelId) || AI_MODELS[0];
+
+  // Upload e extração de texto de PDFs/Docs
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const res = await agentsApi.extractDocument(file);
+      if (res.ok && res.file) {
+        const currentFiles = draft.arquivos || [];
+        const newFiles = [...currentFiles, res.file];
+        update({ arquivos: newFiles });
+        toast.success(`"${res.file.nome}" indexado (${res.file.caracteres} caracteres extraídos)!`);
+      }
+    } catch (err) {
+      toast.error((err as Error).message || 'Falha ao extrair documento.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const currentFiles = draft.arquivos || [];
+    update({ arquivos: currentFiles.filter((_, i) => i !== index) });
+    toast.success('Arquivo removido da base.');
+  };
+
+  const appendFileTextToBase = (docText: string, docName: string) => {
+    if (!docText) return;
+    const currentBase = draft.base_conhecimento || '';
+    const addition = `\n\n--- DOCUMENTO INDEXADO: ${docName} ---\n${docText}`;
+    update({ base_conhecimento: (currentBase + addition).trim() });
+    toast.success('Texto do documento incorporado à Base!');
+  };
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
@@ -1044,7 +1110,14 @@ function AgentEditor({
         <WhatsAppSimulator
           agentName={name}
           instructions={(draft.instrucoes as string) || ''}
-          knowledge={(draft.base_conhecimento as string) || ''}
+          knowledge={
+            [
+              (draft.base_conhecimento as string) || '',
+              ...(draft.arquivos || []).map((f) => f.texto || ''),
+            ]
+              .filter(Boolean)
+              .join('\n\n')
+          }
           faqs={(draft.faqs as { q: string; a: string }[]) || []}
           onClose={() => setShowSimulator(false)}
         />
@@ -1073,15 +1146,18 @@ function AgentEditor({
 
       {/* ═══ CONTEÚDO DAS ABAS ═══ */}
       <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-6">
-        {/* ABA 1: IDENTIDADE & MODELO */}
+        {/* ABA 1: IDENTIDADE & MOTOR (MODELO + AI TOOLS) */}
         {tab === 'personalidade' && (
           <div className="space-y-6">
-            {/* Seletor de Modelo de IA */}
+            {/* Seletor de Modelo de IA (ChatbotX Registry) */}
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block mb-2">
-                Motor de Inteligência Artificial
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Motor de Inteligência Artificial (ChatbotX Registry)
+                </label>
+                <span className="text-[11px] text-zinc-500">8 modelos de alta performance</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {AI_MODELS.map((m) => {
                   const isSelected = selectedModelId === m.id;
                   return (
@@ -1089,29 +1165,93 @@ function AgentEditor({
                       key={m.id}
                       type="button"
                       onClick={() => update({ model: m.id })}
-                      className={`text-left p-3.5 rounded-xl border transition-all flex items-start justify-between ${
+                      className={`text-left p-3 rounded-xl border transition-all flex flex-col justify-between ${
                         isSelected
                           ? 'bg-indigo-500/10 border-indigo-500/50 shadow-sm ring-1 ring-indigo-500/30'
                           : 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700'
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-zinc-100">{m.name}</span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                            {m.badge}
-                          </span>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-zinc-100">{m.name}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-indigo-400" />}
                         </div>
-                        <div className="text-xs text-zinc-400 mt-1 flex items-center gap-2">
-                          <span>{m.provider}</span>
-                          <span className="text-zinc-600">•</span>
-                          <span className="text-emerald-400 font-medium">{m.speed}</span>
-                        </div>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 inline-block">
+                          {m.badge}
+                        </span>
                       </div>
-                      {isSelected && <Check className="w-4 h-4 text-indigo-400 mt-1" />}
+                      <div className="text-[10px] text-zinc-400 mt-2 flex items-center justify-between pt-1 border-t border-zinc-800/60">
+                        <span>{m.provider}</span>
+                        <span className="text-emerald-400 font-medium">{m.speed}</span>
+                      </div>
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Capacidades & Ferramentas Autônomas (AI Tools) */}
+            <div className="pt-2 border-t border-zinc-800/80 space-y-3">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
+                Ferramentas & Políticas Autônomas (AI Tools)
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Web Search */}
+                <div className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs font-bold text-zinc-200">Pesquisa na Web</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.web_search_enabled)}
+                      onChange={(e) => update({ web_search_enabled: e.target.checked })}
+                      className="accent-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    Permite que a IA busque fatos recentes na internet quando faltar dados na base.
+                  </p>
+                </div>
+
+                {/* Transbordo Humano */}
+                <div className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Headphones className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-bold text-zinc-200">Transbordo Humano</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={draft.human_handoff_enabled !== false}
+                      onChange={(e) => update({ human_handoff_enabled: e.target.checked })}
+                      className="accent-emerald-500 w-4 h-4 cursor-pointer"
+                    />
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    Transfere para o atendente e pausa o robô se o lead pedir atendente humano.
+                  </p>
+                </div>
+
+                {/* Áudios no WhatsApp */}
+                <div className="bg-zinc-950 border border-zinc-800/80 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Mic className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs font-bold text-zinc-200">Áudios no Zap</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.audio_response_enabled)}
+                      onChange={(e) => update({ audio_response_enabled: e.target.checked })}
+                      className="accent-purple-500 w-4 h-4 cursor-pointer"
+                    />
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    Transcreve áudios recebidos de clientes e ativa síntese de voz (TTS).
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1135,8 +1275,8 @@ function AgentEditor({
                   className="w-full accent-indigo-500 cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-zinc-500">
-                  <span>0.0 (Ultra Preciso & Fiel)</span>
-                  <span>1.0 (Mais Criativo)</span>
+                  <span>0.0 (Fiel & Seguro)</span>
+                  <span>1.0 (Muito Criativo)</span>
                 </div>
               </div>
 
@@ -1159,7 +1299,7 @@ function AgentEditor({
                 />
                 <div className="flex justify-between text-[10px] text-zinc-500">
                   <span>1s (Quase instantâneo)</span>
-                  <span>10s (Simula digitação longa)</span>
+                  <span>10s (Digitação longa)</span>
                 </div>
               </div>
             </div>
@@ -1172,9 +1312,9 @@ function AgentEditor({
               <textarea
                 value={(draft.personalidade as string) ?? ''}
                 onChange={(e) => update({ personalidade: e.target.value })}
-                rows={5}
+                rows={4}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none leading-relaxed"
-                placeholder="Ex: Fale de forma amigável, direta e profissional. Use emojis com moderação (máximo 1 ou 2 por mensagem). Trate o cliente pelo primeiro nome sempre que possível. Nunca use termos excessivamente técnicos..."
+                placeholder="Ex: Fale de forma amigável, direta e profissional. Use emojis com moderação..."
               />
             </div>
           </div>
@@ -1195,44 +1335,139 @@ function AgentEditor({
               rows={12}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none leading-relaxed"
               placeholder={`# OBJETIVO PRINCIPAL
-Você é o atendente de vendas da [Nome da Empresa]. Seu foco é tirar dúvidas do cliente, entender a necessidade dele e direcioná-lo para fechar a compra ou agendar uma reunião.
-
-# REGRAS DE ATENDIMENTO
-1. Seja objetivo e não envie mensagens excessivamente longas (limite a 2 ou 3 parágrafos curtos).
-2. Faça perguntas abertas para qualificar o interesse do lead.
-3. Se o cliente perguntar de preços, apresente as opções e ofereça o link de compra direto.
-
-# LIMITES E TRANSBORDO HUMANO
-- Se o cliente pedir expressamente para falar com um humano, responda cordialmente: "Com certeza! Estou transferindo seu atendimento para a nossa equipe agora mesmo" e pause o fluxo.`}
+Você é o atendente do [Nome da Empresa]. Seu foco é tirar dúvidas do cliente e direcioná-lo para a conversão...`}
             />
           </div>
         )}
 
-        {/* ABA 3: BASE DE CONHECIMENTO */}
+        {/* ABA 3: BASE DE CONHECIMENTO & ARQUIVOS (AI FILES RAG) */}
         {tab === 'base' && (
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-sm font-bold text-zinc-200 mb-1">Base de Conhecimento e Catálogo</h4>
-              <p className="text-xs text-zinc-400">
-                Cole aqui todas as informações da sua empresa, produtos, serviços, preços, formas de pagamento e links de checkout. A IA usará apenas essas informações para responder fatos aos clientes.
-              </p>
+          <div className="space-y-6">
+            {/* Upload de Arquivos / PDFs (AI Files) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-zinc-200 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-indigo-400" />
+                    Arquivos & Documentos Indexados (AI Files RAG)
+                  </h4>
+                  <p className="text-xs text-zinc-400">
+                    Faça upload de PDFs, catálogos ou tabelas de preços. O texto é extraído automaticamente com PyMuPDF.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 border border-indigo-500/30 text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  {isUploading ? 'Processando Documento…' : 'Anexar PDF / Arquivo'}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.txt,.md,.csv,.doc,.docx"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
+
+              {/* Lista de Documentos Anexados */}
+              {(draft.arquivos || []).length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {(draft.arquivos || []).map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-zinc-950 border border-zinc-800 rounded-xl p-3.5 flex items-start justify-between gap-3 shadow-inner group"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0 mt-0.5">
+                          {file.nome.endsWith('.pdf') ? (
+                            <FileText className="w-4 h-4 text-red-400" />
+                          ) : (
+                            <FileSpreadsheet className="w-4 h-4 text-cyan-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-zinc-200 truncate block">
+                            {file.nome}
+                          </span>
+                          <div className="flex items-center gap-2 text-[10px] text-zinc-500 mt-0.5">
+                            {file.tamanho && <span>{(file.tamanho / 1024).toFixed(0)} KB</span>}
+                            <span>•</span>
+                            <span className="text-emerald-400 font-medium">
+                              {file.caracteres || 0} caracteres indexados
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {file.texto && (
+                          <button
+                            type="button"
+                            onClick={() => appendFileTextToBase(file.texto || '', file.nome)}
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-indigo-300 hover:bg-zinc-800 transition-all"
+                            title="Copiar texto extraído para o campo abaixo"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeFile(idx)}
+                          className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                          title="Remover documento"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border border-dashed border-zinc-800 hover:border-indigo-500/50 rounded-2xl p-6 text-center cursor-pointer transition-all hover:bg-zinc-900/40 space-y-2"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-zinc-800/80 flex items-center justify-center mx-auto text-zinc-400">
+                    <UploadCloud className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs font-bold text-zinc-300">
+                    Nenhum documento anexado ainda
+                  </div>
+                  <p className="text-[11px] text-zinc-500 max-w-sm mx-auto">
+                    Clique para enviar manuais, cardápios ou políticas em PDF. O motor extrai o conteúdo para alimentar a IA.
+                  </p>
+                </div>
+              )}
             </div>
-            <textarea
-              value={(draft.base_conhecimento as string) ?? ''}
-              onChange={(e) => update({ base_conhecimento: e.target.value })}
-              rows={12}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none leading-relaxed"
-              placeholder={`PLANOS E PREÇOS:
+
+            {/* Base de Conhecimento em Texto Livre */}
+            <div className="space-y-2 pt-3 border-t border-zinc-800/80">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-zinc-200">Base de Conhecimento em Texto</h4>
+                  <p className="text-xs text-zinc-400">
+                    Cole aqui informações da sua empresa, produtos, serviços, preços, formas de pagamento e links de checkout.
+                  </p>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-500">
+                  {((draft.base_conhecimento as string) || '').length} caracteres
+                </span>
+              </div>
+              <textarea
+                value={(draft.base_conhecimento as string) ?? ''}
+                onChange={(e) => update({ base_conhecimento: e.target.value })}
+                rows={11}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all resize-none leading-relaxed"
+                placeholder={`PLANOS E PREÇOS:
 - Plano Essencial: R$ 97/mês (Até 1.000 leads, 1 número de WhatsApp)
 - Plano Profissional: R$ 149/mês (Leads ilimitados, IA autônoma e disparos em massa)
-- Link de Checkout do Plano Profissional: https://seusite.com/checkout/pro
-
-FORMAS DE PAGAMENTO:
-- Cartão de crédito em até 12x ou Pix à vista com 5% de desconto.
-
-POLÍTICA DE CANCELAMENTO:
-- Garantia incondicional de 7 dias com reembolso integral.`}
-            />
+- Link de Checkout do Plano Profissional: https://seusite.com/checkout/pro...`}
+              />
+            </div>
           </div>
         )}
 
@@ -1486,11 +1721,11 @@ function WhatsAppSimulator({
       if (matchedFaq && matchedFaq.a) {
         botResponse = matchedFaq.a;
       } else if (knowledge && knowledge.toLowerCase().includes(userMsg.toLowerCase().slice(0, 10))) {
-        botResponse = `Com base nas informações cadastradas: temos exatamente o que você procura! Quer que eu te envie o link direto para contratação?`;
+        botResponse = `Com base nas informações e documentos cadastrados: temos exatamente o que você procura! Quer que eu te envie o link direto para contratação?`;
       } else if (userMsg.toLowerCase().includes('preço') || userMsg.toLowerCase().includes('valor')) {
         botResponse = `A consulta completa custa apenas R$ 9,90 via Pix com liberação imediata. Deseja que eu gere o seu código Pix agora?`;
       } else {
-        botResponse = `Entendido! Estou respondendo conforme as diretrizes do seu atendente de IA. Posso te ajudar com algo mais específico?`;
+        botResponse = `Entendido! Estou respondendo conforme as diretrizes e documentos do seu atendente de IA. Posso te ajudar com algo mais específico?`;
       }
 
       setMessages((prev) => [

@@ -1,11 +1,22 @@
 import { api } from './client';
 
+export interface DocumentFile {
+  nome: string;
+  url: string;
+  tamanho?: number;
+  caracteres?: number;
+  texto?: string;
+}
+
 export interface AgentDraft {
   personalidade?: string;
   instrucoes?: string;
   base_conhecimento?: string;
   faqs?: { q: string; a: string }[];
-  arquivos?: { nome: string; url: string }[];
+  arquivos?: DocumentFile[];
+  web_search_enabled?: boolean;
+  human_handoff_enabled?: boolean;
+  audio_response_enabled?: boolean;
   [k: string]: unknown;
 }
 
@@ -69,4 +80,12 @@ export const agentsApi = {
       ok: boolean;
       published: { agent_id: number; version_id: number; version_number: number } | null;
     }>('/api/studio/publish/status'),
+  extractDocument: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.upload<{
+      ok: boolean;
+      file: DocumentFile;
+    }>('/api/studio/agents/extract-document', formData);
+  },
 };

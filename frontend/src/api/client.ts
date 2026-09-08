@@ -73,4 +73,30 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
   delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const res = await fetch(path, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+      body: formData,
+    });
+    const text = await res.text();
+    const data = text ? safeJson(text) : null;
+    if (!res.ok) {
+      const serverMessage =
+        data && typeof data === 'object'
+          ? String(
+              (data as { error?: unknown; message?: unknown }).error ||
+                (data as { message?: unknown }).message ||
+                '',
+            )
+          : '';
+      throw new ApiError(
+        res.status,
+        data,
+        serverMessage || `POST ${path} → ${res.status}`,
+      );
+    }
+    return data as T;
+  },
 };

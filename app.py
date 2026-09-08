@@ -2206,6 +2206,72 @@ def api_studio_agent_one(aid: int):
         db.close()
 
 
+@app.route("/api/studio/agents/extract-document", methods=["POST"])
+@login_required
+@require_admin
+def api_studio_extract_document():
+    """Recebe um arquivo (PDF, TXT, MD, CSV) e extrai o texto para alimentar a Base de Conhecimento do Agente."""
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "ficheiro em falta (campo 'file')"}), 400
+    f = request.files["file"]
+    if not f or not getattr(f, "filename", None):
+        return jsonify({"ok": False, "error": "nome de ficheiro inválido"}), 400
+    orig = str(f.filename or "")
+    ext = os.path.splitext(orig)[1].lower()
+    allowed = {".pdf", ".txt", ".md", ".csv", ".json", ".doc", ".docx"}
+    if ext not in allowed:
+        return jsonify({"ok": False, "error": f"formato não suportado: {ext}. Use PDF, TXT, MD ou CSV."}), 400
+
+    max_b = 25 * 1024 * 1024
+    try:
+        f.seek(0, os.SEEK_END)
+        sz = f.tell()
+        f.seek(0)
+    except Exception:
+        sz = int(request.content_length or -1)
+    if sz > max_b > 0:
+        return jsonify({"ok": False, "error": "ficheiro demasiado grande (máx. 25MB)"}), 400
+
+    safe_name = f"agent_doc_{uuid.uuid4().hex}{ext}"
+    path = os.path.join(DOWNLOAD_DIR, safe_name)
+    try:
+        f.save(path)
+    except Exception as e:
+        logger.error("[STUDIO] extract-document save: %s", e)
+        return jsonify({"ok": False, "error": "falha ao gravar ficheiro"}), 500
+
+    extracted_text = ""
+    try:
+        if ext == ".pdf":
+            import fitz
+            doc = fitz.open(path)
+            pages_text = [page.get_text() for page in doc]
+            doc.close()
+            extracted_text = "\n".join(pages_text).strip()
+        elif ext in {".txt", ".md", ".csv", ".json"}:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                extracted_text = fh.read().strip()
+        elif ext in {".doc", ".docx"}:
+            with open(path, "rb") as fh:
+                raw = fh.read()
+            extracted_text = raw.decode("utf-8", errors="ignore")[:15000].strip()
+    except Exception as exc:
+        logger.warning("[STUDIO] falha na extração de texto: %s", exc)
+
+    orig_disp = secure_filename(orig) or safe_name
+    return jsonify({
+        "ok": True,
+        "file": {
+            "nome": orig_disp,
+            "url": f"/media/{safe_name}",
+            "tamanho": sz,
+            "caracteres": len(extracted_text),
+            "texto": extracted_text[:35000],
+        }
+    }), 200
+
+
+
 @app.route("/api/studio/agents/<int:aid>/versions", methods=["POST"])
 @login_required
 @require_admin
