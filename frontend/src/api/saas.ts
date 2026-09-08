@@ -249,6 +249,7 @@ export interface SequenceItem {
   name: string;
   active: boolean;
   folder_name?: string | null;
+  trigger_tag?: string | null;
   subscribers: number;
   messages: number;
   created_at?: string | null;
@@ -278,9 +279,9 @@ export interface EnrolledContactItem {
 export const sequencesApi = {
   list: () => api.get<{ sequences: SequenceItem[] }>('/saas/sequences'),
   get: (id: number) => api.get<{ sequence: SequenceItem }>(`/saas/sequences/${id}`),
-  create: (body: { name: string; folder_name?: string }) =>
+  create: (body: { name: string; folder_name?: string; trigger_tag?: string }) =>
     api.post<{ ok: boolean; sequence: SequenceItem }>('/saas/sequences', body),
-  update: (id: number, body: { name?: string; active?: boolean; folder_name?: string }) =>
+  update: (id: number, body: { name?: string; active?: boolean; folder_name?: string; trigger_tag?: string | null }) =>
     api.put<{ ok: boolean; sequence: SequenceItem }>(`/saas/sequences/${id}`, body),
   rename: (id: number, name: string) =>
     api.patch<{ ok: boolean; id: number; name: string }>(`/saas/sequences/${id}/rename`, { name }),

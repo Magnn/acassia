@@ -3936,6 +3936,24 @@ def integrations_summary():
                 "path": "/webhook/cakto",
                 "hint": "POST: notificações de pagamento e eventos configurados na Cakto.",
             },
+            {
+                "id": "meta_social",
+                "label": "Meta Social (Instagram / Facebook Comments & Mentions)",
+                "path": "/api/public/webhooks/social",
+                "hint": "POST/GET: Webhook unificado Meta Graph para Comment-to-DM e menções no Instagram.",
+            },
+            {
+                "id": "tiktok",
+                "label": "TikTok Business (Lead & Messaging API)",
+                "path": "/api/public/webhooks/tiktok",
+                "hint": "POST/GET: Webhook receptor de eventos do TikTok for Business.",
+            },
+            {
+                "id": "api_v1",
+                "label": "Developer API v1 (Zapier, Make, n8n, CRM Externo)",
+                "path": "/api/v1/messages/send",
+                "hint": "POST: Endpoint REST público com autenticação X-API-Key.",
+            },
         ],
         "meta": {
             "waba_configured": bool(WABA_ID),

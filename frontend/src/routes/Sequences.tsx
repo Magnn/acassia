@@ -217,8 +217,13 @@ export default function Sequences() {
                       <Workflow className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="group-hover:text-purple-300 transition font-semibold">
+                      <div className="group-hover:text-purple-300 transition font-semibold flex items-center gap-2">
                         {seq.name}
+                        {seq.trigger_tag && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                            #{seq.trigger_tag}
+                          </span>
+                        )}
                       </div>
                       {seq.folder_name && (
                         <span className="text-[11px] text-zinc-500">Pasta: {seq.folder_name}</span>
@@ -385,6 +390,11 @@ function SequenceDetailView({
           </div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-zinc-100">{sequence.name}</h1>
+            {sequence.trigger_tag && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                Gatilho: #{sequence.trigger_tag}
+              </span>
+            )}
             <span
               className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
                 sequence.active
@@ -899,9 +909,15 @@ function CreateSequenceModal({
 }) {
   const [name, setName] = useState('');
   const [folderName, setFolderName] = useState('');
+  const [triggerTag, setTriggerTag] = useState('');
 
   const createMutation = useMutation({
-    mutationFn: () => sequencesApi.create({ name, folder_name: folderName }),
+    mutationFn: () =>
+      sequencesApi.create({
+        name,
+        folder_name: folderName,
+        trigger_tag: triggerTag.trim().toLowerCase() || undefined,
+      }),
     onSuccess: (res) => {
       toast.success('Sequência criada com sucesso!');
       onCreated(res.sequence);
@@ -945,6 +961,22 @@ function CreateSequenceModal({
               onChange={(e) => setFolderName(e.target.value)}
               className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+              Tag de Auto-Inscrição (Trigger Tag)
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: lead_quente, vip, checkout_abandonado"
+              value={triggerTag}
+              onChange={(e) => setTriggerTag(e.target.value)}
+              className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
+            />
+            <span className="text-[10px] text-zinc-500 mt-1 block">
+              Qualquer contato que receber esta tag será inscrito automaticamente nesta sequência.
+            </span>
           </div>
         </div>
 
