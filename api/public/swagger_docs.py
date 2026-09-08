@@ -65,9 +65,10 @@ OPENAPI_SPEC = {
                         "application/json": {
                             "schema": {
                                 "type": "object",
+                                "required": ["site_key"],
                                 "properties": {
-                                    "tenant_id": {"type": "string", "example": "default"},
-                                    "session_id": {"type": "string", "example": "web_abc123"},
+                                    "site_key": {"type": "string", "description": "Chave pública assinada obtida na configuração do widget"},
+                                    "session_token": {"type": "string", "description": "Token devolvido por uma inicialização anterior para retomar a sessão"},
                                     "name": {"type": "string", "example": "Visitante"},
                                 }
                             }
@@ -89,10 +90,9 @@ OPENAPI_SPEC = {
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": ["session_id", "text"],
+                                "required": ["session_token", "text"],
                                 "properties": {
-                                    "tenant_id": {"type": "string", "example": "default"},
-                                    "session_id": {"type": "string", "example": "web_abc123"},
+                                    "session_token": {"type": "string", "description": "Token assinado devolvido por /init"},
                                     "text": {"type": "string", "example": "Olá, como funciona?"}
                                 }
                             }
