@@ -9,7 +9,6 @@ import {
   Kanban,
   Plug,
   Smartphone,
-  Store,
   FolderTree,
   Mic,
   Library,
@@ -19,12 +18,13 @@ import {
   ShieldCheck,
   Power,
   ChevronDown,
+  ChevronUp,
   Menu,
   X,
   Sparkles,
+  Layers,
   type LucideIcon,
 } from 'lucide-react';
-import Logo, { Wordmark } from './Logo';
 import { useTheme } from '../context/ThemeContext';
 import { useQuery } from '@tanstack/react-query';
 import { authApi } from '../api/auth';
@@ -39,38 +39,45 @@ interface NavItem {
 
 interface NavSection {
   title: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
   items: NavItem[];
 }
 
+// ═══ ESTRUTURA DE NAVEGAÇÃO ENXUTA (PADRÃO CHATBOTX / LINEAR) ═══
 const NAVIGATION_SECTIONS: NavSection[] = [
   {
     title: 'Principal',
+    collapsible: false,
     items: [
+      { to: '/leads', icon: MessageSquare, label: 'Conversas / Live Chat', badge: 'Ao Vivo' },
       { to: '/blueprints', icon: Workflow, label: 'Funis & Automações' },
-      { to: '/agents', icon: Bot, label: 'Agentes de IA (WhatsApp)' },
-      { to: '/leads', icon: MessageSquare, label: 'Conversas & Inbox' },
+      { to: '/agents', icon: Bot, label: 'Agentes de IA' },
+      { to: '/broadcast', icon: Megaphone, label: 'Disparos em Massa' },
+      { to: '/pipeline', icon: Kanban, label: 'Contatos & CRM' },
+      { to: '/wa-connection', icon: Smartphone, label: 'Conexão WhatsApp & Meta', badge: 'Oficial' },
       { to: '/dashboard', icon: LayoutDashboard, label: 'Visão Geral' },
-      { to: '/pipeline', icon: Kanban, label: 'Pipeline & CRM' },
-      { to: '/broadcast', icon: Megaphone, label: 'Disparos WhatsApp' },
-      { to: '/wa-connection', icon: Smartphone, label: 'Conexão & API Meta' },
     ],
   },
   {
-    title: 'Modelos & Recursos',
+    title: 'Recursos & Mídia',
+    collapsible: true,
+    defaultOpen: false,
     items: [
       { to: '/templates', icon: FolderTree, label: 'Templates de Funil' },
+      { to: '/voice', icon: Mic, label: 'Voz & Áudios IA (Cigana)' },
+      { to: '/audio-library', icon: Library, label: 'Biblioteca de Áudios' },
       { to: '/coach', icon: Sparkles, label: 'Copilot Estratégico' },
-      { to: '/marketplace', icon: Store, label: 'Marketplace de Fluxos' },
-      { to: '/voice', icon: Mic, label: 'Voz & Áudios IA' },
-      { to: '/audio-library', icon: Library, label: 'Biblioteca de Mídia' },
       { to: '/scheduling', icon: CalendarClock, label: 'Agendamentos' },
     ],
   },
   {
     title: 'Configurações',
+    collapsible: true,
+    defaultOpen: false,
     items: [
       { to: '/integrations', icon: Plug, label: 'Webhooks & Integrações' },
-      { to: '/settings/devices', icon: SettingsIcon, label: 'Configurações' },
+      { to: '/settings/devices', icon: SettingsIcon, label: 'Configurações do Sistema' },
       { to: '/billing', icon: CreditCard, label: 'Plano & Faturamento' },
       { to: '/admin/tenants', icon: ShieldCheck, label: 'Super Admin', roles: ['admin'] },
     ],
@@ -82,6 +89,16 @@ export default function Layout() {
   const { toggle } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Estados de seções colapsadas
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    'Recursos & Mídia': false,
+    'Configurações': false,
+  });
+
+  const toggleSection = (title: string) => {
+    setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
+  };
+
   // Consulta do usuário logado
   const { data: user } = useQuery({
     queryKey: ['me'],
@@ -89,10 +106,9 @@ export default function Layout() {
     staleTime: 60_000,
   });
 
-  // Fecha o menu mobile ao navegar
   const closeMobile = () => setMobileOpen(false);
 
-  // Determina o título da página atual para os breadcrumbs
+  // Título dinâmico da tela
   const currentPageTitle = useMemo(() => {
     for (const sec of NAVIGATION_SECTIONS) {
       for (const item of sec.items) {
@@ -101,41 +117,43 @@ export default function Layout() {
         }
       }
     }
-    if (location.pathname.startsWith('/flows/')) return 'Editor de Fluxo';
-    return 'Acássia';
+    if (location.pathname.startsWith('/flows/')) return 'Editor Visual de Funil';
+    return 'Acássia Studio';
   }, [location.pathname]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 antialiased font-sans">
-      {/* ═══ MOBILE BACKDROP ═══ */}
+      {/* Mobile Backdrop */}
       {mobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm md:hidden transition-opacity"
           onClick={closeMobile}
         />
       )}
 
-      {/* ═══ SINGLE SIDEBAR (Padrão ChatbotX / Linear) ═══ */}
+      {/* ═══ SIDEBAR ENXUTA (PADRÃO CHATBOTX) ═══ */}
       <aside
         className={[
-          'fixed md:static inset-y-0 left-0 z-50 w-64 bg-zinc-950/95 md:bg-zinc-900/60 backdrop-blur-xl border-r border-zinc-800/80 flex flex-col transition-transform duration-200 ease-in-out',
+          'fixed md:static inset-y-0 left-0 z-50 w-64 bg-zinc-950 border-r border-zinc-800/80 flex flex-col transition-transform duration-200 ease-in-out',
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
       >
-        {/* Topo da Sidebar: Logo & Workspace */}
-        <div className="h-16 px-5 border-b border-zinc-800/80 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-md shadow-indigo-500/20 flex items-center justify-center text-white font-black text-sm ring-1 ring-white/20">
+        {/* Topo da Sidebar: Workspace Selector */}
+        <div className="h-16 px-4 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-md shadow-indigo-500/20 flex items-center justify-center text-white font-bold text-sm shrink-0">
               ⚡
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
-                Acássia
-                <span className="px-1.5 py-0.2 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-bold">
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-sm text-zinc-100 tracking-tight truncate">
+                  Acássia
+                </span>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 uppercase">
                   PRO
                 </span>
-              </span>
-              <span className="text-[11px] text-zinc-400 truncate max-w-[140px]">
+              </div>
+              <span className="text-[11px] text-zinc-400 truncate">
                 {user?.name || user?.email?.split('@')[0] || 'Meu Workspace'}
               </span>
             </div>
@@ -145,12 +163,12 @@ export default function Layout() {
             onClick={closeMobile}
             className="md:hidden p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Itens de Navegação */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6 scrollbar-thin scrollbar-thumb-zinc-800">
+        {/* Lista de Navegação com Seções Enxutas */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 scrollbar-thin scrollbar-thumb-zinc-800">
           {NAVIGATION_SECTIONS.map((section) => {
             const visibleItems = section.items.filter(
               (item) => !item.roles || (user?.role && item.roles.includes(user.role as 'admin' | 'user'))
@@ -158,59 +176,94 @@ export default function Layout() {
 
             if (visibleItems.length === 0) return null;
 
-            return (
-              <div key={section.title} className="space-y-1">
-                <div className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-300">
-                  {section.title}
-                </div>
-                {visibleItems.map((item) => {
-                  const isActive =
-                    location.pathname === item.to ||
-                    (item.to !== '/' && location.pathname.startsWith(item.to + '/'));
+            const isCollapsible = section.collapsible;
+            // Se algum item da seção estiver ativo, mantém aberta
+            const hasActiveItem = visibleItems.some(
+              (item) => location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+            );
+            const isOpen = !isCollapsible || (openSections[section.title] ?? false) || hasActiveItem;
 
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      onClick={closeMobile}
-                      className={[
-                        'flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 group',
-                        isActive
-                          ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/30 shadow-sm'
-                          : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50',
-                      ].join(' ')}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <item.icon
+            return (
+              <div key={section.title} className="space-y-0.5">
+                {/* Título da Seção */}
+                {isCollapsible ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.title)}
+                    className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:text-zinc-100 transition-colors group"
+                  >
+                    <span>{section.title}</span>
+                    <span className="text-zinc-400 group-hover:text-zinc-200">
+                      {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </span>
+                  </button>
+                ) : (
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-300">
+                    {section.title}
+                  </div>
+                )}
+
+                {/* Itens */}
+                {isOpen && (
+                  <div className="space-y-0.5 pt-0.5">
+                    {visibleItems.map((item) => {
+                      const isActive =
+                        location.pathname === item.to ||
+                        (item.to !== '/' && location.pathname.startsWith(item.to + '/'));
+
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          onClick={closeMobile}
                           className={[
-                            'w-4 h-4 transition-colors',
-                            isActive ? 'text-indigo-400' : 'text-zinc-400 group-hover:text-zinc-200',
+                            'flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all group',
+                            isActive
+                              ? 'bg-zinc-800/90 text-zinc-100 font-semibold border border-zinc-700/60 shadow-sm'
+                              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/80',
                           ].join(' ')}
-                          strokeWidth={isActive ? 2.2 : 1.8}
-                        />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge && (
-                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/20 text-indigo-300">
-                          {item.badge}
-                        </span>
-                      )}
-                    </NavLink>
-                  );
-                })}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <item.icon
+                              className={[
+                                'w-4 h-4 transition-colors shrink-0',
+                                isActive
+                                  ? 'text-indigo-400'
+                                  : 'text-zinc-400 group-hover:text-zinc-200',
+                              ].join(' ')}
+                              strokeWidth={isActive ? 2.2 : 1.8}
+                            />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase shrink-0 ${
+                                item.badge === 'Ao Vivo'
+                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
 
         {/* Rodapé da Sidebar: Perfil do Usuário */}
-        <div className="p-3 border-t border-zinc-800/80 bg-zinc-950/40 flex items-center justify-between">
+        <div className="p-3 border-t border-zinc-800/80 bg-zinc-950 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-300 shrink-0 uppercase">
+            <div className="w-8 h-8 rounded-xl bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-xs font-bold text-zinc-200 shrink-0 uppercase">
               {(user?.name || user?.email || 'US').substring(0, 2)}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-zinc-200 truncate">
+              <span className="text-xs font-medium text-zinc-200 truncate">
                 {user?.name || user?.email?.split('@')[0] || 'Usuário'}
               </span>
               <span className="text-[10px] text-zinc-300 truncate">
@@ -222,7 +275,7 @@ export default function Layout() {
           <a
             href="/saas/logout"
             title="Sair da conta"
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all shrink-0"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all shrink-0"
           >
             <Power className="w-4 h-4" />
           </a>
@@ -231,9 +284,9 @@ export default function Layout() {
 
       {/* ═══ ÁREA PRINCIPAL DE CONTEÚDO ═══ */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-zinc-950 relative">
-        {/* Header Superior Fino (Apenas fora do editor de nós full-screen) */}
+        {/* Header Superior Fino */}
         {!location.pathname.startsWith('/flows/') && (
-          <header className="h-14 px-6 border-b border-zinc-800/80 bg-zinc-950/50 backdrop-blur-md flex items-center justify-between shrink-0 z-20">
+          <header className="h-14 px-6 border-b border-zinc-800/80 bg-zinc-950 flex items-center justify-between shrink-0 z-20">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setMobileOpen(true)}
@@ -242,7 +295,6 @@ export default function Layout() {
                 <Menu className="w-5 h-5" />
               </button>
 
-              {/* Breadcrumb sutil */}
               <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
                 <span>Plataforma</span>
                 <span>/</span>
@@ -250,10 +302,10 @@ export default function Layout() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <button
                 onClick={toggle}
-                className="p-2 rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-all"
+                className="p-2 rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-all border border-zinc-800/60"
                 title="Alternar tema"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>

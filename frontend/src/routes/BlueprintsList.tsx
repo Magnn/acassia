@@ -63,6 +63,7 @@ export default function BlueprintsList() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [newFlowTitle, setNewFlowTitle] = useState('');
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
 
@@ -181,7 +182,7 @@ export default function BlueprintsList() {
 
       {/* ═══ BARRA DE BUSCA & FILTRO ═══ */}
       {blueprints.length > 0 && (
-        <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -191,6 +192,58 @@ export default function BlueprintsList() {
               placeholder="Buscar fluxos por nome ou slug..."
               className="w-full pl-10 pr-4 py-2 bg-zinc-900/70 border border-zinc-800/80 rounded-xl text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowTemplates((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              showTemplates
+                ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span>{showTemplates ? 'Ocultar Modelos' : 'Explorar Modelos Prontos'}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Grid de Modelos quando toggle ativo */}
+      {showTemplates && blueprints.length > 0 && (
+        <div className="mb-8 p-5 bg-zinc-900/40 border border-zinc-800 rounded-2xl animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 mb-4">
+            <Layers className="w-4 h-4 text-indigo-400" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+              Modelos Prontos de Inicialização Rápida
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {STARTER_TEMPLATES.map((tmpl) => (
+              <div
+                key={tmpl.id}
+                className="p-4 rounded-xl bg-zinc-900/70 border border-zinc-800 hover:border-zinc-700 flex flex-col justify-between transition-all group"
+              >
+                <div>
+                  <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-800 text-zinc-300 mb-2">
+                    {tmpl.badge}
+                  </span>
+                  <h4 className="font-bold text-xs text-zinc-100 group-hover:text-indigo-400 transition-colors mb-1">
+                    {tmpl.title}
+                  </h4>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed mb-3">
+                    {tmpl.desc}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleUseTemplate(tmpl)}
+                  disabled={isCreating}
+                  className="w-full py-1.5 px-3 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-indigo-600 text-zinc-200 hover:text-white transition-all flex items-center justify-center gap-1"
+                >
+                  <span>Usar modelo</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
