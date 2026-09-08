@@ -68,6 +68,115 @@ def _valid_meta_signature(app_secret: str) -> bool:
     return bool(app_secret and hmac.compare_digest(supplied, expected))
 
 
+def reply_to_instagram_comment(comment_id: str, message: str, access_token: str) -> bool:
+    """Responde publicamente ao comentário via Graph API."""
+    if not comment_id or not message or not access_token:
+        return False
+    try:
+        import requests
+        url = f"https://graph.facebook.com/v21.0/{comment_id}/replies"
+        res = requests.post(url, json={"message": message}, params={"access_token": access_token}, timeout=10)
+        return res.status_code == 200
+    except Exception as exc:
+        logger.warning("[COMMENT_REPLY] Falha ao responder comentário %s: %s", comment_id, exc)
+        return False
+
+
+def send_instagram_private_reply(comment_id: str, message: str, access_token: str) -> bool:
+    """Envia DM privada ao usuário que comentou via Instagram Private Replies API."""
+    if not comment_id or not message or not access_token:
+        return False
+    try:
+        import requests
+        url = "https://graph.facebook.com/v21.0/me/messages"
+        payload = {
+            "recipient": {"comment_id": comment_id},
+            "message": {"text": message},
+        }
+        res = requests.post(url, json=payload, params={"access_token": access_token}, timeout=10)
+        return res.status_code == 200
+    except Exception as exc:
+        logger.warning("[PRIVATE_REPLY] Falha ao enviar DM para comment %s: %s", comment_id, exc)
+        return False
+
+
+def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
+    """
+    Compara comentário recebido com as regras ativas de Comment-to-DM do tenant.
+    Se bater com a palavra-chave:
+      1. Responde o comentário no feed/post (se configurado)
+      2. Envia DM exclusiva (Private Reply)
+      3. Cria ou atualiza Lead com tag ['comment_to_dm', 'instagram']
+      4. Dispara realtime SSE para o Inbox
+    """
+    from datetime import datetime, timezone
+    text = (comment_data.get("text") or comment_data.get("message") or "").strip()
+    comment_id = comment_data.get("id") or comment_data.get("comment_id") or ""
+    sender = comment_data.get("from") or {}
+    sender_id = sender.get("id") or ""
+    sender_username = sender.get("username") or ""
+
+    if not text or not comment_id:
+        return 0
+
+    rules = _get_variable(db, tenant_id, "social.comment_rules", [])
+    access_token = _get_secret(db, tenant_id, "meta_social.access_token")
+
+    matched_count = 0
+    text_upper = text.upper()
+
+    for rule in rules:
+        if not rule.get("active", True):
+            continue
+        kw = (rule.get("keyword") or "").strip().upper()
+        if not kw or kw in text_upper:
+            # Match!
+            reply_comment = rule.get("reply_comment")
+            send_dm = rule.get("send_dm")
+
+            if reply_comment and access_token:
+                reply_to_instagram_comment(comment_id, reply_comment, access_token)
+
+            if send_dm and access_token:
+                send_instagram_private_reply(comment_id, send_dm, access_token)
+
+            # Criar ou enriquecer lead
+            lead_ident = sender_id or (f"ig_{sender_username}" if sender_username else f"comment_{comment_id}")
+            lead = db.query(models.Lead).filter_by(tenant_id=tenant_id, telefone=lead_ident).first()
+            now = datetime.now(timezone.utc)
+            if not lead:
+                tags = ["instagram", "comment_to_dm"]
+                lead = models.Lead(
+                    tenant_id=tenant_id,
+                    telefone=lead_ident,
+                    nome=sender_username or "Usuário Instagram",
+                    tags=tags,
+                    custom_fields={"channel": "instagram", "ig_username": sender_username},
+                    metadata_json={"origem": "comment_to_dm", "comment_id": comment_id, "text": text},
+                )
+                db.add(lead)
+                db.commit()
+                db.refresh(lead)
+            else:
+                current_tags = list(lead.tags or [])
+                if "comment_to_dm" not in current_tags:
+                    current_tags.append("comment_to_dm")
+                    lead.tags = current_tags
+                    db.commit()
+
+            # Notificar realtime SSE
+            try:
+                from api.saas.realtime_hooks import notify_lead_updated
+                notify_lead_updated(tenant_id, lead.id, {"tags": lead.tags})
+            except Exception:
+                pass
+
+            matched_count += 1
+            break  # Executa primeira regra correspondente
+
+    return matched_count
+
+
 # ── 1. INSTAGRAM & FACEBOOK COMMENT AUTO-REPLY ────────────────────────
 
 @social_bp.route("/api/public/webhooks/meta-social", methods=["GET", "POST"])
@@ -109,6 +218,13 @@ def meta_social_webhook():
             if field in ["comments", "feed", "live_comments"]:
                 post_id = val.get("post_id") or val.get("media", {}).get("id")
                 logger.info("[COMMENT_DETECTED] tenant=%s post=%s", tenant_id, post_id)
+                db_proc = SessionLocal()
+                try:
+                    process_social_comment(tenant_id, val, db_proc)
+                except Exception as exc:
+                    logger.warning("[COMMENT_PROC_ERROR] tenant=%s: %s", tenant_id, exc)
+                finally:
+                    db_proc.close()
 
     return jsonify({"status": "received"}), 200
 
@@ -142,6 +258,8 @@ def comment_rules():
                 _put_secret(db, tenant_id, "meta_social.verify_token", str(credentials["verify_token"]).strip())
             if "app_secret" in credentials:
                 _put_secret(db, tenant_id, "meta_social.app_secret", str(credentials["app_secret"]).strip())
+            if "access_token" in credentials:
+                _put_secret(db, tenant_id, "meta_social.access_token", str(credentials["access_token"]).strip())
             db.commit()
             return jsonify({"ok": True, "rules": new_rules})
 
@@ -151,6 +269,7 @@ def comment_rules():
             "credentials_configured": {
                 "verify_token": bool(_get_secret(db, tenant_id, "meta_social.verify_token")),
                 "app_secret": bool(_get_secret(db, tenant_id, "meta_social.app_secret")),
+                "access_token": bool(_get_secret(db, tenant_id, "meta_social.access_token")),
             },
         })
     finally:
