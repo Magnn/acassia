@@ -207,6 +207,10 @@ export const broadcastApi = {
     api.get<{ recipients: BroadcastRecipientItem[] }>(`/saas/broadcast/${id}/recipients`),
   send: (id: number) =>
     api.post<{ ok: boolean; total_recipients: number; total_queued?: number; status: string; message: string }>(`/saas/broadcast/${id}/send`),
+  duplicate: (id: number) =>
+    api.post<{ ok: boolean; id: number; title: string }>(`/saas/broadcast/${id}/duplicate`),
+  resendFailed: (id: number) =>
+    api.post<{ ok: boolean; total_retrying: number; message: string }>(`/saas/broadcast/${id}/resend-failed`),
   tags: () => api.get<{ tags: string[] }>('/saas/broadcast/tags'),
 };
 

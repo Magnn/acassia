@@ -23,8 +23,13 @@ import {
   Check,
   FileText,
   Sparkles,
+  Copy,
+  RotateCcw,
+  Workflow,
+  Info,
 } from 'lucide-react';
 import { broadcastApi, type Campaign } from '../api/saas';
+import { blueprintsApi } from '../api/blueprints';
 import { handleApiError } from '../lib/handleApiError';
 import { toast } from '../lib/toast';
 
@@ -33,6 +38,8 @@ export default function Broadcast() {
   const [showWizard, setShowWizard] = useState(false);
   const [selectedStatusTab, setSelectedStatusTab] = useState<string>('all');
   const [inspectCampaignId, setInspectCampaignId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [deleteCandidateId, setDeleteCandidateId] = useState<number | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['broadcast-campaigns'],
@@ -48,15 +55,23 @@ export default function Broadcast() {
   const totalDelivered = campaigns.reduce((acc, c) => acc + (c.delivered_count || c.total_delivered || c.sent_count || 0), 0);
   const deliveryRate = totalRecipients > 0 ? Math.round((totalDelivered / totalRecipients) * 100) : 100;
 
-  // Filtro por abas
+  // Filtro por abas e busca
   const filteredCampaigns = useMemo(() => {
-    if (selectedStatusTab === 'all') return campaigns;
-    if (selectedStatusTab === 'draft') return campaigns.filter(c => c.status === 'draft');
-    if (selectedStatusTab === 'scheduled') return campaigns.filter(c => c.status === 'scheduled');
-    if (selectedStatusTab === 'sending') return campaigns.filter(c => c.status === 'sending');
-    if (selectedStatusTab === 'completed') return campaigns.filter(c => c.status === 'completed' || c.status === 'sent');
-    return campaigns;
-  }, [campaigns, selectedStatusTab]);
+    let list = campaigns;
+    if (selectedStatusTab === 'draft') list = list.filter(c => c.status === 'draft');
+    else if (selectedStatusTab === 'scheduled') list = list.filter(c => c.status === 'scheduled');
+    else if (selectedStatusTab === 'sending') list = list.filter(c => c.status === 'sending');
+    else if (selectedStatusTab === 'completed') list = list.filter(c => c.status === 'completed' || c.status === 'sent');
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(c =>
+        (c.title || c.name || '').toLowerCase().includes(q) ||
+        (c.message_text || c.message_template || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [campaigns, selectedStatusTab, searchQuery]);
 
   return (
     <div className="p-6 md:p-10 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
@@ -118,32 +133,47 @@ export default function Broadcast() {
         </div>
       </div>
 
-      {/* Status Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto">
-        {[
-          { id: 'all', label: 'Todas', count: campaigns.length },
-          { id: 'draft', label: 'Rascunhos', count: campaigns.filter(c => c.status === 'draft').length },
-          { id: 'scheduled', label: 'Agendadas', count: campaigns.filter(c => c.status === 'scheduled').length },
-          { id: 'sending', label: 'Em Envio', count: campaigns.filter(c => c.status === 'sending').length },
-          { id: 'completed', label: 'Concluídas', count: campaigns.filter(c => c.status === 'completed' || c.status === 'sent').length },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setSelectedStatusTab(tab.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap ${
-              selectedStatusTab === tab.id
-                ? 'bg-accent-amethyst text-white shadow-sm'
-                : 'text-secondary hover:text-white hover:bg-bg-surface'
-            }`}
-          >
-            {tab.label}
-            <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-              selectedStatusTab === tab.id ? 'bg-white/20 text-white' : 'bg-bg-surface border border-border text-secondary'
-            }`}>
-              {tab.count}
-            </span>
-          </button>
-        ))}
+      {/* Filters & Search Toolbar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-border pb-3">
+        {/* Status Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+          {[
+            { id: 'all', label: 'Todas', count: campaigns.length },
+            { id: 'draft', label: 'Rascunhos', count: campaigns.filter(c => c.status === 'draft').length },
+            { id: 'scheduled', label: 'Agendadas', count: campaigns.filter(c => c.status === 'scheduled').length },
+            { id: 'sending', label: 'Em Envio', count: campaigns.filter(c => c.status === 'sending').length },
+            { id: 'completed', label: 'Concluídas', count: campaigns.filter(c => c.status === 'completed' || c.status === 'sent').length },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setSelectedStatusTab(tab.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap ${
+                selectedStatusTab === tab.id
+                  ? 'bg-accent-amethyst text-white shadow-sm'
+                  : 'text-secondary hover:text-white hover:bg-bg-surface'
+              }`}
+            >
+              {tab.label}
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                selectedStatusTab === tab.id ? 'bg-white/20 text-white' : 'bg-bg-surface border border-border text-secondary'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search Box */}
+        <div className="relative w-full sm:w-64">
+          <Search className="w-4 h-4 text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Buscar campanhas..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 bg-bg-surface border border-border rounded-xl text-xs text-white focus:border-accent-amethyst outline-none"
+          />
+        </div>
       </div>
 
       {/* Campaigns List */}
@@ -160,9 +190,11 @@ export default function Broadcast() {
           </div>
           <h3 className="font-black text-lg mb-2">Nenhuma campanha encontrada</h3>
           <p className="text-secondary text-sm mb-6">
-            {selectedStatusTab === 'all'
+            {searchQuery
+              ? 'Nenhuma campanha corresponde ao termo de busca informado.'
+              : selectedStatusTab === 'all'
               ? 'Você ainda não possui disparos criados. Crie sua primeira campanha com segmentação e agendamento inteligente.'
-              : 'Nenhuma campanha corresponde ao filtro selecionado.'}
+              : 'Nenhuma campanha com o status selecionado.'}
           </p>
           <button
             onClick={() => setShowWizard(true)}
@@ -178,6 +210,7 @@ export default function Broadcast() {
               key={c.id}
               campaign={c}
               onInspect={() => setInspectCampaignId(c.id)}
+              onRequestDelete={() => setDeleteCandidateId(c.id)}
               onRefresh={() => qc.invalidateQueries({ queryKey: ['broadcast-campaigns'] })}
             />
           ))}
@@ -200,6 +233,19 @@ export default function Broadcast() {
         <RecipientsDrawer
           campaignId={inspectCampaignId}
           onClose={() => setInspectCampaignId(null)}
+          onRefresh={() => qc.invalidateQueries({ queryKey: ['broadcast-campaigns'] })}
+        />
+      )}
+
+      {/* Custom Delete Confirmation Modal (Zero Native Confirms) */}
+      {deleteCandidateId !== null && (
+        <DeleteConfirmModal
+          campaignId={deleteCandidateId}
+          onClose={() => setDeleteCandidateId(null)}
+          onDeleted={() => {
+            setDeleteCandidateId(null);
+            qc.invalidateQueries({ queryKey: ['broadcast-campaigns'] });
+          }}
         />
       )}
     </div>
@@ -212,10 +258,12 @@ export default function Broadcast() {
 function CampaignItemCard({
   campaign: c,
   onInspect,
+  onRequestDelete,
   onRefresh,
 }: {
   campaign: Campaign;
   onInspect: () => void;
+  onRequestDelete: () => void;
   onRefresh: () => void;
 }) {
   const sendMut = useMutation({
@@ -227,18 +275,28 @@ function CampaignItemCard({
     onError: handleApiError('Erro ao iniciar disparo'),
   });
 
-  const deleteMut = useMutation({
-    mutationFn: () => broadcastApi.delete(c.id),
+  const duplicateMut = useMutation({
+    mutationFn: () => broadcastApi.duplicate(c.id),
     onSuccess: () => {
-      toast.success('Campanha removida.');
+      toast.success('Campanha duplicada com sucesso!');
       onRefresh();
     },
-    onError: handleApiError('Erro ao remover campanha'),
+    onError: handleApiError('Erro ao duplicar campanha'),
+  });
+
+  const resendFailedMut = useMutation({
+    mutationFn: () => broadcastApi.resendFailed(c.id),
+    onSuccess: res => {
+      toast.success(res.message || 'Reenvio de falhas iniciado!');
+      onRefresh();
+    },
+    onError: handleApiError('Erro ao reenviar para falhas'),
   });
 
   const title = c.title || c.name || 'Campanha Sem Nome';
   const message = c.message_text || c.message_template || '';
   const delivered = c.delivered_count || c.total_delivered || c.sent_count || 0;
+  const failed = c.failed_count || c.total_failed || 0;
   const total = c.total_recipients || 0;
   const progressPercent = total > 0 ? Math.min(100, Math.round((delivered / total) * 100)) : 0;
 
@@ -257,12 +315,13 @@ function CampaignItemCard({
   // Segment tag badges
   const filterTags = (c.segment_filters?.tags as string[]) || [];
   const antiBanDelay = (c.segment_filters?.anti_ban_delay_seconds as number) || 2;
+  const flowBlueprintId = c.segment_filters?.flow_blueprint_id;
 
   return (
     <div className="bg-bg-surface border border-border hover:border-accent-amethyst/30 rounded-2xl p-5 md:p-6 transition-all shadow-sm">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div className="space-y-1 max-w-2xl">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h3 className="font-black text-base text-white">{title}</h3>
             <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${cfg.color}`}>
               <StatusIcon className="w-3 h-3" />
@@ -273,6 +332,11 @@ function CampaignItemCard({
                 <ImageIcon className="w-3 h-3 text-accent-amethyst" /> Mídia
               </span>
             )}
+            {Boolean(flowBlueprintId) && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center gap-1">
+                <Workflow className="w-3 h-3" /> Flow Trigger
+              </span>
+            )}
           </div>
           <p className="text-xs text-secondary line-clamp-2 font-mono bg-bg-primary/40 px-3 py-1.5 rounded-xl border border-border/40 mt-1">
             {message}
@@ -280,15 +344,39 @@ function CampaignItemCard({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+        <div className="flex items-center gap-2 self-start md:self-center shrink-0 flex-wrap">
           <button
             onClick={onInspect}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-secondary hover:text-white transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-secondary hover:text-white transition-all"
             title="Ver destinatários e logs"
           >
             <Eye className="w-3.5 h-3.5 text-accent-amethyst" /> Destinatários & Logs
           </button>
 
+          {/* Reenviar falhas se houver */}
+          {failed > 0 && c.status !== 'sending' && (
+            <button
+              onClick={() => resendFailedMut.mutate()}
+              disabled={resendFailedMut.isPending}
+              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-bold transition-all"
+              title="Reenviar apenas para os números com falha"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              {resendFailedMut.isPending ? 'Reenviando...' : `Reenviar Falhas (${failed})`}
+            </button>
+          )}
+
+          {/* Duplicar campanha */}
+          <button
+            onClick={() => duplicateMut.mutate()}
+            disabled={duplicateMut.isPending}
+            className="p-2 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-secondary hover:text-white transition-all"
+            title="Duplicar Campanha"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+
+          {/* Enviar agora */}
           {(c.status === 'draft' || c.status === 'scheduled') && (
             <button
               onClick={() => sendMut.mutate()}
@@ -300,29 +388,14 @@ function CampaignItemCard({
             </button>
           )}
 
-          {c.status === 'sending' && (
-            <button
-              onClick={() => deleteMut.mutate()}
-              disabled={deleteMut.isPending}
-              className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all"
-            >
-              <XCircle className="w-3.5 h-3.5" /> Cancelar
-            </button>
-          )}
-
-          {c.status !== 'sending' && (
-            <button
-              onClick={() => {
-                if (window.confirm('Excluir esta campanha?')) {
-                  deleteMut.mutate();
-                }
-              }}
-              className="p-2 hover:bg-red-500/10 text-secondary hover:text-red-400 rounded-xl transition-all"
-              title="Excluir campanha"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
+          {/* Excluir */}
+          <button
+            onClick={onRequestDelete}
+            className="p-2 hover:bg-red-500/10 text-secondary hover:text-red-400 rounded-xl transition-all"
+            title="Excluir campanha"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -384,9 +457,71 @@ function CampaignItemCard({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   CUSTOM DELETE CONFIRMATION MODAL (ZERO BROWSER DIALOGS)
+   ───────────────────────────────────────────────────────────────────────────── */
+function DeleteConfirmModal({
+  campaignId,
+  onClose,
+  onDeleted,
+}: {
+  campaignId: number;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const deleteMut = useMutation({
+    mutationFn: () => broadcastApi.delete(campaignId),
+    onSuccess: () => {
+      toast.success('Campanha removida com sucesso.');
+      onDeleted();
+    },
+    onError: handleApiError('Erro ao remover campanha'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+      <div className="bg-bg-surface border border-border rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mx-auto">
+          <Trash2 className="w-6 h-6" />
+        </div>
+        <div className="text-center space-y-1">
+          <h3 className="font-black text-base text-white">Excluir Campanha?</h3>
+          <p className="text-xs text-secondary">
+            Esta ação não pode ser desfeita. Todos os logs e agendamentos desta campanha serão excluídos permanentemente.
+          </p>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onClose}
+            disabled={deleteMut.isPending}
+            className="flex-1 px-4 py-2.5 bg-bg-primary hover:bg-bg-primary/80 border border-border rounded-xl text-xs font-bold text-white transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => deleteMut.mutate()}
+            disabled={deleteMut.isPending}
+            className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-red-500/20"
+          >
+            {deleteMut.isPending ? 'Excluindo...' : 'Sim, Excluir'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    RECIPIENTS AUDIT DRAWER / MODAL
    ───────────────────────────────────────────────────────────────────────────── */
-function RecipientsDrawer({ campaignId, onClose }: { campaignId: number; onClose: () => void }) {
+function RecipientsDrawer({
+  campaignId,
+  onClose,
+  onRefresh,
+}: {
+  campaignId: number;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
@@ -395,7 +530,18 @@ function RecipientsDrawer({ campaignId, onClose }: { campaignId: number; onClose
     queryFn: () => broadcastApi.recipients(campaignId),
   });
 
+  const resendFailedMut = useMutation({
+    mutationFn: () => broadcastApi.resendFailed(campaignId),
+    onSuccess: res => {
+      toast.success(res.message || 'Reenvio de falhas iniciado!');
+      onRefresh();
+      onClose();
+    },
+    onError: handleApiError('Erro ao reenviar para falhas'),
+  });
+
   const recipients = data?.recipients ?? [];
+  const failedCount = recipients.filter(r => r.status === 'failed').length;
 
   const filtered = useMemo(() => {
     return recipients.filter(r => {
@@ -423,9 +569,21 @@ function RecipientsDrawer({ campaignId, onClose }: { campaignId: number; onClose
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-bg-primary rounded-xl text-secondary hover:text-white transition-all">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {failedCount > 0 && (
+              <button
+                onClick={() => resendFailedMut.mutate()}
+                disabled={resendFailedMut.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-bold transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                {resendFailedMut.isPending ? 'Iniciando...' : `Reenviar ${failedCount} Falhas`}
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-bg-primary rounded-xl text-secondary hover:text-white transition-all">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -528,6 +686,8 @@ function CreateCampaignWizardModal({
 
   // Form State
   const [name, setName] = useState('');
+  const [messageType, setMessageType] = useState<'text' | 'flow'>('text');
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'document'>('image');
@@ -556,6 +716,12 @@ function CreateCampaignWizardModal({
   });
   const availableTags = tagsData?.tags ?? ['vip', 'lead_quente', 'cliente', 'abandono_carrinho', 'oraculo'];
 
+  // Fetch available flow blueprints
+  const { data: blueprints } = useQuery({
+    queryKey: ['broadcast-blueprints'],
+    queryFn: blueprintsApi.list,
+  });
+
   // Current segment filters object
   const currentFilters = useMemo(() => {
     const filters: Record<string, unknown> = {
@@ -569,8 +735,11 @@ function CreateCampaignWizardModal({
     if (scoreBand !== 'all') {
       filters.score_band = [scoreBand];
     }
+    if (messageType === 'flow' && selectedBlueprintId) {
+      filters.flow_blueprint_id = selectedBlueprintId;
+    }
     return filters;
-  }, [selectedTags, scoreBand, excludeOptedOut, antiBanDelaySeconds]);
+  }, [selectedTags, scoreBand, excludeOptedOut, antiBanDelaySeconds, messageType, selectedBlueprintId]);
 
   // Debounced Audience Estimation
   useEffect(() => {
@@ -869,6 +1038,66 @@ function CreateCampaignWizardModal({
                   />
                 </div>
 
+                {/* Message vs Flow trigger selector */}
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-secondary block mb-1.5">
+                    Tipo de Conteúdo do Disparo
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMessageType('text')}
+                      className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                        messageType === 'text'
+                          ? 'bg-accent-amethyst/15 border-accent-amethyst text-white'
+                          : 'bg-bg-primary border-border text-secondary hover:text-white'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4" /> Mensagem de Texto & Mídia
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMessageType('flow')}
+                      className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                        messageType === 'flow'
+                          ? 'bg-accent-amethyst/15 border-accent-amethyst text-white'
+                          : 'bg-bg-primary border-border text-secondary hover:text-white'
+                      }`}
+                    >
+                      <Workflow className="w-4 h-4" /> Disparar Fluxo (Flow Builder)
+                    </button>
+                  </div>
+                </div>
+
+                {/* If Flow chosen, show Blueprint picker */}
+                {messageType === 'flow' && (
+                  <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-blue-400 block">
+                      Selecione o Fluxo Visual a ser iniciado ao responder
+                    </label>
+                    <select
+                      value={selectedBlueprintId || ''}
+                      onChange={e => setSelectedBlueprintId(Number(e.target.value) || null)}
+                      className="w-full p-2.5 bg-bg-surface border border-border rounded-xl text-xs text-white outline-none"
+                    >
+                      <option value="">Selecione um fluxo cadastrado...</option>
+                      {(blueprints || []).map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.title || b.slug}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Meta 24-hour window guidance alert */}
+                <div className="p-3 rounded-xl bg-bg-primary/40 border border-border/60 flex items-start gap-2.5 text-xs text-secondary">
+                  <Info className="w-4 h-4 text-accent-amethyst shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Janela de 24h da Meta:</strong> Mensagens livres são entregues normalmente para quem interagiu nas últimas 24h. Para bases inativas há mais tempo, use copy humanizada de reengajamento.
+                  </span>
+                </div>
+
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-secondary block">
@@ -877,7 +1106,7 @@ function CreateCampaignWizardModal({
                     <span className="text-[10px] text-secondary font-mono">{message.length} caracteres</span>
                   </div>
                   <textarea
-                    rows={6}
+                    rows={5}
                     placeholder="Olá {nome}! Tenho uma novidade especial sobre a sua previsão..."
                     value={message}
                     onChange={e => setMessage(e.target.value)}
@@ -1127,6 +1356,12 @@ function CreateCampaignWizardModal({
                     <strong className="text-indigo-400 font-bold">{antiBanDelaySeconds} segundos por lead</strong>
                   </div>
                 </div>
+
+                {messageType === 'flow' && selectedBlueprintId && (
+                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400">
+                    <strong>Gatilho de Fluxo Vinculado:</strong> Blueprint #{selectedBlueprintId} será disparado para quem responder.
+                  </div>
+                )}
 
                 <div className="pt-3 border-t border-border/50">
                   <span className="text-secondary block text-xs font-medium mb-1">Prévia da Mensagem:</span>

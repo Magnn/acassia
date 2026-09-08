@@ -342,6 +342,84 @@ def delete_campaign(campaign_id: int):
         db.close()
 
 
+@broadcast_bp.route("/<int:campaign_id>/duplicate", methods=["POST"])
+@login_required
+def duplicate_campaign(campaign_id: int):
+    """Duplica uma campanha existente criando um novo rascunho com o mesmo conteúdo e segmentação."""
+    db = SessionLocal()
+    try:
+        c = db.query(models.BroadcastCampaign).filter_by(
+            id=campaign_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not c:
+            return jsonify({"error": "not_found"}), 404
+
+        new_campaign = models.BroadcastCampaign(
+            tenant_id=current_user.tenant_id,
+            created_by_user_id=current_user.id,
+            title=f"{c.title} (Cópia)"[:200],
+            message_text=c.message_text,
+            message_media_url=c.message_media_url,
+            message_media_type=c.message_media_type,
+            segment_filters=dict(c.segment_filters or {}),
+            status="draft",
+            scheduled_at=None,
+        )
+        db.add(new_campaign)
+        db.commit()
+        db.refresh(new_campaign)
+        return jsonify({"ok": True, "id": new_campaign.id, "title": new_campaign.title}), 201
+    finally:
+        db.close()
+
+
+@broadcast_bp.route("/<int:campaign_id>/resend-failed", methods=["POST"])
+@login_required
+def resend_failed_campaign(campaign_id: int):
+    """Reenvia apenas para os destinatários que falharam na campanha."""
+    db = SessionLocal()
+    try:
+        c = db.query(models.BroadcastCampaign).filter_by(
+            id=campaign_id, tenant_id=current_user.tenant_id,
+        ).first()
+        if not c:
+            return jsonify({"error": "not_found"}), 404
+
+        failed_recs = db.query(models.BroadcastRecipient).filter_by(
+            campaign_id=campaign_id, status="failed",
+        ).all()
+
+        if not failed_recs:
+            return jsonify({"error": "no_failed_recipients"}), 422
+
+        # Resetar status dos que falharam para pending
+        for r in failed_recs:
+            r.status = "pending"
+            r.error_reason = None
+            r.sent_at = None
+
+        c.status = "sending"
+        c.failed_count = 0
+        db.commit()
+
+        # Disparar background worker
+        tenant_id = current_user.tenant_id
+        t = threading.Thread(
+            target=_send_campaign_worker,
+            args=(c.id, tenant_id),
+            daemon=True,
+        )
+        t.start()
+
+        return jsonify({
+            "ok": True,
+            "total_retrying": len(failed_recs),
+            "message": f"Reenvio iniciado para {len(failed_recs)} contatos que falharam.",
+        })
+    finally:
+        db.close()
+
+
 @broadcast_bp.route("/<int:campaign_id>/preview", methods=["POST"])
 @login_required
 def preview_campaign(campaign_id: int):
