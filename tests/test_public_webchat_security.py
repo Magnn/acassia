@@ -74,8 +74,13 @@ def test_init_requires_signed_site_key_and_allowed_origin(configured_client):
     assert valid.headers["Access-Control-Allow-Origin"] == _ORIGIN
 
 
-def test_session_token_binds_tenant_and_session(configured_client):
+def test_session_token_binds_tenant_and_session(configured_client, monkeypatch):
     client, user, site_key = configured_client
+    notifications = []
+    monkeypatch.setattr(
+        "api.saas.realtime_hooks.notify_message_created",
+        lambda tenant_id, lead_id, payload: notifications.append((tenant_id, lead_id, payload)),
+    )
     initialized = client.post(
         "/api/public/webchat/init",
         json={"site_key": site_key},
@@ -102,6 +107,8 @@ def test_session_token_binds_tenant_and_session(configured_client):
             tenant_id=user.tenant_id, telefone=initialized["session_id"]
         ).one()
         assert db.query(models.Mensagem).filter_by(lead_id=lead.id, remetente="user").count() == 1
+        assert notifications[0][0] == user.tenant_id
+        assert notifications[0][1] == lead.id
     finally:
         db.close()
 

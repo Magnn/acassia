@@ -321,7 +321,7 @@ def send_message():
                 "texto": text,
                 "remetente": "user",
                 "timestamp": now.isoformat(),
-            }, origin=origin)
+            })
         except Exception:
             pass
 
