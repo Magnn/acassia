@@ -42,7 +42,7 @@ export const agentsApi = {
     );
     return data.agent;
   },
-  create: (input: { name: string; avatar?: string }) =>
+  create: (input: { name: string; avatar?: string; draft?: AgentDraft }) =>
     api.post<{ ok: boolean; agent: AgentSummary }>(
       '/api/studio/agents',
       input,

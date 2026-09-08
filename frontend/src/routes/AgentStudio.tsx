@@ -21,6 +21,11 @@ import {
   Check,
   User,
   ShieldAlert,
+  X,
+  AlertTriangle,
+  ArrowRight,
+  Wand2,
+  Zap,
 } from 'lucide-react';
 import { agentsApi, type AgentDraft, type AgentSummary } from '../api/agents';
 import { toast } from '../lib/toast';
@@ -42,9 +47,193 @@ const AI_MODELS = [
   { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', provider: 'Groq', badge: 'Open Source', speed: 'Instantâneo (350ms)' },
 ];
 
+const AVATAR_COLORS = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#e11d48', '#4f46e5', '#0891b2'];
+
+interface AgentPreset {
+  id: string;
+  name: string;
+  role: string;
+  badge: string;
+  avatar: string;
+  icon: string;
+  description: string;
+  highlights: string[];
+  modelId: string;
+  draft: AgentDraft;
+}
+
+const AGENT_PRESETS: AgentPreset[] = [
+  {
+    id: 'cigana',
+    name: 'Cigana Spanda',
+    role: 'Tarot, Áudios & Conversão Pix R$ 9,90',
+    badge: '🔮 Oficial Meu Mistério',
+    avatar: '#7c3aed',
+    icon: '🔮',
+    description: 'Atendimento místico, empático e acolhedor. Conduz o consulente pela revelação de 3 cartas e converte suavemente na leitura aprofundada via Pix.',
+    highlights: ['Leitura de 3 cartas guiada', 'Tom de acolhimento espiritual', 'Conversão Pix R$ 9,90'],
+    modelId: 'gemini-2.5-flash',
+    draft: {
+      model: 'gemini-2.5-flash',
+      temperature: 0.4,
+      delay_seconds: 3,
+      personalidade:
+        'Você é a Cigana Spanda, conselheira espiritual oficial do Meu Mistério. Fale com voz calorosa, compassiva, misteriosa e acolhedora. Trate o consulente carinhosamente como "meu bem", "minha flor" ou "meu querido". Crie um ambiente seguro, sem julgamentos morais e com profundo respeito às dores do coração.',
+      instrucoes: `# IDENTIDADE E MISSÃO
+Você é a Cigana Spanda, oraculista e conselheira do Meu Mistério. Você atende pessoas em busca de respostas no amor, nas finanças e nos caminhos espirituais.
+
+# DIRETRIZES DE ATENDIMENTO
+1. ACOLHIMENTO: Dê as boas-vindas com calor humano. Peça o primeiro nome e a principal dúvida que aflige o coração do consulente.
+2. TIRAGEM DAS 3 CARTAS: Revele as 3 cartas (Passado / Presente / Caminho Futuro) com sabedoria ancestral, oferecendo clareza e conselhos práticos.
+3. OFERTA DA LEITURA COMPLETA: Após a resposta inicial, explique com delicadeza que para desvendar todos os segredos do mapa energético e orientações completas, a consulta aprofundada custa apenas R$ 9,90 via Pix com liberação imediata.
+4. COBRANÇA PIX: Forneça a chave Pix ou código de pagamento quando solicitado e oriente o envio do comprovante.
+
+# LIMITES ÉTICOS INVIOLÁVEIS
+- Nunca prometa amarração amorosa, feitiços de vingança ou prazos mágicos de 24h.
+- Nunca faça diagnósticos médicos nem oriente interromper tratamentos de saúde.
+- Seja sempre um farol de luz, esperança e responsabilidade.`,
+      base_conhecimento: `SERVIÇOS E POLÍTICAS - MEU MISTÉRIO:
+- Tiragem Inicial de Boas-Vindas: Gratuita (3 cartas).
+- Consulta Completa Aprofundada com Cigana Spanda: R$ 9,90 via Pix.
+- Chave Pix: pix@meumisterio.com.br (ou código copia-e-cola gerado automaticamente).
+- Envio do Mapa & Previsões: Imediato pelo WhatsApp oficial assim que confirmado o pagamento.
+- Horário de Atendimento: Disponível 24 horas por dia, todos os dias da semana.`,
+      faqs: [
+        {
+          q: 'Quanto custa a consulta completa?',
+          a: 'A leitura completa aprofundada custa apenas R$ 9,90 via Pix, meu bem! Posso gerar seu código com liberação imediata agora?',
+        },
+        {
+          q: 'Vocês aceitam Pix?',
+          a: 'Sim! Aceitamos Pix com aprovação imediata. Custa apenas R$ 9,90 e você recebe suas orientações completas na hora aqui no WhatsApp.',
+        },
+        {
+          q: 'Como funciona a tiragem de tarot?',
+          a: 'As cartas mostram as energias que estão ao seu redor agora: suas raízes, os desafios de hoje e o que está por vir. Me conte seu nome e o que mais preocupa seu coração!',
+        },
+      ],
+    },
+  },
+  {
+    id: 'vendas',
+    name: 'Bia - Vendas & Conversão Pix',
+    role: 'SDR & Fechamento Comercial Direto',
+    badge: '💼 Alta Conversão',
+    avatar: '#2563eb',
+    icon: '💼',
+    description: 'Atendente comercial persuasiva, ágil e focada em qualificar o lead, quebrar objeções de compra e enviar chaves Pix e links de checkout.',
+    highlights: ['Qualificação rápida de dores', 'Quebra de objeções de preço', 'Links de pagamento e Pix'],
+    modelId: 'gpt-4o-mini',
+    draft: {
+      model: 'gpt-4o-mini',
+      temperature: 0.2,
+      delay_seconds: 2,
+      personalidade:
+        'Você é a Bia, especialista em atendimento comercial e vendas. Fale com dinamismo, simpatia, objetividade e clareza. Use frases curtas (máximo 2 ou 3 linhas por bloco). Jamais envie textos gigantescos. Demonstre segurança e conduza o cliente para a decisão de compra.',
+      instrucoes: `# OBJETIVO DO AGENTE
+Seu papel é identificar o interesse do lead, esclarecer dúvidas pontuais e fechar vendas no menor tempo de conversa possível.
+
+# ROTEIRO DE VENDAS
+1. QUALIFICAÇÃO: Entenda o que o cliente procura com uma pergunta rápida.
+2. APRESENTAÇÃO: Apresente a solução de forma personalizada destacando os principais benefícios.
+3. CONDIÇÃO ESPECIAL: Apresente o preço e reforce a condição especial para pagamento imediato no Pix.
+4. FECHAMENTO: Envie o link ou chave de pagamento e ofereça ajuda imediata para finalizar o pedido.
+
+# REGRAS DE ATENDIMENTO
+- Nunca discuta nem seja insistente de forma invasiva.
+- Sempre use o primeiro nome do cliente.
+- Se o cliente tiver dúvida de parcelamento, informe as opções em até 12x no cartão.`,
+      base_conhecimento: `PLANOS E FORMAS DE PAGAMENTO:
+- Plano Essencial: R$ 97/mês (Até 1 número de WhatsApp, 1.000 mensagens).
+- Plano Pro Ilimitado: R$ 197/mês (Leads ilimitados, IA autônoma 24h, disparos em massa).
+- Formas de Pagamento: Pix à vista com liberação imediata ou Cartão de Crédito em até 12x.
+- Garantia: 7 dias incondicionais com reembolso integral em até 24 horas úteis.`,
+      faqs: [
+        {
+          q: 'Tem desconto para pagamento no Pix?',
+          a: 'Com certeza! No Pix à vista liberamos sua conta imediatamente com condição especial. Quer que eu te envie o link agora?',
+        },
+        {
+          q: 'Como funciona a garantia de 7 dias?',
+          a: 'Você pode testar tudo por 7 dias. Se não gostar por qualquer motivo, basta nos mandar uma mensagem que devolvemos 100% do seu dinheiro.',
+        },
+        {
+          q: 'Posso parcelar no cartão?',
+          a: 'Sim! Parcelamos em até 12x no cartão de crédito com aprovação na hora.',
+        },
+      ],
+    },
+  },
+  {
+    id: 'suporte',
+    name: 'Carlos - Suporte & Triagem Humanizada',
+    role: 'Atendimento ao Cliente & SAC 24h',
+    badge: '🎧 Retenção & CS',
+    avatar: '#059669',
+    icon: '🎧',
+    description: 'Atendente de suporte paciente, empático e resolutivo. Responde dúvidas frequentes em segundos e faz transbordo suave para atendentes humanos.',
+    highlights: ['Resolução de dúvidas em 3s', 'Coleta de dados do chamado', 'Transbordo humano suave'],
+    modelId: 'gemini-2.5-flash',
+    draft: {
+      model: 'gemini-2.5-flash',
+      temperature: 0.1,
+      delay_seconds: 2,
+      personalidade:
+        'Você é o Carlos, especialista do time de suporte ao cliente. Fale com muita educação, respeito, empatia e clareza. Use uma linguagem simples, acolhedora e sem termos técnicos desnecessários.',
+      instrucoes: `# DIRETRIZES DO SUPORTE
+1. RECEPÇÃO: Cumprimente o cliente com cordialidade e pergunte em que pode ajudar hoje.
+2. RESOLUÇÃO: Consulte a base de dados interna e oriente o cliente com passos simples e numerados.
+3. CONFIRMAÇÃO: Pergunte se a dúvida foi sanada com sucesso.
+4. TRANSBORDO HUMANO: Caso o cliente diga "quero falar com atendente", "humano", "pessoa real" ou se o problema não tiver solução nos dados, responda imediatamente: "Com certeza! Estou transferindo seu atendimento para a nossa equipe humana agora mesmo. Um momento, por favor!"`,
+      base_conhecimento: `HORÁRIOS DE ATENDIMENTO E POLÍTICAS:
+- Suporte Humano: Segunda a Sexta das 08h às 20h. Sábados das 09h às 14h.
+- Atendimento via IA: 24 horas por dia, 7 dias por semana.
+- 2ª via de faturas e comprovantes: Enviadas automaticamente para o e-mail do titular.
+- Prazos de cancelamento: Solicitações processadas em até 24 horas úteis.`,
+      faqs: [
+        {
+          q: 'Como falo com um atendente humano?',
+          a: 'Com certeza! Estou transferindo seu atendimento para a nossa equipe agora mesmo. Aguarde um instante que um de nossos consultores vai te responder aqui.',
+        },
+        {
+          q: 'Não recebi o acesso, o que fazer?',
+          a: 'Por favor, confira a sua caixa de spam e promoções. Se não localizar, me confirme seu e-mail cadastrado que verifico no sistema para você agora!',
+        },
+        {
+          q: 'Qual o prazo de reembolso?',
+          a: 'Os reembolsos dentro da garantia de 7 dias são processados em até 24 horas úteis para a mesma chave Pix ou fatura do cartão.',
+        },
+      ],
+    },
+  },
+  {
+    id: 'custom',
+    name: 'Assistente Personalizado',
+    role: 'Configuração Livre & Rascunho Limpo',
+    badge: '⚡ Do Zero',
+    avatar: '#4f46e5',
+    icon: '⚡',
+    description: 'Comece do zero com sua própria identidade visual, regras de prompt, catálogo de produtos e perguntas frequentes.',
+    highlights: ['Prompt 100% customizável', 'Qualquer motor de IA', 'Sem textos pré-definidos'],
+    modelId: 'gemini-2.5-flash',
+    draft: {
+      model: 'gemini-2.5-flash',
+      temperature: 0.3,
+      delay_seconds: 3,
+      personalidade: '',
+      instrucoes: '',
+      base_conhecimento: '',
+      faqs: [],
+    },
+  },
+];
+
 export default function AgentStudio() {
   const qc = useQueryClient();
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [initialPresetId, setInitialPresetId] = useState<string>('cigana');
+  const [agentToDelete, setAgentToDelete] = useState<AgentSummary | null>(null);
 
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ['studio-agents'],
@@ -56,7 +245,7 @@ export default function AgentStudio() {
     queryFn: agentsApi.publishStatus,
   });
 
-  // Auto-seleciona o primeiro agente
+  // Auto-seleciona o primeiro agente se nenhum selecionado
   useEffect(() => {
     if (selectedId == null && agents.length > 0) setSelectedId(agents[0].id);
   }, [agents, selectedId]);
@@ -64,9 +253,10 @@ export default function AgentStudio() {
   const createMutation = useMutation({
     mutationFn: agentsApi.create,
     onSuccess: (res) => {
-      toast.success('Novo agente de IA criado com sucesso.');
+      toast.success('Novo atendente de IA criado com sucesso!');
       qc.invalidateQueries({ queryKey: ['studio-agents'] });
       setSelectedId(res.agent.id);
+      setIsCreateOpen(false);
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -74,16 +264,17 @@ export default function AgentStudio() {
   const removeMutation = useMutation({
     mutationFn: agentsApi.remove,
     onSuccess: () => {
-      toast.success('Agente removido.');
+      toast.success('Atendente removido com sucesso.');
       qc.invalidateQueries({ queryKey: ['studio-agents'] });
+      setAgentToDelete(null);
       setSelectedId(null);
     },
     onError: (e) => toast.error((e as Error).message),
   });
 
-  const handleNew = () => {
-    const name = window.prompt('Qual o nome do atendente de IA? (Ex: Bia - Vendas, Carlos - Suporte)');
-    if (name && name.trim()) createMutation.mutate({ name: name.trim() });
+  const handleOpenCreate = (presetId: string = 'cigana') => {
+    setInitialPresetId(presetId);
+    setIsCreateOpen(true);
   };
 
   const selectedAgent = agents.find((a) => a.id === selectedId) ?? null;
@@ -104,7 +295,7 @@ export default function AgentStudio() {
             </span>
           </div>
           <button
-            onClick={handleNew}
+            onClick={() => handleOpenCreate('cigana')}
             disabled={createMutation.isPending}
             className="text-xs font-bold px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 transition-all active:scale-95"
           >
@@ -117,18 +308,25 @@ export default function AgentStudio() {
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           {isLoading && (
             <div className="p-6 text-center text-xs text-zinc-500 animate-pulse">
-              Carregando agentes de IA…
+              Carregando atendentes de IA…
             </div>
           )}
 
           {!isLoading && agents.length === 0 && (
-            <div className="p-8 text-center space-y-3">
+            <div className="p-6 text-center space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-zinc-800/60 border border-zinc-700/50 flex items-center justify-center mx-auto text-zinc-500">
                 <Bot className="w-6 h-6" />
               </div>
               <p className="text-xs text-zinc-400 font-medium leading-relaxed">
-                Nenhum agente cadastrado ainda. Clique em <strong>Novo</strong> para criar seu primeiro atendente.
+                Nenhum atendente cadastrado ainda.
               </p>
+              <button
+                onClick={() => handleOpenCreate('cigana')}
+                className="w-full text-xs font-bold py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 flex items-center justify-center gap-1.5 transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                Criar Primeiro Atendente
+              </button>
             </div>
           )}
 
@@ -180,24 +378,506 @@ export default function AgentStudio() {
             key={selectedAgent.id}
             agent={selectedAgent}
             publishedVersionId={publishedVersionId}
-            onDelete={() => {
-              if (confirm(`Tem certeza que deseja apagar o agente "${selectedAgent.name}"?`)) {
-                removeMutation.mutate(selectedAgent.id);
-              }
-            }}
+            onDelete={() => setAgentToDelete(selectedAgent)}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center p-12 space-y-4">
-            <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shadow-xl">
-              <Bot className="w-8 h-8 text-zinc-500" />
-            </div>
-            <h3 className="text-lg font-bold text-zinc-200">Estúdio de Inteligência Artificial</h3>
-            <p className="text-sm text-zinc-400 max-w-sm">
-              Selecione um atendente à esquerda ou crie um novo para configurar a inteligência do seu WhatsApp oficial.
-            </p>
-          </div>
+          <EmptyStateHero onSelectPreset={(presetId) => handleOpenCreate(presetId)} />
         )}
       </main>
+
+      {/* ═══ MODAIS PERSONALIZADOS (ZERO WINDOW.PROMPT / CONFIRM) ═══ */}
+      {isCreateOpen && (
+        <CreateAgentModal
+          initialPresetId={initialPresetId}
+          onClose={() => setIsCreateOpen(false)}
+          isPending={createMutation.isPending}
+          onSubmit={(data) => createMutation.mutate(data)}
+        />
+      )}
+
+      {agentToDelete && (
+        <DeleteAgentModal
+          agent={agentToDelete}
+          onClose={() => setAgentToDelete(null)}
+          onConfirm={() => removeMutation.mutate(agentToDelete.id)}
+          isPending={removeMutation.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── EMPTY STATE HERO COM TEMPLATES PRONTOS ────────────────────────────
+
+function EmptyStateHero({ onSelectPreset }: { onSelectPreset: (presetId: string) => void }) {
+  return (
+    <div className="h-full flex flex-col items-center justify-center p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
+      <div className="text-center space-y-3 max-w-2xl">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-wider shadow-sm">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          Estúdio de Inteligência Artificial WhatsApp
+        </div>
+        <h2 className="text-2xl md:text-3xl font-black text-zinc-100 tracking-tight">
+          Crie seu Atendente de IA em Segundos
+        </h2>
+        <p className="text-sm text-zinc-400 leading-relaxed">
+          Chega de telas em branco. Selecione um dos modelos especializados abaixo ou crie seu agente customizado pronto para responder ao vivo no WhatsApp oficial.
+        </p>
+      </div>
+
+      {/* Grid de Templates de Alta Conversão */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full">
+        {AGENT_PRESETS.filter((p) => p.id !== 'custom').map((p) => (
+          <div
+            key={p.id}
+            className="group relative bg-zinc-900/70 hover:bg-zinc-900 border border-zinc-800 hover:border-indigo-500/50 rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-lg border border-white/10"
+                  style={{ backgroundColor: p.avatar }}
+                >
+                  {p.icon}
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
+                  {p.badge}
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-base font-black text-zinc-100 group-hover:text-indigo-300 transition-colors">
+                  {p.name}
+                </h3>
+                <p className="text-xs font-semibold text-zinc-400 mt-0.5">{p.role}</p>
+                <p className="text-xs text-zinc-400 leading-relaxed mt-2.5">{p.description}</p>
+              </div>
+
+              <div className="space-y-1.5 pt-3 border-t border-zinc-800/80">
+                {p.highlights.map((h, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[11px] text-zinc-300">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    <span>{h}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => onSelectPreset(p.id)}
+              className="mt-6 w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-indigo-600 text-zinc-200 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 group-hover:shadow-md group-hover:shadow-indigo-600/20"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+              Usar Este Modelo
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-2">
+        <button
+          onClick={() => onSelectPreset('custom')}
+          className="text-xs font-bold text-zinc-400 hover:text-indigo-300 flex items-center gap-1.5 transition-colors underline-offset-4 hover:underline"
+        >
+          <Zap className="w-3.5 h-3.5 text-indigo-400" />
+          Ou criar um atendente em branco (personalizado) →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL WIZARD: NOVO ATENDENTE DE IA ─────────────────────────────────
+
+function CreateAgentModal({
+  initialPresetId,
+  onClose,
+  onSubmit,
+  isPending,
+}: {
+  initialPresetId: string;
+  onClose: () => void;
+  onSubmit: (data: { name: string; avatar: string; draft: AgentDraft }) => void;
+  isPending: boolean;
+}) {
+  const [selectedPresetId, setSelectedPresetId] = useState(initialPresetId);
+  const activePreset = AGENT_PRESETS.find((p) => p.id === selectedPresetId) || AGENT_PRESETS[0];
+
+  const [name, setName] = useState(activePreset.name);
+  const [avatar, setAvatar] = useState(activePreset.avatar);
+  const [selectedModel, setSelectedModel] = useState(activePreset.modelId);
+
+  // Atualiza nome e cor ao trocar preset
+  const handleSelectPreset = (p: AgentPreset) => {
+    setSelectedPresetId(p.id);
+    setName(p.name);
+    setAvatar(p.avatar);
+    setSelectedModel(p.modelId);
+  };
+
+  const handleConfirm = () => {
+    if (!name.trim()) {
+      toast.error('Informe um nome para o atendente de IA.');
+      return;
+    }
+    const finalDraft: AgentDraft = {
+      ...activePreset.draft,
+      model: selectedModel,
+    };
+    onSubmit({
+      name: name.trim(),
+      avatar,
+      draft: finalDraft,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-zinc-100">Novo Atendente de IA</h3>
+              <p className="text-xs text-zinc-400">
+                Escolha uma persona pronta de alta conversão ou monte a sua do zero.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-all"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Escolha do Template / Preset */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
+            1. Selecione o Modelo Base
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {AGENT_PRESETS.map((p) => {
+              const isSelected = selectedPresetId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleSelectPreset(p)}
+                  className={`text-left p-3.5 rounded-2xl border transition-all flex items-start gap-3 ${
+                    isSelected
+                      ? 'bg-indigo-500/10 border-indigo-500/60 ring-1 ring-indigo-500/30'
+                      : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow flex-shrink-0"
+                    style={{ backgroundColor: p.avatar }}
+                  >
+                    {p.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-100 truncate">{p.name}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />}
+                    </div>
+                    <span className="text-[10px] text-zinc-400 line-clamp-2 mt-0.5 leading-snug">
+                      {p.role}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Nome do Atendente & Identidade */}
+        <div className="space-y-4 pt-2 border-t border-zinc-800/80">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
+                2. Nome do Atendente
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: Bia - Vendas, Cigana Spanda, Carlos"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500 transition-all font-bold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
+                Cor do Avatar
+              </label>
+              <div className="flex items-center gap-2 pt-1">
+                {AVATAR_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setAvatar(c)}
+                    className={`w-7 h-7 rounded-xl transition-all ${
+                      avatar === c ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-900 scale-110' : 'opacity-70 hover:opacity-100'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Motor de IA */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
+              3. Motor de Inteligência Artificial
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {AI_MODELS.map((m) => {
+                const isSelected = selectedModel === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setSelectedModel(m.id)}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      isSelected
+                        ? 'bg-indigo-500/15 border-indigo-500/60 ring-1 ring-indigo-500/20'
+                        : 'bg-zinc-950/60 border-zinc-800 hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold text-zinc-200 truncate">{m.name}</div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">{m.badge}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Rodapé e Botões */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={isPending || !name.trim()}
+            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2 active:scale-95"
+          >
+            <Wand2 className="w-4 h-4" />
+            {isPending ? 'Criando Atendente…' : 'Criar Atendente de IA'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL: EXCLUIR AGENTE (SUBSTITUTO SLEEK DE CONFIRM) ─────────────────
+
+function DeleteAgentModal({
+  agent,
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  agent: AgentSummary;
+  onClose: () => void;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mx-auto">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+
+        <div className="text-center space-y-2">
+          <h3 className="text-lg font-black text-zinc-100">Excluir Atendente de IA?</h3>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Tem certeza que deseja apagar o atendente <strong className="text-zinc-200">"{agent.name}"</strong>?
+            Esta ação é irreversível e removerá todas as diretrizes de prompt e versões congeladas.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-all shadow-md shadow-red-600/30 flex items-center justify-center gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {isPending ? 'Excluindo…' : 'Sim, Excluir'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL: CONGELAR VERSÃO (SUBSTITUTO SLEEK DE WINDOW.PROMPT) ─────────
+
+function FreezeVersionModal({
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  onClose: () => void;
+  onConfirm: (note: string) => void;
+  isPending: boolean;
+}) {
+  const [note, setNote] = useState('');
+
+  const quickTags = [
+    'Prompt ajustado para fechar mais vendas',
+    'Atualização de preços Pix',
+    'Ajuste no acolhimento de Tarot',
+    'Versão estável validada',
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-7 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <Camera className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-zinc-100">Congelar Nova Versão</h3>
+              <p className="text-xs text-zinc-400">
+                Gere um ponto de restauração imutável para publicar no WhatsApp.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
+            Descrição / Nota da Versão
+          </label>
+          <input
+            type="text"
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && onConfirm(note)}
+            placeholder="Ex: Prompt ajustado para fechar vendas no WhatsApp..."
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500 transition-all font-medium"
+          />
+
+          <div className="pt-2 space-y-1.5">
+            <span className="text-[10px] uppercase font-bold text-zinc-500">Sugestões rápidas:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {quickTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setNote(tag)}
+                  className="text-[11px] px-2.5 py-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-all border border-zinc-700/50"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onConfirm(note)}
+            disabled={isPending}
+            className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center gap-1.5"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            {isPending ? 'Congelando…' : 'Salvar & Congelar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL: PUBLICAR NO WHATSAPP (SUBSTITUTO SLEEK DE CONFIRM) ──────────
+
+function PublishVersionModal({
+  version,
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  version: { id: number; version_number: number; note?: string | null };
+  onClose: () => void;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-7 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mx-auto">
+          <Rocket className="w-6 h-6" />
+        </div>
+
+        <div className="text-center space-y-2">
+          <h3 className="text-lg font-black text-zinc-100">Ativar no WhatsApp Oficial?</h3>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Deseja publicar e colocar ao vivo a <strong className="text-zinc-200">Versão #{version.version_number}</strong>
+            {version.note ? ` ("${version.note}")` : ''}?
+            Ela responderá imediatamente a todas as conversas do seu WhatsApp oficial.
+          </p>
+        </div>
+
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-xs text-emerald-300 font-medium">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span>Ativação instantânea no motor do WhatsApp oficial</span>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/30 flex items-center justify-center gap-1.5"
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            {isPending ? 'Ativando…' : 'Publicar ao Vivo'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -220,6 +900,14 @@ function AgentEditor({
   const [dirty, setDirty] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
 
+  // Estados dos novos modais elegantes
+  const [isFreezeOpen, setIsFreezeOpen] = useState(false);
+  const [versionToPublish, setVersionToPublish] = useState<{
+    id: number;
+    version_number: number;
+    note?: string | null;
+  } | null>(null);
+
   // Sincroniza estado quando muda o agente ativo
   useEffect(() => {
     setDraft(agent.draft ?? {});
@@ -231,7 +919,7 @@ function AgentEditor({
     mutationFn: () => agentsApi.update(agent.id, { name, draft }),
     onSuccess: () => {
       setDirty(false);
-      toast.success('Configurações salvas.');
+      toast.success('Configurações salvas com sucesso.');
       qc.invalidateQueries({ queryKey: ['studio-agents'] });
     },
     onError: (e) => toast.error((e as Error).message),
@@ -240,7 +928,8 @@ function AgentEditor({
   const snapshotMutation = useMutation({
     mutationFn: (note: string) => agentsApi.snapshot(agent.id, note),
     onSuccess: () => {
-      toast.success('Versão congelada criada.');
+      toast.success('Versão congelada criada com sucesso!');
+      setIsFreezeOpen(false);
       qc.invalidateQueries({ queryKey: ['studio-agents'] });
     },
     onError: (e) => toast.error((e as Error).message),
@@ -249,7 +938,8 @@ function AgentEditor({
   const publishMutation = useMutation({
     mutationFn: (versionId: number) => agentsApi.publish(agent.id, versionId),
     onSuccess: (res) => {
-      toast.success(`Versão #${res.published_version_id} ativada para o WhatsApp!`);
+      toast.success(`Versão #${res.published_version_id} ativada para o WhatsApp oficial!`);
+      setVersionToPublish(null);
       qc.invalidateQueries({ queryKey: ['studio-publish-status'] });
       qc.invalidateQueries({ queryKey: ['studio-agents'] });
     },
@@ -313,8 +1003,8 @@ function AgentEditor({
             onClick={() => setShowSimulator(!showSimulator)}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
               showSimulator
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200'
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
+                : 'bg-zinc-850 border-zinc-700/80 text-zinc-300 hover:text-white hover:bg-zinc-800'
             }`}
           >
             <MessageSquare className="w-4 h-4 text-emerald-400" />
@@ -330,10 +1020,7 @@ function AgentEditor({
           </button>
 
           <button
-            onClick={() => {
-              const note = window.prompt('Descrição desta versão congelada (Ex: Prompt ajustado para fechar vendas):') ?? '';
-              snapshotMutation.mutate(note);
-            }}
+            onClick={() => setIsFreezeOpen(true)}
             disabled={snapshotMutation.isPending}
             className="px-3.5 py-2 rounded-xl border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-xs font-bold text-zinc-200 flex items-center gap-1.5 transition-all"
             title="Congelar rascunho em uma versão fixa"
@@ -345,7 +1032,7 @@ function AgentEditor({
           <button
             onClick={onDelete}
             className="p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 hover:border-red-500/50 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 transition-all"
-            title="Excluir agente"
+            title="Excluir atendente"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -356,8 +1043,8 @@ function AgentEditor({
       {showSimulator && (
         <WhatsAppSimulator
           agentName={name}
-          instructions={draft.instrucoes as string || ''}
-          knowledge={draft.base_conhecimento as string || ''}
+          instructions={(draft.instrucoes as string) || ''}
+          knowledge={(draft.base_conhecimento as string) || ''}
           faqs={(draft.faqs as { q: string; a: string }[]) || []}
           onClose={() => setShowSimulator(false)}
         />
@@ -564,16 +1251,13 @@ POLÍTICA DE CANCELAMENTO:
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-sm font-bold text-zinc-200">Histórico de Versões do Agente</h4>
+                <h4 className="text-sm font-bold text-zinc-200">Histórico de Versões do Atendente</h4>
                 <p className="text-xs text-zinc-400">
                   Cada snapshot é uma cópia segura e imutável. Você pode ativar qualquer versão anterior a qualquer momento.
                 </p>
               </div>
               <button
-                onClick={() => {
-                  const note = window.prompt('Descrição para esta nova versão (Ex: Atualização de preços):') ?? '';
-                  snapshotMutation.mutate(note);
-                }}
+                onClick={() => setIsFreezeOpen(true)}
                 disabled={snapshotMutation.isPending}
                 className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-100 flex items-center gap-1.5 border border-zinc-700 transition-all"
               >
@@ -625,11 +1309,7 @@ POLÍTICA DE CANCELAMENTO:
 
                       {!isActive && (
                         <button
-                          onClick={() => {
-                            if (confirm(`Ativar v${v.version_number} para responder ao vivo no WhatsApp oficial?`)) {
-                              publishMutation.mutate(v.id);
-                            }
-                          }}
+                          onClick={() => setVersionToPublish(v)}
                           disabled={publishMutation.isPending}
                           className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm shadow-emerald-600/20 active:scale-95"
                         >
@@ -644,6 +1324,24 @@ POLÍTICA DE CANCELAMENTO:
           </div>
         )}
       </div>
+
+      {/* Modais de Versão e Publicação */}
+      {isFreezeOpen && (
+        <FreezeVersionModal
+          onClose={() => setIsFreezeOpen(false)}
+          onConfirm={(note) => snapshotMutation.mutate(note)}
+          isPending={snapshotMutation.isPending}
+        />
+      )}
+
+      {versionToPublish && (
+        <PublishVersionModal
+          version={versionToPublish}
+          onClose={() => setVersionToPublish(null)}
+          onConfirm={() => publishMutation.mutate(versionToPublish.id)}
+          isPending={publishMutation.isPending}
+        />
+      )}
     </div>
   );
 }

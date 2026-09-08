@@ -2150,11 +2150,13 @@ def api_studio_agents():
             pass
 
         avatar = (body.get("avatar") or "#7c3aed").strip()
+        draft_in = body.get("draft")
+        draft_json = draft_in if isinstance(draft_in, dict) and draft_in else _studio_default_data()
         agent = models.StudioAgent(
             tenant_id=tid,
             name=name[:200],
             avatar=avatar[:32],
-            draft_json=_studio_default_data(),
+            draft_json=draft_json,
         )
         db.add(agent)
         db.commit()
