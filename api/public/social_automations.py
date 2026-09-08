@@ -100,6 +100,24 @@ def send_instagram_private_reply(comment_id: str, message: str, access_token: st
         return False
 
 
+def send_instagram_direct_message(recipient_id: str, message: str, access_token: str) -> bool:
+    """Envia mensagem para um usuário que já iniciou uma interação no Instagram."""
+    if not recipient_id or not message or not access_token:
+        return False
+    try:
+        import requests
+        response = requests.post(
+            "https://graph.facebook.com/v21.0/me/messages",
+            json={"recipient": {"id": recipient_id}, "message": {"text": message}},
+            params={"access_token": access_token},
+            timeout=10,
+        )
+        return response.status_code == 200
+    except Exception as exc:
+        logger.warning("[INSTAGRAM_DM] Falha ao enviar DM para recipient=%s: %s", recipient_id, exc)
+        return False
+
+
 def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
     """
     Compara comentário recebido com as regras ativas de Comment-to-DM do tenant.
@@ -242,11 +260,11 @@ def meta_social_webhook():
                         "reply_text": "Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?",
                     })
                     if story_cfg.get("active", True):
-                        send_instagram_private_reply(
-                            tenant_id,
+                        access_token = _get_secret(db_proc, tenant_id, "meta_social.access_token")
+                        send_instagram_direct_message(
                             sender,
                             story_cfg.get("reply_text", "Obrigada por responder nosso Story! ✨"),
-                            db_proc,
+                            access_token,
                         )
                 except Exception as exc:
                     logger.warning("[STORY_REPLY_ERROR] tenant=%s: %s", tenant_id, exc)

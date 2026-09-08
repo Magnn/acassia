@@ -6,6 +6,7 @@ from api.public.social_automations import (
     process_social_comment,
     reply_to_instagram_comment,
     send_instagram_private_reply,
+    send_instagram_direct_message,
     _put_variable,
     _put_secret,
 )
@@ -31,6 +32,13 @@ def test_send_instagram_private_reply_success():
         ok = send_instagram_private_reply("c_123", "Aqui está o link prometido", "token_abc")
         assert ok is True
         mock_post.assert_called_once()
+
+
+def test_send_instagram_direct_message_uses_recipient_id():
+    with patch("requests.post") as mock_post:
+        mock_post.return_value = MagicMock(status_code=200)
+        assert send_instagram_direct_message("ig_user_1", "Olá", "token_abc") is True
+        assert mock_post.call_args.kwargs["json"]["recipient"] == {"id": "ig_user_1"}
 
 
 def test_process_social_comment_matching_rule():

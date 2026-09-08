@@ -11,9 +11,11 @@ def test_registry_returns_correct_adapter():
     assert isinstance(get_channel_adapter("whatsapp", "tenant_1"), WhatsAppChannelAdapter)
     assert isinstance(get_channel_adapter("webchat", "tenant_1"), WebchatChannelAdapter)
     assert isinstance(get_channel_adapter("telegram", "tenant_1"), TelegramChannelAdapter)
-    assert isinstance(get_channel_adapter("invalid_channel", "tenant_1"), WhatsAppChannelAdapter)
+    with pytest.raises(ValueError, match="unsupported_channel"):
+        get_channel_adapter("invalid_channel", "tenant_1")
     assert "whatsapp" in list_supported_channels()
     assert "telegram" in list_supported_channels()
+    assert "instagram" not in list_supported_channels()
 
 def test_parse_inbound_whatsapp():
     adapter = WhatsAppChannelAdapter("tenant_1")

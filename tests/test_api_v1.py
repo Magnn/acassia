@@ -96,6 +96,16 @@ def test_send_message_missing_data(client, test_data):
     rv = client.post('/api/v1/messages/send', json={"channel": "webchat"}, headers={"X-API-Key": test_data["raw_key"]})
     assert rv.status_code == 400
 
+
+def test_send_message_rejects_unsupported_channel(client, test_data):
+    rv = client.post('/api/v1/messages/send', json={
+        "recipient": "destinatario",
+        "text": "Olá",
+        "channel": "instagram",
+    }, headers={"X-API-Key": test_data["raw_key"]})
+    assert rv.status_code == 422
+    assert rv.json["error"] == "unsupported_channel"
+
 # Minimal mock for channel adapter send_message
 def test_send_message_webchat(client, test_data, monkeypatch):
     class MockResult:

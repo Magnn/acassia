@@ -15,11 +15,13 @@ def get_channel_adapter(channel: str | ChannelType, tenant_id: str) -> ChannelAd
     """Retorna instância do ChannelAdapter para o canal e tenant informados."""
     try:
         ctype = ChannelType(str(channel).lower())
-    except ValueError:
-        ctype = ChannelType.WHATSAPP
+    except ValueError as exc:
+        raise ValueError(f"unsupported_channel:{channel}") from exc
 
-    cls = _ADAPTER_MAP.get(ctype, WhatsAppChannelAdapter)
+    cls = _ADAPTER_MAP.get(ctype)
+    if cls is None:
+        raise ValueError(f"channel_not_implemented:{ctype.value}")
     return cls(tenant_id=tenant_id)
 
 def list_supported_channels() -> list[str]:
-    return [c.value for c in ChannelType]
+    return [channel.value for channel in _ADAPTER_MAP]

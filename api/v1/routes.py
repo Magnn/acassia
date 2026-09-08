@@ -37,7 +37,14 @@ def send_message():
     from api.channels.registry import get_channel_adapter
     from api.channels.base import OutboundMessage
 
-    adapter = get_channel_adapter(channel, g.tenant_id)
+    try:
+        adapter = get_channel_adapter(channel, g.tenant_id)
+    except ValueError:
+        return jsonify({
+            "error": "unsupported_channel",
+            "channel": channel,
+            "supported_channels": ["whatsapp", "webchat", "telegram"],
+        }), 422
     out = OutboundMessage(
         recipient_id=recipient,
         text=text,
