@@ -486,4 +486,8 @@ export const growthToolsApi = {
   createLink: (body: { name: string; phone: string; message: string; tags?: string[] }) =>
     api.post<{ ok: boolean; link: GrowthLinkItem }>('/saas/growth/links', body),
   deleteLink: (id: string) => api.delete<{ ok: boolean }>(`/saas/growth/links/${id}`),
+  getStoryReplyConfig: () =>
+    api.get<{ ok: boolean; config: { active: boolean; reply_text: string } }>('/saas/social/story-reply'),
+  saveStoryReplyConfig: (body: { active: boolean; reply_text: string }) =>
+    api.post<{ ok: boolean; config: { active: boolean; reply_text: string } }>('/saas/social/story-reply', body),
 };

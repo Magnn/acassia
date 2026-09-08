@@ -215,14 +215,41 @@ def meta_social_webhook():
             field = change.get("field")
             val = change.get("value", {})
 
-            if field in ["comments", "feed", "live_comments"]:
+            if field in ["comments", "feed", "live_comments", "mentions"]:
                 post_id = val.get("post_id") or val.get("media", {}).get("id")
-                logger.info("[COMMENT_DETECTED] tenant=%s post=%s", tenant_id, post_id)
+                logger.info("[COMMENT_DETECTED] tenant=%s post=%s field=%s", tenant_id, post_id, field)
                 db_proc = SessionLocal()
                 try:
                     process_social_comment(tenant_id, val, db_proc)
                 except Exception as exc:
                     logger.warning("[COMMENT_PROC_ERROR] tenant=%s: %s", tenant_id, exc)
+                finally:
+                    db_proc.close()
+
+        # Respostas e reações a Stories chegam via entry.messaging
+        messaging_events = entry.get("messaging", [])
+        for msg_ev in messaging_events:
+            sender = msg_ev.get("sender", {}).get("id")
+            recipient = msg_ev.get("recipient", {}).get("id")
+            message = msg_ev.get("message", {})
+            story_ref = message.get("reply_to", {}).get("story") or message.get("story")
+            if sender and story_ref:
+                logger.info("[STORY_REPLY_DETECTED] tenant=%s sender=%s", tenant_id, sender)
+                db_proc = SessionLocal()
+                try:
+                    story_cfg = _get_variable(db_proc, tenant_id, "social.story_reply_config", {
+                        "active": True,
+                        "reply_text": "Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?",
+                    })
+                    if story_cfg.get("active", True):
+                        send_instagram_private_reply(
+                            tenant_id,
+                            sender,
+                            story_cfg.get("reply_text", "Obrigada por responder nosso Story! ✨"),
+                            db_proc,
+                        )
+                except Exception as exc:
+                    logger.warning("[STORY_REPLY_ERROR] tenant=%s: %s", tenant_id, exc)
                 finally:
                     db_proc.close()
 
@@ -272,6 +299,34 @@ def comment_rules():
                 "access_token": bool(_get_secret(db, tenant_id, "meta_social.access_token")),
             },
         })
+    finally:
+        db.close()
+
+
+@social_bp.route("/saas/social/story-reply", methods=["GET", "POST"])
+@login_required
+def story_reply_config():
+    """Gerencia configurações da automação de resposta a Stories do Instagram."""
+    db = SessionLocal()
+    try:
+        tenant_id = current_user.tenant_id
+        default_cfg = {
+            "active": True,
+            "reply_text": "Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?",
+        }
+        cfg = _get_variable(db, tenant_id, "social.story_reply_config", default_cfg)
+
+        if request.method == "POST":
+            data = request.get_json(silent=True) or {}
+            cfg = {
+                "active": bool(data.get("active", True)),
+                "reply_text": (data.get("reply_text") or default_cfg["reply_text"]).strip(),
+            }
+            _put_variable(db, tenant_id, "social.story_reply_config", cfg)
+            db.commit()
+            return jsonify({"ok": True, "config": cfg})
+
+        return jsonify({"ok": True, "config": cfg})
     finally:
         db.close()
 

@@ -74,6 +74,26 @@ export default function GrowthTools() {
     queryFn: growthToolsApi.listLinks,
   });
 
+  const { data: storyConfigData, isLoading: isLoadingStoryConfig } = useQuery({
+    queryKey: ['growth-story-reply-config'],
+    queryFn: growthToolsApi.getStoryReplyConfig,
+  });
+
+  const [storyActive, setStoryActive] = useState<boolean | null>(null);
+  const [storyReplyText, setStoryReplyText] = useState<string | null>(null);
+
+  const currentStoryActive = storyActive !== null ? storyActive : (storyConfigData?.config?.active ?? true);
+  const currentStoryText = storyReplyText !== null ? storyReplyText : (storyConfigData?.config?.reply_text ?? 'Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?');
+
+  const saveStoryMutation = useMutation({
+    mutationFn: growthToolsApi.saveStoryReplyConfig,
+    onSuccess: () => {
+      toast.success('Configurações de resposta a Stories salvas!');
+      qc.invalidateQueries({ queryKey: ['growth-story-reply-config'] });
+    },
+    onError: (e: any) => toast.error(e.message || 'Falha ao salvar configuração de Stories'),
+  });
+
   // Save Rules Mutation
   const saveRulesMutation = useMutation({
     mutationFn: growthToolsApi.saveCommentRules,
@@ -417,21 +437,62 @@ export default function GrowthTools() {
 
         {/* ── TAB 2: STORY REPLIES ── */}
         {activeTab === 'stories' && (
-          <div className="p-8 border border-zinc-800 rounded-2xl bg-zinc-900/30 text-center space-y-4 max-w-2xl mx-auto">
-            <div className="w-14 h-14 rounded-2xl bg-pink-500/10 border border-pink-500/20 text-pink-400 flex items-center justify-center mx-auto">
-              <Instagram className="w-7 h-7" />
+          <div className="p-8 border border-zinc-800 rounded-2xl bg-zinc-900/30 space-y-6 max-w-2xl mx-auto">
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-pink-500/10 border border-pink-500/20 text-pink-400 flex items-center justify-center mx-auto">
+                <Instagram className="w-7 h-7" />
+              </div>
+              <h3 className="text-base font-bold text-white">Automação de Respostas a Stories</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Responda automaticamente a qualquer seguidor que enviar uma mensagem, emoji ou reação aos seus Stories do Instagram. Conduza o lead para uma conversa de vendas ou tiragem de tarot instantânea.
+              </p>
             </div>
-            <h3 className="text-base font-bold text-white">Automação de Respostas a Stories</h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Responda automaticamente a qualquer seguidor que enviar uma mensagem, emoji ou reação aos seus Stories do Instagram. Conduza o lead para uma conversa de vendas ou tiragem de tarot instantânea.
-            </p>
-            <div className="pt-2">
-              <button
-                onClick={() => toast.success('Automação de Stories ativada no perfil conectado!')}
-                className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold shadow-lg shadow-pink-600/20 transition-all"
-              >
-                Ativar Automação de Stories
-              </button>
+
+            <div className="p-5 rounded-xl bg-zinc-950/70 border border-zinc-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-white">Status da Automação</h4>
+                  <p className="text-[11px] text-zinc-400">Ativa o envio de DM privada quando um seguidor responder a um Story</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStoryActive(!currentStoryActive)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                    currentStoryActive
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                  }`}
+                >
+                  {currentStoryActive ? 'Ativado' : 'Desativado'}
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-300 block">
+                  Mensagem Automática no Direct (DM)
+                </label>
+                <textarea
+                  rows={3}
+                  value={currentStoryText}
+                  onChange={(e) => setStoryReplyText(e.target.value)}
+                  placeholder="Ex: Obrigada por responder nosso Story! 🔮 Como posso te ajudar hoje?"
+                  className="w-full text-xs rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white focus:outline-none focus:border-pink-500 resize-none"
+                />
+                <span className="text-[10px] text-zinc-500 block">
+                  Texto enviado instantaneamente via Direct Message quando o seguidor interagir com qualquer Story.
+                </span>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  disabled={saveStoryMutation.isPending}
+                  onClick={() => saveStoryMutation.mutate({ active: currentStoryActive, reply_text: currentStoryText })}
+                  className="px-5 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-pink-600/20 transition-all"
+                >
+                  {saveStoryMutation.isPending ? 'Salvando...' : 'Salvar Configuração de Stories'}
+                </button>
+              </div>
             </div>
           </div>
         )}
