@@ -45,6 +45,8 @@ def test_process_social_comment_matching_rule():
     db = SessionLocal()
     tenant_id = "test_social_tenant"
     try:
+        db.query(models.SocialWebhookReceipt).filter_by(tenant_id=tenant_id).delete()
+        db.commit()
         # Configurar regras e secret
         _put_variable(db, tenant_id, "social.comment_rules", [
             {
@@ -71,6 +73,7 @@ def test_process_social_comment_matching_rule():
 
             matched = process_social_comment(tenant_id, comment_data, db)
             assert matched == 1
+            assert process_social_comment(tenant_id, comment_data, db) == 0
             mock_reply.assert_called_once_with("comment_999", "Enviado no direct! 🔮", "test_ig_token")
             mock_dm.assert_called_once_with("comment_999", "Aqui está seu cupom exclusivo: QUERO10", "test_ig_token")
 
