@@ -119,11 +119,22 @@ def resolve_binding_by_webhook_path(webhook_path: str | None) -> dict | None:
             webhook_path=path,
         ).first()
         if row:
+            app_secret = row.app_secret
+            if not app_secret:
+                try:
+                    from api.utils.tenant_secrets import decrypt_tenant_secret
+                    sec_row = db.query(models.TenantFlowSecret).filter_by(
+                        tenant_id=row.tenant_id, key="whatsapp.app_secret"
+                    ).first()
+                    if sec_row and sec_row.value_cipher:
+                        app_secret = decrypt_tenant_secret(sec_row.value_cipher, allow_plaintext_legacy=True)
+                except Exception:
+                    pass
             payload = {
                 "tenant_id": row.tenant_id,
                 "phone_number_id": row.phone_number_id,
                 "verify_token": row.verify_token,
-                "app_secret": row.app_secret,
+                "app_secret": app_secret,
             }
             _PATH_TO_BINDING[path] = (_now() + _CACHE_TTL, payload)
             return payload
@@ -135,7 +146,7 @@ def resolve_binding_by_webhook_path(webhook_path: str | None) -> dict | None:
 
 
 def get_app_secret_for_phone_id(phone_number_id: str | None) -> str | None:
-    """Retorna app_secret do binding (ou None se nao houver — usar global)."""
+    """Retorna app_secret do binding ou TenantFlowSecret (ou None se nao houver — usar global)."""
     if not phone_number_id:
         return None
     db = SessionLocal()
@@ -143,7 +154,20 @@ def get_app_secret_for_phone_id(phone_number_id: str | None) -> str | None:
         row = db.query(models.WaPhoneTenantBinding).filter_by(
             phone_number_id=str(phone_number_id).strip(),
         ).first()
-        return row.app_secret if (row and row.app_secret) else None
+        if not row:
+            return None
+        if row.app_secret:
+            return row.app_secret
+        try:
+            from api.utils.tenant_secrets import decrypt_tenant_secret
+            sec_row = db.query(models.TenantFlowSecret).filter_by(
+                tenant_id=row.tenant_id, key="whatsapp.app_secret"
+            ).first()
+            if sec_row and sec_row.value_cipher:
+                return decrypt_tenant_secret(sec_row.value_cipher, allow_plaintext_legacy=True)
+        except Exception:
+            pass
+        return None
     except Exception:
         return None
     finally:

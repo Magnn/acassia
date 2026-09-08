@@ -4503,6 +4503,20 @@ _bootstrap_redis_inbound_consumer()
 @app.route("/webhook/cakto", methods=["POST"])
 def webhook_cakto():
     """Recebe notificações de pagamento e abandono do Cakto."""
+    cakto_cfg = CONFIG_CLIENTE.get("cakto") or {}
+    cakto_secret = cakto_cfg.get("webhook_secret") or os.getenv("CAKTO_WEBHOOK_SECRET", "")
+    if cakto_secret:
+        from api.payments.signatures import verify_cakto_signature
+        sig_header = (
+            request.headers.get("X-Cakto-Signature")
+            or request.headers.get("X-Webhook-Signature")
+            or request.headers.get("X-Hub-Signature-256")
+            or ""
+        )
+        if not verify_cakto_signature(request.get_data(), sig_header, cakto_secret):
+            logger.warning("🚫 [CAKTO] Assinatura HMAC inválida no webhook.")
+            return "Invalid Signature", 403
+
     data = request.get_json(silent=True)
     if not data:
         return "NO_DATA", 400
