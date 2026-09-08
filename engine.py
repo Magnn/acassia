@@ -233,6 +233,16 @@ class Engine:
         _gk = kwargs.get("gemini_api_key") or os.getenv("GEMINI_API_KEY")
         self.wa_url = f"https://graph.facebook.com/v19.0/{whatsapp_phone_id}/messages"
 
+        # Connection pooling persistente para chamadas da Meta Graph API (reaproveita TCP/TLS)
+        self._http_session = requests.Session()
+        _adapter = requests.adapters.HTTPAdapter(
+            pool_connections=20,
+            pool_maxsize=50,
+            max_retries=1,
+        )
+        self._http_session.mount("https://", _adapter)
+        self._http_session.mount("http://", _adapter)
+
         self.intent_classifier  = IntentClassifier(_gk)
         self.sentiment_analyzer = SentimentAnalyzer(_gk)
         self.response_validator = ResponseValidator(_gk)
@@ -2943,13 +2953,13 @@ class Engine:
                 "Authorization": f"Bearer {self.whatsapp_token}",
                 "Content-Type": "application/json",
             }
-            r = requests.post(self.wa_url, json=payload, headers=headers, timeout=15)
+            r = self._http_session.post(self.wa_url, json=payload, headers=headers, timeout=15)
             if r.status_code == 200:
                 self._circuit.registrar_sucesso()
                 return True
             if k == "audio" and r.status_code in (400, 403, 404):
                 payload["typing"] = {"type": "text"}
-                r2 = requests.post(self.wa_url, json=payload, headers=headers, timeout=15)
+                r2 = self._http_session.post(self.wa_url, json=payload, headers=headers, timeout=15)
                 if r2.status_code == 200:
                     self._circuit.registrar_sucesso()
                     logger.info("event=wa_typing_audio_fallback_text ok")
@@ -3028,7 +3038,7 @@ class Engine:
                     "Content-Type":  "application/json",
                 }
 
-                r = requests.post(self.wa_url, json=payload, headers=headers, timeout=15)
+                r = self._http_session.post(self.wa_url, json=payload, headers=headers, timeout=15)
 
                 if r.status_code == 200:
                     self._circuit.registrar_sucesso()
@@ -3084,7 +3094,7 @@ class Engine:
         }
         for tentativa in range(MAX_RETRY):
             try:
-                r = requests.post(self.wa_url, json=payload, headers=headers, timeout=25)
+                r = self._http_session.post(self.wa_url, json=payload, headers=headers, timeout=25)
                 if r.status_code == 200:
                     self._circuit.registrar_sucesso()
                     return True

@@ -35,38 +35,47 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 _redis_client = None
-_redis_init_done = False
+_last_connect_fail_ts: float = 0.0
+_CONNECT_RETRY_INTERVAL: float = 30.0
 _redis_lock = threading.Lock()
 
 
 def _get_redis():
-    """Lazy init do cliente Redis. Retorna None se não configurado."""
-    global _redis_client, _redis_init_done
-    if _redis_init_done:
+    """Lazy init do cliente Redis. Retorna None se não configurado ou indisponível."""
+    global _redis_client, _last_connect_fail_ts
+    if _redis_client is not None:
         return _redis_client
+    url = (os.getenv("REDIS_URL") or "").strip()
+    if not url:
+        return None
+
+    now = time.time()
+    if now - _last_connect_fail_ts < _CONNECT_RETRY_INTERVAL:
+        return None
+
     with _redis_lock:
-        if _redis_init_done:
+        if _redis_client is not None:
             return _redis_client
-        url = (os.getenv("REDIS_URL") or "").strip()
-        if not url:
-            logger.info("[DLOCK] REDIS_URL não configurada — usando fallback local (threading.Lock)")
-            _redis_init_done = True
+        if time.time() - _last_connect_fail_ts < _CONNECT_RETRY_INTERVAL:
             return None
         try:
             import redis
+            _is_tls = url.startswith("rediss://")
+            _sock_timeout = float(os.getenv("REDIS_LOCK_SOCKET_TIMEOUT", "5.0" if _is_tls else "2.0") or 5.0)
             _redis_client = redis.from_url(
                 url,
                 decode_responses=True,
-                socket_connect_timeout=2.0,
-                socket_timeout=2.0,
+                socket_connect_timeout=_sock_timeout,
+                socket_timeout=_sock_timeout,
             )
             _redis_client.ping()
-            logger.info("[DLOCK] Redis conectado para locks distribuídos")
+            logger.info("[DLOCK] Redis conectado para locks distribuídos%s", " [TLS]" if _is_tls else "")
+            return _redis_client
         except Exception as exc:
-            logger.warning("[DLOCK] Falha ao conectar Redis (%s) — fallback local instantâneo", exc)
+            _last_connect_fail_ts = time.time()
             _redis_client = None
-        _redis_init_done = True
-        return _redis_client
+            logger.warning("[DLOCK] Falha ao conectar Redis (%s) — fallback local ativo (retry em %ss)", exc, _CONNECT_RETRY_INTERVAL)
+            return None
 
 
 # ── Fallback: pool de threading.Lock por nome ──
@@ -133,7 +142,10 @@ class DistributedLock:
                     self._acquired = True
                     return True
             except Exception as exc:
-                logger.warning("[DLOCK] Redis SET falhou (%s) — tentando fallback", exc)
+                logger.warning("[DLOCK] Redis SET falhou (%s) — tentando fallback local", exc)
+                global _redis_client, _last_connect_fail_ts
+                _redis_client = None
+                _last_connect_fail_ts = time.time()
                 # Fallback para local em caso de falha Redis
                 self._local_lock = _get_local_lock(self.name)
                 self._acquired = self._local_lock.acquire(timeout=max(0.001, timeout))
@@ -269,6 +281,9 @@ class DistributedSemaphore:
                 r.decr(self.key)
             except Exception as exc:
                 logger.warning("[DSEM] Redis falhou (%s) — fallback local", exc)
+                global _redis_client, _last_connect_fail_ts
+                _redis_client = None
+                _last_connect_fail_ts = time.time()
                 if self._local_sem is None:
                     self._local_sem = threading.BoundedSemaphore(value=self.max_concurrent)
                 self._acquired = self._local_sem.acquire(timeout=max(0.001, timeout))

@@ -22,48 +22,59 @@ logger = logging.getLogger(__name__)
 QUEUE_KEY = os.getenv("REDIS_INBOUND_QUEUE_KEY", "meumisterio:wa:inbound").strip() or "meumisterio:wa:inbound"
 
 _redis_client: Any = None
-_redis_unavailable: bool = False
+_last_connect_fail_ts: float = 0.0
+_CONNECT_RETRY_INTERVAL: float = 30.0
 _consumer_started = False
 _consumer_lock = threading.Lock()
+_client_lock = threading.Lock()
 
 
 def _client():
     """Cliente Redis singleton; None se desabilitado ou indisponível."""
-    global _redis_client, _redis_unavailable
-    if _redis_unavailable:
-        return None
+    global _redis_client, _last_connect_fail_ts
     if _redis_client is not None:
         return _redis_client
     url = (os.getenv("REDIS_URL") or "").strip()
     if not url:
         return None
-    try:
-        import redis  # noqa: WPS433 — opcional
 
-        # TLS remoto (Upstash rediss://) precisa de mais tempo para handshake;
-        # local (redis://) pode usar timeout menor sem problema.
-        _is_tls = url.startswith("rediss://")
-        _sock_connect_timeout = float(os.getenv("REDIS_SOCKET_TIMEOUT", "10" if _is_tls else "5") or 10)
-        # socket_timeout precisa ser maior que brpop_timeout para o BRPOP não expirar o socket
-        # antes de o Redis responder com "nada na fila" ao fim do block period.
-        _brpop_timeout = int(os.getenv("REDIS_BRPOP_TIMEOUT", "10") or 10)
-        _sock_read_timeout = _brpop_timeout + 5
-
-        r = redis.from_url(
-            url,
-            decode_responses=True,
-            socket_connect_timeout=_sock_connect_timeout,
-            socket_timeout=_sock_read_timeout,
-            retry_on_timeout=True,
-        )
-        r.ping()
-        _redis_client = r
-        logger.info("📮 [REDIS] Conectado%s (fila inbound: %s).", " [TLS]" if _is_tls else "", QUEUE_KEY)
-        return _redis_client
-    except Exception as e:
-        _redis_unavailable = True
-        logger.warning("⚠️ [REDIS] Indisponível — usando apenas thread in-process: %s", e)
+    now = time.time()
+    if now - _last_connect_fail_ts < _CONNECT_RETRY_INTERVAL:
         return None
+
+    with _client_lock:
+        if _redis_client is not None:
+            return _redis_client
+        if time.time() - _last_connect_fail_ts < _CONNECT_RETRY_INTERVAL:
+            return None
+        try:
+            import redis  # noqa: WPS433 — opcional
+
+            # TLS remoto (Upstash rediss://) precisa de mais tempo para handshake;
+            # local (redis://) pode usar timeout menor sem problema.
+            _is_tls = url.startswith("rediss://")
+            _sock_connect_timeout = float(os.getenv("REDIS_SOCKET_TIMEOUT", "10" if _is_tls else "5") or 10)
+            # socket_timeout precisa ser maior que brpop_timeout para o BRPOP não expirar o socket
+            # antes de o Redis responder com "nada na fila" ao fim do block period.
+            _brpop_timeout = int(os.getenv("REDIS_BRPOP_TIMEOUT", "10") or 10)
+            _sock_read_timeout = _brpop_timeout + 5
+
+            r = redis.from_url(
+                url,
+                decode_responses=True,
+                socket_connect_timeout=_sock_connect_timeout,
+                socket_timeout=_sock_read_timeout,
+                retry_on_timeout=True,
+            )
+            r.ping()
+            _redis_client = r
+            logger.info("📮 [REDIS] Conectado%s (fila inbound: %s).", " [TLS]" if _is_tls else "", QUEUE_KEY)
+            return _redis_client
+        except Exception as e:
+            _last_connect_fail_ts = time.time()
+            _redis_client = None
+            logger.warning("⚠️ [REDIS] Indisponível — fallback in-process ativo (retry em %ss): %s", _CONNECT_RETRY_INTERVAL, e)
+            return None
 
 
 def redis_inbound_ready() -> bool:
@@ -77,6 +88,7 @@ def enqueue_inbound_webhook(data: dict) -> bool:
     """
     Enfileira o JSON bruto do webhook. Retorna True se gravou no Redis.
     """
+    global _redis_client, _last_connect_fail_ts
     r = _client()
     if not r:
         return False
@@ -86,18 +98,18 @@ def enqueue_inbound_webhook(data: dict) -> bool:
         return True
     except Exception as e:
         logger.warning("⚠️ [REDIS] LPUSH falhou — fallback in-process: %s", e)
+        _redis_client = None
+        _last_connect_fail_ts = time.time()
         return False
 
 
 def start_consumer_if_configured(handler: Callable[[dict], Any]) -> None:
     """
     Inicia thread daemon que consome BRPOP e chama `handler(data)`.
-    Idempotente (uma vez por processo).
+    Idempotente (uma vez por processo). Mantém retentativa contínua mesmo se Redis estiver off no boot.
     """
     global _consumer_started
     if not (os.getenv("REDIS_URL") or "").strip():
-        return
-    if _client() is None:
         return
     with _consumer_lock:
         if _consumer_started:
@@ -127,9 +139,9 @@ def start_consumer_if_configured(handler: Callable[[dict], Any]) -> None:
             except Exception as e:
                 logger.error("🚨 [REDIS] Erro no worker inbound: %s", e, exc_info=True)
                 # Reconexão: descarta cliente em cache para forçar novo ping na próxima iteração
-                global _redis_client, _redis_unavailable
+                global _redis_client, _last_connect_fail_ts
                 _redis_client = None
-                _redis_unavailable = False
+                _last_connect_fail_ts = time.time()
                 time.sleep(3.0)
 
     threading.Thread(target=_loop, daemon=True, name="RedisWAInbound").start()

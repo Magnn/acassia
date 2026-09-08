@@ -21,7 +21,10 @@ export default function Runs() {
   } = useQuery({
     queryKey: ['flow-runs'],
     queryFn: () => runsApi.list({ limit: 100 }),
-    refetchInterval: 15000,
+    refetchInterval: () => {
+      if (typeof document !== 'undefined' && document.hidden) return false;
+      return 30000;
+    },
   });
 
   return (

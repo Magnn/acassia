@@ -202,7 +202,11 @@ function DeviceCard({
   const { data: liveStatus, refetch } = useQuery({
     queryKey: ['device-status', d.id],
     queryFn: () => api.get<any>(`/saas/devices/${d.id}/status`),
-    refetchInterval: 15000,
+    refetchInterval: (query) => {
+      if (typeof document !== 'undefined' && document.hidden) return false;
+      const isConn = query.state.data?.connected ?? d.connected;
+      return isConn ? 60000 : 15000;
+    },
   });
 
   const isConnected = liveStatus?.connected ?? d.connected;

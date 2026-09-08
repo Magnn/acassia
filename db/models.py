@@ -1836,7 +1836,11 @@ class ExpertScheduleSlot(Base):
     lead_id = Column(Integer, ForeignKey("leads.id"), nullable=True)
     consumer_id = Column(Integer, ForeignKey("consumer_profiles.id"), nullable=True)
     purchase_id = Column(Integer, ForeignKey("consumer_purchases.id"), nullable=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True)
+    appointment_id = Column(
+        Integer,
+        ForeignKey("appointments.id", use_alter=True, name="fk_slot_appointment_id"),
+        nullable=True,
+    )
 
     # Recorrência (semanal)
     recurrence_rule = Column(String(32), nullable=True)  # weekly, biweekly, none

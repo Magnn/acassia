@@ -40,5 +40,8 @@ if [ "${PORT}" != "5000" ]; then
     BINDS="${BINDS} -b 0.0.0.0:5000"
 fi
 
-echo "🌐 [ENTRYPOINT] Starting server (1 worker, 8 threads) listening on: ${BINDS}..."
-exec gunicorn app:app ${BINDS} --workers 1 --threads 8 --worker-class gthread --timeout 180 --access-logfile - --error-logfile -
+GUNICORN_WORKERS="${GUNICORN_WORKERS:-1}"
+GUNICORN_THREADS="${GUNICORN_THREADS:-24}"
+
+echo "🌐 [ENTRYPOINT] Starting server (${GUNICORN_WORKERS} worker(s), ${GUNICORN_THREADS} threads) listening on: ${BINDS}..."
+exec gunicorn app:app ${BINDS} --workers "${GUNICORN_WORKERS}" --threads "${GUNICORN_THREADS}" --worker-class gthread --timeout 180 --access-logfile - --error-logfile -

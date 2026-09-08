@@ -15,7 +15,10 @@ export default function Pix() {
   const { data, isLoading } = useQuery({
     queryKey: ['pix-list'],
     queryFn: () => pixApi.list({ limit: 50 }),
-    refetchInterval: 15000,
+    refetchInterval: () => {
+      if (typeof document !== 'undefined' && document.hidden) return false;
+      return 30000;
+    },
   });
 
   const items = data?.items ?? [];
@@ -227,7 +230,11 @@ function PixDetailModal({
   const { data, isLoading } = useQuery({
     queryKey: ['pix-detail', pixId],
     queryFn: () => pixApi.get(pixId),
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'approved' || status === 'expired' || status === 'cancelled') return false;
+      return 5000;
+    },
   });
 
   const cancelMut = useMutation({
