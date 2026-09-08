@@ -121,6 +121,7 @@ def process_csv_import():
         failed_count = 0
         error_logs = []
         enrolled_lead_ids = []
+        leads_for_auto_enroll = []
 
         for idx, row in enumerate(rows):
             # Extrair campos usando o mapping
@@ -170,6 +171,8 @@ def process_csv_import():
             success_count += 1
             if enroll_seq_id and lead.id:
                 enrolled_lead_ids.append(lead.id)
+            if assigned_tags and lead.id:
+                leads_for_auto_enroll.append(lead.id)
 
         # Se tiver sequência configurada, matricula os leads válidos
         if enroll_seq_id and enrolled_lead_ids:
@@ -206,6 +209,14 @@ def process_csv_import():
         import_record.error_log = error_logs[:50]
         import_record.completed_at = _agora_utc()
         db.commit()
+
+        if leads_for_auto_enroll and assigned_tags:
+            try:
+                from api.saas.sequences import check_and_enroll_by_tags
+                for lid in set(leads_for_auto_enroll):
+                    check_and_enroll_by_tags(tenant_id, lid, assigned_tags)
+            except Exception as ex:
+                logger.error("Erro no auto_enroll na importacao: %s", ex)
 
         return jsonify({
             "ok": True,

@@ -2075,12 +2075,12 @@ class Sequence(Base):
     Permite enviar mensagens ou fluxos em intervalos de horas/dias para leads inscritos.
     """
     __tablename__ = "sequences"
-
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(64), nullable=False, index=True)
     name = Column(String(200), nullable=False)
     active = Column(Boolean, default=True, nullable=False)
     folder_name = Column(String(100), nullable=True)
+    trigger_tag = Column(String(100), nullable=True)  # Auto-inscreve quando lead ganha esta tag
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False)
 

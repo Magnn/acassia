@@ -93,6 +93,7 @@ def list_sequences():
                 "name": s.name,
                 "active": s.active,
                 "folder_name": s.folder_name,
+                "trigger_tag": s.trigger_tag,
                 "subscribers": subscribers_count,
                 "messages": messages_count,
                 "created_at": s.created_at.isoformat() if s.created_at else None,
@@ -121,6 +122,7 @@ def create_sequence():
             tenant_id=current_user.tenant_id,
             name=name[:200],
             folder_name=(body.get("folder_name") or "").strip() or None,
+            trigger_tag=(body.get("trigger_tag") or "").strip().lower() or None,
             active=True,
         )
         db.add(seq)
@@ -134,6 +136,7 @@ def create_sequence():
                 "name": seq.name,
                 "active": seq.active,
                 "folder_name": seq.folder_name,
+                "trigger_tag": seq.trigger_tag,
                 "subscribers": 0,
                 "messages": 0,
             }
@@ -200,6 +203,7 @@ def get_sequence(sequence_id: int):
                 "name": seq.name,
                 "active": seq.active,
                 "folder_name": seq.folder_name,
+                "trigger_tag": seq.trigger_tag,
                 "subscribers": subscribers_count,
                 "messages": len(steps),
                 "created_at": seq.created_at.isoformat() if seq.created_at else None,
@@ -240,6 +244,8 @@ def update_sequence(sequence_id: int):
             seq.active = bool(body["active"])
         if "folder_name" in body:
             seq.folder_name = str(body["folder_name"]).strip() or None
+        if "trigger_tag" in body:
+            seq.trigger_tag = str(body["trigger_tag"]).strip().lower() or None
 
         seq.updated_at = _agora_utc()
         db.commit()
@@ -689,3 +695,48 @@ def trigger_process_due():
     """Aciona manualmente a verificação de disparos devidos no tenant."""
     count = process_due_sequence_steps(tenant_id=current_user.tenant_id)
     return jsonify({"ok": True, "processed": count})
+
+
+def check_and_enroll_by_tags(tenant_id: str, lead_id: int, tags: list[str]) -> int:
+    """Verifica se há sequências ativas com trigger_tag presente nas tags do lead e o inscreve automaticamente."""
+    if not tags:
+        return 0
+    clean_tags = [str(t).strip().lower() for t in tags if str(t).strip()]
+    db = SessionLocal()
+    enrolled = 0
+    try:
+        matching_seqs = db.query(models.Sequence).filter(
+            models.Sequence.tenant_id == tenant_id,
+            models.Sequence.active == True,
+            models.Sequence.trigger_tag.in_(clean_tags),
+        ).all()
+
+        for seq in matching_seqs:
+            # Check if already enrolled
+            existing = db.query(models.ContactOnSequence).filter_by(
+                sequence_id=seq.id, lead_id=lead_id
+            ).first()
+            if not existing:
+                first_step = db.query(models.SequenceStep).filter_by(
+                    sequence_id=seq.id, order=0, is_active=True
+                ).first()
+                now = _agora_utc()
+                db.add(models.ContactOnSequence(
+                    tenant_id=tenant_id,
+                    sequence_id=seq.id,
+                    lead_id=lead_id,
+                    current_step=0,
+                    status="active",
+                    next_run_at=_calculate_next_run_at(first_step, now) if first_step else now,
+                    enrolled_at=now,
+                ))
+                enrolled += 1
+        if enrolled:
+            db.commit()
+            logger.info("[SEQUENCES] Lead %d auto-inscrito em %d sequências por tag", lead_id, enrolled)
+        return enrolled
+    except Exception as exc:
+        logger.exception("[SEQUENCES] Erro no auto-enroll: %s", exc)
+        return 0
+    finally:
+        db.close()

@@ -624,6 +624,11 @@ def add_lead_tag(lead_id: int):
             lead.tags = current_tags
             db.commit()
             try:
+                from api.saas.sequences import check_and_enroll_by_tags
+                check_and_enroll_by_tags(tenant_id, lead_id, tags_to_add)
+            except Exception:
+                pass
+            try:
                 from api.saas.realtime_hooks import notify_lead_updated
                 notify_lead_updated(tenant_id, lead_id, {"tags": current_tags})
             except Exception:
