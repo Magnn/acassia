@@ -35,6 +35,12 @@ def require_api_key(f):
             g.tenant_id = key_obj.tenant_id
             g.api_key_id = key_obj.id
             g.api_tier = key_obj.tier
+
+            # Incrementar estatísticas de uso da chave de API
+            from datetime import datetime, timezone
+            key_obj.total_requests = (key_obj.total_requests or 0) + 1
+            key_obj.last_used_at = datetime.now(timezone.utc)
+            db.commit()
         finally:
             db.close()
 
