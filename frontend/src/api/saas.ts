@@ -136,25 +136,78 @@ export const contentApi = {
 /* ── Broadcast ──────────────────────────────────────── */
 export interface Campaign {
   id: number;
-  name: string;
-  message_template: string;
+  title?: string;
+  name?: string;
+  message_text?: string;
+  message_template?: string;
+  message_media_url?: string | null;
+  message_media_type?: string | null;
   segment_filters: Record<string, unknown>;
-  status: string;
+  status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'cancelled' | 'failed' | string;
   total_recipients: number;
-  total_sent: number;
-  total_delivered: number;
-  total_failed: number;
+  total_sent?: number;
+  sent_count?: number;
+  total_delivered?: number;
+  delivered_count?: number;
+  total_failed?: number;
+  failed_count?: number;
+  reply_count?: number;
   created_at: string;
-  sent_at: string | null;
+  started_at?: string | null;
+  sent_at?: string | null;
   scheduled_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface BroadcastRecipientItem {
+  id: number;
+  lead_id: number;
+  lead_name: string | null;
+  lead_phone: string | null;
+  status: 'pending' | 'sent' | 'delivered' | 'failed' | 'replied' | string;
+  sent_at: string | null;
+  error_reason: string | null;
 }
 
 export const broadcastApi = {
   campaigns: () => api.get<{ campaigns: Campaign[] }>('/saas/broadcast/'),
-  create: (b: { name: string; message_template: string; segment_filters?: Record<string, unknown>; scheduled_at?: string; status?: string }) =>
-    api.post<{ ok: boolean; id: number }>('/saas/broadcast/', b),
-  preview: (id: number) => api.post<{ preview: Array<{ lead_id: number; nome: string }> }>(`/saas/broadcast/${id}/preview`),
-  send: (id: number) => api.post<{ ok: boolean; total_queued: number }>(`/saas/broadcast/${id}/send`),
+  get: (id: number) => api.get<Campaign>(`/saas/broadcast/${id}`),
+  create: (b: {
+    title?: string;
+    name?: string;
+    message_text?: string;
+    message_template?: string;
+    message_media_url?: string | null;
+    message_media_type?: string | null;
+    segment_filters?: Record<string, unknown>;
+    scheduled_at?: string | null;
+    status?: string;
+  }) => api.post<{ ok: boolean; id: number; status: string }>('/saas/broadcast/', b),
+  update: (id: number, b: Partial<{
+    title: string;
+    name: string;
+    message_text: string;
+    message_template: string;
+    message_media_url: string | null;
+    segment_filters: Record<string, unknown>;
+    scheduled_at: string | null;
+  }>) => api.put<{ ok: boolean }>(`/saas/broadcast/${id}`, b),
+  delete: (id: number) => api.delete<{ ok: boolean; action: string }>(`/saas/broadcast/${id}`),
+  previewSegment: (filters: Record<string, unknown>) =>
+    api.post<{
+      total_matching: number;
+      sample: Array<{ id: number; nome: string | null; telefone: string; signo?: string; score_band?: string; tags?: string[] }>;
+    }>('/saas/broadcast/segments/preview', { filters }),
+  preview: (id: number) =>
+    api.post<{
+      total_matching: number;
+      sample: Array<{ id: number; nome: string | null; telefone: string; signo?: string; score_band?: string }>;
+    }>(`/saas/broadcast/${id}/preview`),
+  recipients: (id: number) =>
+    api.get<{ recipients: BroadcastRecipientItem[] }>(`/saas/broadcast/${id}/recipients`),
+  send: (id: number) =>
+    api.post<{ ok: boolean; total_recipients: number; total_queued?: number; status: string; message: string }>(`/saas/broadcast/${id}/send`),
+  tags: () => api.get<{ tags: string[] }>('/saas/broadcast/tags'),
 };
 
 /* ── Subscriptions (Pacotes) ────────────────────────── */

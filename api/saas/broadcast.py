@@ -141,6 +141,33 @@ except ImportError:
 # ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════
 
+@broadcast_bp.route("/tags", methods=["GET"])
+@login_required
+def list_available_tags():
+    """Retorna lista de tags únicas existentes nos leads do tenant."""
+    db = SessionLocal()
+    try:
+        leads = db.query(models.Lead.tags).filter_by(tenant_id=current_user.tenant_id).all()
+        tag_set = set()
+        for (tags,) in leads:
+            if isinstance(tags, list):
+                for t in tags:
+                    if t and isinstance(t, str):
+                        tag_set.add(t.strip())
+            elif isinstance(tags, str):
+                for t in tags.split(","):
+                    clean = t.strip().strip('"').strip("'")
+                    if clean:
+                        tag_set.add(clean)
+        # Tags padrão sugeridas de alta conversão
+        default_suggestions = ["vip", "lead_quente", "cliente", "abandono_carrinho", "prospecto", "oraculo", "novo_lead"]
+        for s in default_suggestions:
+            tag_set.add(s)
+        return jsonify({"tags": sorted(list(tag_set))})
+    finally:
+        db.close()
+
+
 @broadcast_bp.route("/", methods=["GET"])
 @login_required
 def list_campaigns():
@@ -153,13 +180,25 @@ def list_campaigns():
         return jsonify({
             "campaigns": [
                 {
-                    "id": c.id, "title": c.title, "status": c.status,
+                    "id": c.id,
+                    "title": c.title,
+                    "name": c.title,
+                    "message_text": c.message_text,
+                    "message_template": c.message_text,
+                    "message_media_url": c.message_media_url,
+                    "message_media_type": c.message_media_type,
+                    "segment_filters": c.segment_filters or {},
+                    "status": c.status,
                     "total_recipients": c.total_recipients,
                     "sent_count": c.sent_count,
+                    "total_sent": c.sent_count,
                     "delivered_count": c.delivered_count,
+                    "total_delivered": c.delivered_count,
                     "failed_count": c.failed_count,
+                    "total_failed": c.failed_count,
                     "reply_count": c.reply_count,
                     "scheduled_at": c.scheduled_at.isoformat() if c.scheduled_at else None,
+                    "started_at": c.started_at.isoformat() if c.started_at else None,
                     "completed_at": c.completed_at.isoformat() if c.completed_at else None,
                     "created_at": c.created_at.isoformat(),
                 } for c in campaigns
@@ -176,15 +215,15 @@ def create_campaign():
     """
     Cria campanha de broadcast (rascunho).
 
-    Body: {title, message_text, message_media_url?, segment_filters?, scheduled_at?}
+    Body: {title|name, message_text|message_template, message_media_url?, segment_filters?, scheduled_at?}
     """
     body = request.get_json(silent=True) or {}
-    title = (body.get("title") or "").strip()
-    text = (body.get("message_text") or "").strip()
+    title = (body.get("title") or body.get("name") or "").strip()
+    text = (body.get("message_text") or body.get("message_template") or "").strip()
 
-    if not title or len(title) < 3:
+    if not title or len(title) < 2:
         return jsonify({"error": "title_required"}), 422
-    if not text or len(text) < 5:
+    if not text or len(text) < 3:
         return jsonify({"error": "message_text_required"}), 422
 
     db = SessionLocal()
@@ -197,14 +236,14 @@ def create_campaign():
             message_media_url=body.get("message_media_url"),
             message_media_type=body.get("message_media_type"),
             segment_filters=body.get("segment_filters") or {},
-            status="draft",
+            status="scheduled" if body.get("scheduled_at") else "draft",
             scheduled_at=_parse_dt(body.get("scheduled_at")),
         )
         db.add(campaign)
         db.commit()
         db.refresh(campaign)
 
-        return jsonify({"ok": True, "id": campaign.id, "status": "draft"}), 201
+        return jsonify({"ok": True, "id": campaign.id, "status": campaign.status}), 201
     finally:
         db.close()
 
@@ -221,15 +260,22 @@ def get_campaign(campaign_id: int):
             return jsonify({"error": "not_found"}), 404
 
         return jsonify({
-            "id": c.id, "title": c.title, "message_text": c.message_text,
+            "id": c.id,
+            "title": c.title,
+            "name": c.title,
+            "message_text": c.message_text,
+            "message_template": c.message_text,
             "message_media_url": c.message_media_url,
             "message_media_type": c.message_media_type,
-            "segment_filters": c.segment_filters,
+            "segment_filters": c.segment_filters or {},
             "status": c.status,
             "total_recipients": c.total_recipients,
             "sent_count": c.sent_count,
+            "total_sent": c.sent_count,
             "delivered_count": c.delivered_count,
+            "total_delivered": c.delivered_count,
             "failed_count": c.failed_count,
+            "total_failed": c.failed_count,
             "reply_count": c.reply_count,
             "scheduled_at": c.scheduled_at.isoformat() if c.scheduled_at else None,
             "started_at": c.started_at.isoformat() if c.started_at else None,
@@ -251,13 +297,13 @@ def update_campaign(campaign_id: int):
         ).first()
         if not c:
             return jsonify({"error": "not_found"}), 404
-        if c.status != "draft":
-            return jsonify({"error": "only_draft_editable"}), 409
+        if c.status not in ("draft", "scheduled"):
+            return jsonify({"error": "only_draft_or_scheduled_editable"}), 409
 
-        if "title" in body:
-            c.title = (body["title"] or "").strip()[:200]
-        if "message_text" in body:
-            c.message_text = (body["message_text"] or "").strip()
+        if "title" in body or "name" in body:
+            c.title = (body.get("title") or body.get("name") or "").strip()[:200]
+        if "message_text" in body or "message_template" in body:
+            c.message_text = (body.get("message_text") or body.get("message_template") or "").strip()
         if "message_media_url" in body:
             c.message_media_url = body["message_media_url"]
         if "message_media_type" in body:
@@ -266,6 +312,8 @@ def update_campaign(campaign_id: int):
             c.segment_filters = body["segment_filters"]
         if "scheduled_at" in body:
             c.scheduled_at = _parse_dt(body["scheduled_at"])
+            if c.scheduled_at and c.status == "draft":
+                c.status = "scheduled"
 
         db.commit()
         return jsonify({"ok": True})
@@ -490,11 +538,27 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
                 db.commit()
                 continue
 
+            # Throttle configurável por campanha (proteção Anti-Ban Meta)
+            throttle_secs = 2
+            if campaign.segment_filters and isinstance(campaign.segment_filters, dict):
+                try:
+                    throttle_secs = int(campaign.segment_filters.get("anti_ban_delay_seconds", 2))
+                    throttle_secs = max(1, min(throttle_secs, 30))
+                except Exception:
+                    throttle_secs = 2
+
             try:
                 if wa_client:
-                    ok = wa_client.enviar_mensagem(
-                        lead.telefone, campaign.message_text, formato="texto",
-                    )
+                    if campaign.message_media_url:
+                        media_fmt = campaign.message_media_type or "imagem"
+                        ok = wa_client.enviar_mensagem(
+                            lead.telefone, campaign.message_text, formato=media_fmt,
+                            media_url=campaign.message_media_url,
+                        )
+                    else:
+                        ok = wa_client.enviar_mensagem(
+                            lead.telefone, campaign.message_text, formato="texto",
+                        )
                     if ok:
                         rec.status = "sent"
                         rec.sent_at = datetime.now(timezone.utc)
@@ -517,8 +581,8 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
             campaign.failed_count = failed
             db.commit()
 
-            # Throttle: 2 segundos entre mensagens (Meta rate limit)
-            time.sleep(2)
+            # Throttle dinâmico anti-ban
+            time.sleep(throttle_secs)
 
         campaign.status = "completed"
         campaign.completed_at = datetime.now(timezone.utc)
