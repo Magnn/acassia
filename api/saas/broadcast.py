@@ -427,12 +427,8 @@ def resend_failed_campaign(campaign_id: int):
 
         # Disparar background worker
         tenant_id = current_user.tenant_id
-        t = threading.Thread(
-            target=_send_campaign_worker,
-            args=(c.id, tenant_id),
-            daemon=True,
-        )
-        t.start()
+        from api.utils.task_queue import enqueue_campaign_send
+        enqueue_campaign_send(c.id, tenant_id)
 
         return jsonify({
             "ok": True,
@@ -483,12 +479,8 @@ def resume_campaign(campaign_id: int):
         db.commit()
 
         tenant_id = current_user.tenant_id
-        t = threading.Thread(
-            target=_send_campaign_worker,
-            args=(c.id, tenant_id),
-            daemon=True,
-        )
-        t.start()
+        from api.utils.task_queue import enqueue_campaign_send
+        enqueue_campaign_send(c.id, tenant_id)
         return jsonify({"ok": True, "status": "sending", "message": "Disparo retomado.", "campaign": {"id": c.id, "status": "sending"}})
     finally:
         db.close()
@@ -642,12 +634,8 @@ def send_campaign(campaign_id: int):
 
         # Disparar em background
         tenant_id = current_user.tenant_id
-        _thread = threading.Thread(
-            target=_send_campaign_worker,
-            args=(c.id, tenant_id),
-            daemon=True,
-        )
-        _thread.start()
+        from api.utils.task_queue import enqueue_campaign_send
+        enqueue_campaign_send(c.id, tenant_id)
 
         return jsonify({
             "ok": True,

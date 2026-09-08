@@ -18,7 +18,7 @@
     return scripts[scripts.length - 1];
   })();
 
-  const tenantId = (currentScript && currentScript.getAttribute('data-tenant')) || 'default';
+  const siteKey = (currentScript && currentScript.getAttribute('data-site-key')) || '';
   const chatTitle = (currentScript && currentScript.getAttribute('data-title')) || 'Atendimento';
   const primaryColor = (currentScript && currentScript.getAttribute('data-color')) || '#9333ea';
   const apiBase = (currentScript && currentScript.getAttribute('data-api')) || (function () {
@@ -32,7 +32,7 @@
 
   // 2. Estado local
   let isOpen = false;
-  let sessionId = localStorage.getItem('acassia_webchat_session_' + tenantId) || '';
+  let sessionToken = localStorage.getItem('acassia_webchat_token_') || '';
   let lastMessageId = 0;
   let pollInterval = null;
 
@@ -320,15 +320,18 @@
   // 6. Comunicação com a API
   async function initChat() {
     try {
+      const payload = { site_key: siteKey };
+      if (sessionToken) payload.session_token = sessionToken;
+
       const res = await fetch(`${apiBase}/api/public/webchat/init`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenantId, session_id: sessionId }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.ok) {
-        sessionId = data.session_id;
-        localStorage.setItem('acassia_webchat_session_' + tenantId, sessionId);
+        sessionToken = data.session_token;
+        localStorage.setItem('acassia_webchat_token_', sessionToken);
 
         messagesList.innerHTML = '';
         if (data.messages && data.messages.length > 0) {
@@ -357,10 +360,12 @@
     try {
       const res = await fetch(`${apiBase}/api/public/webchat/message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Webchat-Session': sessionToken
+        },
         body: JSON.stringify({
-          tenant_id: tenantId,
-          session_id: sessionId,
+          session_token: sessionToken,
           text: text,
         }),
       });
@@ -390,9 +395,13 @@
   function startPolling() {
     if (pollInterval) return;
     pollInterval = setInterval(async () => {
-      if (!isOpen || !sessionId) return;
+      if (!isOpen || !sessionToken) return;
       try {
-        const res = await fetch(`${apiBase}/api/public/webchat/poll?tenant_id=${tenantId}&session_id=${sessionId}&after_id=${lastMessageId}`);
+        const res = await fetch(`${apiBase}/api/public/webchat/poll?session_token=${sessionToken}&after_id=${lastMessageId}`, {
+          headers: {
+            'X-Webchat-Session': sessionToken
+          }
+        });
         const data = await res.json();
         if (data.messages && data.messages.length > 0) {
           data.messages.forEach(m => {

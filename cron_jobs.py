@@ -733,12 +733,8 @@ def hourly_dispatch_scheduled_broadcasts():
                 db.commit()
 
                 # Disparar worker em background
-                t = threading.Thread(
-                    target=_send_campaign_worker,
-                    args=(campaign.id, campaign.tenant_id),
-                    daemon=True,
-                )
-                t.start()
+                from api.utils.task_queue import enqueue_campaign_send
+                enqueue_campaign_send(campaign.id, campaign.tenant_id)
 
                 logger.info(
                     "[cron.scheduled_broadcasts] campaign=%d disparada: %d leads",
@@ -752,6 +748,13 @@ def hourly_dispatch_scheduled_broadcasts():
                 )
     finally:
         db.close()
+
+
+def hourly_process_due_sequences():
+    """Verifica e processa disparos de sequências devidos (cron)."""
+    from api.utils.task_queue import enqueue_sequence_process
+    enqueue_sequence_process()
+    logger.info("[cron.sequences] Processamento de sequências enfileirado")
 
 
 if __name__ == "__main__":

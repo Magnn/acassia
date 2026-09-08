@@ -126,7 +126,7 @@ export default function Integrations() {
                 if (!document.getElementById('acassia-widget-container')) {
                   const s = document.createElement('script');
                   s.src = '/assets/widget.js';
-                  s.setAttribute('data-tenant', 'default');
+                  s.setAttribute('data-site-key', 'SUA_SITE_KEY_AQUI');
                   s.setAttribute('data-title', 'Atendimento Acássia');
                   s.setAttribute('data-color', '#9333ea');
                   document.body.appendChild(s);
@@ -148,13 +148,13 @@ export default function Integrations() {
               <pre className="p-4 bg-bg-primary border border-border rounded-2xl font-mono text-xs text-primary overflow-x-auto select-all leading-relaxed">
 {`<script 
   src="${window.location.origin}/assets/widget.js" 
-  data-tenant="default" 
+  data-site-key="SUA_SITE_KEY_AQUI" 
   data-title="Atendimento" 
   data-color="#9333ea">
 </script>`}
               </pre>
               <button
-                onClick={() => copy(`<script src="${window.location.origin}/assets/widget.js" data-tenant="default" data-title="Atendimento" data-color="#9333ea"></script>`)}
+                onClick={() => copy(`<script src="${window.location.origin}/assets/widget.js" data-site-key="SUA_SITE_KEY_AQUI" data-title="Atendimento" data-color="#9333ea"></script>`)}
                 className="absolute top-3 right-3 p-2 rounded-xl bg-bg-surface border border-border hover:bg-bg-primary text-secondary hover:text-primary transition-all shadow-sm"
                 title="Copiar snippet"
               >

@@ -156,19 +156,7 @@ def webchat_config():
 @webchat_bp.route("/", methods=["OPTIONS"])
 def handle_options(subpath=None):
     origin = (request.headers.get("Origin") or "").rstrip("/")
-    site_payload = _verify_token(request.args.get("site_key") or "", "webchat_site")
-    session_payload = _session_from_request()
-    identity = site_payload or session_payload
-    if not identity:
-        return _cors_response({"error": "invalid_webchat_identity"}, 403)
-    db = SessionLocal()
-    try:
-        tenant_id = str(identity.get("tenant_id") or "")
-        if not _tenant_exists(db, tenant_id) or not _origin_allowed(db, tenant_id):
-            return _cors_response({"error": "origin_not_allowed"}, 403)
-        return _cors_response({}, 204, origin)
-    finally:
-        db.close()
+    return _cors_response({}, 200, origin)
 
 
 @webchat_bp.route("/init", methods=["POST"])
@@ -348,14 +336,17 @@ def send_message():
                     )
                     # Aguarda a thread da fila persistir os balões
                     import time
-                    time.sleep(0.35)
-
-                    # Busca mensagens geradas pelo motor e salvas no banco
-                    new_bot_msgs = engine_db.query(models.Mensagem).filter(
-                        models.Mensagem.lead_id == lead.id,
-                        models.Mensagem.id > user_msg.id,
-                        models.Mensagem.remetente != "user",
-                    ).order_by(models.Mensagem.timestamp.asc()).all()
+                    new_bot_msgs = []
+                    for _ in range(3):
+                        time.sleep(0.15)
+                        # Busca mensagens geradas pelo motor e salvas no banco
+                        new_bot_msgs = engine_db.query(models.Mensagem).filter(
+                            models.Mensagem.lead_id == lead.id,
+                            models.Mensagem.id > user_msg.id,
+                            models.Mensagem.remetente != "user",
+                        ).order_by(models.Mensagem.timestamp.asc()).all()
+                        if new_bot_msgs:
+                            break
 
                     for bm in new_bot_msgs:
                         if bm.texto and bm.texto.strip():

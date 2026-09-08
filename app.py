@@ -199,6 +199,11 @@ def _dispatch_triagem_fallback(data: dict, name: str = "triagem-meta") -> None:
 # ── INICIALIZAÇÃO DA APLICAÇÃO ───────────────────────────────────────
 app = Flask(__name__)
 
+# Correlation ID para rastreabilidade
+from api.utils.correlation import init_correlation_id
+init_correlation_id(app)
+
+
 # Secret key — necessária para sessions (flask-login flash, CSRF, etc).
 # Em prod, defina FLASK_SECRET_KEY no .env (estável; mudar invalida sessões).
 # Em dev, gera uma chave volátil ao subir (sessões morrem ao reiniciar — OK).
@@ -4646,6 +4651,13 @@ if __name__ == "__main__":
     logger.info(
         "🚀 [SYSTEM] Meu Mistério v8.7 — plataforma de funil (ex.: fluxo Meu Mistério Esmeralda no motor de nós)."
     )
+
+    # Iniciar workers de fila durável (broadcasts + sequências)
+    try:
+        from api.utils.task_queue import start_workers
+        start_workers()
+    except Exception as exc:
+        logger.warning("⚠️ [STARTUP] Task queue workers não iniciados: %s", exc)
 
     use_waitress = os.environ.get("USE_WAITRESS", "1").strip() in ("1", "true", "yes")
 

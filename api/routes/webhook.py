@@ -64,7 +64,12 @@ def _validate_hmac(payload_bytes: bytes) -> bool:
     """Validação HMAC SHA256 do webhook Meta."""
     app_secret = os.getenv("APP_SECRET", "")
     if not app_secret:
-        return True  # Sem secret = dev mode
+        # Em produção, sem secret configurado → rejeitar
+        # Em dev/test, permitir (PYTEST_CURRENT_TEST ou FLASK_ENV=development)
+        if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("FLASK_ENV") == "development":
+            return True
+        logger.warning("[WEBHOOK] APP_SECRET não configurado — rejeitando requisição")
+        return False
     sig_header = request.headers.get("X-Hub-Signature-256", "")
     if not sig_header:
         return False
