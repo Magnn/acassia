@@ -428,7 +428,10 @@ def resend_failed_campaign(campaign_id: int):
         # Disparar background worker
         tenant_id = current_user.tenant_id
         from api.utils.task_queue import enqueue_campaign_send
-        enqueue_campaign_send(c.id, tenant_id)
+        if not enqueue_campaign_send(c.id, tenant_id):
+            c.status = "paused"
+            db.commit()
+            return jsonify({"error": "task_queue_unavailable", "message": "Fila de envio indisponível. Tente novamente."}), 503
 
         return jsonify({
             "ok": True,
@@ -480,7 +483,10 @@ def resume_campaign(campaign_id: int):
 
         tenant_id = current_user.tenant_id
         from api.utils.task_queue import enqueue_campaign_send
-        enqueue_campaign_send(c.id, tenant_id)
+        if not enqueue_campaign_send(c.id, tenant_id):
+            c.status = "paused"
+            db.commit()
+            return jsonify({"error": "task_queue_unavailable", "message": "Fila de envio indisponível. Tente novamente."}), 503
         return jsonify({"ok": True, "status": "sending", "message": "Disparo retomado.", "campaign": {"id": c.id, "status": "sending"}})
     finally:
         db.close()
@@ -635,7 +641,10 @@ def send_campaign(campaign_id: int):
         # Disparar em background
         tenant_id = current_user.tenant_id
         from api.utils.task_queue import enqueue_campaign_send
-        enqueue_campaign_send(c.id, tenant_id)
+        if not enqueue_campaign_send(c.id, tenant_id):
+            c.status = "paused"
+            db.commit()
+            return jsonify({"error": "task_queue_unavailable", "message": "Fila de envio indisponível. Tente novamente."}), 503
 
         return jsonify({
             "ok": True,
@@ -693,7 +702,9 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
     """Worker que envia mensagens uma a uma com throttling."""
     db = SessionLocal()
     try:
-        campaign = db.query(models.BroadcastCampaign).filter_by(id=campaign_id).first()
+        campaign = db.query(models.BroadcastCampaign).filter_by(
+            id=campaign_id, tenant_id=tenant_id,
+        ).first()
         if not campaign:
             return
 
@@ -800,7 +811,9 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
     except Exception as exc:
         logger.exception("[broadcast] worker error campaign=%d: %s", campaign_id, exc)
         try:
-            campaign = db.query(models.BroadcastCampaign).filter_by(id=campaign_id).first()
+            campaign = db.query(models.BroadcastCampaign).filter_by(
+                id=campaign_id, tenant_id=tenant_id,
+            ).first()
             if campaign:
                 campaign.status = "completed"
                 campaign.completed_at = datetime.now(timezone.utc)

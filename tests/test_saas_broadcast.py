@@ -119,7 +119,8 @@ def test_broadcast_lifecycle_and_chatbotx_parity(auth_client):
     db.commit()
     db.close()
 
-    res_retry = client.post(f"/saas/broadcast/{camp_id}/resend-failed")
+    with patch("api.utils.task_queue.enqueue_campaign_send", return_value=True):
+        res_retry = client.post(f"/saas/broadcast/{camp_id}/resend-failed")
     assert res_retry.status_code == 200
     assert res_retry.get_json()["requeued_count"] == 1
 

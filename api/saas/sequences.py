@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import func
+from api.channels.base import OutboundMessage
+from api.channels.whatsapp import WhatsAppChannelAdapter
 
 from db import models
 from db.database import SessionLocal
@@ -613,6 +615,17 @@ def process_due_sequence_steps(tenant_id: Optional[str] = None) -> int:
             return 0
 
         for en in due_enrollments:
+            # Claim the row atomically. A crashed worker releases it after 15 minutes.
+            claimed = db.query(models.ContactOnSequence).filter(
+                models.ContactOnSequence.id == en.id,
+                models.ContactOnSequence.status == "active",
+                models.ContactOnSequence.next_run_at <= now,
+            ).update({models.ContactOnSequence.next_run_at: now + timedelta(minutes=15)}, synchronize_session=False)
+            db.commit()
+            if claimed != 1:
+                continue
+            db.refresh(en)
+
             step = db.query(models.SequenceStep).filter_by(
                 sequence_id=en.sequence_id,
                 order=en.current_step,
@@ -634,37 +647,48 @@ def process_due_sequence_steps(tenant_id: Optional[str] = None) -> int:
                 db.commit()
                 continue
 
-            # Tenta envio do conteúdo (Flow ou template de texto)
+            # A sent dispatch is the durable idempotency marker for this step.
+            already_sent = db.query(models.SequenceDispatch).filter_by(
+                tenant_id=en.tenant_id, sequence_id=en.sequence_id,
+                step_id=step.id, lead_id=en.lead_id, status="sent",
+            ).first()
+
             dispatch_status = "sent"
             error_msg = None
-            try:
-                # Simulação de envio ou integração WhatsApp
-                msg = step.message_template or f"Olá {lead.nome or ''}, novidades na sua jornada!"
-                # Log de auditoria
-                logger.info(
-                    "[SEQUENCE] Disparando passo %s da seq %s para lead %s (%s)",
-                    step.order, en.sequence_id, lead.id, lead.telefone
-                )
-            except Exception as ex:
-                dispatch_status = "failed"
-                error_msg = str(ex)[:200]
+            if not already_sent:
+                try:
+                    msg = step.message_template or f"Olá {lead.nome or ''}, novidades na sua jornada!"
+                    msg = msg.replace("{{nome}}", lead.nome or "").replace("{{telefone}}", lead.telefone or "")
+                    result = WhatsAppChannelAdapter(en.tenant_id).send_message(OutboundMessage(
+                        recipient_id=lead.telefone, text=msg,
+                        metadata={"idempotency_key": f"sequence:{en.id}:step:{step.id}"},
+                    ))
+                    if not result.ok:
+                        raise RuntimeError(result.error or "channel_send_failed")
+                    logger.info("[SEQUENCE] Sent step=%s sequence=%s lead=%s", step.order, en.sequence_id, lead.id)
+                except Exception as ex:
+                    dispatch_status = "failed"
+                    error_msg = str(ex)[:200]
 
             # Registrar histórico
-            dispatch_log = models.SequenceDispatch(
-                tenant_id=en.tenant_id,
-                sequence_id=en.sequence_id,
-                step_id=step.id,
-                lead_id=en.lead_id,
-                status=dispatch_status,
-                error_reason=error_msg,
-                dispatched_at=now,
-            )
-            db.add(dispatch_log)
+            if not already_sent:
+                db.add(models.SequenceDispatch(
+                    tenant_id=en.tenant_id, sequence_id=en.sequence_id,
+                    step_id=step.id, lead_id=en.lead_id, status=dispatch_status,
+                    error_reason=error_msg, dispatched_at=now,
+                ))
 
             if dispatch_status == "sent":
                 step.sent_count = (step.sent_count or 0) + 1
             else:
                 step.failed_count = (step.failed_count or 0) + 1
+
+            if dispatch_status != "sent":
+                en.last_error = error_msg
+                en.next_run_at = now + timedelta(minutes=15)
+                db.commit()
+                processed_count += 1
+                continue
 
             # Calcular próximo passo
             next_step = db.query(models.SequenceStep).filter_by(

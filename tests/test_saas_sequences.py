@@ -135,7 +135,10 @@ def test_sequence_lifecycle_and_chatbotx_parity(auth_client):
     db.commit()
     db.close()
 
-    res_due = client.post("/saas/sequences/process-due")
+    from api.channels.base import ChannelResult
+    from unittest.mock import patch
+    with patch("api.saas.sequences.WhatsAppChannelAdapter.send_message", return_value=ChannelResult(ok=True)):
+        res_due = client.post("/saas/sequences/process-due")
     assert res_due.status_code == 200
     assert res_due.get_json()["processed"] >= 1
 

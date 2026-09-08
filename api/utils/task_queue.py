@@ -1,15 +1,4 @@
-"""
-api/utils/task_queue.py — Fila de tarefas durável baseada em Redis
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Substitui threading.Thread para broadcasts e sequências.
-Garante que tarefas sobrevivem a restarts do servidor.
-
-Arquitetura:
-  - Producer: enqueue_campaign_send() → RPUSH em redis key 'acassia:tasks:broadcast'
-  - Consumer: campaign_worker_loop() → BLPOP + chama _send_campaign_worker
-  - Fallback: se Redis indisponível, cai para threading.Thread local
-"""
-
+"""Reliable Redis queue with leases, retries and a dead-letter queue."""
 from __future__ import annotations
 
 import json
@@ -17,12 +6,19 @@ import logging
 import os
 import threading
 import time
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+_PREFIX = "acassia:tasks"
+_KINDS = ("broadcast", "sequence")
+_LEASE_SECONDS = int(os.getenv("TASK_QUEUE_LEASE_SECONDS", "300"))
+_MAX_ATTEMPTS = int(os.getenv("TASK_QUEUE_MAX_ATTEMPTS", "5"))
 
-_BROADCAST_QUEUE = "acassia:tasks:broadcast"
-_SEQUENCE_QUEUE = "acassia:tasks:sequence"
+
+def _key(kind: str, suffix: str) -> str:
+    return f"{_PREFIX}:{kind}:{suffix}"
 
 
 def _get_redis():
@@ -36,130 +32,162 @@ def _get_redis():
 
 def _redis_available() -> bool:
     r = _get_redis()
-    if not r:
-        return False
     try:
-        return r.ping()
+        return bool(r and r.ping())
     except Exception:
         return False
 
 
-def enqueue_campaign_send(campaign_id: int, tenant_id: str) -> bool:
-    """Enfileira campanha de broadcast. Retorna True se enfileirou no Redis."""
+def _enqueue(kind: str, payload: dict) -> bool:
     r = _get_redis()
-    if r:
-        try:
-            payload = json.dumps({"campaign_id": campaign_id, "tenant_id": tenant_id})
-            r.rpush(_BROADCAST_QUEUE, payload)
-            logger.info("[TASK_QUEUE] Broadcast campaign=%d enfileirada no Redis", campaign_id)
-            return True
-        except Exception as exc:
-            logger.warning("[TASK_QUEUE] Redis indisponível, fallback thread: %s", exc)
+    if not r:
+        logger.error("[TASK_QUEUE] Redis unavailable; %s job rejected", kind)
+        return False
+    job_id = str(uuid.uuid4())
+    job = {"id": job_id, "kind": kind, "payload": payload, "attempts": 0,
+           "created_at": datetime.now(timezone.utc).isoformat()}
+    try:
+        pipe = r.pipeline(transaction=True)
+        pipe.hset(_key(kind, "jobs"), job_id, json.dumps(job))
+        pipe.rpush(_key(kind, "ready"), job_id)
+        pipe.execute()
+        logger.info("[TASK_QUEUE] job=%s kind=%s queued", job_id, kind)
+        return True
+    except Exception as exc:
+        logger.exception("[TASK_QUEUE] Failed to enqueue %s: %s", kind, exc)
+        return False
 
-    # Fallback: thread local
-    from api.saas.broadcast import _send_campaign_worker
-    t = threading.Thread(
-        target=_send_campaign_worker,
-        args=(campaign_id, tenant_id),
-        daemon=True,
-        name=f"broadcast-fallback-{campaign_id}",
-    )
-    t.start()
-    logger.info("[TASK_QUEUE] Broadcast campaign=%d via thread fallback", campaign_id)
-    return False
+
+def enqueue_campaign_send(campaign_id: int, tenant_id: str) -> bool:
+    return _enqueue("broadcast", {"campaign_id": campaign_id, "tenant_id": tenant_id})
 
 
 def enqueue_sequence_process(tenant_id: Optional[str] = None) -> bool:
-    """Enfileira processamento de sequências devidas."""
-    r = _get_redis()
-    if r:
-        try:
-            payload = json.dumps({"tenant_id": tenant_id})
-            r.rpush(_SEQUENCE_QUEUE, payload)
-            return True
-        except Exception as exc:
-            logger.warning("[TASK_QUEUE] Redis indisponível para sequence: %s", exc)
+    return _enqueue("sequence", {"tenant_id": tenant_id})
 
-    # Fallback: execução direta
-    from api.saas.sequences import process_due_sequence_steps
-    try:
-        process_due_sequence_steps(tenant_id=tenant_id)
-    except Exception as exc:
-        logger.exception("[TASK_QUEUE] Falha no fallback de sequence: %s", exc)
-    return False
+
+_RESERVE_SCRIPT = """
+local id = redis.call('LPOP', KEYS[1])
+if not id then return nil end
+local payload = redis.call('HGET', KEYS[2], id)
+if not payload then return nil end
+redis.call('ZADD', KEYS[3], ARGV[1], id)
+return payload
+"""
+_PROMOTE_SCRIPT = """
+local ids = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, 100)
+for _, id in ipairs(ids) do
+  if redis.call('ZREM', KEYS[1], id) == 1 then redis.call('RPUSH', KEYS[2], id) end
+end
+return #ids
+"""
+
+
+def _promote_and_recover(r, kind: str, now: float) -> None:
+    r.eval(_PROMOTE_SCRIPT, 2, _key(kind, "delayed"), _key(kind, "ready"), now)
+    r.eval(_PROMOTE_SCRIPT, 2, _key(kind, "processing"), _key(kind, "ready"), now)
+
+
+def _reserve(r, kind: str) -> Optional[dict]:
+    now = time.time()
+    _promote_and_recover(r, kind, now)
+    raw = r.eval(_RESERVE_SCRIPT, 3, _key(kind, "ready"), _key(kind, "jobs"),
+                 _key(kind, "processing"), now + _LEASE_SECONDS)
+    return json.loads(raw) if raw else None
+
+
+def _ack(r, job: dict) -> None:
+    kind, job_id = job["kind"], job["id"]
+    pipe = r.pipeline(transaction=True)
+    pipe.zrem(_key(kind, "processing"), job_id)
+    pipe.hdel(_key(kind, "jobs"), job_id)
+    pipe.execute()
+
+
+def _retry(r, job: dict, exc: Exception) -> None:
+    kind, job_id = job["kind"], job["id"]
+    job["attempts"] = int(job.get("attempts", 0)) + 1
+    job["last_error"] = str(exc)[:500]
+    serialized = json.dumps(job)
+    pipe = r.pipeline(transaction=True)
+    pipe.zrem(_key(kind, "processing"), job_id)
+    if job["attempts"] >= _MAX_ATTEMPTS:
+        pipe.rpush(_key(kind, "dead"), serialized)
+        pipe.hdel(_key(kind, "jobs"), job_id)
+        logger.error("[TASK_QUEUE] job=%s exhausted retries and entered DLQ", job_id)
+    else:
+        delay = min(300, 2 ** job["attempts"])
+        pipe.hset(_key(kind, "jobs"), job_id, serialized)
+        pipe.zadd(_key(kind, "delayed"), {job_id: time.time() + delay})
+        logger.warning("[TASK_QUEUE] job=%s retry=%d in %ds", job_id, job["attempts"], delay)
+    pipe.execute()
+
+
+def _execute(job: dict) -> None:
+    payload = job["payload"]
+    if job["kind"] == "broadcast":
+        from api.saas.broadcast import _send_campaign_worker
+        _send_campaign_worker(payload["campaign_id"], payload["tenant_id"])
+    elif job["kind"] == "sequence":
+        from api.saas.sequences import process_due_sequence_steps
+        process_due_sequence_steps(tenant_id=payload.get("tenant_id"))
+    else:
+        raise ValueError(f"Unsupported task kind: {job['kind']}")
+
+
+def worker_loop(kind: str) -> None:
+    if kind not in _KINDS:
+        raise ValueError(f"Unsupported worker kind: {kind}")
+    logger.info("[TASK_QUEUE] %s worker started", kind)
+    while True:
+        r = _get_redis()
+        if not r:
+            time.sleep(5)
+            continue
+        try:
+            job = _reserve(r, kind)
+            if not job:
+                time.sleep(1)
+                continue
+            try:
+                _execute(job)
+            except Exception as exc:
+                logger.exception("[TASK_QUEUE] job=%s failed", job.get("id"))
+                _retry(r, job, exc)
+            else:
+                _ack(r, job)
+        except Exception as exc:
+            logger.exception("[TASK_QUEUE] %s worker connection error: %s", kind, exc)
+            time.sleep(5)
 
 
 def campaign_worker_loop():
-    """Consumer loop — roda como daemon thread. Faz BLPOP no Redis."""
-    logger.info("[TASK_QUEUE] Broadcast worker loop iniciado")
-    while True:
-        try:
-            r = _get_redis()
-            if not r:
-                time.sleep(10)
-                continue
-
-            result = r.blpop(_BROADCAST_QUEUE, timeout=30)
-            if not result:
-                continue
-
-            _, raw = result
-            task = json.loads(raw)
-            campaign_id = task["campaign_id"]
-            tenant_id = task["tenant_id"]
-
-            logger.info("[TASK_QUEUE] Processando broadcast campaign=%d", campaign_id)
-            from api.saas.broadcast import _send_campaign_worker
-            _send_campaign_worker(campaign_id, tenant_id)
-
-        except Exception as exc:
-            logger.exception("[TASK_QUEUE] Erro no worker loop: %s", exc)
-            time.sleep(5)
+    worker_loop("broadcast")
 
 
 def sequence_worker_loop():
-    """Consumer loop para sequências."""
-    logger.info("[TASK_QUEUE] Sequence worker loop iniciado")
-    while True:
-        try:
-            r = _get_redis()
-            if not r:
-                time.sleep(10)
-                continue
-
-            result = r.blpop(_SEQUENCE_QUEUE, timeout=30)
-            if not result:
-                continue
-
-            _, raw = result
-            task = json.loads(raw)
-            tenant_id = task.get("tenant_id")
-
-            from api.saas.sequences import process_due_sequence_steps
-            count = process_due_sequence_steps(tenant_id=tenant_id)
-            logger.info("[TASK_QUEUE] Sequências processadas: %d", count)
-
-        except Exception as exc:
-            logger.exception("[TASK_QUEUE] Erro no sequence worker: %s", exc)
-            time.sleep(5)
+    worker_loop("sequence")
 
 
-def start_workers():
-    """Inicia os worker loops como daemon threads. Chamado no startup do app."""
+def start_workers() -> bool:
+    """Start embedded workers only when explicitly enabled for local development."""
+    if os.getenv("TASK_WORKERS_IN_WEB", "0").lower() not in ("1", "true", "yes"):
+        logger.info("[TASK_QUEUE] Embedded workers disabled; run task_worker.py")
+        return False
     if not _redis_available():
-        logger.warning("[TASK_QUEUE] Redis indisponível — workers não iniciados (fallback ativo)")
-        return
+        logger.error("[TASK_QUEUE] Redis unavailable; workers not started")
+        return False
+    for kind in _KINDS:
+        threading.Thread(target=worker_loop, args=(kind,), daemon=True,
+                         name=f"TaskQueue-{kind}").start()
+    return True
 
-    threading.Thread(
-        target=campaign_worker_loop,
-        daemon=True,
-        name="TaskQueue-Broadcast",
-    ).start()
 
-    threading.Thread(
-        target=sequence_worker_loop,
-        daemon=True,
-        name="TaskQueue-Sequence",
-    ).start()
-
-    logger.info("[TASK_QUEUE] Workers de broadcast e sequência iniciados")
+def run_workers() -> None:
+    """Run both consumers as a dedicated long-lived process."""
+    threads = [threading.Thread(target=worker_loop, args=(kind,), name=f"TaskQueue-{kind}")
+               for kind in _KINDS]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
