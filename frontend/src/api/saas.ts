@@ -222,6 +222,121 @@ export const broadcastApi = {
   tags: () => api.get<{ tags: string[] }>('/saas/broadcast/tags'),
 };
 
+/* ── Sequences (Drip Campaigns) ────────────────────────── */
+export interface SequenceStepItem {
+  id: number;
+  order: number;
+  delay_days: number;
+  delay_minutes: number;
+  delay_unit: string;
+  specific_date_time?: string | null;
+  is_active: boolean;
+  anytime: boolean;
+  send_time_start?: string | null;
+  send_time_end?: string | null;
+  send_days?: string[];
+  flow_id?: string | null;
+  message_template?: string | null;
+  sent_count?: number;
+  delivered_count?: number;
+  seen_count?: number;
+  clicked_count?: number;
+  failed_count?: number;
+}
+
+export interface SequenceItem {
+  id: number;
+  name: string;
+  active: boolean;
+  folder_name?: string | null;
+  subscribers: number;
+  messages: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  steps?: SequenceStepItem[];
+  stats?: {
+    sent: number;
+    delivered: number;
+    seen: number;
+    clicked: number;
+    failed: number;
+  };
+}
+
+export interface EnrolledContactItem {
+  id: number;
+  lead_id: number;
+  name: string;
+  phone: string;
+  current_step: number;
+  status: string;
+  enrolled_at?: string | null;
+  next_run_at?: string | null;
+  completed_at?: string | null;
+}
+
+export const sequencesApi = {
+  list: () => api.get<{ sequences: SequenceItem[] }>('/saas/sequences'),
+  get: (id: number) => api.get<{ sequence: SequenceItem }>(`/saas/sequences/${id}`),
+  create: (body: { name: string; folder_name?: string }) =>
+    api.post<{ ok: boolean; sequence: SequenceItem }>('/saas/sequences', body),
+  update: (id: number, body: { name?: string; active?: boolean; folder_name?: string }) =>
+    api.put<{ ok: boolean; sequence: SequenceItem }>(`/saas/sequences/${id}`, body),
+  rename: (id: number, name: string) =>
+    api.patch<{ ok: boolean; id: number; name: string }>(`/saas/sequences/${id}/rename`, { name }),
+  delete: (id: number) =>
+    api.delete<{ ok: boolean; message: string }>(`/saas/sequences/${id}`),
+  addStep: (sequenceId: number, body: Partial<SequenceStepItem>) =>
+    api.post<{ ok: boolean; step: SequenceStepItem }>(`/saas/sequences/${sequenceId}/steps`, body),
+  updateStep: (sequenceId: number, stepId: number, body: Partial<SequenceStepItem>) =>
+    api.put<{ ok: boolean; step_id: number }>(`/saas/sequences/${sequenceId}/steps/${stepId}`, body),
+  deleteStep: (sequenceId: number, stepId: number) =>
+    api.delete<{ ok: boolean; message: string }>(`/saas/sequences/${sequenceId}/steps/${stepId}`),
+  enroll: (sequenceId: number, lead_ids: number[]) =>
+    api.post<{ ok: boolean; enrolled_count: number; message: string }>(`/saas/sequences/${sequenceId}/enroll`, { lead_ids }),
+  unenroll: (sequenceId: number, lead_id: number) =>
+    api.post<{ ok: boolean; message: string }>(`/saas/sequences/${sequenceId}/unenroll`, { lead_id }),
+  contacts: (sequenceId: number) =>
+    api.get<{ contacts: EnrolledContactItem[] }>(`/saas/sequences/${sequenceId}/contacts`),
+  processDue: () =>
+    api.post<{ ok: boolean; processed: number }>('/saas/sequences/process-due'),
+};
+
+/* ── Contacts Import & Sync ────────────────────────── */
+export interface ContactImportItem {
+  id: number;
+  name: string;
+  status: string;
+  total_rows: number;
+  processed_rows: number;
+  success_rows: number;
+  failed_rows: number;
+  created_at?: string | null;
+  completed_at?: string | null;
+  error_log?: Array<{ row?: number; reason: string }>;
+}
+
+export const contactsImportApi = {
+  list: () => api.get<{ imports: ContactImportItem[] }>('/saas/contacts/imports'),
+  processImport: (body: {
+    name: string;
+    rows: Array<Record<string, any>>;
+    mapping: Record<string, string>;
+    assigned_tags?: string[];
+    enroll_sequence_id?: number | null;
+  }) =>
+    api.post<{
+      ok: boolean;
+      import_id: number;
+      total_rows: number;
+      success_rows: number;
+      failed_rows: number;
+      message: string;
+    }>('/saas/contacts/imports/process', body),
+  syncWhatsApp: () =>
+    api.post<{ ok: boolean; synced_contacts: number; message: string }>('/saas/contacts/imports/sync-whatsapp'),
+};
+
 /* ── Subscriptions (Pacotes) ────────────────────────── */
 export interface Subscription {
   id: number;
@@ -316,4 +431,41 @@ export const trailsApi = {
   addStep: (id: number, b: Partial<TrailStep>) => api.post<{ ok: boolean; id: number }>(`/saas/trails/${id}/steps`, b),
   catalog: () => api.get<{ trails: Trail[] }>('/saas/trails/catalog'),
   badges: () => api.get<{ badges: Array<{ id: number; name: string; icon: string; type: string; description: string; xp: number; earned_at: string }>; total_xp: number }>('/saas/trails/badges'),
+};
+
+/* ── Growth Tools: Social Automations & Coupons ────────────────────────── */
+export interface CommentRule {
+  id: string;
+  platform: 'instagram' | 'facebook';
+  keyword: string;
+  reply_comment: string;
+  send_dm: string;
+  active: boolean;
+}
+
+export interface CouponItem {
+  id: number;
+  code: string;
+  discount_type: 'percent' | 'fixed';
+  discount_value: number;
+  applies_to: string;
+  max_uses?: number | null;
+  used_count: number;
+  valid_until?: string | null;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export const growthToolsApi = {
+  getCommentRules: () => api.get<{ ok: boolean; rules: CommentRule[] }>('/saas/social/rules'),
+  saveCommentRules: (rules: CommentRule[]) => api.post<{ ok: boolean; rules: CommentRule[] }>('/saas/social/rules', { rules }),
+  listCoupons: () => api.get<{ coupons: CouponItem[] }>('/saas/coupons/'),
+  createCoupon: (body: {
+    code: string;
+    discount_type: 'percent' | 'fixed';
+    discount_value: number;
+    max_uses?: number | null;
+    valid_until?: string | null;
+  }) => api.post<{ ok: boolean; id: number; code: string }>('/saas/coupons/', body),
+  deleteCoupon: (id: number) => api.delete<{ ok: boolean }>(`/saas/coupons/${id}`),
 };

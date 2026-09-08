@@ -13,6 +13,7 @@ interface Props {
 export default function VersionsSidebar({ blueprintId, onClose, onRestored }: Props) {
   const qc = useQueryClient();
   const [note, setNote] = useState('');
+  const [versionToRestore, setVersionToRestore] = useState<{ id: number; version_number: number } | null>(null);
 
   const { data: versions = [], isLoading } = useQuery({
     queryKey: ['blueprint-versions', blueprintId],
@@ -32,7 +33,8 @@ export default function VersionsSidebar({ blueprintId, onClose, onRestored }: Pr
   const restore = useMutation({
     mutationFn: (vid: number) => blueprintsApi.restoreVersion(blueprintId, vid),
     onSuccess: () => {
-      toast.success('Versão restaurada.');
+      toast.success('Versão restaurada com sucesso!');
+      setVersionToRestore(null);
       qc.invalidateQueries({ queryKey: ['blueprint', blueprintId] });
       qc.invalidateQueries({ queryKey: ['blueprint-versions', blueprintId] });
       onRestored();
@@ -103,12 +105,9 @@ export default function VersionsSidebar({ blueprintId, onClose, onRestored }: Pr
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm(`Restaurar v${v.version_number}? O estado atual será sobrescrito (você pode criar um snapshot antes).`))
-                    restore.mutate(v.id);
-                }}
+                onClick={() => setVersionToRestore({ id: v.id, version_number: v.version_number })}
                 disabled={restore.isPending}
-                className="text-[11px] px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst text-sibila-fog hover:text-sibila-moonlight disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
+                className="text-[11px] px-2 py-1 rounded border border-sibila-mist hover:border-sibila-amethyst text-sibila-fog hover:text-sibila-moonlight disabled:opacity-50 flex items-center gap-1 flex-shrink-0 transition-colors"
                 title="Restaurar esta versão"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -118,6 +117,38 @@ export default function VersionsSidebar({ blueprintId, onClose, onRestored }: Pr
           ))}
         </ul>
       </div>
+
+      {/* Confirmation Modal (Zero native browser confirm) */}
+      {versionToRestore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl">
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-purple-400" />
+              Restaurar Versão v{versionToRestore.version_number}?
+            </h4>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              O fluxo atual será sobrescrito com o estado desta versão. Se desejar, crie um snapshot antes de continuar.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setVersionToRestore(null)}
+                className="px-3 py-1.5 rounded-lg border border-zinc-700 text-xs font-medium text-zinc-300 hover:bg-zinc-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={restore.isPending}
+                onClick={() => restore.mutate(versionToRestore.id)}
+                className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-xs font-bold text-white transition-colors"
+              >
+                {restore.isPending ? 'Restaurando...' : 'Confirmar Restauração'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

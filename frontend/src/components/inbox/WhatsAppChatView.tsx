@@ -22,8 +22,13 @@ import {
   MessageSquare,
   X,
   Info,
+  Star,
+  Archive,
+  Ban,
+  Mail,
 } from 'lucide-react';
-import type { LeadDetail, LeadMessage } from '../../api/inbox';
+import { inboxApi, type LeadDetail, type LeadMessage } from '../../api/inbox';
+import { toast } from '../../lib/toast';
 import type { QuickReply } from '../../api/compose';
 import ComposeToolbar from '../ComposeToolbar';
 import ScrollToBottom from './ScrollToBottom';
@@ -442,11 +447,77 @@ export default function WhatsAppChatView({
                   <Zap className="w-3.5 h-3.5 text-amber-400" />
                   Gerenciar Respostas Rápidas
                 </button>
+                <div className="my-1 border-t border-[#2a3942]" />
+                <button
+                  onClick={() => {
+                    inboxApi.contextAction(selectedLeadId, 'toggle_star')
+                      .then((res) => toast.success(res.is_starred ? 'Marcado para Follow-up (⭐)' : 'Removido de Follow-up'))
+                      .catch((e) => toast.error(e.message));
+                    setShowMoreActions(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#2a3942] flex items-center gap-2 text-yellow-400"
+                >
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  Seguir (Follow-up)
+                </button>
+                <button
+                  onClick={() => {
+                    inboxApi.contextAction(selectedLeadId, 'mark_unread')
+                      .then(() => toast.success('Conversa marcada como não lida'))
+                      .catch((e) => toast.error(e.message));
+                    setShowMoreActions(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#2a3942] flex items-center gap-2"
+                >
+                  <Mail className="w-3.5 h-3.5 text-sky-400" />
+                  Marcar como Não Lida
+                </button>
+                <button
+                  onClick={() => {
+                    inboxApi.contextAction(selectedLeadId, 'toggle_archive')
+                      .then((res) => toast.success(res.is_archived ? 'Conversa arquivada' : 'Conversa desarquivada'))
+                      .catch((e) => toast.error(e.message));
+                    setShowMoreActions(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#2a3942] flex items-center gap-2 text-zinc-400"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  Arquivar Conversa
+                </button>
+                <button
+                  onClick={() => {
+                    inboxApi.contextAction(selectedLeadId, 'toggle_block')
+                      .then((res) => toast.success(res.is_blocked ? 'Contato bloqueado' : 'Contato desbloqueado'))
+                      .catch((e) => toast.error(e.message));
+                    setShowMoreActions(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-500/20 flex items-center gap-2 text-rose-400"
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  Bloquear Contato
+                </button>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Bot Takeover Banner Pill (ChatbotX Slide 3 Parity) */}
+      {!selectedLead?.bot_pausado && (
+        <div className="flex items-center justify-between px-6 py-2 bg-emerald-950/40 border-b border-emerald-500/20 text-xs">
+          <div className="flex items-center gap-2 text-emerald-300 font-medium">
+            <Bot className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <span>Bot de IA está ativo e respondendo automaticamente</span>
+          </div>
+          <button
+            onClick={onToggleTakeover}
+            disabled={isTogglingTakeover}
+            className="px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 font-bold text-[11px] transition-all"
+          >
+            Pausar e Assumir Atendimento
+          </button>
+        </div>
+      )}
 
       {/* 2. Corpo do chat com textura WhatsApp */}
       <div

@@ -249,6 +249,10 @@ def list_view_data():
                 "urgent_reason": getattr(lead, "urgent_reason", None),
                 "urgent_at": lead.urgent_at.isoformat() if getattr(lead, "urgent_at", None) else None,
                 "ultimo_sentimento": getattr(lead, "ultimo_sentimento", None),
+                "metadata_json": lead.metadata_json or {},
+                "is_starred": bool((lead.metadata_json or {}).get("is_starred", False)),
+                "is_archived": bool((lead.metadata_json or {}).get("is_archived", False)),
+                "is_blocked": bool((lead.metadata_json or {}).get("is_blocked", False)),
             })
         return jsonify({
             "items": items, "filtro": filtro, "total": len(items),
@@ -484,6 +488,81 @@ def takeover_data(lead_id: int):
         except Exception:
             pass
         return jsonify({"status": "ok", "bot_pausado": lead.bot_pausado})
+    finally:
+        db.close()
+
+
+@inbox_bp.route("/<int:lead_id>/action", methods=["POST"])
+@login_required
+def lead_context_action(lead_id: int):
+    """
+    Ações de contexto de atendimento (ChatbotX Live Chat parity):
+      - toggle_star: Seguir contato (Follow-up)
+      - toggle_archive: Arquivar conversa
+      - toggle_block: Bloquear contato (e pausar automações)
+      - mark_unread: Marcar conversa como não lida
+    """
+    tenant_id = current_user.tenant_id
+    body = request.get_json(silent=True) or {}
+    action = body.get("action")
+
+    db = SessionLocal()
+    try:
+        lead = db.query(models.Lead).filter_by(id=lead_id, tenant_id=tenant_id).first()
+        if not lead:
+            return jsonify({"error": "not_found"}), 404
+
+        meta = dict(lead.metadata_json or {})
+        tags = list(lead.tags) if isinstance(lead.tags, list) else []
+
+        if action == "toggle_star":
+            is_starred = not meta.get("is_starred", False)
+            meta["is_starred"] = is_starred
+            if is_starred and "followup" not in tags:
+                tags.append("followup")
+            elif not is_starred and "followup" in tags:
+                tags = [t for t in tags if t != "followup"]
+        elif action == "toggle_archive":
+            is_archived = not meta.get("is_archived", False)
+            meta["is_archived"] = is_archived
+            if is_archived and "arquivado" not in tags:
+                tags.append("arquivado")
+            elif not is_archived and "arquivado" in tags:
+                tags = [t for t in tags if t != "arquivado"]
+        elif action == "toggle_block":
+            is_blocked = not meta.get("is_blocked", False)
+            meta["is_blocked"] = is_blocked
+            lead.bot_pausado = is_blocked or lead.bot_pausado
+            if is_blocked and "bloqueado" not in tags:
+                tags.append("bloqueado")
+            elif not is_blocked and "bloqueado" in tags:
+                tags = [t for t in tags if t != "bloqueado"]
+        elif action == "mark_unread":
+            meta["unread_manual"] = True
+
+        lead.metadata_json = meta
+        lead.tags = tags
+        db.commit()
+
+        try:
+            from api.saas.realtime_hooks import notify_lead_updated
+            notify_lead_updated(tenant_id, lead_id, {
+                "metadata_json": meta,
+                "tags": tags,
+                "bot_pausado": lead.bot_pausado
+            })
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": True,
+            "lead_id": lead_id,
+            "is_starred": bool(meta.get("is_starred")),
+            "is_archived": bool(meta.get("is_archived")),
+            "is_blocked": bool(meta.get("is_blocked")),
+            "tags": tags,
+            "bot_pausado": lead.bot_pausado,
+        })
     finally:
         db.close()
 

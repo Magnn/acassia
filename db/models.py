@@ -2066,6 +2066,124 @@ class BroadcastRecipient(Base):
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# SEQUENCES (DRIP CAMPAIGNS) — Nutrição Multi-dias Padrão ChatbotX
+# ═══════════════════════════════════════════════════════════════════════
+
+class Sequence(Base):
+    """
+    Régua de comunicação/nutrição automatizada sequencial (Drip Campaign).
+    Permite enviar mensagens ou fluxos em intervalos de horas/dias para leads inscritos.
+    """
+    __tablename__ = "sequences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    active = Column(Boolean, default=True, nullable=False)
+    folder_name = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=_agora_utc, onupdate=_agora_utc, nullable=False)
+
+
+class SequenceStep(Base):
+    """
+    Passo individual de uma sequência de nutrição.
+    """
+    __tablename__ = "sequence_steps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sequence_id = Column(Integer, ForeignKey("sequences.id"), nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    order = Column(Integer, default=0, nullable=False)
+
+    # Delays & Timing
+    delay_days = Column(Integer, default=1, nullable=False)
+    delay_minutes = Column(Integer, default=0, nullable=False)
+    delay_unit = Column(String(20), default="days", nullable=False)  # minutes, hours, days, specificTime
+    specific_date_time = Column(DateTime(timezone=True), nullable=True)
+
+    is_active = Column(Boolean, default=True, nullable=False)
+    anytime = Column(Boolean, default=True, nullable=False)
+    send_time_start = Column(String(10), default="09:00", nullable=True)
+    send_time_end = Column(String(10), default="18:00", nullable=True)
+    send_days = Column(JSON, default=lambda: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"])
+
+    # Conteúdo a disparar: Fluxo do visual builder ou template de mensagem
+    flow_id = Column(String(64), nullable=True)
+    message_template = Column(Text, nullable=True)
+
+    # Métricas individuais do passo
+    sent_count = Column(Integer, default=0)
+    delivered_count = Column(Integer, default=0)
+    seen_count = Column(Integer, default=0)
+    clicked_count = Column(Integer, default=0)
+    failed_count = Column(Integer, default=0)
+
+
+class ContactOnSequence(Base):
+    """
+    Rastreamento de um lead inscrito em uma sequência de nutrição.
+    """
+    __tablename__ = "contacts_on_sequences"
+    __table_args__ = (
+        UniqueConstraint("sequence_id", "lead_id", name="uq_sequence_lead"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    sequence_id = Column(Integer, ForeignKey("sequences.id"), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+
+    current_step = Column(Integer, default=0, nullable=False)
+    status = Column(String(20), default="active", nullable=False)  # active, completed, paused, cancelled
+    next_run_at = Column(DateTime(timezone=True), nullable=True, index=True)
+
+    enrolled_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(Text, nullable=True)
+
+
+class SequenceDispatch(Base):
+    """
+    Log de disparo de cada passo de sequência para auditoria e histórico.
+    """
+    __tablename__ = "sequence_dispatches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    sequence_id = Column(Integer, ForeignKey("sequences.id"), nullable=False, index=True)
+    step_id = Column(Integer, ForeignKey("sequence_steps.id"), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+
+    status = Column(String(20), default="sent", nullable=False)  # sent, delivered, seen, failed
+    error_reason = Column(String(255), nullable=True)
+    dispatched_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class ContactImport(Base):
+    """
+    Registro e histórico de importações de listas de contatos (CSV / Canais).
+    Paridade 100% com ChatbotX (@chatbotx.io/imports).
+    """
+    __tablename__ = "contact_imports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    status = Column(String(20), default="processing", nullable=False)  # processing, completed, failed
+    total_rows = Column(Integer, default=0)
+    processed_rows = Column(Integer, default=0)
+    success_rows = Column(Integer, default=0)
+    failed_rows = Column(Integer, default=0)
+    column_mapping = Column(JSON, default=dict)
+    assigned_tags = Column(JSON, default=list)
+    enrolled_sequence_id = Column(Integer, nullable=True)
+    error_log = Column(JSON, default=list)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # EVENTOS & RETIROS — Vagas limitadas, inscrição, lista de espera
 # ═══════════════════════════════════════════════════════════════════════
 

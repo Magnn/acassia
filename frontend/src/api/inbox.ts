@@ -18,6 +18,10 @@ export interface LeadPreview {
   spiritual_urgency?: 'low' | 'med' | 'high' | null;
   is_urgent?: boolean;
   urgent_reason?: string | null;
+  is_starred?: boolean;
+  is_archived?: boolean;
+  is_blocked?: boolean;
+  metadata_json?: Record<string, any>;
 }
 
 export type SpiritualCategory =
@@ -97,6 +101,20 @@ export const inboxApi = {
     api.post<{ status: string; bot_pausado: boolean }>(
       `/saas/inbox/${leadId}/takeover/data`,
     ),
+
+  contextAction: (
+    leadId: number,
+    action: 'toggle_star' | 'toggle_archive' | 'toggle_block' | 'mark_unread',
+  ) =>
+    api.post<{
+      ok: boolean;
+      lead_id: number;
+      is_starred: boolean;
+      is_archived: boolean;
+      is_blocked: boolean;
+      tags: string[];
+      bot_pausado: boolean;
+    }>(`/saas/inbox/${leadId}/action`, { action }),
 
   // Ações expostas pelo motor (app.py) — texto livre para tarólogo intervir.
   sendMessage: (leadId: number, text: string) =>

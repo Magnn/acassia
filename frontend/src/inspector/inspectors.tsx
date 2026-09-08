@@ -1231,6 +1231,24 @@ export function AbSplitInspector({ node, onUpdate }: InspectorProps) {
           </div>
         ))}
       </div>
+
+      {/* Validação de soma 100% (Padrão ChatbotX Split Traffic) */}
+      {(() => {
+        const totalWeight = weights.reduce((acc, curr) => acc + curr, 0);
+        const isBalanced = Math.abs(totalWeight - 100) < 0.2;
+        return (
+          <div className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-semibold ${
+            isBalanced
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+              : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+          }`}>
+            <span>Total Distribuído:</span>
+            <span>
+              {totalWeight.toFixed(1)}% {isBalanced ? '✓ 100% Calibrado' : '⚠ Deve somar 100%'}
+            </span>
+          </div>
+        );
+      })()}
     </div>
   );
 }

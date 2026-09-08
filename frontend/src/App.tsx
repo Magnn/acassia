@@ -47,6 +47,8 @@ const ProfilePage = lazy(() => import('./routes/Profile'));
 const Events = lazy(() => import('./routes/Events'));
 const ContentPage = lazy(() => import('./routes/Content'));
 const Broadcast = lazy(() => import('./routes/Broadcast'));
+const SequencesPage = lazy(() => import('./routes/Sequences'));
+const GrowthToolsPage = lazy(() => import('./routes/GrowthTools'));
 const SubscriptionsPage = lazy(() => import('./routes/Subscriptions'));
 const TrailsPage = lazy(() => import('./routes/Trails'));
 const CommunityPage = lazy(() => import('./routes/Community'));
@@ -156,6 +158,8 @@ export default function App() {
             <Route path="/events" element={<Events />} />
             <Route path="/content" element={<ContentPage />} />
             <Route path="/broadcast" element={<Broadcast />} />
+            <Route path="/sequences" element={<SequencesPage />} />
+            <Route path="/growth-tools" element={<GrowthToolsPage />} />
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/journal" element={<Navigate to="/leads" replace />} />
             <Route path="/trails" element={<TrailsPage />} />

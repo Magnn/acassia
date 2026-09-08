@@ -332,6 +332,8 @@ def _register_saas_blueprints():
     from api.public.social_automations import social_bp
     from api.public.public_booking import booking_public_bp
     from api.saas.broadcast import broadcast_bp as saas_broadcast_bp
+    from api.saas.sequences import sequences_bp as saas_sequences_bp
+    from api.saas.contacts_import import contacts_import_bp as saas_contacts_import_bp
     from api.saas.events import events_bp as saas_events_bp
     from api.saas.content import content_bp as saas_content_bp
     from api.saas.content import coupons_bp as saas_coupons_bp
@@ -391,7 +393,7 @@ def _register_saas_blueprints():
         saas_persona_bp, saas_exp_bp, saas_realtime_bp,
         saas_api_keys_bp, saas_ritual_bp, public_astro_bp, webchat_bp, swagger_bp, telegram_bp,
         meta_capi_bp, social_bp, booking_public_bp,
-        saas_broadcast_bp, saas_events_bp,
+        saas_broadcast_bp, saas_sequences_bp, saas_contacts_import_bp, saas_events_bp,
         saas_content_bp, saas_coupons_bp,
         saas_scheduling_bp, saas_subscriptions_bp,
         saas_profile_bp, saas_journal_bp, saas_trails_bp,

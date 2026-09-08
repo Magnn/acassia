@@ -435,11 +435,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
 
           {/* Ativar / Publicar */}
           <button
-            onClick={() => {
-              if (confirm(isPublished ? 'Deseja desativar este funil?' : 'Deseja publicar e ativar este funil?')) {
-                publishMutation.mutate();
-              }
-            }}
+            onClick={() => publishMutation.mutate()}
             disabled={publishMutation.isPending}
             className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shadow-xs ${
               isPublished

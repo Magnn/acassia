@@ -19,10 +19,13 @@ import {
   Snowflake,
   Mic,
   MicOff,
+  Upload,
+  Star,
 } from 'lucide-react';
 import { inboxApi } from '../api/inbox';
 import { composeApi } from '../api/compose';
 import { toast } from '../lib/toast';
+import ImportContactsModal from '../components/inbox/ImportContactsModal';
 import ScoreBadge from '../components/ScoreBadge';
 import LeadContextPanel from '../components/LeadContextPanel';
 import ComposeToolbar from '../components/ComposeToolbar';
@@ -127,6 +130,8 @@ export default function Leads() {
   const lastReadMsgIdRef = useRef<number | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(VOICE_ONLY_KEY, voiceOnlyMode ? '1' : '0');
@@ -317,8 +322,9 @@ export default function Leads() {
   const handleSend = () => {
     const text = draft.trim();
     if (!text || selectedLeadId == null) return;
+    // Se o bot estiver ativo, ao enviar uma intervenção humana manual, pausa automaticamente (Takeover ChatbotX)
     if (!selectedLead?.bot_pausado) {
-      if (!confirm('O bot ainda está ativo. Continuar pode atrapalhar a automação. Confirmar envio?')) return;
+      takeoverMutation.mutate(selectedLeadId);
     }
     sendMutation.mutate({ leadId: selectedLeadId, text });
   };
@@ -348,6 +354,14 @@ export default function Leads() {
                 title={viewMode === 'chat' ? 'Ver em Tabela' : 'Ver em Chat'}
               >
                 <LayoutList className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="p-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors flex items-center gap-1 text-xs font-semibold px-2"
+                title="Importar Contatos & Histórico (CSV/WhatsApp)"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Importar</span>
               </button>
             </div>
           </div>
@@ -453,8 +467,11 @@ export default function Leads() {
                           {l.score_band && l.score_band !== 'cold' && (
                             <ScoreBadge band={l.score_band} value={l.score_value} />
                           )}
-                          <div className={`font-bold truncate text-[#e9edef] group-hover:text-[#00a884] transition-colors ${isCompact ? 'text-xs' : 'text-sm'}`}>
-                            {l.nome || l.telefone}
+                          <div className={`font-bold truncate text-[#e9edef] group-hover:text-[#00a884] transition-colors flex items-center gap-1 ${isCompact ? 'text-xs' : 'text-sm'}`}>
+                            <span>{l.nome || l.telefone}</span>
+                            {(l.is_starred || l.tags?.includes('followup')) && (
+                              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 shrink-0" />
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -764,6 +781,15 @@ export default function Leads() {
           <LeadContextPanel leadId={selectedLeadId} />
         </div>
       )}
+
+      {/* Modal de Importação de Contatos & Sincronização ChatbotX */}
+      <ImportContactsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['leads-list'] });
+        }}
+      />
     </div>
   );
 }
