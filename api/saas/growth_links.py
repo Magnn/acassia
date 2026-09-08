@@ -147,6 +147,18 @@ def redirect_growth_link(link_id: str):
     try:
         link = db.get(models.GrowthLink, link_id)
         if not link:
+            # Dual-read / backfill sob demanda de TenantFlowVariable legada
+            rows = db.query(models.TenantFlowVariable).filter_by(key="growth.links").all()
+            for row in rows:
+                if isinstance(row.value_json, list):
+                    for item in row.value_json:
+                        if item.get("id") == link_id:
+                            _migrate_legacy_links(db, row.tenant_id)
+                            link = db.get(models.GrowthLink, link_id)
+                            break
+                if link:
+                    break
+        if not link:
             return "Link não encontrado", 404
         target = link.wa_url or f"https://wa.me/{link.phone}"
         db.query(models.GrowthLink).filter_by(id=link_id).update(

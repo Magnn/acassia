@@ -23,11 +23,15 @@ def require_api_key(scope_or_function=None):
                 key_obj = db.query(models.PublicApiKey).filter_by(key_hash=token_hash, is_active=True).first()
                 if not key_obj:
                     return jsonify({"error": "invalid_api_key"}), 401
-                scopes = set(key_obj.scopes or [])
-                if required_scope and scopes and required_scope not in scopes:
+                if key_obj.scopes is None:
+                    scopes = None
+                else:
+                    scopes = set(key_obj.scopes)
+
+                if required_scope and scopes is not None and required_scope not in scopes:
                     return jsonify({"error": "insufficient_scope", "required_scope": required_scope}), 403
                 g.tenant_id, g.api_key_id, g.api_tier = key_obj.tenant_id, key_obj.id, key_obj.tier
-                g.api_scopes = sorted(scopes)
+                g.api_scopes = sorted(scopes) if scopes is not None else ["*"]
                 from datetime import datetime, timezone
                 key_obj.total_requests = (key_obj.total_requests or 0) + 1
                 key_obj.last_used_at = datetime.now(timezone.utc)

@@ -116,3 +116,57 @@ def test_process_social_comment_unmatching_rule():
             mock_dm.assert_not_called()
     finally:
         db.close()
+
+
+def test_process_social_comment_retries_on_failure():
+    db = SessionLocal()
+    tenant_id = "test_social_retry_tenant"
+    try:
+        db.query(models.SocialWebhookReceipt).filter_by(tenant_id=tenant_id).delete()
+        _put_variable(db, tenant_id, "social.comment_rules", [
+            {
+                "id": "rule_retry",
+                "keyword": "CUPOM",
+                "reply_comment": "Enviado!",
+                "send_dm": "Seu cupom: RETRY",
+                "active": True,
+            }
+        ])
+        _put_secret(db, tenant_id, "meta_social.access_token", "test_ig_token")
+        db.commit()
+
+        comment_data = {
+            "id": "comment_retry_1",
+            "text": "Quero meu cupom agora",
+            "from": {"id": "user_retry_1", "username": "user_retry"},
+        }
+
+        # 1. First attempt fails on DM send
+        with patch("api.public.social_automations.reply_to_instagram_comment", return_value=True), \
+             patch("api.public.social_automations.send_instagram_private_reply", return_value=False):
+            matched = process_social_comment(tenant_id, comment_data, db)
+            assert matched == 1
+
+        receipt = db.query(models.SocialWebhookReceipt).filter_by(
+            tenant_id=tenant_id, event_key="comment:comment_retry_1"
+        ).first()
+        assert receipt is not None
+        assert receipt.status == "failed"
+
+        # 2. Webhook redelivery retry should succeed when DM succeeds
+        with patch("api.public.social_automations.reply_to_instagram_comment", return_value=True), \
+             patch("api.public.social_automations.send_instagram_private_reply", return_value=True):
+            matched_retry = process_social_comment(tenant_id, comment_data, db)
+            assert matched_retry == 1
+
+        receipt_after = db.query(models.SocialWebhookReceipt).filter_by(
+            tenant_id=tenant_id, event_key="comment:comment_retry_1"
+        ).first()
+        assert receipt_after.status == "sent"
+
+        # 3. Third delivery after success is deduplicated
+        matched_dup = process_social_comment(tenant_id, comment_data, db)
+        assert matched_dup == 0
+    finally:
+        db.close()
+

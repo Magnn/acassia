@@ -1,6 +1,7 @@
 """Reliable Redis queue with leases, retries and a dead-letter queue."""
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -123,6 +124,29 @@ def _retry(r, job: dict, exc: Exception) -> None:
     pipe.execute()
 
 
+@contextlib.contextmanager
+def _lease_heartbeat(r, kind: str, job_id: str, interval: float = 30.0, lease_seconds: int = _LEASE_SECONDS):
+    """Renova periodicamente o lease do job no sorted set processing para jobs longos."""
+    stop_event = threading.Event()
+
+    def _heartbeat():
+        while not stop_event.wait(interval):
+            try:
+                now = time.time()
+                r.zadd(_key(kind, "processing"), {job_id: now + lease_seconds})
+                logger.debug("[TASK_QUEUE] Lease renewed for %s:%s until %s", kind, job_id, now + lease_seconds)
+            except Exception as exc:
+                logger.warning("[TASK_QUEUE] Failed to renew lease for %s:%s: %s", kind, job_id, exc)
+
+    t = threading.Thread(target=_heartbeat, daemon=True, name=f"lease-heartbeat-{kind}-{job_id[:8]}")
+    t.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        t.join(timeout=1.0)
+
+
 def _execute(job: dict) -> None:
     payload = job["payload"]
     if job["kind"] == "broadcast":
@@ -150,7 +174,8 @@ def worker_loop(kind: str) -> None:
                 time.sleep(1)
                 continue
             try:
-                _execute(job)
+                with _lease_heartbeat(r, kind, job["id"]):
+                    _execute(job)
             except Exception as exc:
                 logger.exception("[TASK_QUEUE] job=%s failed", job.get("id"))
                 _retry(r, job, exc)

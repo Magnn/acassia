@@ -65,6 +65,23 @@ def test_api_key_scope_is_enforced(client, db_session):
     assert rv.status_code == 403
     assert rv.json["required_scope"] == "messages:write"
 
+
+def test_api_key_empty_scopes_denies_all_scoped_endpoints(client, db_session):
+    raw_key = f"noscopes_{uuid.uuid4().hex}"
+    db_session.add(PublicApiKey(
+        tenant_id=f"noscopes_{uuid.uuid4().hex[:8]}",
+        key_hash=hashlib.sha256(raw_key.encode()).hexdigest(), key_prefix="noscopes",
+        label="No scopes", tier="free", is_active=True, scopes=[],
+    ))
+    db_session.commit()
+    rv_ping = client.get('/api/v1/ping', headers={"X-API-Key": raw_key})
+    assert rv_ping.status_code == 403
+    assert rv_ping.json["error"] == "insufficient_scope"
+    rv = client.post('/api/v1/messages/send', json={"recipient": "1", "text": "oi"},
+                     headers={"X-API-Key": raw_key})
+    assert rv.status_code == 403
+    assert rv.json["error"] == "insufficient_scope"
+
 def test_ping_with_auth(client, test_data):
     rv = client.get('/api/v1/ping', headers={"X-API-Key": test_data["raw_key"]})
     assert rv.status_code == 200

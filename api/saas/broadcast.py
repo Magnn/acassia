@@ -719,8 +719,8 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
         except Exception:
             wa_client = None
 
-        sent = 0
-        failed = 0
+        sent = campaign.sent_count or 0
+        failed = campaign.failed_count or 0
 
         # Pre-fetch leads em lote (elimina N+1 queries de banco no loop)
         lead_ids = [r.lead_id for r in recipients]
@@ -796,16 +796,23 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
         except Exception:
             pass
 
+        pending_count = db.query(models.BroadcastRecipient).filter_by(
+            campaign_id=campaign_id, status="pending"
+        ).count()
+
         if campaign.status not in ("cancelled", "paused"):
-            campaign.status = "completed"
-            campaign.completed_at = datetime.now(timezone.utc)
+            if pending_count == 0:
+                campaign.status = "completed"
+                campaign.completed_at = datetime.now(timezone.utc)
+            else:
+                campaign.status = "paused"
         campaign.sent_count = sent
         campaign.failed_count = failed
         db.commit()
 
         logger.info(
-            "[broadcast] Campaign %d completed: sent=%d failed=%d total=%d",
-            campaign_id, sent, failed, campaign.total_recipients,
+            "[broadcast] Campaign %d finish: status=%s sent=%d failed=%d total=%d",
+            campaign_id, campaign.status, sent, failed, campaign.total_recipients,
         )
 
     except Exception as exc:
@@ -815,11 +822,11 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
                 id=campaign_id, tenant_id=tenant_id,
             ).first()
             if campaign:
-                campaign.status = "completed"
-                campaign.completed_at = datetime.now(timezone.utc)
+                campaign.status = "failed"
                 db.commit()
         except Exception:
             pass
+        raise
     finally:
         db.close()
 

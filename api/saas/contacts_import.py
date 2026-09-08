@@ -98,6 +98,13 @@ def process_csv_import():
     if not rows:
         return jsonify({"error": "no_rows_provided"}), 422
 
+    MAX_IMPORT_ROWS = 10000
+    if len(rows) > MAX_IMPORT_ROWS:
+        return jsonify({
+            "error": "payload_too_large",
+            "message": f"Limite máximo de {MAX_IMPORT_ROWS} linhas por importação excedido.",
+        }), 413
+
     db = SessionLocal()
     try:
         tenant_id = current_user.tenant_id
@@ -247,13 +254,13 @@ def sync_whatsapp_contacts():
         # Registra no log de import
         sync_record = models.ContactImport(
             tenant_id=tenant_id,
-            name="WhatsApp Channel Sync (Automático)",
+            name="WhatsApp Contacts Index (Automático)",
             status="completed",
             total_rows=existing_leads_count,
             processed_rows=existing_leads_count,
             success_rows=existing_leads_count,
             failed_rows=0,
-            column_mapping={"channel": "whatsapp_coexist"},
+            column_mapping={"channel": "whatsapp_coexist", "mode": "contacts_indexed"},
             created_at=_agora_utc(),
             completed_at=_agora_utc(),
         )
@@ -263,7 +270,7 @@ def sync_whatsapp_contacts():
         return jsonify({
             "ok": True,
             "synced_contacts": existing_leads_count,
-            "message": f"Sincronização de contatos e histórico do WhatsApp concluída ({existing_leads_count} contatos indexados).",
+            "message": f"Contatos da base WhatsApp indexados com sucesso ({existing_leads_count} contatos indexados).",
         })
     finally:
         db.close()

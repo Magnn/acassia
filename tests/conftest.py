@@ -46,7 +46,9 @@ def clean_global_state():
     try:
         from db.database import SessionLocal, Base, engine as db_engine
         from db import models
+        from db.sync import sync_database
         Base.metadata.create_all(bind=db_engine)
+        sync_database()
         db = SessionLocal()
         for model in [
             models.EmailVerificationToken,

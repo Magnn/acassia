@@ -138,20 +138,38 @@ def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
     if not text or not comment_id:
         return 0
 
-    # Meta retries webhook deliveries. Claim the event before any external side effect.
+    # Meta retries webhook deliveries. Claim event or check existing status
     event_key = f"comment:{comment_id}"
-    try:
-        db.add(models.SocialWebhookReceipt(tenant_id=tenant_id, provider="meta", event_key=event_key))
-        db.commit()
-    except IntegrityError:
-        db.rollback()
+    receipt = db.query(models.SocialWebhookReceipt).filter_by(
+        tenant_id=tenant_id, provider="meta", event_key=event_key
+    ).first()
+    if receipt and receipt.status == "sent":
         return 0
+    if not receipt:
+        try:
+            receipt = models.SocialWebhookReceipt(
+                tenant_id=tenant_id, provider="meta", event_key=event_key, status="processing"
+            )
+            db.add(receipt)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            receipt = db.query(models.SocialWebhookReceipt).filter_by(
+                tenant_id=tenant_id, provider="meta", event_key=event_key
+            ).first()
+            if receipt and receipt.status == "sent":
+                return 0
+    else:
+        receipt.status = "processing"
+        db.commit()
 
     rules = _get_variable(db, tenant_id, "social.comment_rules", [])
     access_token = _get_secret(db, tenant_id, "meta_social.access_token")
 
     matched_count = 0
     text_upper = text.upper()
+    dispatched_any = False
+    all_ok = True
 
     for rule in rules:
         if not rule.get("active", True):
@@ -163,10 +181,16 @@ def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
             send_dm = rule.get("send_dm")
 
             if reply_comment and access_token:
-                reply_to_instagram_comment(comment_id, reply_comment, access_token)
+                ok = reply_to_instagram_comment(comment_id, reply_comment, access_token)
+                dispatched_any = True
+                if not ok:
+                    all_ok = False
 
             if send_dm and access_token:
-                send_instagram_private_reply(comment_id, send_dm, access_token)
+                ok = send_instagram_private_reply(comment_id, send_dm, access_token)
+                dispatched_any = True
+                if not ok:
+                    all_ok = False
 
             # Criar ou enriquecer lead
             lead_ident = sender_id or (f"ig_{sender_username}" if sender_username else f"comment_{comment_id}")
@@ -200,7 +224,14 @@ def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
                 pass
 
             matched_count += 1
+            if receipt:
+                receipt.status = "sent" if (not dispatched_any or all_ok) else "failed"
+                db.commit()
             break  # Executa primeira regra correspondente
+
+    if receipt and receipt.status == "processing":
+        receipt.status = "sent"
+        db.commit()
 
     return matched_count
 
@@ -268,25 +299,45 @@ def meta_social_webhook():
                     message_id = message.get("mid") or msg_ev.get("timestamp") or hashlib.sha256(
                         json.dumps(msg_ev, sort_keys=True).encode("utf-8")
                     ).hexdigest()
-                    try:
-                        db_proc.add(models.SocialWebhookReceipt(
-                            tenant_id=tenant_id, provider="meta", event_key=f"story:{sender}:{message_id}",
-                        ))
-                        db_proc.commit()
-                    except IntegrityError:
-                        db_proc.rollback()
+                    event_key = f"story:{sender}:{message_id}"
+                    receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
+                        tenant_id=tenant_id, provider="meta", event_key=event_key
+                    ).first()
+                    if receipt and receipt.status == "sent":
                         continue
+                    if not receipt:
+                        try:
+                            receipt = models.SocialWebhookReceipt(
+                                tenant_id=tenant_id, provider="meta", event_key=event_key, status="processing",
+                            )
+                            db_proc.add(receipt)
+                            db_proc.commit()
+                        except IntegrityError:
+                            db_proc.rollback()
+                            receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
+                                tenant_id=tenant_id, provider="meta", event_key=event_key
+                            ).first()
+                            if receipt and receipt.status == "sent":
+                                continue
+                    else:
+                        receipt.status = "processing"
+                        db_proc.commit()
+
                     story_cfg = _get_variable(db_proc, tenant_id, "social.story_reply_config", {
                         "active": True,
                         "reply_text": "Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?",
                     })
+                    sent_ok = False
                     if story_cfg.get("active", True):
                         access_token = _get_secret(db_proc, tenant_id, "meta_social.access_token")
-                        send_instagram_direct_message(
+                        sent_ok = send_instagram_direct_message(
                             sender,
                             story_cfg.get("reply_text", "Obrigada por responder nosso Story! ✨"),
                             access_token,
                         )
+                    if receipt:
+                        receipt.status = "sent" if sent_ok else "failed"
+                        db_proc.commit()
                 except Exception as exc:
                     logger.warning("[STORY_REPLY_ERROR] tenant=%s: %s", tenant_id, exc)
                 finally:

@@ -716,9 +716,13 @@ def process_due_sequence_steps(tenant_id: Optional[str] = None) -> int:
 @sequences_bp.route("/process-due", methods=["POST"])
 @login_required
 def trigger_process_due():
-    """Aciona manualmente a verificação de disparos devidos no tenant."""
-    count = process_due_sequence_steps(tenant_id=current_user.tenant_id)
-    return jsonify({"ok": True, "processed": count})
+    """Aciona verificação de disparos devidos no tenant via fila assíncrona."""
+    from api.utils.task_queue import enqueue_sequence_process
+    enqueued = enqueue_sequence_process(tenant_id=current_user.tenant_id)
+    if not enqueued:
+        count = process_due_sequence_steps(tenant_id=current_user.tenant_id)
+        return jsonify({"ok": True, "enqueued": False, "processed": count, "mode": "sync_fallback"}), 200
+    return jsonify({"ok": True, "enqueued": True, "processed": 0, "mode": "queued"}), 202
 
 
 def check_and_enroll_by_tags(tenant_id: str, lead_id: int, tags: list[str]) -> int:

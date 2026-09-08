@@ -54,3 +54,12 @@ def test_exhausted_job_enters_dead_letter_queue():
 def test_embedded_workers_are_opt_in():
     with patch.dict("os.environ", {}, clear=True):
         assert task_queue.start_workers() is False
+
+
+def test_lease_heartbeat_renews_processing_lease():
+    import time
+    redis = MagicMock()
+    with task_queue._lease_heartbeat(redis, "broadcast", "job-hb", interval=0.05, lease_seconds=100):
+        time.sleep(0.12)
+    assert redis.zadd.call_count >= 1
+

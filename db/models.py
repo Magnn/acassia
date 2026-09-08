@@ -1983,7 +1983,7 @@ class PublicApiKey(Base):
     key_hash = Column(String(128), nullable=False, unique=True, index=True)
     key_prefix = Column(String(12), nullable=False)  # "mm_pk_a3b2" (para identificação visual)
     tier = Column(String(16), nullable=False, default="free")  # free, pro, scale
-    scopes = Column(JSON, default=list, nullable=False)
+    scopes = Column(JSON, default=lambda: ["contacts:read", "contacts:write", "messages:write", "sequences:write"], nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     daily_usage = Column(JSON, default=dict)  # {"2027-01-15": 42}
     total_requests = Column(Integer, default=0)
@@ -2169,6 +2169,7 @@ class SocialWebhookReceipt(Base):
     tenant_id = Column(String(64), nullable=False, index=True)
     provider = Column(String(32), nullable=False)
     event_key = Column(String(128), nullable=False)
+    status = Column(String(32), default="sent", nullable=False)  # processing, sent, failed
     received_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
