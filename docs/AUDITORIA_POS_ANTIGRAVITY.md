@@ -23,11 +23,11 @@ Atualizada em 08/09/2026 sobre o código até `0f2c9a8`, comparado ao ChatbotX `
 
 ### P0 — segurança e integridade
 
-1. **Credenciais de `WADevice` continuam em texto puro.** `evolution_api_key` e `meta_access_token` são gravados diretamente na tabela e usados diretamente pelo provider. Migrar para o cofre por `device_id`, limpar colunas legadas e nunca serializar esses campos.
-2. **Telegram ainda tem endpoint de setup público.** `/api/webhooks/telegram/setup` recebe o token no body, usa `GET` com token na URL da API Telegram e não exige login. Deve virar configuração autenticada, guardar token no cofre e validar o header secreto do webhook.
-3. **API keys são aceitas na query string.** Isso vaza em logs, histórico e proxies. Aceitar apenas `Authorization: Bearer` ou `X-API-Key` e acrescentar scopes por chave.
-4. **Comment-to-DM não é idempotente.** Reentrega do webhook pode responder e mandar DM novamente. Persistir `comment_id/event_id`, registrar tentativa/resultado e deduplicar antes de efeitos externos.
-5. **Growth redirect varre todas as contas.** O redirect consulta todos os registros `growth.links`; além de não escalar, amplia o impacto de colisões/enumeração. Criar tabela indexada com ID opaco único e tenant associado.
+1. **API keys são aceitas na query string.** Isso vaza em logs, histórico e proxies. Aceitar apenas `Authorization: Bearer` ou `X-API-Key` e acrescentar scopes por chave.
+2. **Comment-to-DM não é idempotente.** Reentrega do webhook pode responder e mandar DM novamente. Persistir `comment_id/event_id`, registrar tentativa/resultado e deduplicar antes de efeitos externos.
+3. **Growth redirect varre todas as contas.** O redirect consulta todos os registros `growth.links`; além de não escalar, amplia o impacto de colisões/enumeração. Criar tabela indexada com ID opaco único e tenant associado.
+
+Resolvidos após esta reauditoria: credenciais novas de `WADevice` ficam no cofre por dispositivo e são apagadas ao desativá-lo; o setup do Telegram exige login, grava token/segredo cifrados e o webhook valida `X-Telegram-Bot-Api-Secret-Token`. As colunas antigas permanecem apenas para leitura compatível até uma migração de dados zerá-las.
 
 ### P1 — confiabilidade
 
@@ -69,14 +69,13 @@ Atualizada em 08/09/2026 sobre o código até `0f2c9a8`, comparado ao ChatbotX `
 
 ## Próxima sequência recomendada
 
-1. Migrar segredos de `WADevice` e proteger Telegram.
-2. Trocar a fila atual por processamento com ACK/retry/DLQ e worker separado.
-3. Adicionar idempotência aos efeitos sociais e às sequências.
-4. Normalizar Growth Links em tabela e conectar clique → lead → conversão.
-5. Endurecer API v1: scopes, somente headers, idempotência, paginação e OpenAPI gerado.
-6. Migrar os caminhos de envio para `ChannelAdapter` e declarar capacidades.
-7. Homologar WhatsApp, Telegram, webchat e Meta Social com credenciais reais em contas isoladas.
-8. Só então ampliar canais, SDK/CLI/MCP e white-label.
+1. Trocar a fila atual por processamento com ACK/retry/DLQ e worker separado.
+2. Adicionar idempotência aos efeitos sociais e às sequências.
+3. Normalizar Growth Links em tabela e conectar clique → lead → conversão.
+4. Endurecer API v1: scopes, somente headers, idempotência, paginação e OpenAPI gerado.
+5. Migrar os caminhos de envio para `ChannelAdapter` e declarar capacidades.
+6. Homologar WhatsApp, Telegram, webchat e Meta Social com credenciais reais em contas isoladas.
+7. Só então ampliar canais, SDK/CLI/MCP e white-label.
 
 ## Verificação desta rodada
 

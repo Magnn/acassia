@@ -10,9 +10,38 @@ from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from db.database import SessionLocal
 from db import models
+from api.utils.tenant_secrets import decrypt_tenant_secret, encrypt_tenant_secret
 
 logger = logging.getLogger(__name__)
 devices_bp = Blueprint("wa_devices", __name__, url_prefix="/saas/devices")
+
+
+def _device_secret_key(device_id: int, field: str) -> str:
+    return f"whatsapp.device.{device_id}.{field}"
+
+
+def _set_device_secret(db, device: models.WADevice, field: str, value: str | None) -> None:
+    key = _device_secret_key(device.id, field)
+    row = db.query(models.TenantFlowSecret).filter_by(tenant_id=device.tenant_id, key=key).first()
+    clean = str(value or "").strip()
+    if not clean:
+        if row:
+            db.delete(row)
+        return
+    cipher = encrypt_tenant_secret(clean)
+    if row:
+        row.value_cipher = cipher
+    else:
+        db.add(models.TenantFlowSecret(tenant_id=device.tenant_id, key=key, value_cipher=cipher))
+
+
+def _get_device_secret(db, device: models.WADevice, field: str, legacy_value: str | None) -> str:
+    row = db.query(models.TenantFlowSecret).filter_by(
+        tenant_id=device.tenant_id, key=_device_secret_key(device.id, field)
+    ).first()
+    if row:
+        return decrypt_tenant_secret(row.value_cipher, allow_plaintext_legacy=True)
+    return str(legacy_value or "")
 
 
 @devices_bp.route("/", methods=["GET"])
@@ -76,13 +105,16 @@ def create_device():
             # Evolution
             evolution_server_url=data.get("evolution_server_url"),
             evolution_instance=data.get("evolution_instance"),
-            evolution_api_key=data.get("evolution_api_key"),
+            evolution_api_key=None,
             # Meta Cloud
             meta_phone_number_id=data.get("meta_phone_number_id"),
             meta_waba_id=data.get("meta_waba_id"),
-            meta_access_token=data.get("meta_access_token"),
+            meta_access_token=None,
         )
         db.add(d)
+        db.flush()
+        _set_device_secret(db, d, "evolution_api_key", data.get("evolution_api_key"))
+        _set_device_secret(db, d, "meta_access_token", data.get("meta_access_token"))
         db.commit()
         return jsonify({"ok": True, "device_id": d.id, "is_primary": d.is_primary}), 201
     finally:
@@ -102,10 +134,16 @@ def update_device(device_id):
 
         data = request.json or {}
         for k in ("nickname", "phone_display", "provider",
-                   "evolution_server_url", "evolution_instance", "evolution_api_key",
-                   "meta_phone_number_id", "meta_waba_id", "meta_access_token"):
+                   "evolution_server_url", "evolution_instance",
+                   "meta_phone_number_id", "meta_waba_id"):
             if k in data:
                 setattr(d, k, data[k])
+        if "evolution_api_key" in data:
+            _set_device_secret(db, d, "evolution_api_key", data.get("evolution_api_key"))
+            d.evolution_api_key = None
+        if "meta_access_token" in data:
+            _set_device_secret(db, d, "meta_access_token", data.get("meta_access_token"))
+            d.meta_access_token = None
         db.commit()
         return jsonify({"ok": True})
     finally:
@@ -122,6 +160,12 @@ def delete_device(device_id):
         ).first()
         if not d:
             return jsonify({"error": "not_found"}), 404
+        for field in ("evolution_api_key", "meta_access_token"):
+            row = db.query(models.TenantFlowSecret).filter_by(
+                tenant_id=d.tenant_id, key=_device_secret_key(d.id, field)
+            ).first()
+            if row:
+                db.delete(row)
         d.active = False
         db.commit()
         return jsonify({"ok": True})
@@ -275,6 +319,12 @@ def set_device_flow_mode(device_id: int):
 def _get_provider_for_device(device: models.WADevice):
     """Instantiate a WhatsApp provider from device credentials."""
     try:
+        db = SessionLocal()
+        try:
+            evolution_key = _get_device_secret(db, device, "evolution_api_key", device.evolution_api_key)
+            meta_token = _get_device_secret(db, device, "meta_access_token", device.meta_access_token)
+        finally:
+            db.close()
         if device.provider == "evolution":
             from api.whatsapp_providers.evolution import EvolutionProvider
             return EvolutionProvider(
@@ -282,7 +332,7 @@ def _get_provider_for_device(device: models.WADevice):
                 config={
                     "evolution_server_url": device.evolution_server_url or "",
                     "evolution_instance": device.evolution_instance or "",
-                    "evolution_api_key": device.evolution_api_key or "",
+                    "evolution_api_key": evolution_key,
                 },
             )
         elif device.provider in ("meta_cloud", "coex"):
@@ -290,7 +340,7 @@ def _get_provider_for_device(device: models.WADevice):
             return MetaCloudProvider(
                 tenant_id=device.tenant_id,
                 config={
-                    "access_token": device.meta_access_token or "",
+                    "access_token": meta_token,
                     "phone_number_id": device.meta_phone_number_id or "",
                 },
             )
