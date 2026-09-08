@@ -217,40 +217,85 @@ class Personalizer:
             + "):\n"
         )
         linhas: list[str] = [head]
-        p = data.get("personalidade") if isinstance(data.get("personalidade"), dict) else {}
-        if p:
-            if (p.get("identidade") or "").strip():
-                linhas.append(f"- Identidade: {str(p['identidade']).strip()[:1200]}")
-            if (p.get("diretrizes") or "").strip():
-                linhas.append(f"- Diretrizes de voz: {str(p['diretrizes']).strip()[:1200]}")
-            if (p.get("voz") or "").strip():
-                linhas.append(f"- Registro de voz: {str(p['voz']).strip()[:120]}")
+
+        # 1. Personalidade (string moderna OU dict legado)
+        pers = data.get("personalidade")
+        if isinstance(pers, str) and pers.strip():
+            linhas.append(f"- Personalidade e Tom: {pers.strip()[:2000]}")
+        elif isinstance(pers, dict):
+            if (pers.get("identidade") or "").strip():
+                linhas.append(f"- Identidade: {str(pers['identidade']).strip()[:1200]}")
+            if (pers.get("diretrizes") or "").strip():
+                linhas.append(f"- Diretrizes de voz: {str(pers['diretrizes']).strip()[:1200]}")
+            if (pers.get("voz") or "").strip():
+                linhas.append(f"- Registro de voz: {str(pers['voz']).strip()[:120]}")
             for k in ("estabilidade", "similaridade", "sotaque", "velocidade"):
-                if p.get(k) is not None:
-                    linhas.append(f"- {k}: {p.get(k)}")
-        ins = data.get("instrucoes") if isinstance(data.get("instrucoes"), dict) else {}
-        if ins:
+                if pers.get(k) is not None:
+                    linhas.append(f"- {k}: {pers.get(k)}")
+
+        # 2. Instruções (string moderna OU dict legado)
+        ins = data.get("instrucoes")
+        if isinstance(ins, str) and ins.strip():
+            linhas.append(f"- Instruções Operacionais:\n{ins.strip()[:4000]}")
+        elif isinstance(ins, dict):
             if (ins.get("gerais") or "").strip():
                 linhas.append(f"- Instruções gerais: {str(ins['gerais']).strip()[:2200]}")
             if (ins.get("proibicoes") or "").strip():
                 linhas.append(f"- Proibições: {str(ins['proibicoes']).strip()[:1200]}")
             if (ins.get("formato_saida") or "").strip():
                 linhas.append(f"- Formato de saída: {str(ins['formato_saida']).strip()[:800]}")
-        base = data.get("base") if isinstance(data.get("base"), dict) else {}
-        if base:
-            for k, label in (
-                ("contexto_empresa", "Contexto empresa"),
-                ("produtos", "Produtos/ofertas"),
-                ("politica_preco", "Preço e negociação"),
-            ):
-                if (base.get(k) or "").strip():
-                    linhas.append(f"- {label}: {str(base[k]).strip()[:2400]}")
-        faq = data.get("faq") if isinstance(data.get("faq"), dict) else {}
-        if (faq.get("perguntas") or "").strip():
-            linhas.append(f"- FAQ: {str(faq['perguntas']).strip()[:2400]}")
-        arq = data.get("arquivos") if isinstance(data.get("arquivos"), dict) else {}
-        if (arq.get("links") or "").strip():
-            linhas.append(f"- Referências/links: {str(arq['links']).strip()[:1200]}")
+
+        # 3. Base de conhecimento (string moderna 'base_conhecimento' OU dict legado 'base')
+        base_str = data.get("base_conhecimento")
+        if isinstance(base_str, str) and base_str.strip():
+            linhas.append(f"- Base de Conhecimento e Catálogo:\n{base_str.strip()[:5000]}")
+        else:
+            base = data.get("base") if isinstance(data.get("base"), dict) else {}
+            if base:
+                for k, label in (
+                    ("contexto_empresa", "Contexto empresa"),
+                    ("produtos", "Produtos/ofertas"),
+                    ("politica_preco", "Preço e negociação"),
+                ):
+                    if (base.get(k) or "").strip():
+                        linhas.append(f"- {label}: {str(base[k]).strip()[:2400]}")
+
+        # 4. FAQ (lista moderna de {q, a} OU dict legado 'faq')
+        faqs_list = data.get("faqs")
+        if isinstance(faqs_list, list) and faqs_list:
+            faq_entries = []
+            for item in faqs_list:
+                if isinstance(item, dict):
+                    q = str(item.get("q") or "").strip()
+                    a = str(item.get("a") or "").strip()
+                    if q and a:
+                        faq_entries.append(f"P: {q}\nR: {a}")
+            if faq_entries:
+                linhas.append("- Perguntas Frequentes (FAQ):\n" + "\n\n".join(faq_entries)[:3500])
+        else:
+            faq = data.get("faq") if isinstance(data.get("faq"), dict) else {}
+            if (faq.get("perguntas") or "").strip():
+                linhas.append(f"- FAQ: {str(faq['perguntas']).strip()[:2400]}")
+
+        # 5. Documentos e Arquivos anexados (RAG)
+        arquivos = data.get("arquivos")
+        if isinstance(arquivos, list) and arquivos:
+            docs = []
+            for arq in arquivos:
+                if isinstance(arq, dict):
+                    nome_arq = str(arq.get("nome") or "Doc").strip()
+                    txt = str(arq.get("texto") or "").strip()
+                    if txt:
+                        docs.append(f"[{nome_arq}]: {txt[:2000]}")
+            if docs:
+                linhas.append("- Documentos Indexados (RAG):\n" + "\n\n".join(docs)[:5000])
+        elif isinstance(arquivos, dict) and (arquivos.get("links") or "").strip():
+            linhas.append(f"- Referências/links: {str(arquivos['links']).strip()[:1200]}")
+
+        # 6. Políticas e flags autônomas
+        if data.get("human_handoff_enabled") is not False:
+            linhas.append("- Transbordo Humano: Se o cliente pedir para falar com atendente ou humano, confirme a transferência cordialmente.")
+
         if len(linhas) <= 1:
             return ""
         return "\n".join(linhas) + "\n\n"

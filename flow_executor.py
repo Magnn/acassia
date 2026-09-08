@@ -295,6 +295,22 @@ def _build_system_instruction_from_studio(snap: Any) -> Optional[str]:
     if faq_lines:
         parts.append("## FAQ\n" + "\n\n".join(faq_lines))
 
+    # Documentos e Arquivos indexados (AI Files / RAG)
+    arquivos = data.get("arquivos")
+    if isinstance(arquivos, list) and arquivos:
+        docs_text: List[str] = []
+        for arq in arquivos:
+            if isinstance(arq, dict):
+                n = str(arq.get("nome") or "Documento").strip()
+                t = str(arq.get("texto") or "").strip()
+                if t:
+                    docs_text.append(f"### Arquivo: {n}\n{t[:2500]}")
+        if docs_text:
+            parts.append("## Documentos e Catálogos Anexados (RAG)\n" + "\n\n".join(docs_text))
+
+    if data.get("human_handoff_enabled") is not False:
+        parts.append("## Transbordo Humano\nCaso o cliente solicite expressamente falar com um atendente humano ou pessoa real, confirme cordialmente a transferência para a equipe.")
+
     return "\n\n".join(parts) if parts else None
 
 
@@ -900,6 +916,10 @@ def steps_to_acoes(
 
             # Agente Studio publicado: vira systemInstruction (personalidade + base + FAQ).
             studio_snap = fv.get("__meumisterio_studio__")
+            if not model_raw and isinstance(studio_snap, dict):
+                sdata = studio_snap.get("data")
+                if isinstance(sdata, dict) and sdata.get("model"):
+                    model_raw = str(sdata.get("model")).strip()
             system_instruction = _build_system_instruction_from_studio(studio_snap)
             
             # Combina a instrução global do Studio com o `system_prompt` local deste nó
