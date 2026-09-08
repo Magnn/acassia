@@ -14,6 +14,7 @@ import json
 import os
 from datetime import datetime, timezone
 from db.database import SessionLocal
+from api.utils.tenant_secrets import decrypt_tenant_secret
 from db import models
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ def _send_wa_message(tenant_id, phone_number_id, to_number, text):
         if not sec:
             return False
             
-        token = sec.value_cipher
+        token = decrypt_tenant_secret(sec.value_cipher)
         ver = os.getenv("META_GRAPH_API_VERSION", "v21.0")
         url = f"https://graph.facebook.com/{ver}/{phone_number_id}/messages"
         

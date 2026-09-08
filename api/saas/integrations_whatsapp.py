@@ -35,6 +35,7 @@ from flask_login import current_user, login_required
 
 from db import models
 from db.database import SessionLocal
+from api.utils.tenant_secrets import decrypt_tenant_secret, encrypt_tenant_secret
 
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ def _public_webhook_url() -> str:
 
 
 def _store_secret(db, tenant_id: str, key: str, value: str) -> None:
+    value = encrypt_tenant_secret(value)
     row = db.query(models.TenantFlowSecret).filter_by(
         tenant_id=tenant_id, key=key,
     ).first()
@@ -315,7 +317,8 @@ def save_binding():
         binding.waba_id = waba_id
         binding.display_phone_number = info.get("display_phone_number") if isinstance(info, dict) else None
         binding.verify_token = verify_token
-        binding.app_secret = app_secret
+        # Campo legado fica vazio; o segredo vive apenas no cofre versionado.
+        binding.app_secret = None
         # Gera webhook_path unguessable na primeira vez (preserva entre updates)
         if not binding.webhook_path:
             binding.webhook_path = f"wh_{secrets.token_urlsafe(24)}"
@@ -462,7 +465,7 @@ def force_subscribe():
         if not sec or not sec.value_cipher:
             return jsonify({"error": "access_token_missing"}), 422
 
-        _try_subscribe(binding, sec.value_cipher)
+        _try_subscribe(binding, decrypt_tenant_secret(sec.value_cipher))
         binding.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(binding)
@@ -509,7 +512,7 @@ def test_send():
         try:
             from meta_graph_admin import send_text
             ok, resp = send_text(
-                binding.phone_number_id, sec.value_cipher,
+                binding.phone_number_id, decrypt_tenant_secret(sec.value_cipher),
                 to=to, body=text,
             )
         except Exception as exc:

@@ -4,8 +4,6 @@ variáveis, ACL, agendamentos, export/import, diff, quotas e lint.
 """
 from __future__ import annotations
 
-import base64
-import hashlib
 import ipaddress
 import json
 import logging
@@ -23,6 +21,7 @@ from api.saas.auth import require_role
 from db import models
 from db.database import SessionLocal
 from tenant_context import get_request_tenant_id
+from api.utils.tenant_secrets import decrypt_tenant_secret, encrypt_tenant_secret
 
 # Atalho local — permitimos "user" e "admin" pois a filtragem é por tenant_id,
 # e donos de tenant (role='user' ou 'admin') precisam gerenciar seus próprios
@@ -39,27 +38,12 @@ _SAFE_WEBHOOK_TEST_HOSTS = {
 }
 
 
-def _secret_master_bytes() -> bytes:
-    k = (os.getenv("MEU_MISTERIO_FLOW_SECRETS_KEY") or "").strip()
-    if not k:
-        # Fail-safe para evitar segredo previsível em produção.
-        raise RuntimeError("MEU_MISTERIO_FLOW_SECRETS_KEY ausente")
-    raw = k.encode("utf-8")
-    return hashlib.sha256(raw).digest()
-
-
 def encrypt_flow_secret(plain: str) -> str:
-    k = _secret_master_bytes()
-    b = plain.encode("utf-8")
-    out = bytes(b[i] ^ k[i % len(k)] for i in range(len(b)))
-    return base64.urlsafe_b64encode(out).decode("ascii")
+    return encrypt_tenant_secret(plain)
 
 
 def decrypt_flow_secret(cipher_b64: str) -> str:
-    k = _secret_master_bytes()
-    raw = base64.urlsafe_b64decode(cipher_b64.encode("ascii"))
-    out = bytes(raw[i] ^ k[i % len(k)] for i in range(len(raw)))
-    return out.decode("utf-8")
+    return decrypt_tenant_secret(cipher_b64, allow_plaintext_legacy=True)
 
 
 def _mask_secret_tail(plain: str) -> str:
@@ -953,8 +937,12 @@ def register_flow_platform_routes(app: Flask) -> None:
         tid = get_request_tenant_id()
         db = SessionLocal()
         try:
-            if not (os.getenv("MEU_MISTERIO_FLOW_SECRETS_KEY") or "").strip():
-                return jsonify({"ok": False, "error": "configure MEU_MISTERIO_FLOW_SECRETS_KEY"}), 503
+            if not (
+                (os.getenv("CREDENTIAL_SECRET_KEY") or "").strip()
+                or (os.getenv("MEU_MISTERIO_FLOW_SECRETS_KEY") or "").strip()
+                or (os.getenv("FLASK_SECRET_KEY") or "").strip()
+            ):
+                return jsonify({"ok": False, "error": "configure CREDENTIAL_SECRET_KEY"}), 503
             if request.method == "GET":
                 rows = db.query(models.TenantFlowSecret).filter_by(tenant_id=tid).all()
                 items = []

@@ -791,7 +791,8 @@ def _get_wa_credentials(tenant_id, db):
             tenant_id=tenant_id, key="whatsapp.phone_number_id"
         ).first()
         if sec and phone_var:
-            return {"access_token": sec.value_cipher, "phone_number_id": phone_var.value_json}
+            from api.utils.tenant_secrets import decrypt_tenant_secret
+            return {"access_token": decrypt_tenant_secret(sec.value_cipher), "phone_number_id": phone_var.value_json}
     except Exception as e:
         logger.warning("[groups] WA credentials error: %s", e)
     return None

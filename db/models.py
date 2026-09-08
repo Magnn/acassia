@@ -1487,7 +1487,7 @@ class WaPhoneTenantBinding(Base):
     waba_id = Column(String(64), nullable=True)
     display_phone_number = Column(String(40), nullable=True)
     verify_token = Column(String(120), nullable=True)
-    app_secret = Column(String(200), nullable=True)
+    app_secret = Column(String(200), nullable=True)  # legado; novas gravações usam TenantFlowSecret
     # Per-tenant webhook path (defesa em profundidade). Formato wh_<32_chars_url_safe>.
     # Cada tenant tem URL unica /webhook/<webhook_path> alem do /webhook global.
     webhook_path = Column(String(64), nullable=True, unique=True, index=True)

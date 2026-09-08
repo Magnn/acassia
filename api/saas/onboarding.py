@@ -34,6 +34,7 @@ from flask_login import current_user, login_required
 
 from db import models
 from db.database import SessionLocal
+from api.utils.tenant_secrets import encrypt_tenant_secret
 from flows.post_payment.seeds import AVAILABLE_SEEDS, load_seed
 
 logger = logging.getLogger(__name__)
@@ -460,6 +461,7 @@ def _set_var(tenant_id: str, key: str, value: Any, *, db_session=None) -> None:
 
 
 def _set_secret(tenant_id: str, key: str, cipher: str, *, db_session=None) -> None:
+    cipher = encrypt_tenant_secret(cipher)
     db = db_session if db_session is not None else SessionLocal()
     try:
         existing = db.query(models.TenantFlowSecret).filter_by(

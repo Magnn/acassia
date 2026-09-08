@@ -28,6 +28,7 @@ from api.whatsapp_providers import (
 )
 from db import models
 from db.database import SessionLocal
+from api.utils.tenant_secrets import encrypt_tenant_secret
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +68,8 @@ def _del_var(tenant_id: str, key: str) -> None:
 
 
 def _set_secret(tenant_id: str, key: str, value: str) -> None:
-    """Encrypta e grava. Importa o helper sob demanda pra evitar ciclos."""
-    from app import encrypt_flow_secret  # type: ignore
-
-    cipher = encrypt_flow_secret(value)
+    """Encrypta e grava no formato versionado do cofre."""
+    cipher = encrypt_tenant_secret(value)
     db = SessionLocal()
     try:
         existing = db.query(models.TenantFlowSecret).filter_by(

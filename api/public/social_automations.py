@@ -12,7 +12,7 @@ import json
 import logging
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
-from api.utils.crypto import decrypt_credential, encrypt_credential
+from api.utils.tenant_secrets import decrypt_tenant_secret, encrypt_tenant_secret
 from db.database import SessionLocal
 from db import models
 
@@ -35,11 +35,10 @@ def _put_variable(db, tenant_id: str, key: str, value) -> None:
 
 def _get_secret(db, tenant_id: str, key: str) -> str:
     row = db.query(models.TenantFlowSecret).filter_by(tenant_id=tenant_id, key=key).first()
-    if not row or not row.value_cipher.startswith("fernet:v1:"):
+    if not row:
         return ""
     try:
-        payload = decrypt_credential(row.value_cipher.removeprefix("fernet:v1:"))
-        return str(payload.get("value") or "")
+        return decrypt_tenant_secret(row.value_cipher, allow_plaintext_legacy=False)
     except Exception:
         logger.exception("[SOCIAL_SECRET] Falha ao descriptografar tenant=%s key=%s", tenant_id, key)
         return ""
@@ -51,7 +50,7 @@ def _put_secret(db, tenant_id: str, key: str, value: str) -> None:
         if row:
             db.delete(row)
         return
-    cipher = "fernet:v1:" + encrypt_credential({"value": value})
+    cipher = encrypt_tenant_secret(value)
     if row:
         row.value_cipher = cipher
     else:

@@ -391,7 +391,10 @@ def test_save_whatsapp_grava_vars_e_secret():
         token = db.query(models.TenantFlowSecret).filter_by(tenant_id="t1", key="whatsapp.access_token").first()
         assert phone.value_json == "12345"
         assert waba.value_json == "67890"
-        assert token.value_cipher == "EAAxxxxxxxxxxxxxxxxxx"
+        from api.utils.tenant_secrets import decrypt_tenant_secret
+        assert token.value_cipher.startswith("fernet:v1:")
+        assert "EAAxxxxxxxxxxxxxxxxxx" not in token.value_cipher
+        assert decrypt_tenant_secret(token.value_cipher) == "EAAxxxxxxxxxxxxxxxxxx"
     finally:
         db.close()
 

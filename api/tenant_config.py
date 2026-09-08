@@ -33,6 +33,7 @@ from typing import Any, Mapping, Optional
 
 from db import models
 from db.database import SessionLocal
+from api.utils.tenant_secrets import decrypt_tenant_secret
 
 logger = logging.getLogger(__name__)
 
@@ -130,10 +131,5 @@ def _apply_dotted_key(cfg: dict, key: str, value: Any) -> None:
 
 
 def _decrypt_secret(value_cipher: str) -> str:
-    """
-    Stub de descriptografia. Em dev, value_cipher é texto puro.
-
-    Em produção: substituir por Fernet/AWS KMS/Vault. O contrato mantém-se:
-    string in → string out.
-    """
-    return value_cipher or ""
+    """Lê o formato versionado e mantém compatibilidade temporária com legados."""
+    return decrypt_tenant_secret(value_cipher, allow_plaintext_legacy=True)
