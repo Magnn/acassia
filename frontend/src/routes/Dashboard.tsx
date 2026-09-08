@@ -11,40 +11,39 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Activity, CheckCircle, DollarSign, PauseCircle, Users } from 'lucide-react';
+import { Activity, CheckCircle2, DollarSign, PauseCircle, Users, TrendingUp, Sparkles, PhoneCall } from 'lucide-react';
 import { metricsApi } from '../api/metrics';
 import LaunchChecklist from '../components/LaunchChecklist';
 
-// Cores dos charts — padrão SaaS B2B.
 const CHART = {
-  amethyst: '#6366f1',
+  amethyst: '#818cf8',
   ember: '#10b981',
   rose: '#f43f5e',
-  grid: '#27272a',
-  axis: '#71717a',
+  grid: 'rgba(255, 255, 255, 0.06)',
+  axis: 'rgba(255, 255, 255, 0.4)',
 };
 
 export default function Dashboard() {
   const { data: kpis, isLoading, error } = useQuery({
     queryKey: ['saas-metrics'],
     queryFn: metricsApi.get,
-    staleTime: 5 * 60_000,    // matches Redis cache TTL (300s)
+    staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
   });
 
   const { data: exec } = useQuery({
     queryKey: ['executive-kpis', 7],
     queryFn: () => metricsApi.getExecutive(7),
-    staleTime: 5 * 60_000,    // matches Redis cache TTL (300s)
+    staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
   });
 
   if (isLoading) {
     return (
       <div className="p-12 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[400px]">
-        <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4" />
-        <div className="text-zinc-400 text-xs font-bold uppercase tracking-widest animate-pulse">
-          Consolidando métricas e conversões…
+        <div className="w-12 h-12 border-4 border-[#25D366]/20 border-t-[#25D366] rounded-full animate-spin mb-4" />
+        <div className="text-secondary text-xs font-bold uppercase tracking-widest animate-pulse">
+          Consolidando métricas e conversões do WhatsApp…
         </div>
       </div>
     );
@@ -52,11 +51,11 @@ export default function Dashboard() {
 
   if (error || !kpis) {
     return (
-      <div className="p-12 max-w-7xl mx-auto">
+      <div className="p-8 max-w-6xl mx-auto space-y-6">
         <LaunchChecklist />
-        <div className="bg-red-500/5 border border-red-500/20 text-red-500 rounded-3xl p-8 text-center shadow-sm">
-          <div className="font-black text-xl mb-2">Ops! Falha nas métricas</div>
-          <div className="text-sm opacity-80">{(error as Error)?.message}</div>
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-3xl p-8 text-center">
+          <div className="font-bold text-lg mb-1">Falha ao carregar métricas</div>
+          <div className="text-xs opacity-80">{(error as Error)?.message || 'Erro desconhecido'}</div>
         </div>
       </div>
     );
@@ -68,105 +67,129 @@ export default function Dashboard() {
   }));
 
   return (
-    <div className="px-8 py-10 max-w-6xl mx-auto space-y-10">
-      <div>
-        <h2 className="text-4xl font-black tracking-tight text-primary mb-2">
-          Visão Geral
-        </h2>
-        <p className="text-sm text-secondary font-medium max-w-2xl">
-          Acompanhe o pulso da sua operação em tempo real. Movimentação de leads, conversões e saúde financeira.
-        </p>
+    <div className="px-6 sm:px-8 py-8 max-w-6xl mx-auto space-y-8 text-primary">
+      {/* ═══ HEADER ═══ */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Visão Geral
+            </h1>
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[10px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Tempo Real
+            </div>
+          </div>
+          <p className="text-xs text-secondary mt-1 max-w-2xl">
+            Acompanhe a movimentação dos contatos no funil, conversões de vendas e saúde financeira da sua operação.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="px-3.5 py-1.5 rounded-xl bg-bg-surface border border-border text-xs flex items-center gap-2">
+            <PhoneCall className="w-3.5 h-3.5 text-[#25D366]" />
+            <span className="text-secondary">Meta Cloud API:</span>
+            <strong className="text-emerald-400 font-medium">Ativa</strong>
+          </div>
+        </div>
       </div>
 
-      {/* KPI cards */}
+      {/* Checklist Onboarding */}
       <LaunchChecklist />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+      {/* ═══ KPI CARDS ═══ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Total Leads"
+          label="Total de Leads"
           value={kpis.total_leads}
-          hint="Histórico acumulado"
+          hint="Histórico total acumulado"
           Icon={Users}
+          color="from-blue-500/10 to-indigo-500/5"
+          border="border-blue-500/20"
+          accent="text-blue-400"
         />
         <KpiCard
-          label="Últimos 7 dias"
+          label="Leads (7 dias)"
           value={kpis.leads_7d}
-          hint={`${kpis.leads_30d} no mês`}
+          hint={`${kpis.leads_30d} nos últimos 30 dias`}
           Icon={Activity}
-          accent="text-accent-amethyst"
-          bgAccent="bg-accent-amethyst/5"
+          color="from-purple-500/10 to-violet-500/5"
+          border="border-purple-500/20"
+          accent="text-purple-400"
         />
         <KpiCard
-          label="Convertidos"
+          label="Vendas Confirmadas"
           value={kpis.convertidos}
-          hint={`${kpis.conversion_rate}% de taxa`}
-          Icon={CheckCircle}
-          accent="text-emerald-500"
-          valueAccent="text-emerald-500"
-          bgAccent="bg-emerald-500/5"
+          hint={`${kpis.conversion_rate}% de conversão`}
+          Icon={CheckCircle2}
+          color="from-emerald-500/15 to-[#25D366]/5"
+          border="border-emerald-500/30"
+          accent="text-emerald-400"
+          valueAccent="text-emerald-400"
         />
         <KpiCard
           label="Sessões Ativas"
           value={kpis.ativas}
           hint={`${kpis.pausadas} em pausa · ${kpis.opt_out} saídas`}
           Icon={PauseCircle}
-          accent="text-accent-ember"
-          bgAccent="bg-accent-ember/5"
+          color="from-amber-500/10 to-orange-500/5"
+          border="border-amber-500/20"
+          accent="text-amber-400"
         />
       </div>
 
-      {/* Charts */}
+      {/* ═══ GRÁFICOS FINANCEIROS E CONVERSÕES ═══ */}
       {exec && series.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Panel
             title="Performance Financeira"
-            subtitle="Receita vs Lucro (7d)"
+            subtitle="Receita vs Lucro (7 dias)"
             Icon={DollarSign}
-            iconAccent="text-accent-ember"
+            iconAccent="text-emerald-400"
             metric={`Hoje: ${brl(exec.revenue_today ?? 0)}`}
           >
-            <div className="h-[250px] mt-6">
+            <div className="h-[260px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={series} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={series} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={CHART.ember} stopOpacity={0.2} />
+                      <stop offset="0%" stopColor={CHART.ember} stopOpacity={0.25} />
                       <stop offset="100%" stopColor={CHART.ember} stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="profGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={CHART.amethyst} stopOpacity={0.15} />
+                      <stop offset="0%" stopColor={CHART.amethyst} stopOpacity={0.2} />
                       <stop offset="100%" stopColor={CHART.amethyst} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} opacity={0.5} />
+                  <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="label"
                     stroke={CHART.axis}
-                    fontSize={10}
+                    fontSize={11}
                     tickLine={false}
                     axisLine={false}
-                    dy={10}
+                    dy={8}
                   />
                   <YAxis
                     stroke={CHART.axis}
-                    fontSize={10}
+                    fontSize={11}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => `R$${v}`}
                   />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
                     formatter={(v: number) => brl(v)}
-                    cursor={{ stroke: 'var(--border-primary)', strokeWidth: 1 }}
+                    cursor={{ stroke: 'rgba(255, 255, 255, 0.1)', strokeWidth: 1 }}
                   />
                   <Area
                     type="monotone"
                     dataKey="revenue_brl"
                     stroke={CHART.ember}
                     fill="url(#revGrad)"
-                    strokeWidth={3}
+                    strokeWidth={2.5}
                     name="Receita"
-                    animationDuration={1500}
+                    animationDuration={1200}
                   />
                   <Area
                     type="monotone"
@@ -174,12 +197,12 @@ export default function Dashboard() {
                     stroke={CHART.amethyst}
                     fill="url(#profGrad)"
                     strokeWidth={2}
-                    strokeDasharray="5 5"
+                    strokeDasharray="4 4"
                     name="Lucro"
-                    animationDuration={2000}
+                    animationDuration={1500}
                   />
                   <Legend
-                    wrapperStyle={{ fontSize: 11, fontWeight: 'bold', paddingTop: 20 }}
+                    wrapperStyle={{ fontSize: 11, fontWeight: 'bold', paddingTop: 16 }}
                     iconType="circle"
                     iconSize={8}
                   />
@@ -190,41 +213,41 @@ export default function Dashboard() {
 
           <Panel
             title="Volume de Conversões"
-            subtitle="Vendas confirmadas"
-            Icon={Activity}
-            iconAccent="text-accent-amethyst"
+            subtitle="Checkout confirmados"
+            Icon={TrendingUp}
+            iconAccent="text-indigo-400"
             metric={`Hoje: ${exec.sales_count_today ?? 0} vendas`}
           >
-            <div className="h-[250px] mt-6">
+            <div className="h-[260px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={series} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} opacity={0.5} />
+                  <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="label"
                     stroke={CHART.axis}
-                    fontSize={10}
+                    fontSize={11}
                     tickLine={false}
                     axisLine={false}
-                    dy={10}
+                    dy={8}
                   />
                   <YAxis
                     stroke={CHART.axis}
-                    fontSize={10}
+                    fontSize={11}
                     tickLine={false}
                     axisLine={false}
                     allowDecimals={false}
                   />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    cursor={{ fill: 'var(--bg-primary)', opacity: 0.4 }}
+                    cursor={{ fill: 'rgba(255, 255, 255, 0.03)' }}
                   />
                   <Bar
                     dataKey="transactions_count"
                     fill={CHART.amethyst}
                     radius={[6, 6, 0, 0]}
                     name="Vendas"
-                    barSize={32}
-                    animationDuration={1500}
+                    barSize={28}
+                    animationDuration={1200}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -233,28 +256,32 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Funil */}
-      <Panel title="Distribuição de Contatos" subtitle="Principais etapas do funil de vendas">
+      {/* ═══ FUNIL DE CONTATOS ═══ */}
+      <Panel
+        title="Distribuição por Etapa do Funil"
+        subtitle="Posição atual dos leads cadastrados"
+        Icon={Sparkles}
+        iconAccent="text-purple-400"
+      >
         {kpis.node_distribution && kpis.node_distribution.length > 0 ? (
-          <div className="grid gap-4 mt-8">
+          <div className="grid gap-3.5 mt-6">
             {kpis.node_distribution.map((nd, idx) => {
               const maxCount = kpis.node_distribution[0].count;
-              const width =
-                maxCount > 0 ? Math.round((nd.count / maxCount) * 100) : 0;
+              const width = maxCount > 0 ? Math.round((nd.count / maxCount) * 100) : 0;
               return (
                 <div key={idx} className="group">
-                  <div className="flex justify-between items-end text-xs mb-2">
-                    <span className="font-black text-primary uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">
-                       {nd.node}
+                  <div className="flex justify-between items-end text-xs mb-1.5">
+                    <span className="font-bold text-primary opacity-80 group-hover:opacity-100 transition-opacity">
+                      {nd.node}
                     </span>
-                    <span className="font-mono font-black text-accent-amethyst text-sm">
-                      {nd.count}
+                    <span className="font-mono font-bold text-indigo-400 text-xs">
+                      {nd.count} leads ({width}%)
                     </span>
                   </div>
-                  <div className="w-full h-3 bg-bg-primary rounded-full overflow-hidden border border-border/50 p-0.5">
+                  <div className="w-full h-2.5 bg-bg-primary rounded-full overflow-hidden border border-border p-0.5">
                     <div
-                      className="h-full bg-gradient-to-r from-accent-amethyst to-accent-ember rounded-full transition-all duration-1000 ease-out shadow-sm"
-                      style={{ width: `${width}%` }}
+                      className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all duration-1000 ease-out shadow-sm"
+                      style={{ width: `${Math.max(width, 2)}%` }}
                     />
                   </div>
                 </div>
@@ -262,10 +289,8 @@ export default function Dashboard() {
             })}
           </div>
         ) : (
-          <div className="py-12 text-center">
-            <p className="text-sm text-secondary italic">
-              Nenhum dado de movimentação detectado no funil até o momento.
-            </p>
+          <div className="py-12 text-center text-xs text-secondary italic">
+            Nenhum contato ativo em etapas no momento. Leads novos aparecerão aqui automaticamente.
           </div>
         )}
       </Panel>
@@ -274,12 +299,13 @@ export default function Dashboard() {
 }
 
 const tooltipStyle = {
-  backgroundColor: 'var(--bg-surface)',
-  border: '1px solid var(--border-border)',
+  backgroundColor: '#18181b',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
   borderRadius: '12px',
-  padding: '12px',
-  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-  color: 'var(--text-primary)',
+  padding: '10px 14px',
+  fontSize: '12px',
+  color: '#f4f4f5',
+  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
 };
 
 function KpiCard({
@@ -287,37 +313,38 @@ function KpiCard({
   value,
   hint,
   Icon,
+  color = 'from-bg-surface to-bg-surface',
+  border = 'border-border',
   accent = 'text-secondary',
   valueAccent = 'text-primary',
-  bgAccent = 'bg-bg-primary',
 }: {
   label: string;
   value: number;
   hint: string;
   Icon: typeof Users;
+  color?: string;
+  border?: string;
   accent?: string;
   valueAccent?: string;
-  bgAccent?: string;
 }) {
   return (
-    <div className="bg-bg-surface border border-border rounded-3xl p-6 hover:shadow-xl hover:-translate-y-1 transition-all group overflow-hidden relative">
-      <div className={`absolute top-0 right-0 w-24 h-24 ${bgAccent} rounded-bl-full opacity-50 -mr-8 -mt-8 transition-transform group-hover:scale-110`} />
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-[10px] text-secondary font-black uppercase tracking-[0.15em]">
-            {label}
-          </div>
-          <div className={`p-2 rounded-xl ${bgAccent} ${accent}`}>
-            <Icon className="w-4 h-4" strokeWidth={2.5} />
-          </div>
+    <div
+      className={`bg-gradient-to-br ${color} bg-bg-surface border ${border} rounded-3xl p-5 hover:shadow-lg transition-all group overflow-hidden relative`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] text-secondary font-bold uppercase tracking-wider">
+          {label}
+        </span>
+        <div className={`p-2 rounded-xl bg-bg-primary/80 border border-border/50 ${accent}`}>
+          <Icon className="w-4 h-4" />
         </div>
-        <div className={`font-black text-4xl leading-none tracking-tight ${valueAccent} tabular-nums`}>
-          {value}
-        </div>
-        <div className="text-[11px] text-secondary font-bold mt-4 flex items-center gap-2">
-           <span className="w-1 h-1 rounded-full bg-border" />
-           {hint}
-        </div>
+      </div>
+      <div className={`font-mono font-black text-3xl leading-none tracking-tight ${valueAccent} tabular-nums`}>
+        {value}
+      </div>
+      <div className="text-[10px] text-secondary mt-3 flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-border" />
+        {hint}
       </div>
     </div>
   );
@@ -327,7 +354,7 @@ function Panel({
   title,
   subtitle,
   Icon,
-  iconAccent = 'text-accent-amethyst',
+  iconAccent = 'text-indigo-400',
   metric,
   children,
 }: {
@@ -339,28 +366,28 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-bg-surface border border-border rounded-[32px] p-8 shadow-sm hover:shadow-md transition-shadow">
-      <header className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
+    <section className="bg-bg-surface border border-border rounded-3xl p-6 sm:p-7 shadow-sm">
+      <header className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
           {Icon && (
-            <div className={`p-3 rounded-2xl bg-bg-primary ${iconAccent} border border-border/50 shadow-sm`}>
-               <Icon className="w-5 h-5" strokeWidth={2.5} />
+            <div className={`p-2.5 rounded-2xl bg-bg-primary border border-border ${iconAccent}`}>
+              <Icon className="w-4 h-4" />
             </div>
           )}
           <div>
-            <h3 className="font-black text-lg text-primary leading-tight tracking-tight">
+            <h3 className="font-bold text-base text-primary leading-snug">
               {title}
             </h3>
             {subtitle && (
-              <span className="text-[10px] text-secondary font-black uppercase tracking-widest opacity-60 mt-1 block">
+              <span className="text-[11px] text-secondary block mt-0.5">
                 {subtitle}
               </span>
             )}
           </div>
         </div>
         {metric && (
-          <div className="bg-bg-primary px-4 py-1.5 rounded-full border border-border shadow-inner">
-             <span className="text-[11px] font-black text-primary tabular-nums uppercase tracking-tighter">{metric}</span>
+          <div className="bg-bg-primary px-3 py-1 rounded-full border border-border">
+            <span className="text-xs font-mono font-bold text-primary">{metric}</span>
           </div>
         )}
       </header>

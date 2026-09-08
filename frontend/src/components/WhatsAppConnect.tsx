@@ -133,7 +133,12 @@ export default function WhatsAppConnect() {
   };
 
   if (isLoading) {
-    return <div className="text-secondary text-sm py-6">Carregando…</div>;
+    return (
+      <div className="flex items-center justify-center p-12 text-secondary text-sm">
+        <RefreshCw className="w-5 h-5 animate-spin mr-2 text-emerald-500" />
+        Carregando credenciais Meta...
+      </div>
+    );
   }
 
   const binding = data?.binding;
@@ -142,16 +147,19 @@ export default function WhatsAppConnect() {
     draft.phone_number_id.trim().length >= 6;
 
   return (
-    <div className="space-y-5">
-      <header className="flex items-start justify-between gap-4 border-b border-sibila-mist/50 pb-5">
+    <div className="space-y-6">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
-          <h3 className="text-3xl font-display text-sibila-moonlight tracking-tight flex items-center gap-3">
-            <Phone className="w-8 h-8 text-sibila-amethyst" />
-            WhatsApp Cloud API
-          </h3>
-          <p className="text-sm text-sibila-smoke mt-2 leading-relaxed max-w-2xl">
-            Conecte seu número oficial Meta WhatsApp Business. O fluxo de credenciais é encriptado 
-            e gerido individualmente por Workspace *(Tenant)*.
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[#25D366]">
+              <Phone className="w-4 h-4" />
+            </div>
+            <h3 className="text-xl font-bold text-primary tracking-tight">
+              Meta Cloud API Oficial
+            </h3>
+          </div>
+          <p className="text-xs text-secondary mt-1.5 leading-relaxed max-w-2xl">
+            Credenciais encriptadas ponta-a-ponta e isoladas por Workspace. Permite envio de mensagens ativas, botões de ação e Webhooks em tempo real.
           </p>
         </div>
         {binding && !editing && (
@@ -161,7 +169,7 @@ export default function WhatsAppConnect() {
                 removeMut.mutate();
               }
             }}
-            className="px-4 py-2 bg-sibila-rose/10 border border-sibila-rose/30 text-sibila-rose hover:bg-sibila-rose hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm self-start sm:self-auto"
           >
             <Trash2 className="w-4 h-4" />
             Remover Conexão
@@ -219,39 +227,37 @@ export default function WhatsAppConnect() {
 
 function EmptyState({ onStart, webhookUrl }: { onStart: () => void; webhookUrl: string }) {
   return (
-    <div className="bg-gradient-to-br from-sibila-obsidian/40 to-sibila-veil/20 border border-dashed border-sibila-mist/60 rounded-2xl p-10 text-center space-y-5 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-sibila-amethyst/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="relative z-10 w-20 h-20 mx-auto rounded-full bg-sibila-veil border border-sibila-mist flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-        <Webhook className="w-10 h-10 text-sibila-amethyst" strokeWidth={1.5} />
+    <div className="bg-bg-surface border border-dashed border-border rounded-2xl p-8 text-center space-y-5 relative overflow-hidden">
+      <div className="relative z-10 w-16 h-16 mx-auto rounded-2xl bg-[#25D366]/10 border border-[#25D366]/20 flex items-center justify-center text-[#25D366] shadow-lg">
+        <Webhook className="w-8 h-8" strokeWidth={1.5} />
       </div>
       <div className="relative z-10">
-        <div className="text-xl font-display text-sibila-moonlight mb-2">Nenhum número conectado</div>
-        <p className="text-sm text-sibila-fog max-w-md mx-auto leading-relaxed">
-          Você precisa de um App aprovado no Meta Business e um número de telefone da API Nuvem
-          com um Token de Usuário de Sistema Permanente.
+        <div className="text-lg font-bold text-primary mb-1">Nenhum número conectado</div>
+        <p className="text-xs text-secondary max-w-md mx-auto leading-relaxed">
+          Você precisa de um App aprovado no Meta Business e um número de telefone com Token de Usuário de Sistema permanente.
         </p>
       </div>
-      <div className="relative z-10 inline-flex flex-col items-center gap-2 bg-sibila-veil/50 border border-sibila-mist/50 px-6 py-4 rounded-xl shadow-inner mt-4">
-        <span className="text-[10px] uppercase tracking-widest text-sibila-smoke font-bold">Webhook URL Gerada:</span>
-        <code className="text-xs font-mono text-sibila-moonlight bg-sibila-obsidian/50 px-3 py-1.5 rounded-lg border border-sibila-mist/30">
+      <div className="relative z-10 inline-flex flex-col items-center gap-1.5 bg-bg-primary border border-border px-5 py-3 rounded-xl">
+        <span className="text-[10px] uppercase tracking-wider text-secondary font-bold">Callback URL gerada para seu tenant:</span>
+        <code className="text-xs font-mono text-primary bg-bg-surface px-3 py-1 rounded-lg border border-border">
           {webhookUrl}
         </code>
       </div>
-      <div className="relative z-10 pt-4 flex flex-col items-center gap-4">
+      <div className="relative z-10 pt-2 flex flex-col items-center gap-3">
         <button
           onClick={onStart}
-          className="px-8 py-3 bg-gradient-to-r from-sibila-amethyst to-[#9d89c4] hover:brightness-110 text-white rounded-xl text-sm font-bold uppercase tracking-widest shadow-[0_0_20px_rgba(124,106,153,0.3)] transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+          className="px-6 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:brightness-110 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg shadow-[#25D366]/20 transition-all"
         >
-          Iniciar Conexão Meta
+          Inserir Credenciais Meta
         </button>
         <a
           href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs text-sibila-amethyst hover:text-sibila-moonlight hover:underline transition-colors font-medium"
+          className="inline-flex items-center gap-1.5 text-xs text-secondary hover:text-primary transition-colors font-medium"
         >
           <ExternalLink className="w-3.5 h-3.5" />
-          Ler Documentação Oficial da Meta
+          Documentação Oficial da Meta
         </a>
       </div>
     </div>
@@ -278,26 +284,26 @@ function BindingView({
     active: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]',
     pending: 'text-amber-400 bg-amber-500/10 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]',
     failed: 'text-rose-400 bg-rose-500/10 border-rose-500/30 shadow-[0_0_15px_rgba(225,29,72,0.15)]',
-  }[binding.status] || 'text-sibila-fog bg-sibila-veil border-sibila-mist';
+  }[binding.status] || 'text-secondary bg-bg-primary border-border';
 
   return (
-    <div className="bg-sibila-obsidian/40 border border-sibila-mist/50 rounded-2xl p-6 space-y-4 shadow-inset-veil backdrop-blur-sm">
-      <div className="flex items-center justify-between pb-3 border-b border-sibila-mist/30">
+    <div className="bg-bg-surface border border-border rounded-2xl p-6 space-y-4">
+      <div className="flex items-center justify-between pb-3 border-b border-border">
         <div className="flex items-center gap-3">
           {binding.status === 'active' ? (
-            <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center animate-pulse">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center animate-pulse">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
             </div>
           )}
-          <span className="font-display text-2xl text-sibila-moonlight tracking-tight">
+          <span className="font-mono text-lg font-bold text-primary tracking-tight">
             {binding.display_phone_number || binding.phone_number_id}
           </span>
         </div>
-        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-md border ${statusColor}`}>
+        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${statusColor}`}>
           {binding.status}
         </span>
       </div>
@@ -316,54 +322,54 @@ function BindingView({
         <Row label="Webhook URL global (fallback)" value={webhookUrlGlobal} onCopy={onCopy} mono />
       )}
 
-      <div className="grid grid-cols-2 gap-4 text-xs pt-2">
-        <div className="bg-sibila-veil/30 p-3 rounded-xl border border-sibila-mist/30">
-          <span className="text-[10px] uppercase tracking-widest text-sibila-smoke block mb-1 font-bold">Verify Token</span>
-          <span className="text-sibila-moonlight font-medium">{binding.has_verify_token ? '✓ Definido no Tenant' : '— Global .env'}</span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+        <div className="bg-bg-primary p-3 rounded-xl border border-border">
+          <span className="text-[10px] uppercase tracking-wider text-secondary block mb-0.5 font-bold">Verify Token</span>
+          <span className="text-primary font-medium">{binding.has_verify_token ? '✓ Definido no Tenant' : '— Global .env'}</span>
         </div>
-        <div className="bg-sibila-veil/30 p-3 rounded-xl border border-sibila-mist/30">
-          <span className="text-[10px] uppercase tracking-widest text-sibila-smoke block mb-1 font-bold">App Secret</span>
-          <span className="text-sibila-moonlight font-medium">{binding.has_app_secret ? '✓ Definido no Tenant' : '— Global .env'}</span>
+        <div className="bg-bg-primary p-3 rounded-xl border border-border">
+          <span className="text-[10px] uppercase tracking-wider text-secondary block mb-0.5 font-bold">App Secret</span>
+          <span className="text-primary font-medium">{binding.has_app_secret ? '✓ Definido no Tenant' : '— Global .env'}</span>
         </div>
       </div>
 
       {binding.last_verified_at && (
-        <div className="text-[11px] text-sibila-smoke flex items-center gap-1.5">
-          <Shield className="w-3.5 h-3.5" />
+        <div className="text-[11px] text-secondary flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-emerald-400" />
           Última validação da Graph API: {new Date(binding.last_verified_at).toLocaleString('pt-BR')}
         </div>
       )}
       {binding.last_error && (
-        <div className="text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 shadow-inner">
+        <div className="text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
           <strong>Erro na última verificação:</strong> {binding.last_error}
         </div>
       )}
 
-      <div className="bg-sibila-veil/50 border border-sibila-mist rounded-xl p-4 text-[11px] shadow-inner">
+      <div className="bg-bg-primary border border-border rounded-xl p-3.5 text-[11px]">
         <div className="flex items-center gap-3">
           {binding.subscribed_at ? (
             <>
-              <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               </div>
-              <span className="text-emerald-400 font-bold text-sm tracking-wide">Webhooks Subscritos no WABA</span>
-              <span className="text-sibila-smoke text-[10px] ml-auto font-medium">
+              <span className="text-emerald-400 font-bold text-xs">Webhooks Subscritos no WABA</span>
+              <span className="text-secondary text-[10px] ml-auto font-mono">
                 {new Date(binding.subscribed_at).toLocaleString('pt-BR')}
               </span>
             </>
           ) : (
             <>
-              <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center animate-pulse">
+              <div className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center animate-pulse">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
               </div>
-              <span className="text-amber-400 font-bold text-sm tracking-wide">App não subscrita aos Webhooks WABA</span>
+              <span className="text-amber-400 font-bold text-xs">App não subscrita aos Webhooks WABA</span>
               <button
                 onClick={onSubscribe}
                 disabled={subscribing}
-                className="ml-auto text-xs text-sibila-amethyst hover:text-sibila-moonlight hover:underline font-bold flex items-center gap-1.5 transition-colors"
+                className="ml-auto text-xs text-blue-400 hover:text-blue-300 hover:underline font-bold flex items-center gap-1.5 transition-colors"
               >
                 <RefreshCw className={`w-3 h-3 ${subscribing ? 'animate-spin' : ''}`} />
-                {subscribing ? 'Subscrevendo…' : 'Tentar subscrever'}
+                {subscribing ? 'Subscrevendo…' : 'Subscrever'}
               </button>
             </>
           )}
@@ -373,30 +379,30 @@ function BindingView({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3 pt-4 border-t border-sibila-mist/50">
+      <div className="flex flex-wrap gap-2.5 pt-3 border-t border-border">
         <button
           onClick={onEdit}
-          className="px-4 py-2 bg-sibila-veil/50 hover:bg-sibila-veil border border-sibila-mist hover:border-sibila-amethyst/50 rounded-xl text-xs font-bold text-sibila-moonlight flex items-center gap-2 transition-all shadow-sm"
+          className="px-3.5 py-2 bg-bg-primary hover:bg-bg-surface border border-border hover:border-[#25D366]/40 rounded-xl text-xs font-bold text-primary flex items-center gap-2 transition-all shadow-sm"
         >
-          <KeyRound className="w-3.5 h-3.5 text-sibila-amethyst" />
+          <KeyRound className="w-3.5 h-3.5 text-[#25D366]" />
           Atualizar Credenciais
         </button>
         <button
           onClick={onRotate}
           disabled={rotating}
-          className="px-4 py-2 bg-sibila-veil/50 hover:bg-sibila-veil border border-sibila-mist hover:border-sibila-amethyst/50 rounded-xl text-xs font-bold text-sibila-moonlight flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
+          className="px-3.5 py-2 bg-bg-primary hover:bg-bg-surface border border-border hover:border-amber-500/40 rounded-xl text-xs font-bold text-primary flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
         >
-          <RefreshCw className={`w-3.5 h-3.5 text-sibila-amethyst ${rotating ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${rotating ? 'animate-spin' : ''}`} />
           Rotacionar Verify Token
         </button>
         {binding.webhook_path && (
           <button
             onClick={onRotatePath}
             disabled={rotatingPath}
-            className="px-4 py-2 bg-sibila-veil/50 hover:bg-sibila-veil border border-sibila-mist hover:border-sibila-amethyst/50 rounded-xl text-xs font-bold text-sibila-moonlight flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
-            title="Gera nova URL per-tenant (defesa em profundidade)"
+            className="px-3.5 py-2 bg-bg-primary hover:bg-bg-surface border border-border hover:border-blue-500/40 rounded-xl text-xs font-bold text-primary flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
+            title="Gera nova URL per-tenant"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-sibila-amethyst ${rotatingPath ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-blue-400 ${rotatingPath ? 'animate-spin' : ''}`} />
             Rotacionar Webhook URL
           </button>
         )}
@@ -404,7 +410,6 @@ function BindingView({
     </div>
   );
 }
-
 
 function InboundTelemetry({
   binding,
@@ -414,41 +419,41 @@ function InboundTelemetry({
   const hasInbound = (binding.inbound_count || 0) > 0;
   return (
     <div
-      className={`rounded-2xl p-6 border shadow-inner transition-colors duration-500 ${
+      className={`rounded-2xl p-5 border transition-colors ${
         hasInbound
-          ? 'bg-emerald-500/10 border-emerald-500/30'
-          : 'bg-amber-500/10 border-amber-500/30'
+          ? 'bg-emerald-500/5 border-emerald-500/20'
+          : 'bg-amber-500/5 border-amber-500/20'
       }`}
     >
-      <div className="flex items-center gap-3 mb-4">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${hasInbound ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${hasInbound ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
           {hasInbound ? (
-            <Inbox className="w-4 h-4 text-emerald-400" />
+            <Inbox className="w-4 h-4" />
           ) : (
-            <Activity className="w-4 h-4 text-amber-400 animate-pulse" />
+            <Activity className="w-4 h-4 animate-pulse" />
           )}
         </div>
-        <span className={`text-[11px] font-bold uppercase tracking-widest ${hasInbound ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {hasInbound ? 'Recebendo Webhooks Ativamente' : 'Aguardando 1ª Mensagem (Teste Necessário)'}
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${hasInbound ? 'text-emerald-400' : 'text-amber-400'}`}>
+          {hasInbound ? 'Recebendo Webhooks Ativamente' : 'Aguardando 1ª Mensagem do Chip'}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px]">
-        <div className="bg-sibila-obsidian/30 p-3 rounded-xl border border-sibila-mist/30">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-sibila-smoke">Total Recebido</div>
-          <div className="text-2xl font-black tabular-nums mt-1 text-sibila-moonlight">{binding.inbound_count}</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
+        <div className="bg-bg-primary p-3 rounded-xl border border-border">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-secondary">Total Recebido</div>
+          <div className="text-xl font-black tabular-nums mt-0.5 text-primary">{binding.inbound_count}</div>
         </div>
-        <div className="bg-sibila-obsidian/30 p-3 rounded-xl border border-sibila-mist/30">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-sibila-smoke">Primeira Mensagem</div>
-          <div className="text-xs font-bold mt-2 text-sibila-moonlight">
+        <div className="bg-bg-primary p-3 rounded-xl border border-border">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-secondary">Primeira Mensagem</div>
+          <div className="text-xs font-mono font-bold mt-1 text-primary">
             {binding.first_inbound_at
               ? new Date(binding.first_inbound_at).toLocaleString('pt-BR')
               : '—'}
           </div>
         </div>
-        <div className="bg-sibila-obsidian/30 p-3 rounded-xl border border-sibila-mist/30">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-sibila-smoke">Última Mensagem</div>
-          <div className="text-xs font-bold mt-2 text-sibila-moonlight">
+        <div className="bg-bg-primary p-3 rounded-xl border border-border">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-secondary">Última Mensagem</div>
+          <div className="text-xs font-mono font-bold mt-1 text-primary">
             {binding.last_inbound_at
               ? new Date(binding.last_inbound_at).toLocaleString('pt-BR')
               : '—'}
@@ -457,16 +462,14 @@ function InboundTelemetry({
       </div>
 
       {!hasInbound && (
-        <p className="text-xs text-sibila-fog mt-4 flex items-center gap-2 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-          <AlertTriangle className="w-4 h-4 text-amber-400" />
-          Envie uma mensagem do seu próprio celular para o número conectado para ativar o webhook. 
-          Costuma chegar em 1-2 segundos.
+        <p className="text-xs text-secondary mt-3 flex items-center gap-2 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 text-amber-200">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          Envie um "Oi" do seu celular pessoal para o número conectado para validar o webhook em tempo real.
         </p>
       )}
     </div>
   );
 }
-
 
 function ObservabilityPanel() {
   const statsQ = useQuery({
@@ -483,9 +486,7 @@ function ObservabilityPanel() {
   const stats = statsQ.data;
   const logs = logsQ.data?.logs ?? [];
 
-  if (!stats) {
-    return null;
-  }
+  if (!stats) return null;
 
   const events = stats.events_last_24h || {};
   const errorEvents = ['error', 'rate_limited', 'hmac_invalid', 'tenant_resolve_miss'].filter(
@@ -502,80 +503,78 @@ function ObservabilityPanel() {
   };
 
   return (
-    <div className="bg-sibila-obsidian/40 border border-sibila-mist/50 rounded-2xl p-6 space-y-4 shadow-inset-veil backdrop-blur-sm">
-      <div className="flex items-center justify-between border-b border-sibila-mist/30 pb-3">
-        <h4 className="text-xs font-bold uppercase tracking-widest text-sibila-moonlight flex items-center gap-2">
-          <Activity className="w-4 h-4 text-sibila-amethyst" />
+    <div className="bg-bg-surface border border-border rounded-2xl p-6 space-y-4">
+      <div className="flex items-center justify-between border-b border-border pb-3">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
+          <Activity className="w-4 h-4 text-emerald-400" />
           Observabilidade do Webhook
         </h4>
         {hasErrors && (
-          <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1.5 px-2 py-1 bg-amber-500/10 rounded-lg border border-amber-500/20">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            {errorEvents.length} tipo{errorEvents.length === 1 ? '' : 's'} de erro nas últimas 24h
+          <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 rounded-lg border border-amber-500/20">
+            <AlertTriangle className="w-3 h-3" />
+            {errorEvents.length} erro{errorEvents.length === 1 ? '' : 's'} (24h)
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px]">
-        <div className="bg-sibila-veil/50 border border-sibila-mist/40 rounded-xl p-4 shadow-inner">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-sibila-smoke mb-1">Capacidade / Rate Atual</div>
-          <div className="text-xl font-black tabular-nums text-sibila-moonlight">
-            {stats.rate_limiter.tokens_remaining}<span className="text-sibila-fog text-sm font-medium">/{stats.rate_limiter.burst_capacity}</span>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
+        <div className="bg-bg-primary border border-border rounded-xl p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-secondary mb-0.5">Taxa de Processamento</div>
+          <div className="text-lg font-black tabular-nums text-primary">
+            {stats.rate_limiter.tokens_remaining}<span className="text-secondary text-xs font-medium">/{stats.rate_limiter.burst_capacity}</span>
           </div>
-          <div className="text-[10px] text-sibila-fog mt-1">
-            Recarrega a {stats.rate_limiter.rate_per_min}/min
-          </div>
+          <div className="text-[10px] text-secondary mt-0.5">Recarrega a {stats.rate_limiter.rate_per_min}/min</div>
         </div>
-        <div className="bg-sibila-veil/50 border border-sibila-mist/40 rounded-xl p-4 shadow-inner">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-sibila-smoke mb-1">Eventos 24h</div>
-          <div className="text-xl font-black tabular-nums text-sibila-moonlight">
+        <div className="bg-bg-primary border border-border rounded-xl p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-secondary mb-0.5">Eventos 24h</div>
+          <div className="text-lg font-black tabular-nums text-primary">
             {Object.values(events).reduce((a, b) => a + b, 0)}
           </div>
-          <div className="text-[10px] text-sibila-fog mt-1">Requisições processadas</div>
+          <div className="text-[10px] text-secondary mt-0.5">Requisições processadas</div>
         </div>
-        <div className="bg-sibila-veil/50 border border-sibila-mist/40 rounded-xl p-4 shadow-inner">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-sibila-smoke mb-1">Total Histórico</div>
-          <div className="text-xl font-black tabular-nums text-sibila-moonlight">
+        <div className="bg-bg-primary border border-border rounded-xl p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-secondary mb-0.5">Total Histórico</div>
+          <div className="text-lg font-black tabular-nums text-primary">
             {stats.inbound_count_total}
           </div>
-          <div className="text-[10px] text-sibila-fog mt-1">Desde a conexão inicial</div>
+          <div className="text-[10px] text-secondary mt-0.5">Desde o primeiro binding</div>
         </div>
       </div>
 
       {hasErrors && (
         <div className="space-y-1.5 bg-rose-500/5 p-3 rounded-xl border border-rose-500/20">
-          <div className="text-[10px] uppercase tracking-widest text-rose-400 font-bold mb-2">Erros Detectados</div>
+          <div className="text-[10px] uppercase tracking-wider text-rose-400 font-bold mb-1">Erros Detectados</div>
           {errorEvents.map((evt) => (
-            <div key={evt} className={`text-xs font-bold flex items-center justify-between bg-sibila-obsidian/50 px-3 py-1.5 rounded-lg border border-sibila-mist/30 ${eventColor[evt] || 'text-sibila-smoke'}`}>
+            <div key={evt} className={`text-xs font-bold flex items-center justify-between bg-bg-primary px-3 py-1.5 rounded-lg border border-border ${eventColor[evt] || 'text-secondary'}`}>
               <span className="uppercase">{evt}</span>
-              <span className="tabular-nums px-2 py-0.5 bg-sibila-veil rounded-md">{events[evt]}</span>
+              <span className="tabular-nums px-2 py-0.5 bg-bg-surface rounded-md">{events[evt]}</span>
             </div>
           ))}
         </div>
       )}
 
       {logs.length > 0 && (
-        <details className="group border border-sibila-mist/30 rounded-xl overflow-hidden bg-sibila-veil/30">
-          <summary className="cursor-pointer text-xs text-sibila-moonlight uppercase tracking-widest font-bold list-none flex items-center justify-between p-4 hover:bg-sibila-veil/50 transition-colors">
+        <details className="group border border-border rounded-xl overflow-hidden bg-bg-primary">
+          <summary className="cursor-pointer text-xs text-primary uppercase tracking-wider font-bold list-none flex items-center justify-between p-3 hover:bg-bg-surface transition-colors">
             <div className="flex items-center gap-2">
               <span className="group-open:rotate-90 transition-transform">▸</span>
               Logs Recentes de Webhook
             </div>
-            <span className="text-[10px] text-sibila-smoke bg-sibila-obsidian px-2 py-1 rounded-md">{logs.length} registros</span>
+            <span className="text-[10px] text-secondary bg-bg-surface border border-border px-2 py-0.5 rounded-md">{logs.length} registros</span>
           </summary>
-          <div className="px-4 pb-4 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+          <div className="px-3 pb-3 space-y-1.5 max-h-56 overflow-y-auto">
             {logs.map((log) => (
               <div
                 key={log.id}
-                className="bg-sibila-obsidian/50 border border-sibila-mist/30 rounded-lg p-3 text-[11px] flex items-start gap-3 shadow-inner"
+                className="bg-bg-surface border border-border rounded-lg p-2.5 text-[11px] flex items-start gap-2.5"
               >
-                <span className={`font-bold uppercase tracking-widest px-2 py-0.5 rounded-md text-[9px] ${
-                  eventColor[log.event_type] ? eventColor[log.event_type].replace('text-', 'bg-').replace('400', '500/20') + ' ' + eventColor[log.event_type] : 'bg-sibila-mist/20 text-sibila-smoke'
-                } flex-shrink-0`}>
+                <span className={`font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-[9px] ${
+                  eventColor[log.event_type] ? eventColor[log.event_type].replace('text-', 'bg-').replace('400', '500/20') + ' ' + eventColor[log.event_type] : 'bg-border text-secondary'
+                } shrink-0`}>
                   {log.event_type}
                 </span>
-                <span className="text-sibila-fog font-mono truncate flex-1 leading-relaxed">{log.message || 'Sem descrição'}</span>
-                <span className="text-sibila-smoke text-[9px] flex-shrink-0 tabular-nums">
+                <span className="text-secondary font-mono truncate flex-1">{log.message || 'Sem descrição'}</span>
+                <span className="text-secondary text-[9px] shrink-0 font-mono">
                   {new Date(log.created_at).toLocaleTimeString('pt-BR')}
                 </span>
               </div>
@@ -586,7 +585,6 @@ function ObservabilityPanel() {
     </div>
   );
 }
-
 
 function TestSendForm() {
   const [to, setTo] = useState('');
@@ -618,11 +616,11 @@ function TestSendForm() {
   const valid = to.trim().replace(/[^0-9]/g, '').length >= 10;
 
   return (
-    <div className="bg-sibila-obsidian/40 border border-sibila-mist/50 rounded-2xl p-6 space-y-4 shadow-inset-veil backdrop-blur-sm">
-      <div className="flex items-center gap-2 mb-2 border-b border-sibila-mist/30 pb-3">
-        <Send className="w-4 h-4 text-sibila-amethyst" />
-        <h4 className="text-xs font-bold uppercase tracking-widest text-sibila-moonlight">
-          Enviar mensagem de teste
+    <div className="bg-bg-surface border border-border rounded-2xl p-6 space-y-4">
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <Send className="w-4 h-4 text-emerald-400" />
+        <h4 className="text-xs font-bold uppercase tracking-wider text-primary">
+          Enviar Mensagem de Teste Direto
         </h4>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_auto] gap-3">
@@ -631,40 +629,39 @@ function TestSendForm() {
           value={to}
           onChange={(e) => setTo(e.target.value)}
           placeholder="55119xxxxxxxx"
-          className="bg-sibila-veil/50 border border-sibila-mist/60 focus:border-sibila-amethyst/50 focus:ring-1 focus:ring-sibila-amethyst/50 rounded-xl px-4 py-2.5 text-xs font-mono text-sibila-moonlight outline-none transition-all shadow-inner"
+          className="bg-bg-primary border border-border focus:border-[#25D366] rounded-xl px-3.5 py-2 text-xs font-mono text-primary outline-none transition-all"
         />
         <input
           type="text"
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Mensagem (deixe vazio pra usar default)"
-          className="bg-sibila-veil/50 border border-sibila-mist/60 focus:border-sibila-amethyst/50 focus:ring-1 focus:ring-sibila-amethyst/50 rounded-xl px-4 py-2.5 text-xs text-sibila-moonlight outline-none transition-all shadow-inner"
+          placeholder="Mensagem (deixe vazio para usar mensagem padrão de teste)"
+          className="bg-bg-primary border border-border focus:border-[#25D366] rounded-xl px-3.5 py-2 text-xs text-primary outline-none transition-all"
           maxLength={500}
         />
         <button
           onClick={() => sendMut.mutate()}
           disabled={!valid || sendMut.isPending}
-          className="px-6 py-2.5 bg-gradient-to-r from-sibila-amethyst to-[#9d89c4] hover:brightness-110 disabled:opacity-30 disabled:hover:brightness-100 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(124,106,153,0.3)] transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+          className="px-5 py-2 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:brightness-110 disabled:opacity-40 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
         >
           {sendMut.isPending ? 'Enviando…' : 'Enviar Teste'}
         </button>
       </div>
-      <div className="text-[10px] text-sibila-smoke">
-        Número em formato E.164 sem o '+'. Exemplo: <code className="bg-sibila-obsidian/50 px-1.5 py-0.5 rounded border border-sibila-mist/30">5511999999999</code>.
-        <br />*Custos normais da Meta Cloud API serão aplicados.
+      <div className="text-[10px] text-secondary">
+        Formato E.164 (com DDI e DDD, sem símbolos). Ex: <code className="bg-bg-primary px-1.5 py-0.5 rounded border border-border">556981051492</code>.
       </div>
       {result && (
         <div
-          className={`text-[11px] flex items-start gap-1.5 p-3 rounded-xl border ${
+          className={`text-xs flex items-start gap-2 p-3 rounded-xl border ${
             result.ok ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-rose-400 bg-rose-500/10 border-rose-500/30'
           }`}
         >
           {result.ok ? (
-            <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
           ) : (
-            <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
           )}
-          <span className="font-medium">
+          <span>
             {result.ok
               ? `Enviado com sucesso! WAMID: ${result.message_id}`
               : `Erro: ${result.message}`}
@@ -684,16 +681,16 @@ function Row({
   mono?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-xs border-b border-sibila-mist/20 pb-2 last:border-0 last:pb-0">
-      <span className="text-sibila-smoke uppercase tracking-widest text-[10px] font-bold">{label}</span>
+    <div className="flex items-center justify-between gap-3 text-xs border-b border-border/50 pb-2.5 last:border-0 last:pb-0">
+      <span className="text-secondary uppercase tracking-wider text-[10px] font-bold">{label}</span>
       <div className="flex items-center gap-2 min-w-0">
-        <code className={`bg-sibila-obsidian/50 border border-sibila-mist/40 px-2 py-1 rounded-md shadow-inner text-sibila-moonlight truncate ${mono ? 'font-mono' : ''}`}>
+        <code className={`bg-bg-primary border border-border px-2 py-1 rounded-lg text-primary truncate ${mono ? 'font-mono' : ''}`}>
           {value}
         </code>
         <button
           onClick={() => onCopy(value, `${label} copiado`)}
-          className="text-sibila-smoke hover:text-sibila-amethyst transition-colors p-1 bg-sibila-veil/50 hover:bg-sibila-veil rounded-md border border-transparent hover:border-sibila-mist/50 flex-shrink-0"
-          title="Copiar para a área de transferência"
+          className="text-secondary hover:text-primary transition-colors p-1 bg-bg-primary hover:bg-bg-surface rounded-lg border border-border shrink-0"
+          title="Copiar"
         >
           <Copy className="w-3.5 h-3.5" />
         </button>
@@ -728,23 +725,20 @@ function EditForm({
   isUpdate: boolean;
 }) {
   return (
-    <div className="bg-sibila-obsidian/40 border border-sibila-mist/50 rounded-2xl p-6 space-y-5 shadow-inset-veil backdrop-blur-sm relative overflow-hidden">
-      {/* Decorative gradient blob */}
-      <div className="absolute -top-24 -right-24 w-48 h-48 bg-sibila-amethyst/20 rounded-full blur-3xl pointer-events-none" />
-
-      <Field label="Access Token (System User Permanente)" hint="Acesse o Painel Meta → Business Settings → Users → System Users → Generate Token. Requer as permissões: whatsapp_business_messaging e whatsapp_business_management.">
-        <div className="relative group">
+    <div className="bg-bg-surface border border-border rounded-2xl p-6 space-y-5">
+      <Field label="Access Token Permanente (System User)" hint="Painel Meta → Business Settings → Users → System Users → Generate Token. Permissões necessárias: whatsapp_business_messaging e whatsapp_business_management.">
+        <div className="relative">
           <input
             type={showSecret ? 'text' : 'password'}
             value={draft.access_token}
             onChange={(e) => setDraft({ ...draft, access_token: e.target.value })}
             placeholder="EAAB..."
-            className="w-full bg-sibila-veil/50 border border-sibila-mist/60 focus:border-sibila-amethyst/50 focus:ring-1 focus:ring-sibila-amethyst/50 rounded-xl px-4 py-3 text-xs font-mono text-sibila-moonlight outline-none transition-all shadow-inner pr-10"
+            className="w-full bg-bg-primary border border-border focus:border-[#25D366] rounded-xl px-4 py-2.5 text-xs font-mono text-primary outline-none transition-all pr-10"
           />
           <button
             type="button"
             onClick={() => setShowSecret(!showSecret)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-sibila-smoke hover:text-sibila-amethyst transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-secondary hover:text-primary transition-colors"
           >
             {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
@@ -752,68 +746,68 @@ function EditForm({
       </Field>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Phone Number ID" hint="ID numérico do seu número de telefone registrado na Meta.">
+        <Field label="Phone Number ID" hint="ID numérico do número registrado na Meta Developer.">
           <input
             type="text"
             value={draft.phone_number_id}
             onChange={(e) => setDraft({ ...draft, phone_number_id: e.target.value })}
-            placeholder="123456789012345"
-            className="w-full bg-sibila-veil/50 border border-sibila-mist/60 focus:border-sibila-amethyst/50 focus:ring-1 focus:ring-sibila-amethyst/50 rounded-xl px-4 py-3 text-xs font-mono text-sibila-moonlight outline-none transition-all shadow-inner"
+            placeholder="Ex: 574220792437648"
+            className="w-full bg-bg-primary border border-border focus:border-[#25D366] rounded-xl px-4 py-2.5 text-xs font-mono text-primary outline-none transition-all"
           />
         </Field>
 
-        <Field label="WABA ID" hint="WhatsApp Business Account ID (Recomendado para otimizar conexão).">
+        <Field label="WABA ID" hint="WhatsApp Business Account ID.">
           <input
             type="text"
             value={draft.waba_id}
             onChange={(e) => setDraft({ ...draft, waba_id: e.target.value })}
-            placeholder="987654321098765"
-            className="w-full bg-sibila-veil/50 border border-sibila-mist/60 focus:border-sibila-amethyst/50 focus:ring-1 focus:ring-sibila-amethyst/50 rounded-xl px-4 py-3 text-xs font-mono text-sibila-moonlight outline-none transition-all shadow-inner"
+            placeholder="Ex: 112233445566778"
+            className="w-full bg-bg-primary border border-border focus:border-[#25D366] rounded-xl px-4 py-2.5 text-xs font-mono text-primary outline-none transition-all"
           />
         </Field>
       </div>
 
-      <Field label="App Secret (Avançado)" hint="Utilizado para validação HMAC avançada do webhook isolado por Tenant. Deixe vazio para usar a segurança global.">
+      <Field label="App Secret (Opcional)" hint="Utilizado para validação de assinatura HMAC dos webhooks. Deixe vazio para usar segurança padrão.">
         <input
           type="password"
           value={draft.app_secret}
           onChange={(e) => setDraft({ ...draft, app_secret: e.target.value })}
-          placeholder="(Deixe vazio para usar configuração global)"
-          className="w-full bg-sibila-veil/50 border border-sibila-mist/60 focus:border-sibila-amethyst/50 focus:ring-1 focus:ring-sibila-amethyst/50 rounded-xl px-4 py-3 text-xs font-mono text-sibila-moonlight outline-none transition-all shadow-inner"
+          placeholder="(Opcional)"
+          className="w-full bg-bg-primary border border-border focus:border-[#25D366] rounded-xl px-4 py-2.5 text-xs font-mono text-primary outline-none transition-all"
         />
       </Field>
 
-      <Field label="Verify Token Customizado" hint="Se vazio, o sistema de segurança gerará um token criptográfico robusto e aleatório.">
+      <Field label="Verify Token Customizado (Opcional)" hint="Token para validação inicial do webhook na Meta. Se vazio, será gerado automaticamente.">
         <input
           type="text"
           value={draft.verify_token}
           onChange={(e) => setDraft({ ...draft, verify_token: e.target.value })}
-          placeholder="(Gerar Automaticamente)"
-          className="w-full bg-sibila-veil/50 border border-sibila-mist/60 focus:border-sibila-amethyst/50 focus:ring-1 focus:ring-sibila-amethyst/50 rounded-xl px-4 py-3 text-xs font-mono text-sibila-moonlight outline-none transition-all shadow-inner"
+          placeholder="(Gerar automaticamente)"
+          className="w-full bg-bg-primary border border-border focus:border-[#25D366] rounded-xl px-4 py-2.5 text-xs font-mono text-primary outline-none transition-all"
         />
       </Field>
 
-      <label className="flex items-center gap-3 text-xs text-sibila-smoke cursor-pointer hover:text-sibila-moonlight transition-colors p-2 bg-sibila-veil/30 rounded-xl border border-sibila-mist/30">
+      <label className="flex items-center gap-3 text-xs text-secondary cursor-pointer hover:text-primary transition-colors p-2.5 bg-bg-primary rounded-xl border border-border">
         <input
           type="checkbox"
           checked={draft.skip_validation}
           onChange={(e) => setDraft({ ...draft, skip_validation: e.target.checked })}
-          className="w-4 h-4 rounded border-sibila-mist text-sibila-amethyst focus:ring-sibila-amethyst bg-sibila-obsidian"
+          className="w-4 h-4 rounded border-border text-[#25D366] focus:ring-[#25D366] bg-bg-surface"
         />
-        Pular validação estrita contra Meta Graph API (Use apenas em ambiente local / dev offline)
+        Pular validação imediata contra Meta Graph API (útil para pré-cadastro em desenvolvimento)
       </label>
 
-      <div className="flex items-center gap-4 pt-4 border-t border-sibila-mist/50">
+      <div className="flex items-center gap-4 pt-3 border-t border-border">
         <button
           onClick={onTest}
           disabled={!validDraft || testing}
-          className="px-5 py-2.5 bg-sibila-veil/50 border border-sibila-mist hover:border-sibila-amethyst/50 disabled:opacity-50 disabled:hover:border-sibila-mist rounded-xl text-xs font-bold flex items-center gap-2 text-sibila-moonlight transition-all shadow-sm"
+          className="px-4 py-2.5 bg-bg-primary border border-border hover:border-[#25D366]/50 disabled:opacity-40 rounded-xl text-xs font-bold flex items-center gap-2 text-primary transition-all shadow-sm"
         >
-          <Shield className="w-4 h-4 text-sibila-amethyst" />
+          <Shield className="w-4 h-4 text-[#25D366]" />
           {testing ? 'Testando Conexão...' : 'Validar Credenciais'}
         </button>
         {testResult && (
-          <span className={`text-xs font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-lg border shadow-inner ${testResult.ok ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-rose-400 bg-rose-500/10 border-rose-500/30'}`}>
+          <span className={`text-xs font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${testResult.ok ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-rose-400 bg-rose-500/10 border-rose-500/30'}`}>
             {testResult.ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
             {testResult.message}
           </span>
@@ -823,16 +817,16 @@ function EditForm({
       <div className="flex gap-3 pt-2">
         <button
           onClick={onCancel}
-          className="flex-1 px-5 py-3 bg-sibila-veil/50 hover:bg-sibila-veil border border-sibila-mist rounded-xl text-xs font-bold text-sibila-moonlight transition-colors"
+          className="flex-1 px-4 py-2.5 bg-bg-primary hover:bg-bg-surface border border-border rounded-xl text-xs font-bold text-secondary hover:text-primary transition-colors"
         >
-          Cancelar Edição
+          Cancelar
         </button>
         <button
           onClick={onSave}
           disabled={!validDraft || saving}
-          className="flex-[2] px-5 py-3 bg-gradient-to-r from-sibila-amethyst to-[#9d89c4] hover:brightness-110 disabled:opacity-50 disabled:hover:brightness-100 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-[0_0_15px_rgba(124,106,153,0.3)] transition-all transform hover:scale-[1.01] active:scale-[0.99]"
+          className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:brightness-110 disabled:opacity-40 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all"
         >
-          {saving ? 'Gravando no Cofre...' : (isUpdate ? 'Atualizar Conexão' : 'Conectar à Nuvem')}
+          {saving ? 'Gravando...' : (isUpdate ? 'Atualizar Conexão' : 'Conectar Meta WhatsApp')}
         </button>
       </div>
     </div>
@@ -846,49 +840,48 @@ function SetupInstructions({
   onCopy: (t: string, l?: string) => void;
 }) {
   return (
-    <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 space-y-4 shadow-inner">
-      <h4 className="text-base font-display flex items-center gap-2 text-amber-400">
-        <Webhook className="w-5 h-5" />
-        Configure o Webhook na Meta Business
+    <div className="bg-amber-500/5 border border-amber-500/25 rounded-2xl p-6 space-y-4">
+      <h4 className="text-sm font-bold flex items-center gap-2 text-amber-400">
+        <Webhook className="w-4 h-4" />
+        Configuração do Webhook no Meta Business Manager
       </h4>
-      <p className="text-xs text-amber-200/70">
-        Para finalizar, você precisa informar à Meta para onde enviar as mensagens recebidas.
-        Copie os dados abaixo e cole no painel da Meta Cloud API.
+      <p className="text-xs text-secondary leading-relaxed">
+        Cole a URL de retorno e o token de verificação na seção <strong>WhatsApp &gt; Configuração &gt; Webhook</strong> do seu Meta App:
       </p>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px]">
-        <div className="bg-sibila-obsidian/50 border border-amber-500/20 rounded-xl p-4">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-amber-300/60 mb-1.5">Callback URL (Webhook)</div>
-          <div className="flex items-center justify-between gap-3 bg-sibila-veil/50 border border-sibila-mist/30 px-3 py-2 rounded-lg">
-            <code className="font-mono text-xs text-amber-100 truncate">{data.webhook_url}</code>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+        <div className="bg-bg-primary border border-border rounded-xl p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-secondary mb-1">Callback URL (Webhook)</div>
+          <div className="flex items-center justify-between gap-2 bg-bg-surface border border-border px-3 py-2 rounded-lg">
+            <code className="font-mono text-xs text-primary truncate">{data.webhook_url}</code>
             <button
-              onClick={() => onCopy(data.webhook_url, 'URL copiada com sucesso!')}
-              className="text-amber-300 hover:text-white transition-colors bg-amber-500/10 hover:bg-amber-500/30 p-1.5 rounded-md"
-              title="Copiar Callback URL"
+              onClick={() => onCopy(data.webhook_url, 'URL copiada!')}
+              className="text-secondary hover:text-primary p-1 rounded"
+              title="Copiar"
             >
-              <Copy className="w-4 h-4" />
+              <Copy className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
-        <div className="bg-sibila-obsidian/50 border border-amber-500/20 rounded-xl p-4">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-amber-300/60 mb-1.5">Verify Token (Token de Verificação)</div>
-          <div className="flex items-center justify-between gap-3 bg-sibila-veil/50 border border-sibila-mist/30 px-3 py-2 rounded-lg">
-            <code className="font-mono text-xs text-amber-100 truncate">{data.verify_token}</code>
+        <div className="bg-bg-primary border border-border rounded-xl p-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-secondary mb-1">Verify Token</div>
+          <div className="flex items-center justify-between gap-2 bg-bg-surface border border-border px-3 py-2 rounded-lg">
+            <code className="font-mono text-xs text-primary truncate">{data.verify_token}</code>
             <button
-              onClick={() => onCopy(data.verify_token, 'Token copiado com sucesso!')}
-              className="text-amber-300 hover:text-white transition-colors bg-amber-500/10 hover:bg-amber-500/30 p-1.5 rounded-md"
-              title="Copiar Verify Token"
+              onClick={() => onCopy(data.verify_token, 'Token copiado!')}
+              className="text-secondary hover:text-primary p-1 rounded"
+              title="Copiar"
             >
-              <Copy className="w-4 h-4" />
+              <Copy className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       </div>
-      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 mt-2">
-        <h5 className="text-[10px] uppercase tracking-widest font-bold text-amber-300/80 mb-2">Instruções Passo a Passo</h5>
-        <ol className="text-xs text-amber-100/90 space-y-2 list-decimal list-inside pl-1">
+      <div className="bg-bg-primary/50 border border-border rounded-xl p-3.5 mt-2">
+        <h5 className="text-[10px] uppercase tracking-wider font-bold text-secondary mb-1.5">Passo a Passo</h5>
+        <ol className="text-xs text-secondary space-y-1 list-decimal list-inside pl-1">
           {data.instructions.map((step, i) => (
-            <li key={i} className="pl-1 leading-relaxed border-l-2 border-amber-500/30 ml-1.5">{step}</li>
+            <li key={i} className="leading-relaxed">{step}</li>
           ))}
         </ol>
       </div>
@@ -905,11 +898,11 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-xs font-bold uppercase tracking-wider text-sibila-moonlight ml-1">
+      <label className="block text-xs font-bold text-primary">
         {label}
       </label>
       {children}
-      {hint && <p className="text-[10px] text-sibila-smoke ml-1 leading-relaxed max-w-lg">{hint}</p>}
+      {hint && <p className="text-[11px] text-secondary leading-relaxed">{hint}</p>}
     </div>
   );
 }

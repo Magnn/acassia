@@ -27,6 +27,13 @@ import { toast } from '../lib/toast';
 // Modelos pré-definidos de inicialização rápida
 const STARTER_TEMPLATES = [
   {
+    id: 'meu_misterio',
+    title: 'Funil Meu Mistério (Tarot & Pix)',
+    desc: '7 etapas completas: acolhimento da Cigana, áudios, tiragem de cartas e checkout de R$ 9,90 via Pix.',
+    badge: '⚡ Meu Mistério Oficial',
+    color: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30',
+  },
+  {
     id: 'comercial',
     title: 'Funil Comercial & Vendas',
     desc: 'Apresentação de produtos, qualificação de interesse e direcionamento para fechamento.',

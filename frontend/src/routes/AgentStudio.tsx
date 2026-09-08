@@ -753,10 +753,11 @@ function WhatsAppSimulator({
   faqs: { q: string; a: string }[];
   onClose: () => void;
 }) {
+  const initialGreeting = `Olá! Sou ${agentName || 'o assistente virtual'}. Como posso te ajudar hoje?`;
   const [messages, setMessages] = useState<{ sender: 'user' | 'bot'; text: string; time: string }[]>([
     {
       sender: 'bot',
-      text: `Olá! Sou ${agentName || 'o assistente virtual'}. Como posso te ajudar hoje?`,
+      text: initialGreeting,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -768,28 +769,30 @@ function WhatsAppSimulator({
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const handleSend = () => {
-    if (!input.trim() || isTyping) return;
-    const userMsg = input.trim();
+  const handleSend = (customText?: string) => {
+    const userMsg = (customText ?? input).trim();
+    if (!userMsg || isTyping) return;
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     setMessages((prev) => [...prev, { sender: 'user', text: userMsg, time }]);
-    setInput('');
+    if (!customText) setInput('');
     setIsTyping(true);
 
     // Simulação inteligente baseada em FAQs locais ou prompt
     setTimeout(() => {
       let botResponse = '';
       const matchedFaq = faqs.find((f) =>
-        f.q && userMsg.toLowerCase().includes(f.q.toLowerCase().slice(0, 15))
+        f.q && userMsg.toLowerCase().includes(f.q.toLowerCase().slice(0, 12))
       );
 
       if (matchedFaq && matchedFaq.a) {
         botResponse = matchedFaq.a;
       } else if (knowledge && knowledge.toLowerCase().includes(userMsg.toLowerCase().slice(0, 10))) {
-        botResponse = `Com base nas nossas informações: temos exatamente o que você procura! Quer que eu te envie o link direto para contratação?`;
+        botResponse = `Com base nas informações cadastradas: temos exatamente o que você procura! Quer que eu te envie o link direto para contratação?`;
+      } else if (userMsg.toLowerCase().includes('preço') || userMsg.toLowerCase().includes('valor')) {
+        botResponse = `A consulta completa custa apenas R$ 9,90 via Pix com liberação imediata. Deseja que eu gere o seu código Pix agora?`;
       } else {
-        botResponse = `Entendido! Estou processando seu pedido de acordo com as diretrizes da empresa. Posso tirar mais alguma dúvida específica?`;
+        botResponse = `Entendido! Estou respondendo conforme as diretrizes do seu atendente de IA. Posso te ajudar com algo mais específico?`;
       }
 
       setMessages((prev) => [
@@ -801,7 +804,17 @@ function WhatsAppSimulator({
         },
       ]);
       setIsTyping(false);
-    }, 1200);
+    }, 1100);
+  };
+
+  const handleReset = () => {
+    setMessages([
+      {
+        sender: 'bot',
+        text: initialGreeting,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
   };
 
   return (
@@ -809,56 +822,88 @@ function WhatsAppSimulator({
       {/* WhatsApp Header */}
       <div className="bg-[#202c33] px-4 py-3 flex items-center justify-between border-b border-zinc-800">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-sm font-black text-white">
+          <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center text-sm font-black text-white shadow-md">
             {agentName.charAt(0).toUpperCase() || 'A'}
           </div>
           <div>
-            <div className="text-sm font-bold text-zinc-100">{agentName} (Simulação)</div>
+            <div className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+              <span>{agentName}</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-mono">
+                Simulador Oficial
+              </span>
+            </div>
             <div className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              online
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              online no WhatsApp
             </div>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="text-xs text-zinc-400 hover:text-zinc-100 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 transition-all font-bold"
-        >
-          Fechar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleReset}
+            className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-700/60 transition-all"
+            title="Reiniciar conversa"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="text-xs text-zinc-300 hover:text-white px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-all font-bold"
+          >
+            Fechar
+          </button>
+        </div>
       </div>
 
       {/* WhatsApp Chat Area */}
-      <div className="h-72 p-4 overflow-y-auto space-y-3 bg-[radial-gradient(#111b21_1px,transparent_1px)] [background-size:16px_16px]">
+      <div className="h-80 p-4 overflow-y-auto space-y-3 bg-[#0b141a] bg-[radial-gradient(#182229_1px,transparent_1px)] [background-size:16px_16px]">
         {messages.map((m, i) => (
           <div
             key={i}
             className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${
+              className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${
                 m.sender === 'user'
-                  ? 'bg-[#005c4b] text-zinc-100 rounded-br-none'
+                  ? 'bg-[#005c4b] text-white rounded-br-none'
                   : 'bg-[#202c33] text-zinc-100 rounded-bl-none'
               }`}
             >
-              <p className="leading-relaxed">{m.text}</p>
-              <span className="text-[9px] text-zinc-400 float-right mt-1 ml-2 font-mono">
-                {m.time}
-              </span>
+              <p className="leading-relaxed whitespace-pre-wrap">{m.text}</p>
+              <div className="flex items-center justify-end gap-1 mt-1 font-mono text-[9px] text-zinc-400">
+                <span>{m.time}</span>
+                {m.sender === 'user' && (
+                  <span className="text-[#53bdeb] font-bold">✓✓</span>
+                )}
+              </div>
             </div>
           </div>
         ))}
 
         {isTyping && (
-          <div className="flex items-center gap-1 bg-[#202c33] text-zinc-400 text-xs px-3 py-2 rounded-xl w-fit">
+          <div className="flex items-center gap-1.5 bg-[#202c33] text-zinc-400 text-xs px-3.5 py-2 rounded-2xl rounded-bl-none w-fit shadow-md">
             <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" />
             <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.2s]" />
             <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.4s]" />
-            <span className="text-[11px] font-medium ml-1">digitando...</span>
+            <span className="text-[10px] text-emerald-400 font-medium ml-1">digitando...</span>
           </div>
         )}
         <div ref={endRef} />
+      </div>
+
+      {/* Quick Suggestions Chips */}
+      <div className="px-3 py-2 bg-[#111b21] border-t border-zinc-800 flex items-center gap-1.5 overflow-x-auto">
+        <span className="text-[10px] font-bold text-zinc-500 uppercase shrink-0">Testes rápidos:</span>
+        {['Oi, como funciona?', 'Qual o valor da consulta?', 'Aceita Pix?'].map((suggestion) => (
+          <button
+            key={suggestion}
+            type="button"
+            onClick={() => handleSend(suggestion)}
+            className="text-[11px] px-2.5 py-1 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white shrink-0 transition-colors border border-zinc-700/60"
+          >
+            {suggestion}
+          </button>
+        ))}
       </div>
 
       {/* WhatsApp Input Footer */}
@@ -868,13 +913,13 @@ function WhatsAppSimulator({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Envie uma mensagem para testar o bot..."
-          className="flex-1 bg-[#2a3942] border border-transparent focus:border-emerald-500 rounded-xl px-4 py-2 text-xs text-zinc-100 placeholder:text-zinc-400 focus:outline-none transition-all"
+          placeholder="Digite uma mensagem como cliente..."
+          className="flex-1 bg-[#2a3942] border border-transparent focus:border-[#25D366] rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder:text-zinc-400 focus:outline-none transition-all"
         />
         <button
-          onClick={handleSend}
+          onClick={() => handleSend()}
           disabled={!input.trim() || isTyping}
-          className="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white flex items-center justify-center transition-all shadow-md active:scale-95"
+          className="w-10 h-10 rounded-xl bg-[#00a884] hover:bg-[#008f6f] disabled:opacity-40 text-white flex items-center justify-center transition-all shadow-md active:scale-95 shrink-0"
         >
           <Send className="w-4 h-4" />
         </button>

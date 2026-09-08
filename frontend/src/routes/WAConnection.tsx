@@ -1,8 +1,14 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { QrCode, RefreshCw, AlertTriangle, CheckCircle2, Unplug, ShieldCheck, Signal, Phone, ExternalLink, Zap, Plus, Star, Trash2, X, Save } from 'lucide-react';
+import {
+  QrCode, RefreshCw, AlertTriangle, CheckCircle2, ShieldCheck, Signal, Phone,
+  ExternalLink, Zap, Plus, Star, Trash2, X, Save, KeyRound, Globe, Smartphone,
+  MessageSquare, Send, BookOpen, Copy, Sparkles,
+} from 'lucide-react';
 import { api } from '../api/client';
 import { toast } from '../lib/toast';
+import WhatsAppConnect from '../components/WhatsAppConnect';
 
 const WaLogo = ({ className = 'w-8 h-8' }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -16,13 +22,39 @@ const MetaLogo = ({ className = 'w-4 h-4' }: { className?: string }) => (
   </svg>
 );
 
-interface Device { id: number; nickname: string; provider: string; phone_display: string | null; connected: boolean; connection_state: string | null; is_primary: boolean; groups_count: number; created_at: string | null; flow_mode?: 'static_funnel' | 'ai_agent' | 'flow_builder'; }
+interface Device {
+  id: number;
+  nickname: string;
+  provider: string;
+  phone_display: string | null;
+  connected: boolean;
+  connection_state: string | null;
+  is_primary: boolean;
+  groups_count: number;
+  created_at: string | null;
+  flow_mode?: 'static_funnel' | 'ai_agent' | 'flow_builder';
+}
+
+type TabKey = 'devices' | 'meta_keys' | 'channels';
 
 export default function WAConnection() {
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab: TabKey = (searchParams.get('tab') as TabKey) || 'devices';
+
   const [showAdd, setShowAdd] = useState(false);
   const [showMetaModal, setShowMetaModal] = useState(false);
-  const [form, setForm] = useState({ nickname: '', provider: 'meta_cloud', phone_display: '', meta_phone_number_id: '', meta_waba_id: '', meta_access_token: '', evolution_server_url: '', evolution_instance: '', evolution_api_key: '' });
+  const [form, setForm] = useState({
+    nickname: '',
+    provider: 'meta_cloud',
+    phone_display: '',
+    meta_phone_number_id: '',
+    meta_waba_id: '',
+    meta_access_token: '',
+    evolution_server_url: '',
+    evolution_instance: '',
+    evolution_api_key: '',
+  });
 
   const { data } = useQuery({ queryKey: ['devices'], queryFn: () => api.get<any>('/saas/devices/') });
   const devices: Device[] = data?.devices || [];
@@ -34,17 +66,41 @@ export default function WAConnection() {
 
   const createMut = useMutation({
     mutationFn: (d: any) => api.post('/saas/devices/', d),
-    onSuccess: () => { toast.success('Dispositivo criado!'); qc.invalidateQueries({ queryKey: ['devices'] }); setShowAdd(false); setForm({ nickname: '', provider: 'meta_cloud', phone_display: '', meta_phone_number_id: '', meta_waba_id: '', meta_access_token: '', evolution_server_url: '', evolution_instance: '', evolution_api_key: '' }); },
-    onError: (e: any) => toast.error(e?.message || 'Erro'),
+    onSuccess: () => {
+      toast.success('Dispositivo criado!');
+      qc.invalidateQueries({ queryKey: ['devices'] });
+      setShowAdd(false);
+      setForm({
+        nickname: '',
+        provider: 'meta_cloud',
+        phone_display: '',
+        meta_phone_number_id: '',
+        meta_waba_id: '',
+        meta_access_token: '',
+        evolution_server_url: '',
+        evolution_instance: '',
+        evolution_api_key: '',
+      });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Erro ao criar dispositivo'),
   });
+
   const deleteMut = useMutation({
     mutationFn: (id: number) => api.del(`/saas/devices/${id}`),
-    onSuccess: () => { toast.success('Removido'); qc.invalidateQueries({ queryKey: ['devices'] }); },
+    onSuccess: () => {
+      toast.success('Dispositivo removido');
+      qc.invalidateQueries({ queryKey: ['devices'] });
+    },
   });
+
   const primaryMut = useMutation({
     mutationFn: (id: number) => api.post(`/saas/devices/${id}/set-primary`, {}),
-    onSuccess: () => { toast.success('Dispositivo principal definido!'); qc.invalidateQueries({ queryKey: ['devices'] }); },
+    onSuccess: () => {
+      toast.success('Dispositivo principal definido!');
+      qc.invalidateQueries({ queryKey: ['devices'] });
+    },
   });
+
   const flowModeMut = useMutation({
     mutationFn: ({ id, mode }: { id: number; mode: string }) =>
       api.post(`/saas/devices/${id}/flow-mode`, { flow_mode: mode }),
@@ -59,107 +115,257 @@ export default function WAConnection() {
     onError: (e: any) => toast.error(e?.message || 'Erro ao alterar modo'),
   });
 
+  const setTab = (tab: TabKey) => {
+    setSearchParams({ tab });
+  };
+
   return (
-    <div className="px-8 py-8 max-w-[1100px] mx-auto min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
+    <div className="px-6 sm:px-8 py-8 max-w-6xl mx-auto min-h-screen text-primary space-y-8">
+      {/* ═══ CABEÇALHO UNIFICADO ═══ */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#25D366] to-[#128C7E] flex items-center justify-center shadow-lg shadow-[#25D366]/20">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#25D366] to-[#128C7E] flex items-center justify-center shadow-lg shadow-[#25D366]/20 shrink-0">
             <WaLogo className="w-7 h-7 text-white" />
           </div>
           <div>
-            <h1 className="font-display text-3xl text-primary tracking-tight">Conexão WhatsApp</h1>
-            <p className="text-xs text-secondary mt-0.5">{devices.length} dispositivo{devices.length !== 1 ? 's' : ''} cadastrado{devices.length !== 1 ? 's' : ''}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                Conexão & API Meta
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/25 uppercase tracking-wider">
+                Oficial
+              </span>
+            </div>
+            <p className="text-xs text-secondary mt-1 max-w-xl">
+              Central oficial de comunicação: configure números de WhatsApp, credenciais Meta Cloud API, webhooks e canais externos em um único lugar.
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setShowMetaModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-xl text-sm font-bold transition-all shadow-sm"
-          >
-            <MetaLogo className="w-4 h-4" /> Conectar via Meta
-          </button>
-          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-[#25D366]/20 transition-all">
-            <Plus className="w-4 h-4" /> Novo Dispositivo
-          </button>
-        </div>
+
+        {activeTab === 'devices' && (
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <button
+              onClick={() => setShowMetaModal(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0082FB]/10 hover:bg-[#0082FB]/20 text-[#0082FB] border border-[#0082FB]/30 rounded-xl text-xs font-bold transition-all shadow-sm"
+            >
+              <MetaLogo className="w-4 h-4" /> Conectar via Meta
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-[#25D366]/20 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Novo Dispositivo
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Grid de dispositivos */}
-      {devices.length === 0 && (
-        <div className="text-center py-20 bg-bg-surface border border-border rounded-2xl">
-          <Phone className="w-12 h-12 text-secondary mx-auto mb-4 opacity-30" />
-          <h3 className="text-lg font-bold text-primary mb-2">Nenhum dispositivo conectado</h3>
-          <p className="text-xs text-secondary mb-6">Adicione seu primeiro número WhatsApp para começar.</p>
-          <button onClick={() => setShowAdd(true)} className="px-6 py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-sm font-bold">
-            <Plus className="w-4 h-4 inline mr-2" /> Adicionar Dispositivo
-          </button>
+      {/* ═══ NAVEGAÇÃO ENTRE ABAS ═══ */}
+      <div className="flex items-center gap-2 p-1.5 bg-bg-surface border border-border rounded-2xl w-fit">
+        <button
+          onClick={() => setTab('devices')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'devices'
+              ? 'bg-[#25D366] text-white shadow-md shadow-[#25D366]/20'
+              : 'text-secondary hover:text-primary hover:bg-bg-primary'
+          }`}
+        >
+          <Smartphone className="w-4 h-4" />
+          <span>Meus Números</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+            activeTab === 'devices' ? 'bg-white/20 text-white' : 'bg-bg-primary text-secondary'
+          }`}>
+            {devices.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setTab('meta_keys')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'meta_keys'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+              : 'text-secondary hover:text-primary hover:bg-bg-primary'
+          }`}
+        >
+          <KeyRound className="w-4 h-4" />
+          <span>Credenciais Meta Cloud</span>
+        </button>
+
+        <button
+          onClick={() => setTab('channels')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'channels'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+              : 'text-secondary hover:text-primary hover:bg-bg-primary'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Webhooks & Canais Externos</span>
+        </button>
+      </div>
+
+      {/* ═══ CONTEÚDO DA ABA 1: DISPOSITIVOS & NÚMEROS ═══ */}
+      {activeTab === 'devices' && (
+        <div className="space-y-6">
+          {devices.length === 0 ? (
+            <div className="text-center py-16 bg-bg-surface border border-dashed border-border rounded-3xl p-8">
+              <Phone className="w-12 h-12 text-secondary mx-auto mb-3 opacity-30" />
+              <h3 className="text-lg font-bold text-primary mb-1">Nenhum número conectado</h3>
+              <p className="text-xs text-secondary mb-6 max-w-sm mx-auto">
+                Adicione seu primeiro número do WhatsApp via Meta Cloud API ou Evolution QR Code para começar a atender leads.
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setShowMetaModal(true)}
+                  className="px-5 py-2.5 bg-[#0082FB] hover:bg-[#0070db] text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-2"
+                >
+                  <MetaLogo className="w-4 h-4" /> Conectar via Meta
+                </button>
+                <button
+                  onClick={() => setShowAdd(true)}
+                  className="px-5 py-2.5 bg-bg-primary border border-border hover:bg-bg-surface text-primary rounded-xl text-xs font-bold flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Cadastro Manual
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {devices.map((d) => (
+                <DeviceCard
+                  key={d.id}
+                  device={d}
+                  onDelete={() => deleteMut.mutate(d.id)}
+                  onSetPrimary={() => primaryMut.mutate(d.id)}
+                  onSetFlowMode={(mode) => flowModeMut.mutate({ id: d.id, mode })}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {devices.map(d => (
-          <DeviceCard
-            key={d.id}
-            device={d}
-            onDelete={() => deleteMut.mutate(d.id)}
-            onSetPrimary={() => primaryMut.mutate(d.id)}
-            onSetFlowMode={(mode) => flowModeMut.mutate({ id: d.id, mode })}
-          />
-        ))}
-      </div>
+      {/* ═══ CONTEÚDO DA ABA 2: CREDENCIAIS META CLOUD API ═══ */}
+      {activeTab === 'meta_keys' && (
+        <div className="bg-bg-surface border border-border rounded-3xl p-6 sm:p-8 shadow-sm">
+          <WhatsAppConnect />
+        </div>
+      )}
+
+      {/* ═══ CONTEÚDO DA ABA 3: WEBHOOKS & CANAIS EXTERNOS ═══ */}
+      {activeTab === 'channels' && (
+        <ChannelsTab />
+      )}
 
       {/* Modal Novo Dispositivo */}
       {showAdd && (
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
-          <div onClick={e => e.stopPropagation()} className="bg-bg-surface border border-border rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+          <div onClick={(e) => e.stopPropagation()} className="bg-bg-surface border border-border rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
             <header className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <h3 className="font-display text-xl text-primary">Novo Dispositivo</h3>
-              <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg hover:bg-bg-primary text-secondary"><X className="w-4 h-4" /></button>
+              <h3 className="font-bold text-lg text-primary">Novo Dispositivo</h3>
+              <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg hover:bg-bg-primary text-secondary">
+                <X className="w-4 h-4" />
+              </button>
             </header>
             <div className="p-6 space-y-4">
               <div>
                 <label className="text-xs font-bold text-secondary block mb-1">Apelido *</label>
-                <input value={form.nickname} onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))} placeholder="Ex: Spanda VIP, Suporte, Vendas..." className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary" />
+                <input
+                  value={form.nickname}
+                  onChange={(e) => setForm((f) => ({ ...f, nickname: e.target.value }))}
+                  placeholder="Ex: WhatsApp Comercial, Vendas, Atendimento VIP..."
+                  className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary focus:outline-none focus:border-[#25D366]"
+                />
               </div>
               <div>
-                <label className="text-xs font-bold text-secondary block mb-1">Número do chip</label>
-                <input value={form.phone_display} onChange={e => setForm(f => ({ ...f, phone_display: e.target.value }))} placeholder="+55 11 99999-0000" className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary" />
+                <label className="text-xs font-bold text-secondary block mb-1">Número do chip (formato internacional)</label>
+                <input
+                  value={form.phone_display}
+                  onChange={(e) => setForm((f) => ({ ...f, phone_display: e.target.value }))}
+                  placeholder="+55 69 8105-1492"
+                  className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary focus:outline-none focus:border-[#25D366]"
+                />
               </div>
               <div>
                 <label className="text-xs font-bold text-secondary block mb-2">Provedor</label>
                 <div className="grid grid-cols-2 gap-3">
-                  {[{ id: 'meta_cloud', label: 'Meta Cloud API', sub: 'Oficial', color: 'from-[#0a1a12] to-[#0f2318]', border: 'border-[#25D366]/30' },
-                    { id: 'evolution', label: 'Evolution API', sub: 'QR Code', color: 'from-purple-900/30 to-purple-950/30', border: 'border-purple-500/30' }]
-                    .map(p => (
-                    <button key={p.id} type="button" onClick={() => setForm(f => ({ ...f, provider: p.id }))}
-                      className={`text-left p-4 rounded-xl border transition-all ${form.provider === p.id ? `bg-gradient-to-br ${p.color} ${p.border} ring-1 ring-white/10` : 'bg-bg-primary border-border hover:border-border'}`}>
-                      <div className="text-sm font-bold text-primary">{p.label}</div>
+                  {[
+                    { id: 'meta_cloud', label: 'Meta Cloud API', sub: 'Oficial Meta', color: 'from-[#0a1a12] to-[#0f2318]', border: 'border-[#25D366]/30' },
+                    { id: 'evolution', label: 'Evolution API', sub: 'QR Code', color: 'from-purple-900/20 to-purple-950/20', border: 'border-purple-500/30' },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, provider: p.id }))}
+                      className={`text-left p-3.5 rounded-xl border transition-all ${
+                        form.provider === p.id
+                          ? `bg-gradient-to-br ${p.color} ${p.border} ring-1 ring-[#25D366]/20`
+                          : 'bg-bg-primary border-border hover:border-border'
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-primary">{p.label}</div>
                       <div className="text-[10px] text-secondary">{p.sub}</div>
                     </button>
                   ))}
                 </div>
               </div>
               {form.provider === 'meta_cloud' && (
-                <div className="space-y-3 p-4 bg-[#0a1a12]/50 rounded-xl border border-[#25D366]/10">
-                  <input value={form.meta_phone_number_id} onChange={e => setForm(f => ({ ...f, meta_phone_number_id: e.target.value }))} placeholder="phone_number_id" className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-primary font-mono" />
-                  <input value={form.meta_waba_id} onChange={e => setForm(f => ({ ...f, meta_waba_id: e.target.value }))} placeholder="waba_id" className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-primary font-mono" />
-                  <input value={form.meta_access_token} onChange={e => setForm(f => ({ ...f, meta_access_token: e.target.value }))} placeholder="access_token" type="password" className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-primary font-mono" />
+                <div className="space-y-3 p-4 bg-[#0a1a12]/50 rounded-xl border border-[#25D366]/20">
+                  <input
+                    value={form.meta_phone_number_id}
+                    onChange={(e) => setForm((f) => ({ ...f, meta_phone_number_id: e.target.value }))}
+                    placeholder="phone_number_id (ex: 574220792437648)"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
+                  />
+                  <input
+                    value={form.meta_waba_id}
+                    onChange={(e) => setForm((f) => ({ ...f, meta_waba_id: e.target.value }))}
+                    placeholder="waba_id (ex: 9876543210)"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
+                  />
+                  <input
+                    value={form.meta_access_token}
+                    onChange={(e) => setForm((f) => ({ ...f, meta_access_token: e.target.value }))}
+                    placeholder="access_token permanente (EAAB...)"
+                    type="password"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
+                  />
                 </div>
               )}
               {form.provider === 'evolution' && (
-                <div className="space-y-3 p-4 bg-purple-900/10 rounded-xl border border-purple-500/10">
-                  <input value={form.evolution_server_url} onChange={e => setForm(f => ({ ...f, evolution_server_url: e.target.value }))} placeholder="https://evo.example.com" className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-primary font-mono" />
-                  <input value={form.evolution_instance} onChange={e => setForm(f => ({ ...f, evolution_instance: e.target.value }))} placeholder="instance_name" className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-primary font-mono" />
-                  <input value={form.evolution_api_key} onChange={e => setForm(f => ({ ...f, evolution_api_key: e.target.value }))} placeholder="api_key" type="password" className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-primary font-mono" />
+                <div className="space-y-3 p-4 bg-purple-900/10 rounded-xl border border-purple-500/20">
+                  <input
+                    value={form.evolution_server_url}
+                    onChange={(e) => setForm((f) => ({ ...f, evolution_server_url: e.target.value }))}
+                    placeholder="URL Servidor (ex: https://evo.example.com)"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
+                  />
+                  <input
+                    value={form.evolution_instance}
+                    onChange={(e) => setForm((f) => ({ ...f, evolution_instance: e.target.value }))}
+                    placeholder="Nome da Instância"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
+                  />
+                  <input
+                    value={form.evolution_api_key}
+                    onChange={(e) => setForm((f) => ({ ...f, evolution_api_key: e.target.value }))}
+                    placeholder="API Key"
+                    type="password"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
+                  />
                 </div>
               )}
             </div>
             <footer className="px-6 py-4 border-t border-border flex justify-end gap-3">
-              <button onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm text-secondary hover:text-primary">Cancelar</button>
-              <button onClick={() => createMut.mutate(form)} disabled={!form.nickname || createMut.isPending}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-sm font-bold disabled:opacity-40">
-                <Save className="w-4 h-4" /> {createMut.isPending ? 'Salvando...' : 'Criar Dispositivo'}
+              <button onClick={() => setShowAdd(false)} className="px-4 py-2 text-xs text-secondary hover:text-primary">
+                Cancelar
+              </button>
+              <button
+                onClick={() => createMut.mutate(form)}
+                disabled={!form.nickname || createMut.isPending}
+                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-xs font-bold disabled:opacity-40 shadow-sm"
+              >
+                <Save className="w-3.5 h-3.5" /> {createMut.isPending ? 'Salvando...' : 'Salvar Dispositivo'}
               </button>
             </footer>
           </div>
@@ -178,7 +384,7 @@ export default function WAConnection() {
           onFallbackManual={() => {
             setShowMetaModal(false);
             setShowAdd(true);
-            setForm(f => ({ ...f, provider: 'meta_cloud' }));
+            setForm((f) => ({ ...f, provider: 'meta_cloud' }));
           }}
         />
       )}
@@ -186,7 +392,7 @@ export default function WAConnection() {
   );
 }
 
-/* ── Device Card ─────────────────────────────── */
+/* ── Card de Dispositivo ─────────────────────────────── */
 function DeviceCard({
   device: d,
   onDelete,
@@ -214,66 +420,77 @@ function DeviceCard({
   const currentMode = d.flow_mode || 'static_funnel';
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border transition-all ${isConnected
-      ? 'bg-gradient-to-br from-[#0a1a12] to-[#0f2318] border-[#25D366]/20 hover:border-[#25D366]/40'
-      : 'bg-bg-surface border-border hover:border-amber-500/30'}`}>
-
-      {/* Glow effect when connected */}
-      {isConnected && <div className="absolute top-0 right-0 w-64 h-64 bg-[#25D366]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />}
+    <div
+      className={`relative overflow-hidden rounded-3xl border transition-all ${
+        isConnected
+          ? 'bg-gradient-to-br from-[#0a1a12] via-bg-surface to-[#0f2318] border-[#25D366]/30 shadow-xl shadow-[#25D366]/5'
+          : 'bg-bg-surface border-border hover:border-amber-500/30'
+      }`}
+    >
+      {/* Glow effect */}
+      {isConnected && (
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#25D366]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+      )}
 
       {/* Primary badge */}
       {d.is_primary && (
-        <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/25 z-10">
+        <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 z-10">
           <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-          <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">Principal</span>
+          <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider">Principal</span>
         </div>
       )}
 
       {/* Top section */}
-      <div className="relative px-6 pt-6 pb-5">
+      <div className="relative p-6">
         <div className="flex items-start gap-4">
-          {/* Logo */}
-          <div className="relative flex-shrink-0">
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg ${isConnected ? 'bg-gradient-to-br from-[#25D366] to-[#128C7E] shadow-[#25D366]/20' : 'bg-zinc-800'}`}>
-              <WaLogo className={`w-8 h-8 ${isConnected ? 'text-white' : 'text-zinc-500'}`} />
+          <div className="relative shrink-0">
+            <div
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg ${
+                isConnected
+                  ? 'bg-gradient-to-br from-[#25D366] to-[#128C7E] text-white shadow-[#25D366]/20'
+                  : 'bg-bg-primary text-secondary border border-border'
+              }`}
+            >
+              <WaLogo className="w-7 h-7" />
             </div>
             {isConnected && (
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#0a1a12] flex items-center justify-center">
-                <div className="w-3.5 h-3.5 rounded-full bg-[#25D366] animate-pulse" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black flex items-center justify-center">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#25D366] animate-pulse" />
               </div>
             )}
           </div>
 
-          {/* Info */}
           <div className="flex-1 min-w-0">
-            <h3 className={`text-lg font-bold tracking-tight truncate ${isConnected ? 'text-white' : 'text-primary'}`}>{d.nickname}</h3>
+            <h3 className="text-base sm:text-lg font-bold truncate text-primary">
+              {d.nickname}
+            </h3>
             <div className="flex items-center gap-2 mt-1">
-              <Phone className={`w-3.5 h-3.5 ${isConnected ? 'text-white/40' : 'text-secondary'}`} />
-              <span className={`text-sm font-mono ${isConnected ? 'text-white/60' : 'text-secondary'}`}>
+              <Phone className="w-3.5 h-3.5 text-secondary" />
+              <span className="text-xs sm:text-sm font-mono font-bold text-primary">
                 {d.phone_display || 'Sem número'}
               </span>
             </div>
 
-            {/* Provider badge */}
-            <div className="flex items-center gap-2 mt-2.5">
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               {isMeta ? (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/20">
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#25D366]/10 border border-[#25D366]/25">
                   <ShieldCheck className="w-3 h-3 text-[#25D366]" />
-                  <span className="text-[9px] font-bold text-[#25D366] uppercase tracking-wider">API Oficial</span>
+                  <span className="text-[9px] font-bold text-[#25D366] uppercase tracking-wider">API Oficial Meta</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20">
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/25">
                   <QrCode className="w-3 h-3 text-purple-400" />
-                  <span className="text-[9px] font-bold text-purple-400 uppercase tracking-wider">Evolution · QR</span>
+                  <span className="text-[9px] font-bold text-purple-400 uppercase tracking-wider">Evolution QR</span>
                 </div>
               )}
+
               {isConnected ? (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/20">
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#25D366]/10 border border-[#25D366]/25">
                   <CheckCircle2 className="w-3 h-3 text-[#25D366]" />
                   <span className="text-[9px] font-bold text-[#25D366] uppercase">Conectado</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25">
                   <AlertTriangle className="w-3 h-3 text-amber-400" />
                   <span className="text-[9px] font-bold text-amber-400 uppercase">Desconectado</span>
                 </div>
@@ -282,37 +499,35 @@ function DeviceCard({
           </div>
         </div>
 
-        {/* Stats when connected */}
+        {/* Stats */}
         {isConnected && (
-          <div className="flex items-center gap-2 mt-5 flex-wrap">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/8">
-              <Signal className="w-3.5 h-3.5 text-[#25D366]" />
-              <span className="text-[10px] font-bold text-white/60">Latência: <span className="text-[#25D366]">&lt;200ms</span></span>
+          <div className="flex items-center gap-2 mt-4 flex-wrap">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-primary/80 border border-border text-[10px]">
+              <Signal className="w-3 h-3 text-[#25D366]" />
+              <span className="text-secondary">Latência: <strong className="text-emerald-400">&lt;200ms</strong></span>
             </div>
             {isMeta && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/8">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-[10px] font-bold text-white/60">Rate: <span className="text-amber-400">80/s</span></span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-primary/80 border border-border text-[10px]">
+                <Zap className="w-3 h-3 text-amber-400" />
+                <span className="text-secondary">Vazão: <strong className="text-amber-400">80 msgs/s</strong></span>
               </div>
             )}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/8">
-              <span className="text-[10px] font-bold text-white/60">Grupos: <span className="text-[#0082FB]">{d.groups_count}</span></span>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-primary/80 border border-border text-[10px]">
+              <span className="text-secondary">Grupos: <strong className="text-[#0082FB]">{d.groups_count}</strong></span>
             </div>
           </div>
         )}
 
-        {/* Flow Mode Switcher: Static Funnel vs AI Agent */}
-        <div className={`mt-5 pt-4 border-t ${isConnected ? 'border-white/10' : 'border-border'}`}>
-          <div className="flex items-center justify-between mb-2.5">
+        {/* Modo de Atendimento */}
+        <div className="mt-5 pt-4 border-t border-border">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5">
-              <Zap className={`w-3.5 h-3.5 ${isConnected ? 'text-emerald-400' : 'text-emerald-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-wider ${isConnected ? 'text-white/70' : 'text-secondary'}`}>
+              <Zap className="w-3.5 h-3.5 text-[#25D366]" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-secondary">
                 Modo de Atendimento
               </span>
             </div>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-              isConnected ? 'bg-white/10 text-white border-white/15' : 'bg-bg-primary text-primary border-border'
-            }`}>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-bg-primary border-border">
               {currentMode === 'ai_agent' ? '🤖 Agente de IA' : '⚡ Funil Estático'}
             </span>
           </div>
@@ -321,74 +536,87 @@ function DeviceCard({
             <button
               type="button"
               onClick={() => onSetFlowMode('static_funnel')}
-              className={`p-2.5 rounded-xl border text-left transition-all ${
+              className={`p-3 rounded-2xl border text-left transition-all ${
                 currentMode === 'static_funnel'
-                  ? 'bg-emerald-500/20 border-emerald-500/60 ring-1 ring-emerald-500/30'
-                  : isConnected
-                    ? 'bg-white/5 border-white/10 hover:border-white/20 text-white/60 hover:text-white'
-                    : 'bg-bg-primary border-border hover:border-emerald-500/30 text-secondary hover:text-primary'
+                  ? 'bg-emerald-500/15 border-emerald-500/60 ring-1 ring-emerald-500/30'
+                  : 'bg-bg-primary/60 border-border hover:border-emerald-500/30'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className={`font-bold text-xs flex items-center gap-1 ${isConnected ? 'text-white' : 'text-primary'}`}>
+                <span className="font-bold text-xs flex items-center gap-1.5 text-primary">
                   ⚡ Funil Estático
                 </span>
                 {currentMode === 'static_funnel' && (
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                 )}
               </div>
-              <p className={`text-[10px] mt-0.5 leading-snug ${isConnected ? 'text-white/50' : 'text-secondary'}`}>
-                7 etapas Meu Mistério (áudios, tarot e checkout).
+              <p className="text-[10px] mt-1 text-secondary leading-snug">
+                7 etapas Meu Mistério (áudios, tarot e checkout de R$ 9,90).
               </p>
             </button>
 
             <button
               type="button"
               onClick={() => onSetFlowMode('ai_agent')}
-              className={`p-2.5 rounded-xl border text-left transition-all ${
+              className={`p-3 rounded-2xl border text-left transition-all ${
                 currentMode === 'ai_agent'
-                  ? 'bg-purple-500/20 border-purple-500/60 ring-1 ring-purple-500/30'
-                  : isConnected
-                    ? 'bg-white/5 border-white/10 hover:border-white/20 text-white/60 hover:text-white'
-                    : 'bg-bg-primary border-border hover:border-purple-500/30 text-secondary hover:text-primary'
+                  ? 'bg-purple-500/15 border-purple-500/60 ring-1 ring-purple-500/30'
+                  : 'bg-bg-primary/60 border-border hover:border-purple-500/30'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className={`font-bold text-xs flex items-center gap-1 ${isConnected ? 'text-white' : 'text-primary'}`}>
+                <span className="font-bold text-xs flex items-center gap-1.5 text-primary">
                   🤖 Agente de IA
                 </span>
                 {currentMode === 'ai_agent' && (
                   <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
                 )}
               </div>
-              <p className={`text-[10px] mt-0.5 leading-snug ${isConnected ? 'text-white/50' : 'text-secondary'}`}>
-                IA autônoma Gemini: conversa livre e fechamento.
+              <p className="text-[10px] mt-1 text-secondary leading-snug">
+                IA conversacional Gemini: diálogo livre e fechamento autônomo.
               </p>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Bottom actions */}
-      <div className={`relative px-6 py-3.5 border-t flex items-center justify-between ${isConnected ? 'border-white/5 bg-black/20' : 'border-border bg-bg-primary/30'}`}>
+      {/* Footer */}
+      <div className="px-6 py-3 border-t border-border bg-bg-primary/40 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {!d.is_primary && (
-            <button onClick={onSetPrimary} className={`text-[10px] font-bold hover:underline ${isConnected ? 'text-white/30 hover:text-white/60' : 'text-secondary hover:text-primary'}`}>
-              Definir como principal
+            <button
+              onClick={onSetPrimary}
+              className="text-[11px] font-bold text-secondary hover:text-primary transition-colors"
+            >
+              Tornar número principal
             </button>
           )}
           {isMeta && isConnected && (
-            <a href="https://business.facebook.com" target="_blank" rel="noopener" className="flex items-center gap-1 text-[10px] text-[#0082FB] font-bold hover:underline">
-              <ExternalLink className="w-3 h-3" /> Meta Dashboard
+            <a
+              href="https://business.facebook.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[11px] text-[#0082FB] font-bold hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" /> Meta Manager
             </a>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => refetch()} className={`p-1.5 rounded-lg transition-all ${isConnected ? 'hover:bg-white/5 text-white/30 hover:text-white/60' : 'hover:bg-bg-primary text-secondary'}`}>
+          <button
+            onClick={() => refetch()}
+            className="p-1.5 rounded-lg hover:bg-bg-surface text-secondary hover:text-primary transition-all"
+            title="Atualizar status"
+          >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => { if (confirm(`Remover "${d.nickname}"?`)) onDelete(); }}
-            className="p-1.5 rounded-lg text-red-400/40 hover:text-red-400 hover:bg-red-500/10 transition-all">
+          <button
+            onClick={() => {
+              if (confirm(`Remover "${d.nickname}"?`)) onDelete();
+            }}
+            className="p-1.5 rounded-lg text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
+            title="Excluir dispositivo"
+          >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -397,9 +625,195 @@ function DeviceCard({
   );
 }
 
-/* ── Meta Embedded Signup Modal ─────────────────────────────── */
+/* ── Aba de Canais Externos & Webhooks ─────────────────────────────── */
+function ChannelsTab() {
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copiado para a área de transferência!');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Webchat Widget */}
+      <section className="bg-bg-surface border border-border rounded-3xl p-6 sm:p-8 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-primary">Webchat Widget para Sites</h3>
+              <p className="text-xs text-secondary">Incorpore o atendimento automatizado em landing pages, lojas ou WordPress</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              if (!document.getElementById('acassia-widget-container')) {
+                const s = document.createElement('script');
+                s.src = '/assets/widget.js';
+                s.setAttribute('data-tenant', 'default');
+                s.setAttribute('data-title', 'Atendimento');
+                s.setAttribute('data-color', '#9333ea');
+                document.body.appendChild(s);
+                toast.success('Widget ativado no canto inferior direito!');
+              } else {
+                toast.success('Widget já está carregado na página.');
+              }
+            }}
+            className="text-xs px-4 py-2 bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 border border-purple-500/30 rounded-xl font-bold transition-all self-start sm:self-auto"
+          >
+            Testar Widget ao Vivo
+          </button>
+        </div>
+
+        <p className="text-xs text-secondary leading-relaxed">
+          Cole este snippet no código HTML antes do fechamento de <code className="bg-bg-primary px-1.5 py-0.5 rounded border border-border text-primary font-mono">&lt;/body&gt;</code>:
+        </p>
+
+        <div className="relative">
+          <pre className="p-4 bg-bg-primary border border-border rounded-2xl font-mono text-xs text-primary overflow-x-auto leading-relaxed">
+{`<script 
+  src="${typeof window !== 'undefined' ? window.location.origin : ''}/assets/widget.js" 
+  data-tenant="default" 
+  data-title="Atendimento" 
+  data-color="#25D366">
+</script>`}
+          </pre>
+          <button
+            onClick={() => copy(`<script src="${window.location.origin}/assets/widget.js" data-tenant="default" data-title="Atendimento" data-color="#25D366"></script>`)}
+            className="absolute top-3 right-3 p-2 bg-bg-surface border border-border hover:bg-bg-primary rounded-xl text-secondary hover:text-primary transition-all shadow-sm"
+            title="Copiar snippet"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+        </div>
+      </section>
+
+      {/* Telegram Bot */}
+      <section className="bg-bg-surface border border-border rounded-3xl p-6 sm:p-8 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400">
+              <Send className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-primary">Canal Telegram Bot</h3>
+              <p className="text-xs text-secondary">Conecte um bot do Telegram ao mesmo motor inteligente de atendimento</p>
+            </div>
+          </div>
+          <a
+            href="https://t.me/BotFather"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs px-4 py-2 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 border border-sky-500/30 rounded-xl font-bold transition-all flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            Abrir @BotFather <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="sm:col-span-2">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-secondary block mb-1">
+              Token do Bot Telegram (@BotFather)
+            </label>
+            <input
+              type="password"
+              id="telegram-token-hub"
+              placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+              className="w-full bg-bg-primary border border-border rounded-xl px-3.5 py-2.5 text-xs font-mono text-primary focus:outline-none focus:border-sky-500"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={async () => {
+                const el = document.getElementById('telegram-token-hub') as HTMLInputElement;
+                const token = el ? el.value.trim() : '';
+                if (!token) {
+                  toast.error('Informe o token do bot.');
+                  return;
+                }
+                try {
+                  const res = await fetch('/api/webhooks/telegram/setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      bot_token: token,
+                      tenant_id: 'default',
+                      server_url: window.location.origin,
+                    }),
+                  });
+                  const d = await res.json();
+                  if (d.ok) toast.success('Webhook do Telegram configurado!');
+                  else toast.error(d.telegram_response?.description || 'Falha ao registrar.');
+                } catch (e: any) {
+                  toast.error(e?.message || 'Erro');
+                }
+              }}
+              className="w-full py-2.5 px-4 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-sky-500/20"
+            >
+              Ativar Webhook Telegram
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Swagger & n8n docs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <section className="bg-bg-surface border border-border rounded-3xl p-6 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-primary">Documentação OpenAPI / Swagger</h4>
+              <p className="text-[11px] text-secondary">Endpoints REST para envio e consulta</p>
+            </div>
+          </div>
+          <p className="text-xs text-secondary leading-relaxed">
+            Consulte todos os endpoints para envio ativo de mensagens, consulta de leads e status de disparos.
+          </p>
+          <a
+            href="/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-xs text-[#25D366] hover:underline font-bold pt-1"
+          >
+            Abrir Swagger Interativo <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </section>
+
+        <section className="bg-bg-surface border border-border rounded-3xl p-6 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-primary">Automações com n8n / Make</h4>
+              <p className="text-[11px] text-secondary">Integração via Webhook de Eventos</p>
+            </div>
+          </div>
+          <p className="text-xs text-secondary leading-relaxed">
+            Dispare fluxos externos no n8n a cada nova venda ou mensagem recebida usando os Webhooks de Saída.
+          </p>
+          <a
+            href="/settings/webhooks"
+            className="inline-flex items-center gap-2 text-xs text-amber-400 hover:underline font-bold pt-1"
+          >
+            Configurar Webhooks de Saída <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ── Modal Meta Embedded Signup ─────────────────────────────── */
 function MetaEmbeddedModal({
-  config, onClose, onSuccess, onFallbackManual,
+  config,
+  onClose,
+  onSuccess,
+  onFallbackManual,
 }: {
   config: { configured?: boolean; app_id?: string; config_id?: string; graph_version?: string } | undefined;
   onClose: () => void;
@@ -416,7 +830,7 @@ function MetaEmbeddedModal({
     mutationFn: (payload: { code: string; phone_number_id?: string; waba_id?: string; nickname?: string }) =>
       api.post<{ ok: boolean; device: any }>('/saas/wa/embedded-signup/exchange', payload),
     onSuccess: () => {
-      toast.success('WhatsApp conectado com sucesso via Meta Embedded Signup!');
+      toast.success('WhatsApp conectado via Meta Embedded Signup!');
       onSuccess();
     },
     onError: (err: any) => toast.error(err?.message || 'Falha ao autorizar com a Meta.'),
@@ -428,7 +842,9 @@ function MetaEmbeddedModal({
     if (!config?.app_id) return;
     const redirectUri = `${window.location.origin}/builder/wa-connection`;
     const version = config.graph_version || 'v20.0';
-    const oauthUrl = `https://www.facebook.com/${version}/dialog/oauth?client_id=${config.app_id}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=whatsapp_business_management,whatsapp_business_messaging`;
+    const oauthUrl = `https://www.facebook.com/${version}/dialog/oauth?client_id=${config.app_id}&redirect_uri=${encodeURIComponent(
+      redirectUri
+    )}&response_type=code&scope=whatsapp_business_management,whatsapp_business_messaging`;
 
     const width = 600;
     const height = 700;
@@ -437,14 +853,11 @@ function MetaEmbeddedModal({
     const popup = window.open(
       oauthUrl,
       'MetaEmbeddedSignup',
-      `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`,
+      `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`
     );
 
-    // Listener para o retorno do popup
     const handleMessage = (event: MessageEvent) => {
-      if (!event.origin.includes(window.location.hostname) && !event.origin.includes('facebook.com')) {
-        return;
-      }
+      if (!event.origin.includes(window.location.hostname) && !event.origin.includes('facebook.com')) return;
       try {
         const raw = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (raw?.type === 'WA_EMBEDDED_SIGNUP' || raw?.code) {
@@ -471,13 +884,13 @@ function MetaEmbeddedModal({
   return (
     <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="bg-bg-surface border border-border rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden">
-        <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-600/10 via-transparent to-transparent">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-600/10 to-transparent">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-600/20 flex items-center justify-center text-[#0082FB]">
               <MetaLogo className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-display text-lg text-primary">Conectar via Meta</h3>
+              <h3 className="text-base font-bold text-primary">Conectar via Meta</h3>
               <p className="text-[10px] text-secondary">WhatsApp Cloud API Oficial (Embedded Signup)</p>
             </div>
           </div>
@@ -486,12 +899,12 @@ function MetaEmbeddedModal({
           </button>
         </header>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-4">
           {isConfigured ? (
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-xs text-secondary leading-relaxed">
                 <span className="font-bold text-primary block mb-1">Conexão em 1 Clique</span>
-                Você será redirecionado para autorizar o número da sua empresa diretamente com o Facebook / WhatsApp Business Manager, sem precisar copiar tokens manualmente.
+                Você autorizará o número da sua empresa diretamente no Facebook / WhatsApp Business Manager, sem precisar copiar tokens manualmente.
               </div>
 
               <div>
@@ -499,7 +912,7 @@ function MetaEmbeddedModal({
                 <input
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Ex: WhatsApp Comercial"
+                  placeholder="Ex: WhatsApp Oficial"
                   className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary"
                 />
               </div>
@@ -508,44 +921,30 @@ function MetaEmbeddedModal({
                 type="button"
                 onClick={launchMetaOAuth}
                 disabled={exchangeMut.isPending}
-                className="w-full flex items-center justify-center gap-3 py-3.5 bg-[#0082FB] hover:bg-[#0070db] text-white rounded-xl font-bold text-sm shadow-lg shadow-[#0082FB]/20 transition-all"
+                className="w-full flex items-center justify-center gap-2.5 py-3 bg-[#0082FB] hover:bg-[#0070db] text-white rounded-xl font-bold text-sm shadow-lg shadow-[#0082FB]/20 transition-all"
               >
-                <MetaLogo className="w-5 h-5" />
+                <MetaLogo className="w-4 h-4" />
                 {exchangeMut.isPending ? 'Autenticando...' : 'Entrar com Facebook'}
               </button>
 
-              <div className="pt-2 text-center">
+              <div className="text-center pt-1">
                 <button
                   type="button"
                   onClick={() => setShowManualCode(!showManualCode)}
                   className="text-[11px] text-secondary hover:text-primary underline"
                 >
-                  {showManualCode ? 'Ocultar inserção manual de código' : 'Possui um código de autorização manual?'}
+                  {showManualCode ? 'Ocultar código manual' : 'Possui um código de autorização manual?'}
                 </button>
               </div>
 
               {showManualCode && (
-                <div className="space-y-3 p-4 bg-bg-primary rounded-xl border border-border">
+                <div className="space-y-2.5 p-3.5 bg-bg-primary rounded-xl border border-border">
                   <input
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder="Cole o authorization code aqui"
+                    placeholder="Cole o código aqui"
                     className="w-full px-3 py-2 bg-bg-surface border border-border rounded-lg text-xs font-mono"
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      value={phoneNumberId}
-                      onChange={(e) => setPhoneNumberId(e.target.value)}
-                      placeholder="phone_number_id (opcional)"
-                      className="px-3 py-2 bg-bg-surface border border-border rounded-lg text-xs font-mono"
-                    />
-                    <input
-                      value={wabaId}
-                      onChange={(e) => setWabaId(e.target.value)}
-                      placeholder="waba_id (opcional)"
-                      className="px-3 py-2 bg-bg-surface border border-border rounded-lg text-xs font-mono"
-                    />
-                  </div>
                   <button
                     type="button"
                     onClick={() => exchangeMut.mutate({ code, phone_number_id: phoneNumberId, waba_id: wabaId, nickname })}
@@ -560,32 +959,28 @@ function MetaEmbeddedModal({
           ) : (
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-secondary leading-relaxed">
-                <span className="font-bold text-amber-400 block mb-1">Configuração do Servidor Pendente</span>
-                Para habilitar o login em 1 clique via Meta, configure as variáveis de ambiente no servidor:
-                <div className="mt-2 p-2 bg-black/40 rounded-lg font-mono text-[11px] text-amber-200 space-y-0.5">
-                  <div>META_APP_ID=seu_app_id</div>
-                  <div>META_APP_SECRET=seu_app_secret</div>
-                </div>
-                <p className="mt-2 text-[11px]">
-                  Enquanto isso, você pode adicionar seu número manualmente inserindo o token da API Cloud do Meta diretamente.
+                <span className="font-bold text-amber-400 block mb-1">Configuração de Servidor</span>
+                O embedded login requer as variáveis <code className="text-primary font-mono">META_APP_ID</code> e <code className="text-primary font-mono">META_APP_SECRET</code> no backend.
+                <p className="mt-2">
+                  Você pode conectar seu número agora mesmo inserindo as credenciais diretamente na aba <strong>Credenciais Meta Cloud</strong>.
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2 pt-2">
+              <div className="flex flex-col gap-2 pt-1">
                 <button
                   type="button"
                   onClick={onFallbackManual}
-                  className="w-full py-3 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl font-bold text-sm shadow-md"
+                  className="w-full py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl font-bold text-xs shadow-md"
                 >
                   Inserir Credenciais Manualmente
                 </button>
                 <a
                   href="https://developers.facebook.com/apps"
                   target="_blank"
-                  rel="noopener"
-                  className="text-center py-2 text-xs text-secondary hover:text-primary flex items-center justify-center gap-1"
+                  rel="noopener noreferrer"
+                  className="text-center py-1.5 text-xs text-secondary hover:text-primary flex items-center justify-center gap-1"
                 >
-                  <ExternalLink className="w-3 h-3" /> Abrir Meta Developers Portal
+                  <ExternalLink className="w-3 h-3" /> Painel Meta Developers
                 </a>
               </div>
             </div>
@@ -595,4 +990,3 @@ function MetaEmbeddedModal({
     </div>
   );
 }
-
