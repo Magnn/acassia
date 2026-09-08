@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import json
 import logging
+from sqlalchemy.exc import IntegrityError
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from api.utils.tenant_secrets import decrypt_tenant_secret, encrypt_tenant_secret
@@ -137,6 +138,15 @@ def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
     if not text or not comment_id:
         return 0
 
+    # Meta retries webhook deliveries. Claim the event before any external side effect.
+    event_key = f"comment:{comment_id}"
+    try:
+        db.add(models.SocialWebhookReceipt(tenant_id=tenant_id, provider="meta", event_key=event_key))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return 0
+
     rules = _get_variable(db, tenant_id, "social.comment_rules", [])
     access_token = _get_secret(db, tenant_id, "meta_social.access_token")
 
@@ -255,6 +265,17 @@ def meta_social_webhook():
                 logger.info("[STORY_REPLY_DETECTED] tenant=%s sender=%s", tenant_id, sender)
                 db_proc = SessionLocal()
                 try:
+                    message_id = message.get("mid") or msg_ev.get("timestamp") or hashlib.sha256(
+                        json.dumps(msg_ev, sort_keys=True).encode("utf-8")
+                    ).hexdigest()
+                    try:
+                        db_proc.add(models.SocialWebhookReceipt(
+                            tenant_id=tenant_id, provider="meta", event_key=f"story:{sender}:{message_id}",
+                        ))
+                        db_proc.commit()
+                    except IntegrityError:
+                        db_proc.rollback()
+                        continue
                     story_cfg = _get_variable(db_proc, tenant_id, "social.story_reply_config", {
                         "active": True,
                         "reply_text": "Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?",

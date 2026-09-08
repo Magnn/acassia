@@ -26,18 +26,28 @@ logger = logging.getLogger(__name__)
 growth_links_bp = Blueprint("growth_links", __name__, url_prefix="/saas/growth")
 
 
-def _get_links(db, tenant_id: str) -> list[dict]:
-    row = db.query(models.TenantFlowVariable).filter_by(tenant_id=tenant_id, key="growth.links").first()
-    raw = row.value_json if row and isinstance(row.value_json, list) else []
-    return raw
+def _serialize(link: models.GrowthLink) -> dict:
+    return {"id": link.id, "name": link.name, "phone": link.phone, "message": link.message or "",
+            "tags": link.tags or [], "wa_url": link.wa_url, "short_url": link.short_url,
+            "qr_code": link.qr_code, "clicks": link.clicks or 0,
+            "created_at": link.created_at.isoformat() if link.created_at else None}
 
 
-def _save_links(db, tenant_id: str, links: list[dict]) -> None:
+def _migrate_legacy_links(db, tenant_id: str) -> None:
+    """One-way lazy migration from the previous JSON blob."""
     row = db.query(models.TenantFlowVariable).filter_by(tenant_id=tenant_id, key="growth.links").first()
-    if row:
-        row.value_json = links
-    else:
-        db.add(models.TenantFlowVariable(tenant_id=tenant_id, key="growth.links", value_json=links))
+    if not row or not isinstance(row.value_json, list):
+        return
+    for item in row.value_json:
+        link_id = item.get("id")
+        if link_id and not db.get(models.GrowthLink, link_id):
+            db.add(models.GrowthLink(
+                id=link_id, tenant_id=tenant_id, name=item.get("name") or "Link WhatsApp",
+                phone=item.get("phone") or "", message=item.get("message"), tags=item.get("tags") or [],
+                wa_url=item.get("wa_url") or f"https://wa.me/{item.get('phone', '')}",
+                short_url=item.get("short_url") or "", qr_code=item.get("qr_code"), clicks=item.get("clicks") or 0,
+            ))
+    db.delete(row)
     db.commit()
 
 
@@ -65,8 +75,9 @@ def list_links():
     """Lista todos os links e QR codes do tenant."""
     db = SessionLocal()
     try:
-        links = _get_links(db, current_user.tenant_id)
-        return jsonify({"links": links})
+        _migrate_legacy_links(db, current_user.tenant_id)
+        links = db.query(models.GrowthLink).filter_by(tenant_id=current_user.tenant_id).order_by(models.GrowthLink.created_at.desc()).all()
+        return jsonify({"links": [_serialize(link) for link in links]})
     finally:
         db.close()
 
@@ -100,25 +111,15 @@ def create_link():
 
     qr_code_base64 = _generate_qr_base64(short_url)
 
-    new_link = {
-        "id": link_id,
-        "name": name,
-        "phone": clean_phone,
-        "message": message,
-        "tags": tags,
-        "wa_url": wa_url,
-        "short_url": short_url,
-        "qr_code": qr_code_base64,
-        "clicks": 0,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-
     db = SessionLocal()
     try:
-        links = _get_links(db, current_user.tenant_id)
-        links.insert(0, new_link)
-        _save_links(db, current_user.tenant_id, links)
-        return jsonify({"ok": True, "link": new_link}), 201
+        link = models.GrowthLink(id=link_id, tenant_id=current_user.tenant_id, name=name,
+            phone=clean_phone, message=message, tags=tags, wa_url=wa_url, short_url=short_url,
+            qr_code=qr_code_base64, clicks=0)
+        db.add(link)
+        db.commit()
+        db.refresh(link)
+        return jsonify({"ok": True, "link": _serialize(link)}), 201
     finally:
         db.close()
 
@@ -129,12 +130,12 @@ def delete_link(link_id: str):
     """Remove um link do tenant."""
     db = SessionLocal()
     try:
-        links = _get_links(db, current_user.tenant_id)
-        filtered = [l for l in links if l.get("id") != link_id]
-        if len(filtered) != len(links):
-            _save_links(db, current_user.tenant_id, filtered)
-            return jsonify({"ok": True, "message": "Link removido com sucesso."})
-        return jsonify({"error": "not_found"}), 404
+        link = db.query(models.GrowthLink).filter_by(id=link_id, tenant_id=current_user.tenant_id).first()
+        if not link:
+            return jsonify({"error": "not_found"}), 404
+        db.delete(link)
+        db.commit()
+        return jsonify({"ok": True, "message": "Link removido com sucesso."})
     finally:
         db.close()
 
@@ -144,21 +145,15 @@ def redirect_growth_link(link_id: str):
     """Redirecionamento público para WhatsApp com incremento de clique."""
     db = SessionLocal()
     try:
-        # Busca em todos os tenants onde growth.links existe
-        rows = db.query(models.TenantFlowVariable).filter_by(key="growth.links").all()
-        for row in rows:
-            links = row.value_json if isinstance(row.value_json, list) else []
-            for item in links:
-                if item.get("id") == link_id:
-                    # Incrementa cliques
-                    item["clicks"] = (item.get("clicks") or 0) + 1
-                    row.value_json = list(links)
-                    db.commit()
-
-                    target = item.get("wa_url") or f"https://wa.me/{item.get('phone')}"
-                    return redirect(target, code=302)
-
-        return "Link não encontrado", 404
+        link = db.get(models.GrowthLink, link_id)
+        if not link:
+            return "Link não encontrado", 404
+        target = link.wa_url or f"https://wa.me/{link.phone}"
+        db.query(models.GrowthLink).filter_by(id=link_id).update(
+            {models.GrowthLink.clicks: models.GrowthLink.clicks + 1}, synchronize_session=False,
+        )
+        db.commit()
+        return redirect(target, code=302)
     except Exception as exc:
         logger.exception("[GROWTH_LINK] Erro no redirect: %s", exc)
         return "Erro ao redirecionar", 500

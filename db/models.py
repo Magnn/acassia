@@ -2161,6 +2161,33 @@ class SequenceDispatch(Base):
     dispatched_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
+class SocialWebhookReceipt(Base):
+    """Durable idempotency receipt for externally retried social events."""
+    __tablename__ = "social_webhook_receipts"
+    __table_args__ = (UniqueConstraint("tenant_id", "provider", "event_key", name="uq_social_event_receipt"),)
+    id = Column(Integer, primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    provider = Column(String(32), nullable=False)
+    event_key = Column(String(128), nullable=False)
+    received_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
+class GrowthLink(Base):
+    """Tenant-owned tracked link; public lookup is indexed by opaque id."""
+    __tablename__ = "growth_links"
+    id = Column(String(32), primary_key=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    phone = Column(String(32), nullable=False)
+    message = Column(Text, nullable=True)
+    tags = Column(JSON, default=list, nullable=False)
+    wa_url = Column(Text, nullable=False)
+    short_url = Column(Text, nullable=False)
+    qr_code = Column(Text, nullable=True)
+    clicks = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+
+
 class ContactImport(Base):
     """
     Registro e histórico de importações de listas de contatos (CSV / Canais).
