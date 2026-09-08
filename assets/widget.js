@@ -4,7 +4,7 @@
  * 
  * Usage:
  * <script src="https://acassia-production.up.railway.app/assets/widget.js" 
- *         data-tenant="default" 
+ *         data-site-key="sua_site_key_aqui" 
  *         data-title="Atendimento" 
  *         data-color="#9333ea"></script>
  */
