@@ -371,6 +371,7 @@ def _register_saas_blueprints():
     from api.saas.credentials import credentials_bp as saas_credentials_bp
     from api.b2c_marketplace import b2c_bp
     from api.v1.routes import v1_bp
+    from api.saas.growth_links import growth_links_bp as saas_growth_links_bp
 
 
     login_manager.init_app(app)
@@ -415,6 +416,7 @@ def _register_saas_blueprints():
         saas_credentials_bp,
         b2c_bp,
         v1_bp,
+        saas_growth_links_bp,
     )
     _failed_bps = []
     for bp in _optional:

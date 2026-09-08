@@ -456,6 +456,19 @@ export interface CouponItem {
   created_at?: string;
 }
 
+export interface GrowthLinkItem {
+  id: string;
+  name: string;
+  phone: string;
+  message: string;
+  tags: string[];
+  wa_url: string;
+  short_url: string;
+  qr_code: string;
+  clicks: number;
+  created_at: string;
+}
+
 export const growthToolsApi = {
   getCommentRules: () => api.get<{ ok: boolean; rules: CommentRule[] }>('/saas/social/rules'),
   saveCommentRules: (rules: CommentRule[]) => api.post<{ ok: boolean; rules: CommentRule[] }>('/saas/social/rules', { rules }),
@@ -468,4 +481,8 @@ export const growthToolsApi = {
     valid_until?: string | null;
   }) => api.post<{ ok: boolean; id: number; code: string }>('/saas/coupons/', body),
   deleteCoupon: (id: number) => api.delete<{ ok: boolean }>(`/saas/coupons/${id}`),
+  listLinks: () => api.get<{ links: GrowthLinkItem[] }>('/saas/growth/links'),
+  createLink: (body: { name: string; phone: string; message: string; tags?: string[] }) =>
+    api.post<{ ok: boolean; link: GrowthLinkItem }>('/saas/growth/links', body),
+  deleteLink: (id: string) => api.delete<{ ok: boolean }>(`/saas/growth/links/${id}`),
 };

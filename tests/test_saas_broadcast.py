@@ -84,13 +84,17 @@ def test_broadcast_lifecycle_and_chatbotx_parity(auth_client):
     assert res_pause.status_code == 200
     assert res_pause.get_json()["campaign"]["status"] == "paused"
 
-    # Resume
-    res_resume = client.post(f"/saas/broadcast/{camp_id}/resume")
-    assert res_resume.status_code == 200
-    assert res_resume.get_json()["campaign"]["status"] == "sending"
+    # Resume (mocking enqueue_campaign_send to prevent background worker race condition in unit test)
+    from unittest.mock import patch
+    with patch("api.utils.task_queue.enqueue_campaign_send") as mock_enqueue:
+        res_resume = client.post(f"/saas/broadcast/{camp_id}/resume")
+        assert res_resume.status_code == 200
+        assert res_resume.get_json()["campaign"]["status"] == "sending"
+        mock_enqueue.assert_called_once()
 
     # Pause again and move to draft
-    client.post(f"/saas/broadcast/{camp_id}/pause")
+    res_pause2 = client.post(f"/saas/broadcast/{camp_id}/pause")
+    assert res_pause2.status_code == 200
     res_draft = client.post(f"/saas/broadcast/{camp_id}/move-to-draft")
     assert res_draft.status_code == 200
     assert res_draft.get_json()["campaign"]["status"] == "draft"

@@ -18,11 +18,15 @@ import {
   DollarSign,
   AlertCircle,
   X,
+  Link as LinkIcon,
+  QrCode,
+  Copy,
+  Download,
 } from 'lucide-react';
-import { growthToolsApi, CommentRule, CouponItem } from '../api/saas';
+import { growthToolsApi, CommentRule, CouponItem, GrowthLinkItem } from '../api/saas';
 import { toast } from '../lib/toast';
 
-type Tab = 'comments' | 'stories' | 'coupons';
+type Tab = 'comments' | 'stories' | 'coupons' | 'links';
 
 export default function GrowthTools() {
   const qc = useQueryClient();
@@ -31,7 +35,9 @@ export default function GrowthTools() {
   // Modals state
   const [showNewRuleModal, setShowNewRuleModal] = useState(false);
   const [showNewCouponModal, setShowNewCouponModal] = useState(false);
+  const [showNewLinkModal, setShowNewLinkModal] = useState(false);
   const [couponToDelete, setCouponToDelete] = useState<CouponItem | null>(null);
+  const [linkToDelete, setLinkToDelete] = useState<GrowthLinkItem | null>(null);
 
   // New Rule Form State
   const [rulePlatform, setRulePlatform] = useState<'instagram' | 'facebook'>('instagram');
@@ -46,6 +52,12 @@ export default function GrowthTools() {
   const [couponMaxUses, setCouponMaxUses] = useState<string>('');
   const [couponValidUntil, setCouponValidUntil] = useState<string>('');
 
+  // New Link Form State
+  const [linkName, setLinkName] = useState('');
+  const [linkPhone, setLinkPhone] = useState('');
+  const [linkMessage, setLinkMessage] = useState('');
+  const [linkTags, setLinkTags] = useState('');
+
   // Queries
   const { data: rulesData, isLoading: isLoadingRules } = useQuery({
     queryKey: ['growth-comment-rules'],
@@ -55,6 +67,11 @@ export default function GrowthTools() {
   const { data: couponsData, isLoading: isLoadingCoupons } = useQuery({
     queryKey: ['growth-coupons'],
     queryFn: growthToolsApi.listCoupons,
+  });
+
+  const { data: linksData, isLoading: isLoadingLinks } = useQuery({
+    queryKey: ['growth-links'],
+    queryFn: growthToolsApi.listLinks,
   });
 
   // Save Rules Mutation
@@ -97,7 +114,34 @@ export default function GrowthTools() {
     onError: (e: any) => toast.error(e.message || 'Falha ao remover cupom'),
   });
 
+  // Create Link Mutation
+  const createLinkMutation = useMutation({
+    mutationFn: growthToolsApi.createLink,
+    onSuccess: () => {
+      toast.success('Link WhatsApp & QR Code gerados com sucesso!');
+      qc.invalidateQueries({ queryKey: ['growth-links'] });
+      setShowNewLinkModal(false);
+      setLinkName('');
+      setLinkPhone('');
+      setLinkMessage('');
+      setLinkTags('');
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || e.message || 'Falha ao criar link'),
+  });
+
+  // Delete Link Mutation
+  const deleteLinkMutation = useMutation({
+    mutationFn: (id: string) => growthToolsApi.deleteLink(id),
+    onSuccess: () => {
+      toast.success('Link de WhatsApp removido.');
+      qc.invalidateQueries({ queryKey: ['growth-links'] });
+      setLinkToDelete(null);
+    },
+    onError: (e: any) => toast.error(e.message || 'Falha ao remover link'),
+  });
+
   const currentRules = rulesData?.rules || [];
+  const currentLinks = linksData?.links || [];
 
   const handleToggleRuleActive = (ruleId: string) => {
     const updated = currentRules.map((r) =>
@@ -143,6 +187,40 @@ export default function GrowthTools() {
     });
   };
 
+  const handleCreateLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkPhone.trim() || !linkMessage.trim()) {
+      toast.error('Informe o número de WhatsApp e a mensagem predefinida');
+      return;
+    }
+    const parsedTags = linkTags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    createLinkMutation.mutate({
+      name: linkName.trim() || 'Link WhatsApp',
+      phone: linkPhone.trim(),
+      message: linkMessage.trim(),
+      tags: parsedTags,
+    });
+  };
+
+  const copyToClipboard = (text: string, label: string = 'Link') => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado para a área de transferência!`);
+  };
+
+  const downloadQrCode = (qrBase64: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = qrBase64;
+    link.download = `${filename || 'qrcode-whatsapp'}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Download do QR Code iniciado!');
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-y-auto custom-scrollbar">
       {/* Header */}
@@ -182,6 +260,15 @@ export default function GrowthTools() {
                 Criar Novo Cupom
               </button>
             )}
+            {activeTab === 'links' && (
+              <button
+                onClick={() => setShowNewLinkModal(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-lg shadow-purple-600/20 active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                Gerar Link WhatsApp & QR Code
+              </button>
+            )}
           </div>
         </div>
 
@@ -219,6 +306,17 @@ export default function GrowthTools() {
           >
             <Tag className="w-4 h-4" />
             Cupons de Desconto
+          </button>
+          <button
+            onClick={() => setActiveTab('links')}
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 transition-colors ${
+              activeTab === 'links'
+                ? 'border-purple-500 text-purple-400 font-bold'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <LinkIcon className="w-4 h-4" />
+            Links WhatsApp & QR Code
           </button>
         </div>
       </div>
@@ -410,6 +508,119 @@ export default function GrowthTools() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── TAB 4: LINKS & QR CODE GENERATOR ── */}
+        {activeTab === 'links' && (
+          <div className="space-y-6">
+            {/* Banner de Instrução */}
+            <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 flex items-start gap-3">
+              <QrCode className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-300 leading-relaxed">
+                Crie links encurtados de WhatsApp com mensagens pré-definidas e QR Codes de alta resolução para usar em panfletos, embalagens, bio do Instagram, anúncios ou balcão de loja.
+                Rastreie o número total de cliques e atribua tags automáticas aos leads quando iniciarem a conversa.
+              </div>
+            </div>
+
+            {/* List of Links */}
+            <div className="space-y-4">
+              {isLoadingLinks ? (
+                <div className="py-12 text-center text-xs text-zinc-500">Carregando links...</div>
+              ) : currentLinks.length === 0 ? (
+                <div className="p-12 text-center border border-dashed border-zinc-800 rounded-2xl space-y-3">
+                  <QrCode className="w-8 h-8 text-zinc-600 mx-auto" />
+                  <p className="text-sm font-semibold text-zinc-400">Nenhum link ou QR code gerado ainda.</p>
+                  <button
+                    onClick={() => setShowNewLinkModal(true)}
+                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white transition-colors"
+                  >
+                    Gerar Primeiro Link & QR Code
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {currentLinks.map((link) => (
+                    <div
+                      key={link.id}
+                      className="p-5 rounded-2xl bg-zinc-900/40 border border-zinc-800 hover:border-zinc-700 transition-all flex flex-col justify-between space-y-4"
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* QR Code thumbnail */}
+                        <div className="bg-white p-2 rounded-xl shrink-0 shadow-md">
+                          <img
+                            src={link.qr_code}
+                            alt={`QR Code ${link.name}`}
+                            className="w-24 h-24 object-contain"
+                          />
+                        </div>
+
+                        {/* Details */}
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-sm font-bold text-white truncate">{link.name}</h4>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+                              {link.clicks} {link.clicks === 1 ? 'clique' : 'cliques'}
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-zinc-400">
+                            WhatsApp: <span className="font-mono text-zinc-300">+{link.phone}</span>
+                          </div>
+
+                          <div className="text-xs text-zinc-300 italic bg-zinc-950/60 p-2 rounded-lg border border-zinc-800/80 line-clamp-2">
+                            "{link.message}"
+                          </div>
+
+                          {link.tags && link.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {link.tags.map((t, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-zinc-800 text-zinc-300"
+                                >
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-3 border-t border-zinc-800/80">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => copyToClipboard(link.short_url, 'Link de redirecionamento')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition-colors"
+                            title="Copiar link rastreado"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            Copiar Link
+                          </button>
+                          <button
+                            onClick={() => downloadQrCode(link.qr_code, `qrcode-${link.name.toLowerCase().replace(/\s+/g, '-')}`)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition-colors"
+                            title="Baixar imagem PNG do QR Code"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Baixar QR
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => setLinkToDelete(link)}
+                          className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors"
+                          title="Remover link"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -653,6 +864,138 @@ export default function GrowthTools() {
                 className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-xs font-bold text-white transition-colors"
               >
                 {deleteCouponMutation.isPending ? 'Removendo...' : 'Confirmar Exclusão'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Link & QR Modal */}
+      {showNewLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <QrCode className="w-4 h-4 text-purple-400" />
+                Gerar Link WhatsApp & QR Code
+              </h3>
+              <button
+                onClick={() => setShowNewLinkModal(false)}
+                className="p-1 text-zinc-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateLink} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
+                  Nome da Campanha / Identificador *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Bio Instagram, Panfleto Inauguração, Mesa 04"
+                  value={linkName}
+                  onChange={(e) => setLinkName(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
+                  Número de WhatsApp (DDI + DDD + Número) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: 5511999998888"
+                  value={linkPhone}
+                  onChange={(e) => setLinkPhone(e.target.value)}
+                  className="w-full text-xs font-mono rounded-xl border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:outline-none focus:border-purple-500"
+                />
+                <span className="text-[10px] text-zinc-500 mt-1 block">
+                  Somente números, com o DDI (55 para Brasil).
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
+                  Mensagem Pré-definida *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Ex: Olá! Vi o anúncio no Instagram e gostaria de saber mais informações."
+                  value={linkMessage}
+                  onChange={(e) => setLinkMessage(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:outline-none focus:border-purple-500 resize-none"
+                />
+                <span className="text-[10px] text-zinc-500 mt-0.5 block">
+                  Texto que já aparecerá digitado na caixa de mensagem do usuário ao abrir o WhatsApp.
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
+                  Tags Automáticas (opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: bio_insta, campanha_outono (separadas por vírgula)"
+                  value={linkTags}
+                  onChange={(e) => setLinkTags(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-zinc-700 bg-zinc-950 p-2.5 text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewLinkModal(false)}
+                  className="px-4 py-2 rounded-xl border border-zinc-700 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={createLinkMutation.isPending}
+                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-lg shadow-purple-600/20"
+                >
+                  {createLinkMutation.isPending ? 'Gerando...' : 'Gerar Link & QR'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Link Custom Modal */}
+      {linkToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400" />
+              Remover Link {linkToDelete.name}?
+            </h4>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              O link de redirecionamento curto deixará de funcionar imediatamente. O QR Code físico passará a dar erro de página não encontrada.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setLinkToDelete(null)}
+                className="px-3 py-1.5 rounded-lg border border-zinc-700 text-xs font-medium text-zinc-300 hover:bg-zinc-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={deleteLinkMutation.isPending}
+                onClick={() => deleteLinkMutation.mutate(linkToDelete.id)}
+                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-xs font-bold text-white transition-colors"
+              >
+                {deleteLinkMutation.isPending ? 'Removendo...' : 'Confirmar Exclusão'}
               </button>
             </div>
           </div>

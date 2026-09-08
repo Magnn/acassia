@@ -780,6 +780,11 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
             # Throttle dinâmico anti-ban
             time.sleep(throttle_secs)
 
+        try:
+            db.refresh(campaign)
+        except Exception:
+            pass
+
         if campaign.status not in ("cancelled", "paused"):
             campaign.status = "completed"
             campaign.completed_at = datetime.now(timezone.utc)
