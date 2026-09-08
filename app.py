@@ -185,6 +185,17 @@ def _safe_thread(target, args=(), name: str = "bg-task", daemon: bool = True) ->
     t.start()
     return t
 
+from concurrent.futures import ThreadPoolExecutor
+_inbound_executor = ThreadPoolExecutor(max_workers=32, thread_name_prefix="triagem-meta")
+
+def _dispatch_triagem_fallback(data: dict, name: str = "triagem-meta") -> None:
+    """Fallback in-process limitado por ThreadPoolExecutor quando Redis está off."""
+    try:
+        _inbound_executor.submit(_triagem_meta, data)
+    except Exception as exc:
+        logger.warning("⚠️ [WEBHOOK] Falha ao despachar no pool (%s) — usando _safe_thread", exc)
+        _safe_thread(_triagem_meta, args=(data,), name=name)
+
 # ── INICIALIZAÇÃO DA APLICAÇÃO ───────────────────────────────────────
 app = Flask(__name__)
 
@@ -3941,7 +3952,7 @@ def webhook_meta_per_tenant(webhook_path: str):
     except Exception as e:
         logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
     if not enqueued:
-        _safe_thread(_triagem_meta, args=(data,), name="triagem-meta")
+        _dispatch_triagem_fallback(data, name="triagem-meta")
     return "EVENT_RECEIVED", 200
 
 
@@ -4018,7 +4029,7 @@ def webhook_meta():
     except Exception as e:
         logger.warning("⚠️ [REDIS] Enfileiramento falhou — fallback thread: %s", e)
     if not enqueued:
-        _safe_thread(_triagem_meta, args=(data,), name="triagem-meta-global")
+        _dispatch_triagem_fallback(data, name="triagem-meta-global")
     return "EVENT_RECEIVED", 200
 
 def _log_wa_inbound(

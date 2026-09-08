@@ -1045,20 +1045,19 @@ class Engine:
                             ctx.texto_recebido,
                             ctx.historico,
                         )
-                        ctx.intencao = fut_i.result()
-                        sent = fut_s.result()
+                        ctx.intencao = fut_i.result(timeout=10.0)
+                        sent = fut_s.result(timeout=10.0)
                     except Exception as exc:
                         logger.warning(
-                            "⚠️ [ENGINE] NLU paralelo falhou (%s); a cair para sequencial.",
+                            "⚠️ [ENGINE] NLU paralelo falhou ou timeout (%s); fallback heurístico imediato.",
                             exc,
                         )
-                        ctx.intencao = self.intent_classifier.classificar(
-                            ctx.texto_recebido,
-                            ctx.historico,
-                            ctx.node_atual,
-                            lead_id=lead.id,
-                        )
-                        sent = self.sentiment_analyzer.analisar(ctx.texto_recebido, ctx.historico)
+                        ctx.intencao = "confirmacao" if re.search(
+                            r"\b(ok|sim|pronto|beleza|blz|ta|tá|show|fechado)\b",
+                            str(ctx.texto_recebido or "").lower(),
+                            re.I,
+                        ) else "padrao"
+                        sent = {"sentimento": "padrao", "score": 0.5, "sinais": []}
                     ctx.sentimento = sent.get("sentimento", "padrao")
                     ctx.score_engajamento = sent.get("score", 0.5)
 

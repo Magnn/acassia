@@ -77,19 +77,25 @@ Formato de saída:
 
 class IntentClassifier:
     @staticmethod
-    def _criar_httpx_client(timeout: float = 60) -> httpx.Client:
+    def _criar_httpx_client(timeout: float = 15) -> httpx.Client:
         """Bypassa Windows certificate store e proxy do antivírus via certifi."""
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
         return httpx.Client(
             verify=ssl_ctx,
-            timeout=httpx.Timeout(timeout, connect=15.0),
+            timeout=httpx.Timeout(timeout, connect=10.0),
             trust_env=False,
         )
 
     def __init__(self, api_key: str | None = None, model_name: str | None = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        # Recomendado usar a versão estável do Gemini Pro para classificação lógica
-        self.model_name = model_name or CONFIG_CLIENTE.get("modelo_ia", "gemini-1.5-pro")
+        # NLU rápido: flash responde em ~300ms vs 2.5s do pro e economiza quota
+        self.model_name = (
+            model_name
+            or os.getenv("GEMINI_NLU_MODEL")
+            or CONFIG_CLIENTE.get("modelo_ia_nlu")
+            or CONFIG_CLIENTE.get("modelo_ia")
+            or "gemini-1.5-flash"
+        )
         self.client = self._inicializar_cliente()
         self._cache: Dict[str, str] = {}
         self._quota_cooldown_until = 0.0
