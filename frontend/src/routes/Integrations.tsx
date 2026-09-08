@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -16,6 +17,9 @@ import {
   Video,
   Share2,
   Sparkles,
+  Smartphone,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { integrationsApi } from '../api/integrations';
 import { toast } from '../lib/toast';
@@ -23,6 +27,7 @@ import { api } from '../api/client';
 import WhatsAppConnect from '../components/WhatsAppConnect';
 
 export default function Integrations() {
+  const [showLegacyManual, setShowLegacyManual] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ['integrations-summary'],
     queryFn: integrationsApi.summary,
@@ -55,22 +60,54 @@ export default function Integrations() {
   return (
     <div className="p-8 max-w-5xl mx-auto text-primary space-y-10">
       <div>
-        <h2 className="text-3xl font-black tracking-tight">Integrações</h2>
+        <h2 className="text-3xl font-black tracking-tight">Webhooks & Canais Externos</h2>
         <p className="text-sm text-secondary mt-2 max-w-2xl leading-relaxed">
-          Gerencie os canais de entrada e saída. Webhooks expostos, configuração da Meta WhatsApp Cloud API e estado da infraestrutura de mensageria.
+          Gerencie canais complementares de entrada e saída: Widget para sites, Telegram, documentação de API e webhooks externos.
         </p>
       </div>
 
       <div className="grid gap-6">
-        {/* WhatsApp Cloud API — onboarding por tenant */}
-        <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
-          <header className="px-6 py-4 border-b border-border bg-bg-primary/20">
-            <h3 className="font-black text-sm uppercase tracking-widest">Conectar WhatsApp</h3>
-          </header>
-          <div className="px-6 py-6">
-            <WhatsAppConnect />
+        {/* Banner Central WhatsApp Meta */}
+        <section className="bg-gradient-to-br from-[#0a1a12] to-[#0f2318] border border-[#25D366]/30 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-xl shadow-[#25D366]/5">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#25D366]/10 border border-[#25D366]/20 text-[#25D366] text-xs font-bold w-fit">
+              <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
+              Canal WhatsApp Principal
+            </div>
+            <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              Gerenciar Números & Conexão Meta Cloud API
+            </h3>
+            <p className="text-xs sm:text-sm text-white/70 max-w-xl leading-relaxed">
+              Visualize seus números conectados, configure o modo de atendimento (Funil Estático ou Agente de IA) e gerencie webhooks oficiais em tempo real.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2.5 w-full sm:w-auto">
+            <Link
+              to="/wa-connection"
+              className="px-6 py-3.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:brightness-110 text-white font-bold rounded-2xl text-sm transition-all shadow-lg shadow-[#25D366]/20 flex items-center justify-center gap-2"
+            >
+              <Smartphone className="w-4 h-4" /> Abrir Conexão WhatsApp
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowLegacyManual(v => !v)}
+              className="text-[11px] text-white/40 hover:text-white/70 transition-colors text-center"
+            >
+              {showLegacyManual ? 'Ocultar tokens manuais' : 'Configuração manual de tokens (legado)'}
+            </button>
           </div>
         </section>
+
+        {showLegacyManual && (
+          <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">
+            <header className="px-6 py-4 border-b border-border bg-bg-primary/20">
+              <h3 className="font-black text-sm uppercase tracking-widest text-secondary">Configuração Manual de Tokens Meta</h3>
+            </header>
+            <div className="px-6 py-6">
+              <WhatsAppConnect />
+            </div>
+          </section>
+        )}
 
         {/* Webchat Widget Embed (ManyChat / ChatbotX style) */}
         <section className="bg-bg-surface border border-border rounded-3xl shadow-sm overflow-hidden">

@@ -8,6 +8,7 @@ import {
   Megaphone,
   Kanban,
   Plug,
+  Smartphone,
   Store,
   FolderTree,
   Mic,
@@ -51,7 +52,7 @@ const NAVIGATION_SECTIONS: NavSection[] = [
       { to: '/dashboard', icon: LayoutDashboard, label: 'Visão Geral' },
       { to: '/pipeline', icon: Kanban, label: 'Pipeline & CRM' },
       { to: '/broadcast', icon: Megaphone, label: 'Disparos WhatsApp' },
-      { to: '/integrations', icon: Plug, label: 'Conexão & API Meta' },
+      { to: '/wa-connection', icon: Smartphone, label: 'Conexão & API Meta' },
     ],
   },
   {
@@ -68,6 +69,7 @@ const NAVIGATION_SECTIONS: NavSection[] = [
   {
     title: 'Configurações',
     items: [
+      { to: '/integrations', icon: Plug, label: 'Webhooks & Integrações' },
       { to: '/settings/devices', icon: SettingsIcon, label: 'Configurações' },
       { to: '/billing', icon: CreditCard, label: 'Plano & Faturamento' },
       { to: '/admin/tenants', icon: ShieldCheck, label: 'Super Admin', roles: ['admin'] },
