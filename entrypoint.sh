@@ -3,14 +3,17 @@
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Executa Alembic upgrade antes de iniciar o app.
 # Se SKIP_MIGRATIONS=1, pula (útil para CI/debug).
-# Se falhar, loga mas não impede o startup (sync_database() faz CREATE IF NOT EXISTS).
+# Falha de migração impede o startup: código novo não pode operar em schema antigo.
 
 echo "🚀 [ENTRYPOINT] Starting Acássia SaaS..."
 
 # ── Migrations ──────────────────────────────────────────────
 if [ "${SKIP_MIGRATIONS:-0}" != "1" ] && [ -f "alembic.ini" ]; then
     echo "📦 [ENTRYPOINT] Running Alembic migrations..."
-    alembic upgrade head || echo "⚠️ [ENTRYPOINT] Alembic falhou (sync_database() vai compensar) — continuando..."
+    if ! alembic upgrade head; then
+        echo "❌ [ENTRYPOINT] Alembic falhou — abortando startup para proteger os dados."
+        exit 1
+    fi
 else
     echo "⏩ [ENTRYPOINT] Skipping migrations (SKIP_MIGRATIONS=${SKIP_MIGRATIONS:-0})"
 fi

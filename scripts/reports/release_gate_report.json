@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-07T15:35:45.082700+00:00",
+  "generated_at": "2026-09-09T21:14:18.449604+00:00",
   "status": "ok",
   "guardrails": {
     "status": "ok",
@@ -46,7 +46,7 @@
       {
         "case": "node1_saida_saudacao",
         "ok": true,
-        "details": "node1 gerou 3 baloes",
+        "details": "node1 gerou 4 baloes",
         "stage": "saudacao"
       },
       {
@@ -80,6 +80,6 @@
         "stage": "recuperacao"
       }
     ],
-    "output_excerpt": "\"recuperacao\": {\n      \"total\": 1,\n      \"passed\": 1,\n      \"failed\": 0,\n      \"score\": 100.0\n    }\n  },\n  \"results\": [\n    {\n      \"case\": \"node1_saida_saudacao\",\n      \"ok\": true,\n      \"details\": \"node1 gerou 3 baloes\",\n      \"stage\": \"saudacao\"\n    },\n    {\n      \"case\": \"node5_tentativas_previas\",\n      \"ok\": true,\n      \"details\": \"coleta de tentativas previa ok\",\n      \"stage\": \"coleta\"\n    },\n    {\n      \"case\": \"reparo_entrega_nodes\",\n      \"ok\": true,\n      \"details\": \"todos os nodes responderam com reparo padrao\",\n      \"stage\": \"resiliencia_entrega\"\n    },\n    {\n      \"case\": \"node8_firmo_gate\",\n      \"ok\": true,\n      \"details\": \"gate FIRMO ok\",\n      \"stage\": \"oferta\"\n    },\n    {\n      \"case\": \"node8_link_pos_firmo\",\n      \"ok\": true,\n      \"details\": \"link liberado corretamente apos FIRMO\",\n      \"stage\": \"oferta\"\n    },\n    {\n      \"case\": \"node9_tentativas\",\n      \"ok\": true,\n      \"details\": \"node9 respondeu nas 3 tentativas\",\n      \"stage\": \"recuperacao\"\n    }\n  ]\n}"
+    "output_excerpt": "\"recuperacao\": {\n      \"total\": 1,\n      \"passed\": 1,\n      \"failed\": 0,\n      \"score\": 100.0\n    }\n  },\n  \"results\": [\n    {\n      \"case\": \"node1_saida_saudacao\",\n      \"ok\": true,\n      \"details\": \"node1 gerou 4 baloes\",\n      \"stage\": \"saudacao\"\n    },\n    {\n      \"case\": \"node5_tentativas_previas\",\n      \"ok\": true,\n      \"details\": \"coleta de tentativas previa ok\",\n      \"stage\": \"coleta\"\n    },\n    {\n      \"case\": \"reparo_entrega_nodes\",\n      \"ok\": true,\n      \"details\": \"todos os nodes responderam com reparo padrao\",\n      \"stage\": \"resiliencia_entrega\"\n    },\n    {\n      \"case\": \"node8_firmo_gate\",\n      \"ok\": true,\n      \"details\": \"gate FIRMO ok\",\n      \"stage\": \"oferta\"\n    },\n    {\n      \"case\": \"node8_link_pos_firmo\",\n      \"ok\": true,\n      \"details\": \"link liberado corretamente apos FIRMO\",\n      \"stage\": \"oferta\"\n    },\n    {\n      \"case\": \"node9_tentativas\",\n      \"ok\": true,\n      \"details\": \"node9 respondeu nas 3 tentativas\",\n      \"stage\": \"recuperacao\"\n    }\n  ]\n}"
   }
 }

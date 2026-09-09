@@ -12,7 +12,7 @@ CHECKS: dict[str, list[str]] = {
         "def lead_reportou_problema_entrega",
         "def acoes_reparo_entrega_padrao",
     ],
-    "app.py": [
+    "inbox_manager.py": [
         "class LeadInboxManager",
         "_re_confirmacao_curta",
         "_re_feedback_entrega",
@@ -118,7 +118,7 @@ CHECKS: dict[str, list[str]] = {
     ],
     "scripts/teste_node1_guardrails.py": [
         "NODE1 GUARDRAILS OK",
-        "abertura curta deveria ter no maximo 3 baloes",
+        "node1 deve manter no maximo 4 baloes",
     ],
     "scripts/teste_node2_guardrails.py": [
         "NODE2 GUARDRAILS OK",

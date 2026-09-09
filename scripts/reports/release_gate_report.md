@@ -1,6 +1,6 @@
 # Release Gate Funil
 
-- Gerado em: `2026-04-07T15:35:45.082700+00:00`
+- Gerado em: `2026-09-09T21:14:18.449604+00:00`
 - Status final: `ok`
 
 ## Resultado dos Gates
