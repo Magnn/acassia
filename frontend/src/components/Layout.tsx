@@ -30,6 +30,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useQuery } from '@tanstack/react-query';
 import { authApi } from '../api/auth';
+import { isAuthError, redirectToLogin } from '../api/client';
 
 interface NavItem {
   to: string;
@@ -104,7 +105,7 @@ export default function Layout() {
   };
 
   // Consulta do usuário logado
-  const { data: user, error: userError } = useQuery({
+  const { data: user, error: userError, isPending: userPending } = useQuery({
     queryKey: ['me'],
     queryFn: authApi.me,
     staleTime: 60_000,
@@ -112,10 +113,8 @@ export default function Layout() {
   });
 
   useEffect(() => {
-    if (userError) {
-      window.location.href = '/saas/login?next=' + encodeURIComponent(location.pathname + location.search);
-    }
-  }, [userError, location.pathname, location.search]);
+    if (isAuthError(userError)) redirectToLogin();
+  }, [userError]);
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -131,6 +130,31 @@ export default function Layout() {
     if (location.pathname.startsWith('/flows/')) return 'Editor Visual de Funil';
     return 'Acássia Studio';
   }, [location.pathname]);
+
+  if (userPending || isAuthError(userError)) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-300">
+        <div className="flex flex-col items-center gap-3" role="status" aria-live="polite">
+          <div className="h-9 w-9 animate-spin rounded-full border-2 border-indigo-500/25 border-t-indigo-400" />
+          <span className="text-xs font-semibold">Verificando sua sessão…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (userError) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 p-6 text-zinc-200">
+        <div className="max-w-md rounded-2xl border border-rose-900/60 bg-rose-950/30 p-6 text-center">
+          <h1 className="font-bold">Não foi possível abrir seu workspace</h1>
+          <p className="mt-2 text-sm text-zinc-400">Atualize a página. Se o problema continuar, entre novamente.</p>
+          <button onClick={redirectToLogin} className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">
+            Entrar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100 antialiased font-sans">
@@ -283,13 +307,16 @@ export default function Layout() {
             </div>
           </div>
 
-          <a
-            href="/saas/logout"
-            title="Sair da conta"
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all shrink-0"
-          >
-            <Power className="w-4 h-4" />
-          </a>
+          <form action="/saas/logout" method="post">
+            <button
+              type="submit"
+              title="Sair da conta"
+              aria-label="Sair da conta"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all shrink-0"
+            >
+              <Power className="w-4 h-4" />
+            </button>
+          </form>
         </div>
       </aside>
 

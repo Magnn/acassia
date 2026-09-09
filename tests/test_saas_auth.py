@@ -254,6 +254,17 @@ def test_login_redirect_respeita_next_param(client):
     assert "/custom/path" in res.headers.get("Location", "")
 
 
+def test_login_rejeita_redirect_externo(client):
+    signup_user("redirect@x.com", "senha-1234")
+    res = client.post(
+        "/saas/login?next=https://evil.example/roubo",
+        data={"email": "redirect@x.com", "password": "senha-1234"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 302
+    assert res.headers.get("Location", "").endswith("/builder/workspaces")
+
+
 def test_logout_redireciona_pra_login(client):
     signup_user("alguem@x.com", "senha-1234")
     client.post("/saas/login", data={"email": "alguem@x.com", "password": "senha-1234"})

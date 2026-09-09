@@ -21,6 +21,7 @@ import os
 import secrets
 from datetime import datetime, timezone
 from typing import Iterable, Optional
+from urllib.parse import urlsplit
 
 import bcrypt
 from flask import Blueprint, flash, redirect, render_template, request, url_for, jsonify
@@ -93,6 +94,17 @@ _MIN_PASSWORD_LEN = 8
 auth_bp = Blueprint("saas_auth", __name__, url_prefix="/saas")
 login_manager = LoginManager()
 login_manager.login_view = "saas_auth.login"
+
+
+def _safe_next_url(value: Optional[str], default: str = "/builder/workspaces") -> str:
+    """Aceita somente caminhos locais, evitando redirects externos após login."""
+    candidate = (value or "").strip()
+    if not candidate:
+        return default
+    parsed = urlsplit(candidate)
+    if parsed.scheme or parsed.netloc or not parsed.path.startswith("/") or parsed.path.startswith("//"):
+        return default
+    return candidate
 
 
 @login_manager.unauthorized_handler
@@ -352,7 +364,7 @@ def signup_done():
 @limiter.limit("5/minute", methods=["POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("saas_auth.signup_done"))
+        return redirect(_safe_next_url(request.args.get("next"), "/builder/dashboard"))
 
     if request.method == "POST":
         email = request.form.get("email", "")
@@ -413,7 +425,7 @@ def login():
         except Exception:
             pass
 
-        next_url = request.args.get("next") or "/builder/workspaces"
+        next_url = _safe_next_url(request.args.get("next"))
         return redirect(next_url)
 
     return render_template("auth/login.html")

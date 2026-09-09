@@ -31,6 +31,26 @@ export class ApiError extends Error {
   }
 }
 
+let authRedirectStarted = false;
+
+export function loginUrl(): string {
+  if (typeof window === 'undefined') return '/saas/login';
+  const current = window.location.pathname + window.location.search + window.location.hash;
+  return `/saas/login?next=${encodeURIComponent(current)}`;
+}
+
+export function redirectToLogin(): void {
+  if (typeof window === 'undefined' || authRedirectStarted) return;
+  const path = window.location.pathname;
+  if (path.startsWith('/saas/login') || path.startsWith('/saas/signup')) return;
+  authRedirectStarted = true;
+  window.location.replace(loginUrl());
+}
+
+export function isAuthError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -60,10 +80,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     if (res.status === 401 && typeof window !== 'undefined') {
       const isB2C = path.startsWith('/api/b2c') || path.startsWith('/b2c') || window.location.pathname.startsWith('/portal');
       const isAlreadyOnAuth = window.location.pathname.includes('/login') || window.location.pathname.includes('/signup');
-      if (!isB2C && !isAlreadyOnAuth) {
-        const nextUrl = encodeURIComponent(window.location.pathname + window.location.search);
-        window.location.href = `/saas/login?next=${nextUrl}`;
-      }
+      if (!isB2C && !isAlreadyOnAuth) redirectToLogin();
     }
 
     throw new ApiError(
@@ -112,10 +129,7 @@ export const api = {
       if (res.status === 401 && typeof window !== 'undefined') {
         const isB2C = path.startsWith('/api/b2c') || path.startsWith('/b2c') || window.location.pathname.startsWith('/portal');
         const isAlreadyOnAuth = window.location.pathname.includes('/login') || window.location.pathname.includes('/signup');
-        if (!isB2C && !isAlreadyOnAuth) {
-          const nextUrl = encodeURIComponent(window.location.pathname + window.location.search);
-          window.location.href = `/saas/login?next=${nextUrl}`;
-        }
+        if (!isB2C && !isAlreadyOnAuth) redirectToLogin();
       }
 
       throw new ApiError(

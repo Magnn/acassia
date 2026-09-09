@@ -1,3 +1,5 @@
+import { api } from './client';
+
 // POST /api/media/upload — multipart com 'file'; backend devolve { ok, url: '/media/xxx' }.
 // Limite do backend: 40 MB.
 
@@ -10,14 +12,9 @@ interface UploadResponse {
 export async function uploadMedia(file: File): Promise<string> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch('/api/media/upload', {
-    method: 'POST',
-    credentials: 'include',
-    body: fd,
-  });
-  const data = (await res.json()) as UploadResponse;
-  if (!res.ok || !data.ok || !data.url) {
-    throw new Error(data.error || `upload falhou (${res.status})`);
+  const data = await api.upload<UploadResponse>('/api/media/upload', fd);
+  if (!data.ok || !data.url) {
+    throw new Error(data.error || 'Não foi possível enviar o arquivo.');
   }
   return data.url;
 }

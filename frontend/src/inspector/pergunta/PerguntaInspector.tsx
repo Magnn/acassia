@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { patchConfig, readNum, readStr, type InspectorProps } from '../helpers';
+import { api } from '../../api/client';
 
 /* ── Constantes legado ──────────────────────────────────────────────── */
 const BUILTIN_KEYS = [
@@ -77,9 +78,8 @@ export default function PerguntaInspector({ node, onUpdate }: InspectorProps) {
   const fetchVars = useCallback(async () => {
     setLoadingVars(true);
     try {
-      const res = await fetch('/api/flows/tenant/variables');
-      const j = await res.json();
-      if (res.ok && j?.ok && Array.isArray(j.variables)) {
+      const j = await api.get<{ ok: boolean; variables: Array<{ key: string }> }>('/api/flows/tenant/variables');
+      if (j?.ok && Array.isArray(j.variables)) {
         setTenantVars(j.variables.map((r: any) => ({ key: String(r.key || '').trim() })).filter((r: any) => r.key));
       }
     } catch { /* ignore */ }
@@ -297,11 +297,7 @@ export default function PerguntaInspector({ node, onUpdate }: InspectorProps) {
                        onClick={async () => {
                          if (!newFieldName.trim()) return;
                          try {
-                           await fetch('/api/flows/tenant/variables', {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify({ key: newFieldName.trim(), value: '' }),
-                           });
+                           await api.post('/api/flows/tenant/variables', { key: newFieldName.trim(), value: '' });
                            await fetchVars();
                            onUpdate(patchConfig(node, { save_to_flow_field: newFieldName.trim(), output_var: newFieldName.trim() }));
                            setNewFieldName('');

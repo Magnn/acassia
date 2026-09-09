@@ -29,24 +29,7 @@ export const audioLibraryApi = {
     ),
 
   upload: async (form: FormData) => {
-    const res = await fetch('/saas/audio-library', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { Accept: 'application/json' },
-      body: form,
-    });
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
-    if (!res.ok) {
-      const err = new Error(`POST audio-library → ${res.status}`) as Error & {
-        status?: number;
-        body?: unknown;
-      };
-      err.status = res.status;
-      err.body = data;
-      throw err;
-    }
-    return data as { ok: boolean; item: AudioLibraryItem };
+    return api.upload<{ ok: boolean; item: AudioLibraryItem }>('/saas/audio-library', form);
   },
 
   update: (
