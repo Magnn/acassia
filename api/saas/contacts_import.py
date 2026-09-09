@@ -244,33 +244,8 @@ def sync_whatsapp_contacts():
     Sincroniza contatos existentes do aparelho e histórico retroativo de conversas.
     Paridade com o diálogo 'Sync existing contacts and chat history' do ChatbotX.
     """
-    db = SessionLocal()
-    try:
-        tenant_id = current_user.tenant_id
-
-        # Conta leads já existentes
-        existing_leads_count = db.query(models.Lead).filter_by(tenant_id=tenant_id).count()
-
-        # Registra no log de import
-        sync_record = models.ContactImport(
-            tenant_id=tenant_id,
-            name="WhatsApp Contacts Index (Automático)",
-            status="completed",
-            total_rows=existing_leads_count,
-            processed_rows=existing_leads_count,
-            success_rows=existing_leads_count,
-            failed_rows=0,
-            column_mapping={"channel": "whatsapp_coexist", "mode": "contacts_indexed"},
-            created_at=_agora_utc(),
-            completed_at=_agora_utc(),
-        )
-        db.add(sync_record)
-        db.commit()
-
-        return jsonify({
-            "ok": True,
-            "synced_contacts": existing_leads_count,
-            "message": f"Contatos da base WhatsApp indexados com sucesso ({existing_leads_count} contatos indexados).",
-        })
-    finally:
-        db.close()
+    return jsonify({
+        "ok": False,
+        "error": "whatsapp_history_sync_not_supported",
+        "message": "A sincronização retroativa depende do conector do provedor e ainda não está disponível.",
+    }), 501

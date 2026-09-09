@@ -168,9 +168,6 @@ def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
 
     matched_count = 0
     text_upper = text.upper()
-    dispatched_any = False
-    all_ok = True
-
     for rule in rules:
         if not rule.get("active", True):
             continue
@@ -180,17 +177,26 @@ def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
             reply_comment = rule.get("reply_comment")
             send_dm = rule.get("send_dm")
 
-            if reply_comment and access_token:
-                ok = reply_to_instagram_comment(comment_id, reply_comment, access_token)
-                dispatched_any = True
-                if not ok:
-                    all_ok = False
+            public_ok = not bool(reply_comment)
+            private_ok = not bool(send_dm)
 
-            if send_dm and access_token:
+            if reply_comment and receipt and receipt.public_reply_sent:
+                public_ok = True
+            elif reply_comment and access_token:
+                ok = reply_to_instagram_comment(comment_id, reply_comment, access_token)
+                public_ok = bool(ok)
+                if ok and receipt:
+                    receipt.public_reply_sent = True
+                    db.commit()
+
+            if send_dm and receipt and receipt.private_reply_sent:
+                private_ok = True
+            elif send_dm and access_token:
                 ok = send_instagram_private_reply(comment_id, send_dm, access_token)
-                dispatched_any = True
-                if not ok:
-                    all_ok = False
+                private_ok = bool(ok)
+                if ok and receipt:
+                    receipt.private_reply_sent = True
+                    db.commit()
 
             # Criar ou enriquecer lead
             lead_ident = sender_id or (f"ig_{sender_username}" if sender_username else f"comment_{comment_id}")
@@ -225,7 +231,8 @@ def process_social_comment(tenant_id: str, comment_data: dict, db) -> int:
 
             matched_count += 1
             if receipt:
-                receipt.status = "sent" if (not dispatched_any or all_ok) else "failed"
+                receipt.status = "sent" if (public_ok and private_ok) else "failed"
+                receipt.last_error = None if receipt.status == "sent" else "one_or_more_social_effects_failed"
                 db.commit()
             break  # Executa primeira regra correspondente
 

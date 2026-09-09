@@ -36,7 +36,7 @@ services:
       - "6379:6379"
     volumes:
       - redisdata:/data
-    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -62,8 +62,7 @@ services:
     environment:
       # Override DATABASE_URL para usar PostgreSQL do container
       DATABASE_URL: postgresql://meumisterio:${POSTGRES_PASSWORD:-meumisterio_2026_secure}@db:5432/meumisterio
-      # Redis local (se não usar Upstash)
-      # REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://redis:6379/0
       # Gunicorn workers
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-3}
     volumes:
@@ -88,6 +87,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://meumisterio:${POSTGRES_PASSWORD:-meumisterio_2026_secure}@db:5432/meumisterio
+      REDIS_URL: redis://redis:6379/0
     command: python task_worker.py
     volumes:
       - ./downloads:/app/downloads
@@ -107,9 +107,7 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://meumisterio:${POSTGRES_PASSWORD:-meumisterio_2026_secure}@db:5432/meumisterio
-    command: >
-      sh -c "python -c 'from db.database import engine, Base; from db.models import *; Base.metadata.create_all(bind=engine)' && 
-             echo '✅ Database tables created/synced'"
+    command: alembic upgrade heads
     profiles:
       - tools
 

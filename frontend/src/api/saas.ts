@@ -335,7 +335,7 @@ export const contactsImportApi = {
       message: string;
     }>('/saas/contacts/imports/process', body),
   syncWhatsApp: () =>
-    api.post<{ ok: boolean; synced_contacts: number; message: string }>('/saas/contacts/imports/sync-whatsapp'),
+    api.post<{ ok: boolean; synced_contacts?: number; error?: string; message: string }>('/saas/contacts/imports/sync-whatsapp'),
 };
 
 /* ── Subscriptions (Pacotes) ────────────────────────── */

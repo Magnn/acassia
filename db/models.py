@@ -2176,6 +2176,9 @@ class SocialWebhookReceipt(Base):
     provider = Column(String(32), nullable=False)
     event_key = Column(String(128), nullable=False)
     status = Column(String(32), default="sent", nullable=False)  # processing, sent, failed
+    public_reply_sent = Column(Boolean, default=False, nullable=False)
+    private_reply_sent = Column(Boolean, default=False, nullable=False)
+    last_error = Column(String(500), nullable=True)
     received_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 

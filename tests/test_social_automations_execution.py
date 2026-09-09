@@ -154,10 +154,12 @@ def test_process_social_comment_retries_on_failure():
         assert receipt.status == "failed"
 
         # 2. Webhook redelivery retry should succeed when DM succeeds
-        with patch("api.public.social_automations.reply_to_instagram_comment", return_value=True), \
-             patch("api.public.social_automations.send_instagram_private_reply", return_value=True):
+        with patch("api.public.social_automations.reply_to_instagram_comment", return_value=True) as retry_public, \
+             patch("api.public.social_automations.send_instagram_private_reply", return_value=True) as retry_dm:
             matched_retry = process_social_comment(tenant_id, comment_data, db)
             assert matched_retry == 1
+            retry_public.assert_not_called()
+            retry_dm.assert_called_once()
 
         receipt_after = db.query(models.SocialWebhookReceipt).filter_by(
             tenant_id=tenant_id, event_key="comment:comment_retry_1"
@@ -169,4 +171,3 @@ def test_process_social_comment_retries_on_failure():
         assert matched_dup == 0
     finally:
         db.close()
-

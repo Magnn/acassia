@@ -137,10 +137,11 @@ def test_sequence_lifecycle_and_chatbotx_parity(auth_client):
 
     from api.channels.base import ChannelResult
     from unittest.mock import patch
-    with patch("api.saas.sequences.WhatsAppChannelAdapter.send_message", return_value=ChannelResult(ok=True)):
+    with patch("api.utils.task_queue.enqueue_sequence_process", return_value=True):
         res_due = client.post("/saas/sequences/process-due")
-    assert res_due.status_code == 200
-    assert res_due.get_json()["processed"] >= 1
+    assert res_due.status_code == 202
+    with patch("api.saas.sequences.WhatsAppChannelAdapter.send_message", return_value=ChannelResult(ok=True)):
+        assert process_due_sequence_steps(tenant_id=user.tenant_id) >= 1
 
     # Verify enrollment advanced to step 1
     db = SessionLocal()
@@ -205,6 +206,8 @@ def test_sequence_dispatch_idempotency_and_transactional_claim(auth_client):
         assert dispatch.attempt == 1
         assert dispatch.enrollment_id == enrollment_id
         assert dispatch.idempotency_key == f"seq:{seq.id}:step:{step.id}:lead:{lead.id}:attempt:1"
+        step_db = db.query(models.SequenceStep).filter_by(id=step.id).one()
+        sent_count = step_db.sent_count
 
         # If next_run_at is somehow still in the past or reset, a second run must be idempotent
         en_after = db.query(models.ContactOnSequence).filter_by(id=enrollment_id).first()
@@ -215,4 +218,6 @@ def test_sequence_dispatch_idempotency_and_transactional_claim(auth_client):
         count2 = process_due_sequence_steps(tenant_id=user.tenant_id)
         # Should not send again because already_sent exists
         assert mock_send.call_count == 1
+        db.refresh(step_db)
+        assert step_db.sent_count == sent_count
         db.close()

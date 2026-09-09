@@ -46,7 +46,7 @@ def downgrade():
             op.drop_index('ix_sequence_dispatches_idempotency_key', 'sequence_dispatches')
             op.drop_column('sequence_dispatches', 'idempotency_key')
         if 'enrollment_id' in columns:
-            op.drop_index('bix_sequence_dispatches_enrollment_id', 'sequence_dispatches')
+            op.drop_index('ix_sequence_dispatches_enrollment_id', 'sequence_dispatches')
             op.drop_column('sequence_dispatches', 'enrollment_id')
         if 'provider_message_id' in columns:
             op.drop_column('sequence_dispatches', 'provider_message_id')

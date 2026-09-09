@@ -128,5 +128,5 @@ def test_contact_import_flow(auth_client):
 
     # 6. Test sync whatsapp
     res_sync = client.post("/saas/contacts/imports/sync-whatsapp")
-    assert res_sync.status_code == 200
-    assert res_sync.get_json()["synced_contacts"] == 2
+    assert res_sync.status_code == 501
+    assert res_sync.get_json()["error"] == "whatsapp_history_sync_not_supported"

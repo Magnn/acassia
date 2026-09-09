@@ -657,6 +657,7 @@ def process_due_sequence_steps(tenant_id: Optional[str] = None) -> int:
 
             dispatch_status = "sent"
             error_msg = None
+            newly_sent = False
             if not already_sent:
                 attempt = len(previous_dispatches) + 1
                 idem_key = f"seq:{en.sequence_id}:step:{step.id}:lead:{en.lead_id}:attempt:{attempt}"
@@ -689,6 +690,7 @@ def process_due_sequence_steps(tenant_id: Optional[str] = None) -> int:
                     dispatch.provider_message_id = result.message_id
                     dispatch.dispatched_at = _agora_utc()
                     dispatch_status = "sent"
+                    newly_sent = True
                     logger.info("[SEQUENCE] Sent step=%s sequence=%s lead=%s msg_id=%s", step.order, en.sequence_id, lead.id, result.message_id)
                 except Exception as ex:
                     dispatch.status = "failed"
@@ -697,9 +699,9 @@ def process_due_sequence_steps(tenant_id: Optional[str] = None) -> int:
                     error_msg = str(ex)[:200]
                 db.commit()
 
-            if dispatch_status == "sent":
+            if newly_sent:
                 step.sent_count = (step.sent_count or 0) + 1
-            else:
+            elif dispatch_status != "sent":
                 step.failed_count = (step.failed_count or 0) + 1
 
             if dispatch_status != "sent":
@@ -739,8 +741,10 @@ def trigger_process_due():
     from api.utils.task_queue import enqueue_sequence_process
     enqueued = enqueue_sequence_process(tenant_id=current_user.tenant_id)
     if not enqueued:
-        count = process_due_sequence_steps(tenant_id=current_user.tenant_id)
-        return jsonify({"ok": True, "enqueued": False, "processed": count, "mode": "sync_fallback"}), 200
+        return jsonify({
+            "ok": False, "error": "task_queue_unavailable",
+            "message": "Fila de sequências indisponível. Tente novamente.",
+        }), 503
     return jsonify({"ok": True, "enqueued": True, "processed": 0, "mode": "queued"}), 202
 
 
