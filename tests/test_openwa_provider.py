@@ -234,12 +234,14 @@ def test_whatsapp_channel_adapter_parses_openwa_payload():
 
 
 def test_openwa_webhook_route():
+    import uuid
     from app import app
 
+    random_id = f"openwa_hook_{uuid.uuid4().hex[:8]}"
     payload = {
         "event": "onMessage",
         "data": {
-            "id": "openwa_hook_999",
+            "id": random_id,
             "from": "5511888887777@c.us",
             "body": "Quero saber meu horóscopo",
             "type": "chat",
