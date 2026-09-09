@@ -48,9 +48,13 @@
         <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300">
           Senha
         </label>
-        <span class="text-xs text-zinc-500 hover:text-indigo-400 transition cursor-default">
+        <button 
+          type="button" 
+          id="openForgotModal" 
+          class="text-xs text-zinc-500 hover:text-indigo-400 transition cursor-pointer font-normal focus:outline-none"
+        >
           Esqueceu a senha?
-        </span>
+        </button>
       </div>
       <div class="relative">
         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
@@ -129,10 +133,96 @@
   </div>
 </div>
 
+<!-- Modal de Recuperação de Senha -->
+<div 
+  id="forgotModal" 
+  class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="forgotModalTitle"
+>
+  <div 
+    id="forgotModalCard"
+    class="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-7 shadow-2xl shadow-black/80 scale-95 transition-all duration-200 relative"
+  >
+    <div class="flex items-start justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+        </div>
+        <div>
+          <h2 id="forgotModalTitle" class="text-lg font-bold text-white">Recuperar Senha</h2>
+          <p class="text-xs text-zinc-400">Instruções para redefinir seu acesso</p>
+        </div>
+      </div>
+      <button 
+        type="button" 
+        id="closeForgotModal" 
+        class="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-800 transition"
+        aria-label="Fechar"
+      >
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Alert dinâmico -->
+    <div id="forgotAlert" class="hidden mb-4 p-3.5 rounded-xl text-xs flex flex-col gap-1.5"></div>
+
+    <form id="forgotForm" class="space-y-4">
+      <div>
+        <label for="forgotEmail" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+          E-mail cadastrado
+        </label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <input 
+            type="email" 
+            id="forgotEmail" 
+            name="email" 
+            required 
+            placeholder="nome@empresa.com"
+            class="w-full pl-10 pr-3.5 py-2.5 bg-zinc-950/70 border border-zinc-800 rounded-xl text-zinc-100 placeholder:text-zinc-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+          >
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button 
+          type="button" 
+          id="cancelForgotBtn" 
+          class="px-4 py-2.5 rounded-xl border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold transition"
+        >
+          Cancelar
+        </button>
+        <button 
+          type="submit" 
+          id="submitForgotBtn" 
+          class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/25 transition flex items-center gap-2"
+        >
+          <span id="forgotBtnText">Enviar Link</span>
+          <svg id="forgotSpinner" class="w-3.5 h-3.5 animate-spin hidden text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   // Toggle Mostrar/Ocultar Senha
   const toggleBtn = document.getElementById('togglePassword');
   const passwordInput = document.getElementById('password');
+  const emailInput = document.getElementById('email');
   const eyeIcon = document.getElementById('eyeIcon');
   const eyeOffIcon = document.getElementById('eyeOffIcon');
 
@@ -159,6 +249,103 @@
       btnText.textContent = 'Autenticando...';
       btnArrow.classList.add('hidden');
       btnSpinner.classList.remove('hidden');
+    });
+  }
+
+  // Modal de Recuperação de Senha
+  const forgotModal = document.getElementById('forgotModal');
+  const forgotModalCard = document.getElementById('forgotModalCard');
+  const openForgotModalBtn = document.getElementById('openForgotModal');
+  const closeForgotModalBtn = document.getElementById('closeForgotModal');
+  const cancelForgotBtn = document.getElementById('cancelForgotBtn');
+  const forgotForm = document.getElementById('forgotForm');
+  const forgotEmail = document.getElementById('forgotEmail');
+  const forgotAlert = document.getElementById('forgotAlert');
+  const submitForgotBtn = document.getElementById('submitForgotBtn');
+  const forgotBtnText = document.getElementById('forgotBtnText');
+  const forgotSpinner = document.getElementById('forgotSpinner');
+
+  function openModal() {
+    if (!forgotModal) return;
+    if (emailInput && emailInput.value && forgotEmail && !forgotEmail.value) {
+      forgotEmail.value = emailInput.value.trim();
+    }
+    forgotModal.classList.remove('opacity-0', 'pointer-events-none');
+    forgotModal.classList.add('opacity-100');
+    forgotModalCard.classList.remove('scale-95');
+    forgotModalCard.classList.add('scale-100');
+    setTimeout(() => {
+      if (forgotEmail) forgotEmail.focus();
+    }, 100);
+  }
+
+  function closeModal() {
+    if (!forgotModal) return;
+    forgotModal.classList.remove('opacity-100');
+    forgotModal.classList.add('opacity-0', 'pointer-events-none');
+    forgotModalCard.classList.remove('scale-100');
+    forgotModalCard.classList.add('scale-95');
+  }
+
+  if (openForgotModalBtn) openForgotModalBtn.addEventListener('click', openModal);
+  if (closeForgotModalBtn) closeForgotModalBtn.addEventListener('click', closeModal);
+  if (cancelForgotBtn) cancelForgotBtn.addEventListener('click', closeModal);
+
+  if (forgotModal) {
+    forgotModal.addEventListener('click', (e) => {
+      if (e.target === forgotModal) closeModal();
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && forgotModal && !forgotModal.classList.contains('pointer-events-none')) {
+      closeModal();
+    }
+  });
+
+  if (new URLSearchParams(window.location.search).get('forgot')) {
+    openModal();
+  }
+
+  if (forgotForm) {
+    forgotForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = forgotEmail.value.trim();
+      if (!email) return;
+
+      submitForgotBtn.disabled = true;
+      submitForgotBtn.classList.add('opacity-80', 'cursor-not-allowed');
+      forgotBtnText.textContent = 'Enviando...';
+      forgotSpinner.classList.remove('hidden');
+      forgotAlert.classList.add('hidden');
+
+      try {
+        const resp = await fetch("{{ url_for('saas_auth.forgot_password') }}", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ email: email })
+        });
+
+        const data = await resp.json();
+        forgotAlert.className = 'mb-4 p-3.5 rounded-xl text-xs flex flex-col gap-2 bg-emerald-950/70 border border-emerald-800/60 text-emerald-200';
+        
+        let htmlContent = `<div>${data.message || 'Se o e-mail estiver cadastrado, as instruções foram processadas.'}</div>`;
+        if (data.reset_url) {
+          htmlContent += `<a href="${data.reset_url}" class="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition self-start">Redefinir Senha Agora &rarr;</a>`;
+        }
+        forgotAlert.innerHTML = htmlContent;
+        forgotAlert.classList.remove('hidden');
+        forgotBtnText.textContent = 'Link Enviado';
+      } catch (err) {
+        forgotAlert.className = 'mb-4 p-3.5 rounded-xl text-xs flex flex-col gap-1.5 bg-rose-950/70 border border-rose-800/60 text-rose-200';
+        forgotAlert.textContent = 'Não foi possível processar a solicitação no momento. Tente novamente.';
+        forgotAlert.classList.remove('hidden');
+        submitForgotBtn.disabled = false;
+        submitForgotBtn.classList.remove('opacity-80', 'cursor-not-allowed');
+        forgotBtnText.textContent = 'Enviar Link';
+      } finally {
+        forgotSpinner.classList.add('hidden');
+      }
     });
   }
 </script>

@@ -16,10 +16,11 @@ testáveis sem Flask. Endpoints são finos — apenas marshalling HTTP.
 from __future__ import annotations
 
 import functools
+import hashlib
 import logging
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Iterable, Optional
 from urllib.parse import urlsplit
 
@@ -436,6 +437,159 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for("saas_auth.login"))
+
+
+@auth_bp.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("5/minute")
+def forgot_password():
+    """
+    Solicitação de recuperação de senha.
+    Em requisições GET, redireciona para o login abrindo o modal de recuperação.
+    Em requisições POST, gera o token seguro de uso único e grava no banco.
+    """
+    if request.method == "GET":
+        return redirect(url_for("saas_auth.login", forgot="1"))
+
+    data = request.get_json(silent=True) or request.form
+    email = (data.get("email") or "").strip().lower()
+
+    if not email or "@" not in email:
+        msg = "Se o e-mail informado estiver cadastrado, você receberá as instruções em instantes."
+        if request.is_json:
+            return jsonify({"ok": True, "message": msg})
+        flash(msg, "info")
+        return redirect(url_for("saas_auth.login"))
+
+    db = SessionLocal()
+    try:
+        user = db.query(models.User).filter_by(email=email, is_active=True).first()
+        if not user or getattr(user, "deleted_at", None):
+            msg = "Se o e-mail informado estiver cadastrado, você receberá as instruções em instantes."
+            if request.is_json:
+                return jsonify({"ok": True, "message": msg})
+            flash(msg, "info")
+            return redirect(url_for("saas_auth.login"))
+
+        plain = secrets.token_urlsafe(32)
+        digest = hashlib.sha256(plain.encode("utf-8")).hexdigest()
+
+        # Invalida tokens anteriores não-usados deste usuário
+        db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.user_id == user.id,
+            models.PasswordResetToken.used_at.is_(None),
+        ).delete()
+
+        token_obj = models.PasswordResetToken(
+            user_id=user.id,
+            token_hash=digest,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            requested_ip=request.remote_addr,
+        )
+        db.add(token_obj)
+        db.commit()
+
+        reset_url = url_for("saas_auth.reset_password", token=plain, _external=True)
+        logger.info(
+            "[saas_auth.password_reset] user_id=%s ip=%s email=%s reset_url=%s",
+            user.id, request.remote_addr, email, reset_url,
+        )
+
+        resp_payload = {
+            "ok": True,
+            "message": "Se o e-mail informado estiver cadastrado, você receberá as instruções em instantes.",
+        }
+
+        # Em ambiente local / dev ou teste, expõe o link diretamente
+        if os.getenv("FLASK_ENV") != "production" or os.getenv("ENABLE_DEV_RESET_LINK") == "1":
+            resp_payload["reset_url"] = reset_url
+
+        if request.is_json:
+            return jsonify(resp_payload)
+
+        flash("Se o e-mail informado estiver cadastrado, você receberá as instruções em instantes.", "info")
+        return redirect(url_for("saas_auth.login"))
+    finally:
+        db.close()
+
+
+@auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+@auth_bp.route("/password-reset", methods=["GET", "POST"])
+@limiter.limit("10/minute")
+def reset_password(token: Optional[str] = None):
+    """
+    Visualização e submissão do formulário de redefinição de senha com token de 1h.
+    """
+    if not token:
+        token = request.args.get("token") or request.form.get("token") or ""
+    token = token.strip()
+
+    if not token:
+        flash("Token de recuperação ausente ou inválido.", "error")
+        return redirect(url_for("saas_auth.login"))
+
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    db = SessionLocal()
+    try:
+        token_row = db.query(models.PasswordResetToken).filter_by(token_hash=digest).first()
+        if not token_row or token_row.used_at:
+            flash("Link de recuperação inválido ou já utilizado. Por favor, solicite um novo.", "error")
+            return redirect(url_for("saas_auth.login"))
+
+        expires_at = token_row.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at < datetime.now(timezone.utc):
+            flash("Este link de recuperação expirou (validade de 1 hora). Solicite um novo.", "error")
+            return redirect(url_for("saas_auth.login"))
+
+        user = db.query(models.User).filter_by(id=token_row.user_id, is_active=True).first()
+        if not user:
+            flash("Usuário não encontrado.", "error")
+            return redirect(url_for("saas_auth.login"))
+
+        if request.method == "POST":
+            new_password = (request.form.get("password") or "").strip()
+            confirm_password = (request.form.get("confirm_password") or "").strip()
+
+            if not new_password:
+                flash("Por favor, informe a nova senha.", "error")
+                return render_template("auth/reset_password.html", token=token), 400
+
+            if new_password != confirm_password:
+                flash("As senhas informadas não coincidem.", "error")
+                return render_template("auth/reset_password.html", token=token), 400
+
+            if len(new_password) < _MIN_PASSWORD_LEN:
+                flash(f"A senha deve ter no mínimo {_MIN_PASSWORD_LEN} caracteres.", "error")
+                return render_template("auth/reset_password.html", token=token), 400
+
+            try:
+                from api.saas.security import validate_password_strength, PasswordPolicyError
+                validate_password_strength(new_password, min_len=_MIN_PASSWORD_LEN)
+            except PasswordPolicyError as exc:
+                flash(str(exc), "error")
+                return render_template("auth/reset_password.html", token=token), 422
+            except Exception:
+                pass
+
+            user.password_hash = hash_password(new_password)
+            user.last_password_change_at = datetime.now(timezone.utc)
+            token_row.used_at = datetime.now(timezone.utc)
+            db.commit()
+
+            try:
+                from api.saas.security import record_login_success
+                record_login_success(user.id)
+            except Exception:
+                pass
+
+            logger.info("[saas_auth.password_reset_success] user_id=%s email=%s", user.id, user.email)
+            flash("Senha redefinida com sucesso! Você já pode entrar com sua nova senha.", "success")
+            return redirect(url_for("saas_auth.login"))
+
+        return render_template("auth/reset_password.html", token=token)
+    finally:
+        db.close()
 
 
 @auth_bp.route("/me", methods=["GET"])

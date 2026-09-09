@@ -25,6 +25,7 @@ _TEMPLATE_DIR = str(_PROJECT_ROOT / "templates")
 def _setup_db():
     Base.metadata.create_all(bind=db_engine)
     db = SessionLocal()
+    db.query(models.PasswordResetToken).delete()
     db.query(models.User).delete()
     db.commit()
     db.close()
@@ -304,3 +305,86 @@ def test_authenticated_user_get_id_eh_str():
     u = AuthenticatedUser(user_id=42, email="x@x.com", tenant_id="tenant_xyz", role="operator")
     assert u.get_id() == "42"
     assert u.is_authenticated is True
+
+
+# ─── Recuperação de Senha (Forgot / Reset Password) ──────────────────────────
+
+def test_forgot_password_email_inexistente_retorna_ok_silencioso(client):
+    res = client.post(
+        "/saas/forgot-password",
+        json={"email": "naoexiste@empresa.com"},
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["ok"] is True
+    assert "reset_url" not in data
+
+
+def test_forgot_password_gera_token_para_usuario_existente(client):
+    signup_user("usuario.teste@empresa.com", "senha-original-123")
+    res = client.post(
+        "/saas/forgot-password",
+        json={"email": "usuario.teste@empresa.com"},
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["ok"] is True
+
+    db = SessionLocal()
+    user = db.query(models.User).filter_by(email="usuario.teste@empresa.com").first()
+    token_row = db.query(models.PasswordResetToken).filter_by(user_id=user.id).first()
+    assert token_row is not None
+    assert token_row.used_at is None
+    db.close()
+
+
+def test_reset_password_fluxo_completo(client):
+    signup_user("mudar.senha@empresa.com", "senha-antiga-123")
+    res = client.post(
+        "/saas/forgot-password",
+        json={"email": "mudar.senha@empresa.com"},
+    )
+    assert res.status_code == 200
+
+    db = SessionLocal()
+    user = db.query(models.User).filter_by(email="mudar.senha@empresa.com").first()
+    token_row = db.query(models.PasswordResetToken).filter_by(user_id=user.id).first()
+    assert token_row is not None
+    db.close()
+
+    # Como o token no banco é armazenado em hash sha256, se a rota retorna reset_url em dev:
+    data = res.get_json()
+    reset_url = data.get("reset_url")
+    assert reset_url is not None
+    token = reset_url.split("/reset-password/")[1].split("?")[0]
+
+    # 1. GET no link de redefinição
+    get_res = client.get(f"/saas/reset-password/{token}")
+    assert get_res.status_code == 200
+    assert b"Criar Nova Senha" in get_res.data
+
+    # 2. POST com senhas diferentes deve falhar
+    err_res = client.post(
+        f"/saas/reset-password/{token}",
+        data={"password": "nova-senha-123", "confirm_password": "senha-diferente"},
+    )
+    assert err_res.status_code == 400
+
+    # 3. POST com sucesso
+    post_res = client.post(
+        f"/saas/reset-password/{token}",
+        data={"password": "nova-senha-segura-123", "confirm_password": "nova-senha-segura-123"},
+        follow_redirects=False,
+    )
+    assert post_res.status_code == 302
+    assert "/saas/login" in post_res.headers.get("Location", "")
+
+    # 4. Verifica autenticação com a nova senha
+    authed_user = authenticate_user("mudar.senha@empresa.com", "nova-senha-segura-123")
+    assert authed_user is not None
+    assert authed_user.id == user.id
+
+    # 5. Token não pode ser reutilizado
+    reuse_res = client.get(f"/saas/reset-password/{token}", follow_redirects=False)
+    assert reuse_res.status_code == 302
+
