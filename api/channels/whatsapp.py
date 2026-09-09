@@ -59,6 +59,33 @@ class WhatsAppChannelAdapter(ChannelAdapter):
     def parse_inbound(self, payload: dict) -> list[InboundMessage]:
         messages = []
         try:
+            # 1. Formato OpenWA Gateway (event: onMessage / message)
+            if payload.get("event") in ("onMessage", "message") or ("from" in payload and "body" in payload and "entry" not in payload):
+                data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+                from_num = data.get("from") or data.get("sender", {}).get("id") or ""
+                # Remove sufixos @c.us / @g.us
+                clean_from = from_num.split("@")[0] if from_num else ""
+                msg_type = data.get("type", "chat")
+                format_type = "texto"
+                if msg_type in ("image", "ptt", "audio", "video", "document"):
+                    format_type = "audio" if msg_type in ("ptt", "audio") else msg_type
+                text = data.get("body") or data.get("caption") or ""
+                sender_name = data.get("sender", {}).get("pushname") or data.get("notifyName")
+                msg_id = data.get("id")
+
+                if clean_from:
+                    messages.append(InboundMessage(
+                        sender_id=clean_from,
+                        channel_type=self.channel_type,
+                        text=text,
+                        message_id=str(msg_id) if msg_id else None,
+                        format=format_type,
+                        sender_name=sender_name,
+                        raw_payload=payload,
+                    ))
+                return messages
+
+            # 2. Formato Oficial Meta Cloud API
             entry = (payload.get("entry") or [{}])[0]
             change = (entry.get("changes") or [{}])[0]
             val = change.get("value") or {}

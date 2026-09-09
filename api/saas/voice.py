@@ -570,9 +570,13 @@ def send_audio_to_lead():
             }), 503
         absolute_url = f"{public_base}{gen.audio_url}"
 
-        # Envia via provider
+        # Envia via provider (com simulação humanizada de gravação)
         try:
             from api.whatsapp_api import whatsapp_client
+            try:
+                whatsapp_client.simulate_presence(lead.telefone, presence="recording", delay_seconds=1.5)
+            except Exception:
+                pass
             ok = whatsapp_client.enviar_mensagem(
                 lead.telefone, absolute_url, formato="audio",
             )

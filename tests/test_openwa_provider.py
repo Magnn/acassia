@@ -201,3 +201,65 @@ def test_factory_resolves_openwa():
         assert prov.server_url == "http://openwa.local:3000"
         assert prov.session_id == "tenant_1"
         assert prov.api_key == "my_secret"
+
+
+def test_whatsapp_channel_adapter_parses_openwa_payload():
+    from api.channels.whatsapp import WhatsAppChannelAdapter
+    from api.channels.base import ChannelType
+
+    adapter = WhatsAppChannelAdapter(tenant_id="tenant_1")
+    openwa_payload = {
+        "event": "onMessage",
+        "data": {
+            "id": "openwa_inbound_123",
+            "from": "5511999998888@c.us",
+            "body": "Olá Sibila, gostaria de uma tiragem de tarot!",
+            "type": "chat",
+            "sender": {
+                "id": "5511999998888@c.us",
+                "pushname": "Maria Silva",
+            },
+        },
+    }
+
+    inbound = adapter.parse_inbound(openwa_payload)
+    assert len(inbound) == 1
+    msg = inbound[0]
+    assert msg.sender_id == "5511999998888"
+    assert msg.channel_type == ChannelType.WHATSAPP
+    assert msg.text == "Olá Sibila, gostaria de uma tiragem de tarot!"
+    assert msg.sender_name == "Maria Silva"
+    assert msg.message_id == "openwa_inbound_123"
+    assert msg.format == "texto"
+
+
+def test_openwa_webhook_route():
+    from app import app
+
+    payload = {
+        "event": "onMessage",
+        "data": {
+            "id": "openwa_hook_999",
+            "from": "5511888887777@c.us",
+            "body": "Quero saber meu horóscopo",
+            "type": "chat",
+            "fromMe": False,
+            "sender": {
+                "pushname": "Carlos",
+            },
+        },
+    }
+
+    with patch("app.inbox_manager.enqueue") as mock_enqueue:
+        with app.test_client() as client:
+            resp = client.post("/webhook/openwa/tenant_abc", json=payload)
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data.get("ok") is True
+            assert data.get("status") == "enqueued"
+            mock_enqueue.assert_called_once()
+            args, _ = mock_enqueue.call_args
+            assert args[0] == "5511888887777"
+            assert args[1]["texto_recebido"] == "Quero saber meu horóscopo"
+            assert args[1]["tenant_id"] == "tenant_abc"
+            assert args[1]["nome_perfil_whatsapp"] == "Carlos"

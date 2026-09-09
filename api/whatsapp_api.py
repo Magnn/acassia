@@ -135,5 +135,31 @@ class WhatsAppAPI:
                 pass
         return ok
 
+    def simulate_presence(
+        self,
+        numero: str,
+        presence: str = "composing",
+        delay_seconds: float = 0.0,
+    ) -> bool:
+        """
+        Simula presença humana (digitando / gravando áudio) no canal WhatsApp
+        do tenant atual antes do envio efetivo.
+        """
+        tid = _current_tenant_id()
+        try:
+            provider = get_provider_for_tenant(tid)
+            if hasattr(provider, "simulate_presence"):
+                return provider.simulate_presence(
+                    numero, presence=presence, delay_seconds=delay_seconds
+                )
+        except Exception as exc:
+            logger.debug("[simulate_presence] falha silenciosa: %s", exc)
+        return False
+
 
 whatsapp_client = WhatsAppAPI()
+
+
+def get_client_for_tenant(tenant_id: str):
+    """Retorna o provider configurado para o tenant informado."""
+    return get_provider_for_tenant(tenant_id)

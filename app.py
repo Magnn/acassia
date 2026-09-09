@@ -3978,6 +3978,12 @@ def integrations_summary():
                 "hint": "POST/GET: Webhook receptor de eventos do TikTok for Business.",
             },
             {
+                "id": "openwa",
+                "label": "OpenWA / WA-Automate Gateway",
+                "path": "/webhook/openwa",
+                "hint": "POST: Receptor de eventos e mensagens (onMessage) do Gateway OpenWA.",
+            },
+            {
                 "id": "api_v1",
                 "label": "Developer API v1 (Zapier, Make, n8n, CRM Externo)",
                 "path": "/api/v1/messages/send",
@@ -4546,6 +4552,89 @@ def _bootstrap_redis_inbound_consumer():
 
 
 _bootstrap_redis_inbound_consumer()
+
+
+# ─────────────────────────────────────────────────────────────────────
+# WEBHOOK (OPENWA / WA-AUTOMATE GATEWAY)
+# ─────────────────────────────────────────────────────────────────────
+
+@app.route("/webhook/openwa", methods=["POST"])
+@app.route("/webhook/openwa/<tenant_id>", methods=["POST"])
+def webhook_openwa(tenant_id: str | None = None):
+    """
+    Receptor de webhook para eventos do OpenWA / wa-automate Gateway.
+    Recebe mensagens recebidas (onMessage) e enfileira no motor inteligente.
+    """
+    data = request.get_json(silent=True) or {}
+    if not data:
+        return "NO_DATA", 400
+
+    resolved_tid = tenant_id or request.args.get("tenant_id") or os.getenv("MEU_MISTERIO_TENANT_ID", "default")
+    event = str(data.get("event") or data.get("type") or "message").strip()
+
+    # Se for evento de mensagem (onMessage ou objeto direto de mensagem)
+    msg_data = data.get("data") if isinstance(data.get("data"), dict) else data
+    raw_from = msg_data.get("from") or (msg_data.get("sender") or {}).get("id") or ""
+    sender_digits = "".join(ch for ch in str(raw_from).split("@")[0] if ch.isdigit())
+
+    if not sender_digits:
+        return jsonify({"ok": True, "status": "ignored_non_message_event"}), 200
+
+    # Ignora mensagens enviadas por nós mesmos (fromMe)
+    if msg_data.get("fromMe") is True:
+        return jsonify({"ok": True, "status": "ignored_from_me"}), 200
+
+    msg_id = str(msg_data.get("id") or "")
+    if msg_id:
+        with LOCK_IDEMPOTENCIA:
+            if msg_id in CACHE_MENSAGENS:
+                return jsonify({"ok": True, "status": "duplicate_in_memory"}), 200
+        if not _try_claim_wamid_db(msg_id):
+            with LOCK_IDEMPOTENCIA:
+                if msg_id not in CACHE_MENSAGENS:
+                    CACHE_MENSAGENS.append(msg_id)
+            return jsonify({"ok": True, "status": "duplicate_in_db"}), 200
+        with LOCK_IDEMPOTENCIA:
+            CACHE_MENSAGENS.append(msg_id)
+
+    raw_type = str(msg_data.get("type") or "chat").lower()
+    text = str(msg_data.get("body") or msg_data.get("caption") or "").strip()
+    sender_name = (
+        (msg_data.get("sender") or {}).get("pushname")
+        or msg_data.get("notifyName")
+        or ""
+    )
+
+    tipo = "texto"
+    if raw_type in ("image", "photo"):
+        tipo = "image"
+    elif raw_type in ("audio", "ptt", "voice"):
+        tipo = "audio"
+    elif raw_type in ("video", "document"):
+        tipo = raw_type
+
+    payload = {
+        "telefone": sender_digits,
+        "texto_recebido": text,
+        "tipo_mensagem": tipo,
+        "imagem_url": "",
+        "media_url": "",
+        "meta_msg_id": msg_id,
+        "meta_media_id": "",
+        "nome_perfil_whatsapp": sender_name,
+        "phone_number_id": "openwa",
+        "tenant_id": resolved_tid,
+    }
+
+    try:
+        inbox_manager.enqueue(sender_digits, payload)
+        logger.info("📬 [OPENWA-WEBHOOK] Mensagem enfileirada: %s (tenant=%s)", sender_digits, resolved_tid)
+    except Exception as exc:
+        logger.error("🚨 [OPENWA-WEBHOOK] Falha ao enfileirar: %s", exc)
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+    return jsonify({"ok": True, "status": "enqueued"}), 200
+
 
 # ─────────────────────────────────────────────────────────────────────
 # WEBHOOK (CAKTO) - GESTÃO DE VENDAS
