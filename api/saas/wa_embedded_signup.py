@@ -28,7 +28,7 @@ GRAPH_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
 
 def _get_meta_app_credentials():
-    app_id = (os.getenv("META_APP_ID") or os.getenv("APP_ID") or "2344565976011888").strip()
+    app_id = (os.getenv("META_APP_ID") or os.getenv("APP_ID") or "").strip()
     app_secret = (os.getenv("META_APP_SECRET") or os.getenv("APP_SECRET") or "").strip()
     config_id = os.getenv("META_CONFIG_ID", "").strip()
     return app_id, app_secret, config_id
@@ -40,10 +40,18 @@ def get_config():
     """Retorna se o Embedded Signup está configurado e as credenciais públicas."""
     app_id, app_secret, config_id = _get_meta_app_credentials()
     return jsonify({
-        "configured": bool(app_id and app_secret),
+        "configured": bool(app_id and app_secret and config_id),
+        "exchange_configured": bool(app_id and app_secret),
         "app_id": app_id or None,
         "config_id": config_id or None,
         "graph_version": GRAPH_API_VERSION,
+        "missing": [
+            key for key, value in (
+                ("META_APP_ID", app_id),
+                ("META_APP_SECRET", app_secret),
+                ("META_CONFIG_ID", config_id),
+            ) if not value
+        ],
     })
 
 

@@ -952,7 +952,7 @@ function MetaEmbeddedModal({
   onSuccess,
   onFallbackManual,
 }: {
-  config: { configured?: boolean; app_id?: string; config_id?: string; graph_version?: string } | undefined;
+  config: { configured?: boolean; exchange_configured?: boolean; app_id?: string; config_id?: string; graph_version?: string; missing?: string[] } | undefined;
   onClose: () => void;
   onSuccess: () => void;
   onFallbackManual: () => void;
@@ -973,15 +973,19 @@ function MetaEmbeddedModal({
     onError: (err: any) => toast.error(err?.message || 'Falha ao autorizar com a Meta.'),
   });
 
-  const effectiveAppId = config?.app_id || '2344565976011888';
-  const isConfigured = Boolean(config?.configured || effectiveAppId);
+  const effectiveAppId = config?.app_id || '';
+  const isConfigured = Boolean(config?.configured && effectiveAppId && config?.config_id);
 
   const launchMetaOAuth = () => {
+    if (!isConfigured) {
+      toast.error(`Embedded Signup indisponível. Falta configurar: ${(config?.missing || ['META_CONFIG_ID']).join(', ')}`);
+      return;
+    }
     const redirectUri = `${window.location.origin}/builder/wa-connection`;
     const version = config?.graph_version || 'v20.0';
-    const oauthUrl = `https://www.facebook.com/${version}/dialog/oauth?client_id=${effectiveAppId}&redirect_uri=${encodeURIComponent(
+    const oauthUrl = `https://www.facebook.com/${version}/dialog/oauth?client_id=${effectiveAppId}&config_id=${encodeURIComponent(config!.config_id!)}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&response_type=code&scope=whatsapp_business_management,whatsapp_business_messaging`;
+    )}&response_type=code&override_default_response_type=true`;
 
     const width = 600;
     const height = 700;
@@ -994,7 +998,10 @@ function MetaEmbeddedModal({
     );
 
     const handleMessage = (event: MessageEvent) => {
-      if (!event.origin.includes(window.location.hostname) && !event.origin.includes('facebook.com')) return;
+      const origin = new URL(event.origin);
+      const fromThisApp = origin.origin === window.location.origin;
+      const fromFacebook = origin.protocol === 'https:' && (origin.hostname === 'facebook.com' || origin.hostname.endsWith('.facebook.com'));
+      if (!fromThisApp && !fromFacebook) return;
       try {
         const raw = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (raw?.type === 'WA_EMBEDDED_SIGNUP' || raw?.code) {
@@ -1016,6 +1023,32 @@ function MetaEmbeddedModal({
     };
 
     window.addEventListener('message', handleMessage);
+
+    const startedAt = Date.now();
+    const popupPoll = window.setInterval(() => {
+      if (!popup || popup.closed) {
+        window.clearInterval(popupPoll);
+        window.removeEventListener('message', handleMessage);
+        return;
+      }
+      try {
+        if (popup.location.origin === window.location.origin) {
+          const returnedCode = new URL(popup.location.href).searchParams.get('code');
+          if (returnedCode) {
+            window.clearInterval(popupPoll);
+            window.removeEventListener('message', handleMessage);
+            popup.close();
+            exchangeMut.mutate({ code: returnedCode, nickname });
+          }
+        }
+      } catch { /* popup ainda está no domínio da Meta */ }
+      if (Date.now() - startedAt > 120_000) {
+        window.clearInterval(popupPoll);
+        window.removeEventListener('message', handleMessage);
+        if (!popup.closed) popup.close();
+        toast.error('A autorização da Meta expirou. Tente novamente.');
+      }
+    }, 500);
   };
 
   return (
@@ -1042,6 +1075,13 @@ function MetaEmbeddedModal({
         </header>
 
         <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          {!isConfigured && (
+            <div className="rounded-2xl border border-amber-700/50 bg-amber-950/30 p-4 text-xs text-amber-200">
+              <strong>Configuração do servidor incompleta.</strong>
+              <p className="mt-1 text-amber-100/75">Falta: {(config?.missing || ['META_APP_ID', 'META_APP_SECRET', 'META_CONFIG_ID']).join(', ')}.</p>
+            </div>
+          )}
+
           {/* Banner de destaque 1 clique */}
           <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-600/15 via-blue-900/10 to-transparent border border-blue-500/30 space-y-3">
             <div className="flex items-start gap-3">
@@ -1069,7 +1109,7 @@ function MetaEmbeddedModal({
             <button
               type="button"
               onClick={launchMetaOAuth}
-              disabled={exchangeMut.isPending}
+              disabled={!isConfigured || exchangeMut.isPending}
               className="w-full flex items-center justify-center gap-2.5 py-3 bg-[#0082FB] hover:bg-[#0070db] text-white rounded-xl font-bold text-xs shadow-lg shadow-[#0082FB]/25 transition-all active:scale-[0.99] disabled:opacity-50"
             >
               <MetaLogo className="w-4 h-4" />
