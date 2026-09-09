@@ -531,6 +531,13 @@ def forgot_password():
         db.close()
 
 
+@auth_bp.route("/email-status", methods=["GET"])
+def email_status():
+    """Retorna diagnóstico de provedores de e-mail detectados no ambiente."""
+    from api.utils.email_sender import get_email_diagnostic_info
+    return jsonify(get_email_diagnostic_info())
+
+
 @auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
 @auth_bp.route("/password-reset", methods=["GET", "POST"])
 @limiter.limit("10/minute")
