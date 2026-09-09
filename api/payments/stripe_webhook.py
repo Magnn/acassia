@@ -97,8 +97,11 @@ def stripe_webhook():
             logger.info("[stripe_webhook] event_type=%s não tratado (ack)", event_type)
     except Exception:
         logger.exception("[stripe_webhook] erro processando %s", event_type)
-        # 200 mesmo: idempotency já foi reivindicada, evita reprocessamento.
-        return "PROCESSED_WITH_ERROR", 200
+        # Libera a claim somente quando o handler falha. Responder 5xx permite
+        # que o Stripe faça redelivery em vez de perder o evento para sempre.
+        from api.payments.idempotency import release_payment_event
+        release_payment_event("stripe", event_id, tenant_id or "default")
+        return "PROCESSING_ERROR", 500
 
     return "OK", 200
 

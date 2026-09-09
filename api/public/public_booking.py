@@ -159,19 +159,21 @@ def confirm_public_booking():
     slot_date = data.get("date")
     slot_time = data.get("time")
 
-    if not name or not phone or not slot_date or not slot_time:
+    if not tenant_id or not name or not phone or not slot_date or not slot_time:
         return jsonify({"ok": False, "error": "Campos obrigatorios faltando"}), 400
 
     db = SessionLocal()
     try:
+        if not db.query(models.User.id).filter_by(tenant_id=tenant_id, ativo=True).first():
+            return jsonify({"ok": False, "error": "tenant_not_found"}), 404
         # Encontra ou cria o lead
-        lead = db.query(models.Lead).filter_by(tenant_id=tenant_id, phone=phone).first()
+        lead = db.query(models.Lead).filter_by(tenant_id=tenant_id, telefone=phone).first()
         if not lead:
             lead = models.Lead(
                 tenant_id=tenant_id,
-                phone=phone,
-                name=name,
-                status="agendado",
+                telefone=phone,
+                nome=name,
+                node_atual="agendado",
             )
             db.add(lead)
             db.flush()

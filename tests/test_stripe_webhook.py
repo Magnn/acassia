@@ -267,10 +267,10 @@ def test_evento_nao_tratado_retorna_200(client):
     assert res.status_code == 200
 
 
-# ─── Resiliência: handler crasha mas retorna 200 ─────────────────────────────
+# ─── Resiliência: handler crasha, libera claim e retorna 500 para redelivery ──────
 
-def test_handler_crash_retorna_200_mas_loga(client):
-    """Se handler crash, retorna 200 com 'PROCESSED_WITH_ERROR' pra não disparar retry infinito do Stripe."""
+def test_handler_crash_retorna_500_e_libera_claim(client):
+    """Se handler crasha, retorna 500 e libera a claim para permitir redelivery do Stripe."""
     payload = _make_event(
         "evt_crash", "checkout.session.completed",
         {"customer": "cus_x", "subscription": "sub_x", "metadata": {"tenant_id": "t1"}},
@@ -283,5 +283,6 @@ def test_handler_crash_retorna_200_mas_loga(client):
             headers={"Stripe-Signature": _build_signature(payload)},
         )
 
-    assert res.status_code == 200
-    assert b"ERROR" in res.data
+    assert res.status_code == 500
+    assert b"PROCESSING_ERROR" in res.data
+

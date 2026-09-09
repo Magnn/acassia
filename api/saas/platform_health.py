@@ -111,7 +111,6 @@ def health_readiness():
 _feature_events: list[dict] = []  # In-memory buffer — flush to DB periodically
 
 
-@health_bp.route("/api/telemetry/event", methods=["POST"])
 def track_event():
     """Recebe eventos de analytics do frontend."""
     data = request.get_json(silent=True) or {}

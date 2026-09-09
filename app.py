@@ -995,7 +995,6 @@ def _find_entity_in_snapshot(snapshot: dict, scope: str, entity_id: str) -> dict
 
 
 @app.route("/api/health", methods=["GET"])
-@app.route("/health", methods=["GET"])
 def api_health():
     """Liveness para monitoramento e debug rápido."""
     return jsonify({
@@ -1518,7 +1517,6 @@ def api_flows_blueprints():
         db.close()
 
 
-@app.route("/api/flows/blueprints/<int:bid>", methods=["GET", "PATCH", "DELETE"])
 @login_required
 @require_admin
 def api_flows_blueprint_one(bid: int):
@@ -1635,7 +1633,6 @@ def api_flows_publish_blueprint():
         db.close()
 
 
-@app.route("/api/flows/publish/status", methods=["GET"])
 @login_required
 @require_admin
 def api_flows_publish_blueprint_status():

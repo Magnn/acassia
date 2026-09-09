@@ -1,6 +1,9 @@
 import logging
+import os
+from functools import wraps
 from datetime import datetime, timezone
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from db.database import SessionLocal
@@ -12,6 +15,7 @@ from db.models import (
     ExpertScheduleSlot,
     User  # Used for finding expert profiles
 )
+from extensions import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +24,42 @@ b2c_bp = Blueprint("b2c_marketplace", __name__, url_prefix="/api/b2c")
 def _agora_utc():
     return datetime.now(timezone.utc)
 
+
+def _consumer_serializer():
+    secret = os.getenv("B2C_TOKEN_SECRET") or os.getenv("SECRET_KEY")
+    if not secret:
+        raise RuntimeError("B2C_TOKEN_SECRET não configurado")
+    return URLSafeTimedSerializer(secret, salt="meu-misterio-b2c-v1")
+
+
+def _consumer_token(consumer_id: int) -> str:
+    return _consumer_serializer().dumps({"consumer_id": consumer_id})
+
+
+def consumer_required(function):
+    @wraps(function)
+    def decorated(*args, **kwargs):
+        auth = request.headers.get("Authorization", "")
+        token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+        if not token:
+            return jsonify({"error": "consumer_auth_required"}), 401
+        try:
+            payload = _consumer_serializer().loads(token, max_age=60 * 60 * 24 * 30)
+            g.consumer_id = int(payload["consumer_id"])
+        except SignatureExpired:
+            return jsonify({"error": "consumer_token_expired"}), 401
+        except (BadSignature, KeyError, TypeError, ValueError):
+            return jsonify({"error": "consumer_token_invalid"}), 401
+        requested_id = kwargs.get("consumer_id")
+        if requested_id is not None and int(requested_id) != g.consumer_id:
+            return jsonify({"error": "forbidden"}), 403
+        return function(*args, **kwargs)
+    return decorated
+
 # ─── CONSUMER AUTHENTICATION (B2C) ──────────────────────────────────────────
 
 @b2c_bp.route("/auth/signup", methods=["POST"])
+@limiter.limit("10/hour")
 def consumer_signup():
     """Cria a identidade global do Consumidor no Super App."""
     data = request.json or {}
@@ -33,6 +70,8 @@ def consumer_signup():
 
     if not phone or not password:
         return jsonify({"error": "Telefone e senha são obrigatórios"}), 400
+    if len(password) < 8:
+        return jsonify({"error": "A senha deve ter pelo menos 8 caracteres"}), 422
 
     db = SessionLocal()
     try:
@@ -50,17 +89,17 @@ def consumer_signup():
         db.commit()
         db.refresh(consumer)
 
-        # Em um cenário real, aqui emitiríamos um JWT.
-        # Por simplicidade de arquitetura, retornamos o ID seguro para a sessão do cliente.
         return jsonify({
             "message": "Conta B2C criada com sucesso",
-            "consumer": {"id": consumer.id, "name": consumer.name, "phone": consumer.phone}
+            "consumer": {"id": consumer.id, "name": consumer.name, "phone": consumer.phone},
+            "access_token": _consumer_token(consumer.id),
         }), 201
     finally:
         db.close()
 
 
 @b2c_bp.route("/auth/login", methods=["POST"])
+@limiter.limit("10/minute")
 def consumer_login():
     """Autentica o consumidor para acessar o Cofre e o Marketplace."""
     data = request.json or {}
@@ -75,7 +114,8 @@ def consumer_login():
 
         return jsonify({
             "message": "Login B2C efetuado",
-            "consumer": {"id": consumer.id, "name": consumer.name, "phone": consumer.phone}
+            "consumer": {"id": consumer.id, "name": consumer.name, "phone": consumer.phone},
+            "access_token": _consumer_token(consumer.id),
         })
     finally:
         db.close()
@@ -136,6 +176,7 @@ def list_expert_services(tenant_id):
 # ─── CONSUMER MEMBER AREA (O COFRE / ÁREA DE MEMBROS) ────────────────────────
 
 @b2c_bp.route("/me/<int:consumer_id>/vault", methods=["GET"])
+@consumer_required
 def get_member_vault(consumer_id):
     """
     Retorna os conteúdos comprados (Leituras Gravadas, Terapias, PDFs)
@@ -158,6 +199,7 @@ def get_member_vault(consumer_id):
         db.close()
 
 @b2c_bp.route("/me/<int:consumer_id>/appointments", methods=["GET"])
+@consumer_required
 def get_consumer_appointments(consumer_id):
     """
     Retorna a agenda do consumidor (Sessões ao vivo marcadas).
