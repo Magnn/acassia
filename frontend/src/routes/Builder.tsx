@@ -17,6 +17,8 @@ import {
   Undo2,
   XCircle,
   Zap,
+  LogIn,
+  AlertTriangle,
 } from 'lucide-react';
 import { blueprintsApi, type BlueprintDetail } from '../api/blueprints';
 import Canvas from '../builder/Canvas';
@@ -54,13 +56,55 @@ export default function Builder() {
   }
 
   if (isLoading) {
-    return <div className="p-6 text-secondary">Carregando fluxo…</div>;
-  }
-  if (error || !data) {
     return (
-      <div className="p-6 text-red-400">
-        Erro carregando fluxo: {(error as Error)?.message ?? 'desconhecido'}.{' '}
-        <Link className="underline" to="/blueprints">Voltar</Link>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-zinc-400">
+        <div className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+        <span className="text-xs font-semibold tracking-wide">Carregando fluxo...</span>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    const isAuthError =
+      error instanceof Error &&
+      (error.message.toLowerCase().includes('unauthorized') ||
+        error.message.includes('401') ||
+        error.message.toLowerCase().includes('forbidden'));
+
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-6">
+        <div className="max-w-md w-full p-6 rounded-2xl bg-zinc-900 border border-zinc-800 text-center space-y-4 shadow-xl">
+          <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-400">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-zinc-100">
+              {isAuthError ? 'Sessão Expirada ou Não Autenticado' : 'Não foi possível carregar o fluxo'}
+            </h3>
+            <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+              {isAuthError
+                ? 'Sua sessão expirou ou você não tem permissão para editar este fluxo. Faça login novamente para prosseguir.'
+                : (error as Error)?.message || 'O fluxo solicitado não foi encontrado ou está inacessível.'}
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <Link
+              to="/blueprints"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-all"
+            >
+              Voltar aos Fluxos
+            </Link>
+            {isAuthError && (
+              <a
+                href={`/saas/login?next=${encodeURIComponent(window.location.pathname)}`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-sm"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Entrar novamente</span>
+              </a>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

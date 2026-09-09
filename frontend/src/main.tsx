@@ -6,11 +6,18 @@ import { ThemeProvider } from './context/ThemeContext';
 import App from './App';
 import './index.css';
 
+import { ApiError } from './api/client';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      retry: 1,
+      retry: (failureCount, error) => {
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+          return false;
+        }
+        return failureCount < 1;
+      },
       refetchOnWindowFocus: false,
     },
   },

@@ -27,6 +27,7 @@ import {
   UserPlus,
   UserMinus,
   RefreshCw,
+  LogIn,
 } from 'lucide-react';
 import { sequencesApi, SequenceItem, SequenceStepItem, EnrolledContactItem } from '../api/saas';
 import { blueprintsApi } from '../api/blueprints';
@@ -54,7 +55,7 @@ export default function Sequences() {
   const [sequenceToDelete, setSequenceToDelete] = useState<SequenceItem | null>(null);
 
   // Queries
-  const { data: sequencesData, isLoading: isLoadingList } = useQuery({
+  const { data: sequencesData, isLoading: isLoadingList, error: listError } = useQuery({
     queryKey: ['saas-sequences'],
     queryFn: () => sequencesApi.list(),
   });
@@ -171,12 +172,42 @@ export default function Sequences() {
         </div>
       </div>
 
+      {listError && (
+        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="font-medium text-rose-200">
+              {(listError as Error).message.toLowerCase().includes('unauthorized') || (listError as Error).message.includes('401')
+                ? 'Sua sessão expirou ou você não está autenticado.'
+                : `Erro ao carregar sequências: ${(listError as Error).message}`}
+            </p>
+            {((listError as Error).message.toLowerCase().includes('unauthorized') || (listError as Error).message.includes('401')) && (
+              <p className="text-xs text-rose-400 mt-0.5">
+                Faça login novamente para gerenciar réguas e sequências automatizadas.
+              </p>
+            )}
+          </div>
+          {((listError as Error).message.toLowerCase().includes('unauthorized') || (listError as Error).message.includes('401')) && (
+            <a
+              href={`/saas/login?next=${encodeURIComponent(window.location.pathname)}`}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition-all shrink-0 shadow-sm"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Entrar novamente</span>
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Table List */}
       <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl overflow-hidden shadow-xl">
         {isLoadingList ? (
           <div className="py-20 text-center text-zinc-500 text-sm flex items-center justify-center gap-2">
             <RefreshCw className="w-4 h-4 animate-spin text-purple-400" />
             Carregando sequências...
+          </div>
+        ) : listError ? (
+          <div className="py-16 text-center text-zinc-500 text-sm">
+            Não foi possível carregar as sequências.
           </div>
         ) : filteredSequences.length === 0 ? (
           <div className="py-20 text-center text-zinc-500 space-y-3">

@@ -34,6 +34,7 @@ import {
   Calendar as CalendarIcon,
   List as ListIcon,
   Undo2,
+  LogIn,
 } from 'lucide-react';
 import { broadcastApi, type Campaign } from '../api/saas';
 import { blueprintsApi } from '../api/blueprints';
@@ -51,7 +52,7 @@ export default function Broadcast() {
   const [deleteCandidateId, setDeleteCandidateId] = useState<number | null>(null);
   const [renamingCampaign, setRenamingCampaign] = useState<{ id: number; title: string } | null>(null);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error: campaignError, refetch } = useQuery({
     queryKey: ['broadcast-campaigns'],
     queryFn: broadcastApi.campaigns,
     refetchInterval: 8000, // Atualiza dinamicamente caso haja envios ativos
@@ -212,6 +213,32 @@ export default function Broadcast() {
               />
             </div>
           </div>
+
+          {campaignError && (
+            <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="font-medium text-rose-200">
+                  {(campaignError as Error).message.toLowerCase().includes('unauthorized') || (campaignError as Error).message.includes('401')
+                    ? 'Sua sessão expirou ou você não está autenticado.'
+                    : `Erro ao carregar campanhas: ${(campaignError as Error).message}`}
+                </p>
+                {((campaignError as Error).message.toLowerCase().includes('unauthorized') || (campaignError as Error).message.includes('401')) && (
+                  <p className="text-xs text-rose-400 mt-0.5">
+                    Faça login novamente para gerenciar campanhas e disparos em massa.
+                  </p>
+                )}
+              </div>
+              {((campaignError as Error).message.toLowerCase().includes('unauthorized') || (campaignError as Error).message.includes('401')) && (
+                <a
+                  href={`/saas/login?next=${encodeURIComponent(window.location.pathname)}`}
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition-all shrink-0 shadow-sm"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Entrar novamente</span>
+                </a>
+              )}
+            </div>
+          )}
 
           {/* Campaigns List */}
           {isLoading ? (
