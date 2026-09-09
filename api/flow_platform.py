@@ -748,21 +748,19 @@ def register_flow_platform_routes(app: Flask) -> None:
             bp = _bp_row(db, tid, bid)
             if not bp:
                 return jsonify({"ok": False, "error": "fluxo não encontrado"}), 404
-            lid = None
-            if lead_id is not None:
-                try:
-                    lid = int(lead_id)
-                except (TypeError, ValueError):
-                    return jsonify({"ok": False, "error": "lead_id inválido"}), 400
-                lead = db.get(models.Lead, lid)
-                if not lead or str(getattr(lead, "tenant_id", "default") or "default") != tid:
-                    return jsonify({"ok": False, "error": "lead não encontrado"}), 404
+            try:
+                lid = int(lead_id)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": "lead_id obrigatório e deve ser inteiro"}), 400
+            lead = db.query(models.Lead).filter_by(id=lid, tenant_id=tid).first()
+            if not lead:
+                return jsonify({"ok": False, "error": "lead não encontrado"}), 404
             run = models.FlowRun(
                 tenant_id=tid,
                 blueprint_id=bid,
                 lead_id=lid,
-                status="created",
-                meta_json={"source": "manual_run_stub"},
+                status="queued",
+                meta_json={"source": "manual_run"},
             )
             db.add(run)
             db.flush()
@@ -776,7 +774,13 @@ def register_flow_platform_routes(app: Flask) -> None:
             )
             db.commit()
             db.refresh(run)
-            return jsonify({"ok": True, "run_id": run.id}), 201
+            from api.utils.task_queue import enqueue_flow_execution
+            if not enqueue_flow_execution(tenant_id=tid, blueprint_id=bid, lead_id=lid, run_id=run.id):
+                run.status = "failed"
+                db.add(models.FlowRunEvent(run_id=run.id, seq=2, event_type="queue_failed", payload_json={}))
+                db.commit()
+                return jsonify({"ok": False, "error": "task_queue_unavailable", "run_id": run.id}), 503
+            return jsonify({"ok": True, "run_id": run.id, "status": "queued"}), 202
         except Exception as e:
             logger.error("[API] blueprint run create %s: %s", bid, e)
             db.rollback()

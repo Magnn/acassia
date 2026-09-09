@@ -61,7 +61,8 @@ def test_parse_inbound_telegram():
 @patch("api.channels.whatsapp.horoscope")
 def test_send_message_whatsapp(mock_horoscope):
     mock_client = MagicMock()
-    mock_client.enviar_mensagem.return_value = True
+    from api.whatsapp_providers.base import SendResult
+    mock_client.send_message_result.return_value = SendResult(ok=True, message_id="wamid.test")
     mock_horoscope._get_whatsapp_client.return_value = mock_client
     
     adapter = WhatsAppChannelAdapter("tenant_1")
@@ -69,7 +70,9 @@ def test_send_message_whatsapp(mock_horoscope):
     res = adapter.send_message(out)
     
     assert res.ok is True
-    mock_client.enviar_mensagem.assert_called_once_with("5511999999999", "Hello", formato="texto")
+    mock_client.send_message_result.assert_called_once_with(
+        "5511999999999", "Hello", formato="texto", media_url=None
+    )
 
 @patch("api.channels.webchat.SessionLocal")
 def test_send_message_webchat(mock_session_local):
@@ -92,9 +95,11 @@ def test_send_message_webchat(mock_session_local):
 
 def test_channel_capabilities():
     wa = WhatsAppChannelAdapter("tenant_1")
-    assert wa.get_capabilities().supports_buttons is True
+    assert wa.get_capabilities().supports_buttons is False
+    assert wa.get_capabilities().supports_templates is False
+    assert wa.get_capabilities().supports_reactions is False
     assert wa.get_capabilities().supports_media is True
-    assert wa.get_capabilities().supports_templates is True
+    assert wa.get_capabilities().supports_audio is True
 
     wc = WebchatChannelAdapter("tenant_1")
     assert wc.get_capabilities().supports_buttons is False
@@ -105,4 +110,3 @@ def test_channel_capabilities():
     assert tg.get_capabilities().supports_buttons is True
     assert tg.get_capabilities().supports_media is True
     assert tg.get_capabilities().supports_templates is False
-

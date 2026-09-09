@@ -722,14 +722,17 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
         sent = campaign.sent_count or 0
         failed = campaign.failed_count or 0
 
-        # Pre-fetch leads em lote (elimina N+1 queries de banco no loop)
-        lead_ids = [r.lead_id for r in recipients]
-        leads_cache = {}
-        if lead_ids:
-            for l in db.query(models.Lead).filter(models.Lead.id.in_(lead_ids)).all():
-                leads_cache[l.id] = l
+        # Throttle configurável por campanha (proteção Anti-Ban Meta)
+        throttle_secs = 2
+        if campaign.segment_filters and isinstance(campaign.segment_filters, dict):
+            try:
+                throttle_secs = int(campaign.segment_filters.get("anti_ban_delay_seconds", 2))
+                throttle_secs = max(1, min(throttle_secs, 30))
+            except Exception:
+                throttle_secs = 2
 
-        for rec in recipients:
+        BATCH_SIZE = 50
+        while True:
             try:
                 db.refresh(campaign)
             except Exception:
@@ -737,71 +740,97 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
             if campaign.status in ("cancelled", "paused"):
                 break
 
-            lead = leads_cache.get(rec.lead_id)
-            if not lead or not lead.telefone:
-                rec.status = "failed"
-                rec.error_reason = "no_phone"
-                failed += 1
-                db.commit()
-                continue
+            # Claim batch atomico
+            candidates = db.query(models.BroadcastRecipient).filter_by(
+                campaign_id=campaign_id, status="pending"
+            ).limit(BATCH_SIZE).all()
 
-            # Throttle configurável por campanha (proteção Anti-Ban Meta)
-            throttle_secs = 2
-            if campaign.segment_filters and isinstance(campaign.segment_filters, dict):
-                try:
-                    throttle_secs = int(campaign.segment_filters.get("anti_ban_delay_seconds", 2))
-                    throttle_secs = max(1, min(throttle_secs, 30))
-                except Exception:
-                    throttle_secs = 2
+            if not candidates:
+                break
 
-            try:
-                if wa_client:
-                    if campaign.message_media_url:
-                        media_fmt = campaign.message_media_type or "imagem"
-                        ok = wa_client.enviar_mensagem(
-                            lead.telefone, campaign.message_text, formato=media_fmt,
-                            media_url=campaign.message_media_url,
-                        )
-                    else:
-                        ok = wa_client.enviar_mensagem(
-                            lead.telefone, campaign.message_text, formato="texto",
-                        )
-                    if ok:
-                        rec.status = "sent"
-                        rec.sent_at = datetime.now(timezone.utc)
-                        sent += 1
-                    else:
-                        rec.status = "failed"
-                        rec.error_reason = "send_returned_false"
-                        failed += 1
-                else:
-                    rec.status = "failed"
-                    rec.error_reason = "wa_client_unavailable"
-                    failed += 1
-            except Exception as exc:
-                rec.status = "failed"
-                rec.error_reason = str(exc)[:200]
-                failed += 1
-
-            # Update counters
-            campaign.sent_count = sent
-            campaign.failed_count = failed
+            candidate_ids = [c.id for c in candidates]
+            db.query(models.BroadcastRecipient).filter(
+                models.BroadcastRecipient.id.in_(candidate_ids),
+                models.BroadcastRecipient.status == "pending",
+            ).update({models.BroadcastRecipient.status: "claimed"}, synchronize_session=False)
             db.commit()
 
-            # Throttle dinâmico anti-ban
-            time.sleep(throttle_secs)
+            # Pre-fetch leads em lote do chunk
+            lead_ids = [c.lead_id for c in candidates]
+            leads_cache = {}
+            if lead_ids:
+                for l in db.query(models.Lead).filter(models.Lead.id.in_(lead_ids)).all():
+                    leads_cache[l.id] = l
+
+            for rec in candidates:
+                try:
+                    db.refresh(campaign)
+                except Exception:
+                    pass
+                if campaign.status in ("cancelled", "paused"):
+                    # Reverter não processados deste lote para pending
+                    db.query(models.BroadcastRecipient).filter_by(
+                        id=rec.id, status="claimed"
+                    ).update({models.BroadcastRecipient.status: "pending"}, synchronize_session=False)
+                    db.commit()
+                    continue
+
+                lead = leads_cache.get(rec.lead_id)
+                if not lead or not lead.telefone:
+                    rec.status = "failed"
+                    rec.error_reason = "no_phone"
+                    failed += 1
+                    db.commit()
+                    continue
+
+                rec.attempt = (rec.attempt or 0) + 1
+                rec.idempotency_key = f"bcast:{campaign.id}:rec:{rec.id}"
+
+                try:
+                    if wa_client:
+                        media_fmt = (campaign.message_media_type or "imagem") if campaign.message_media_url else "texto"
+                        res = wa_client.send_message_result(
+                            lead.telefone,
+                            campaign.message_text,
+                            formato=media_fmt,
+                            media_url=campaign.message_media_url,
+                        )
+                        if res.ok:
+                            rec.status = "sent"
+                            rec.sent_at = datetime.now(timezone.utc)
+                            rec.provider_message_id = res.message_id
+                            sent += 1
+                        else:
+                            rec.status = "failed"
+                            rec.error_reason = res.error or "send_returned_false"
+                            failed += 1
+                    else:
+                        rec.status = "failed"
+                        rec.error_reason = "wa_client_unavailable"
+                        failed += 1
+                except Exception as exc:
+                    rec.status = "failed"
+                    rec.error_reason = str(exc)[:200]
+                    failed += 1
+
+                campaign.sent_count = sent
+                campaign.failed_count = failed
+                db.commit()
+
+                time.sleep(throttle_secs)
 
         try:
             db.refresh(campaign)
         except Exception:
             pass
 
-        pending_count = db.query(models.BroadcastRecipient).filter_by(
-            campaign_id=campaign_id, status="pending"
+        pending_or_claimed = db.query(models.BroadcastRecipient).filter(
+            models.BroadcastRecipient.campaign_id == campaign_id,
+            models.BroadcastRecipient.status.in_(["pending", "claimed"]),
         ).count()
 
         if campaign.status not in ("cancelled", "paused"):
-            if pending_count == 0:
+            if pending_or_claimed == 0:
                 campaign.status = "completed"
                 campaign.completed_at = datetime.now(timezone.utc)
             else:

@@ -130,56 +130,62 @@ def process_csv_import():
         enrolled_lead_ids = []
         leads_for_auto_enroll = []
 
-        for idx, row in enumerate(rows):
-            # Extrair campos usando o mapping
-            phone_col = next((col for col, target in mapping.items() if target == "telefone"), None)
-            name_col = next((col for col, target in mapping.items() if target == "nome"), None)
-            email_col = next((col for col, target in mapping.items() if target == "email"), None)
+        CHUNK_SIZE = 100
+        for chunk_start in range(0, len(rows), CHUNK_SIZE):
+            chunk = rows[chunk_start:chunk_start + CHUNK_SIZE]
+            for offset, row in enumerate(chunk):
+                idx = chunk_start + offset
+                # Extrair campos usando o mapping
+                phone_col = next((col for col, target in mapping.items() if target == "telefone"), None)
+                name_col = next((col for col, target in mapping.items() if target == "nome"), None)
+                email_col = next((col for col, target in mapping.items() if target == "email"), None)
 
-            raw_phone = row.get(phone_col) if phone_col else (row.get("telefone") or row.get("phone") or row.get("tel"))
-            clean_tel = _clean_phone(raw_phone)
+                raw_phone = row.get(phone_col) if phone_col else (row.get("telefone") or row.get("phone") or row.get("tel"))
+                clean_tel = _clean_phone(raw_phone)
 
-            if not clean_tel or len(clean_tel) < 8:
-                failed_count += 1
-                error_logs.append({
-                    "row": idx + 1,
-                    "reason": f"Telefone inválido ou ausente: '{raw_phone}'",
-                })
-                continue
+                if not clean_tel or len(clean_tel) < 8:
+                    failed_count += 1
+                    error_logs.append({
+                        "row": idx + 1,
+                        "reason": f"Telefone inválido ou ausente: '{raw_phone}'",
+                    })
+                    continue
 
-            lead_name = (row.get(name_col) if name_col else (row.get("nome") or row.get("name") or "")).strip() or None
-            lead_email = (row.get(email_col) if email_col else (row.get("email") or "")).strip() or None
+                lead_name = (row.get(name_col) if name_col else (row.get("nome") or row.get("name") or "")).strip() or None
+                lead_email = (row.get(email_col) if email_col else (row.get("email") or "")).strip() or None
 
-            # Upsert do lead
-            lead = db.query(models.Lead).filter_by(
-                tenant_id=tenant_id,
-                telefone=clean_tel,
-            ).first()
-
-            if not lead:
-                lead = models.Lead(
+                # Upsert do lead
+                lead = db.query(models.Lead).filter_by(
                     tenant_id=tenant_id,
                     telefone=clean_tel,
-                    nome=lead_name,
-                    email=lead_email,
-                    tags=list(set(assigned_tags)),
-                )
-                db.add(lead)
-                db.flush()
-            else:
-                if lead_name and not lead.nome:
-                    lead.nome = lead_name
-                if lead_email and not lead.email:
-                    lead.email = lead_email
-                # Merge tags
-                current_tags = list(lead.tags) if isinstance(lead.tags, list) else []
-                lead.tags = list(set(current_tags + assigned_tags))
+                ).first()
 
-            success_count += 1
-            if enroll_seq_id and lead.id:
-                enrolled_lead_ids.append(lead.id)
-            if assigned_tags and lead.id:
-                leads_for_auto_enroll.append(lead.id)
+                if not lead:
+                    lead = models.Lead(
+                        tenant_id=tenant_id,
+                        telefone=clean_tel,
+                        nome=lead_name,
+                        email=lead_email,
+                        tags=list(set(assigned_tags)),
+                    )
+                    db.add(lead)
+                    db.flush()
+                else:
+                    if lead_name and not lead.nome:
+                        lead.nome = lead_name
+                    if lead_email and not lead.email:
+                        lead.email = lead_email
+                    # Merge tags
+                    current_tags = list(lead.tags) if isinstance(lead.tags, list) else []
+                    lead.tags = list(set(current_tags + assigned_tags))
+
+                success_count += 1
+                if enroll_seq_id and lead.id:
+                    enrolled_lead_ids.append(lead.id)
+                if assigned_tags and lead.id:
+                    leads_for_auto_enroll.append(lead.id)
+
+            db.commit()
 
         # Se tiver sequência configurada, matricula os leads válidos
         if enroll_seq_id and enrolled_lead_ids:

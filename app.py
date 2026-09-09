@@ -372,6 +372,7 @@ def _register_saas_blueprints():
     from api.b2c_marketplace import b2c_bp
     from api.v1.routes import v1_bp
     from api.saas.growth_links import growth_links_bp as saas_growth_links_bp
+    from api.payments.dispatch import payments_bp as saas_payments_bp
 
 
     login_manager.init_app(app)
@@ -417,6 +418,7 @@ def _register_saas_blueprints():
         b2c_bp,
         v1_bp,
         saas_growth_links_bp,
+        saas_payments_bp,
     )
     _failed_bps = []
     for bp in _optional:
@@ -439,8 +441,11 @@ except Exception as _e:
     logger.error("[SAAS] Falha registrando blueprints: %s", _e)
     raise
 
-from db.sync import sync_database
-sync_database()
+if os.getenv("FLASK_ENV") != "production" or os.getenv("AUTO_SYNC_DB") == "1":
+    from db.sync import sync_database
+    sync_database()
+else:
+    logger.info("🛡️ [DATABASE] FLASK_ENV=production detectado — DDL automático ignorado no boot (Alembic gerencia o schema).")
 
 # Auto-seed default community groups (zodiac + thematic)
 try:

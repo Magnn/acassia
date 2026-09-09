@@ -21,12 +21,12 @@ class WhatsAppChannelAdapter(ChannelAdapter):
 
     def get_capabilities(self) -> ChannelCapabilities:
         return ChannelCapabilities(
-            supports_buttons=True,
+            supports_buttons=False,
             supports_media=True,
-            supports_templates=True,
-            supports_reactions=True,
+            supports_templates=False,
+            supports_reactions=False,
             supports_audio=True,
-            supports_markdown=True,
+            supports_markdown=False,
         )
 
     def send_message(self, message: OutboundMessage) -> ChannelResult:
@@ -35,28 +35,23 @@ class WhatsAppChannelAdapter(ChannelAdapter):
             if not client:
                 return ChannelResult(ok=False, error="whatsapp_client_not_configured")
 
-            if message.media_url:
-                ok = client.enviar_mensagem(
-                    message.recipient_id,
-                    message.text,
-                    formato=message.format or "imagem",
-                    media_url=message.media_url,
-                )
-            else:
-                ok = client.enviar_mensagem(
-                    message.recipient_id,
-                    message.text,
-                    formato="texto",
-                )
+            caps = self.get_capabilities()
+            body_text = message.text or ""
+            if message.buttons and not caps.supports_buttons:
+                button_lines = []
+                for i, btn in enumerate(message.buttons, 1):
+                    btn_title = btn.get("title") or btn.get("text") or btn.get("id") or f"Opção {i}"
+                    button_lines.append(f"{i}. {btn_title}")
+                if button_lines:
+                    body_text = (body_text + "\n\n" + "\n".join(button_lines)).strip()
 
-            wamid = None
-            try:
-                from api.whatsapp_providers.meta_cloud import pop_last_wamid
-                wamid = pop_last_wamid()
-            except Exception:
-                pass
-
-            return ChannelResult(ok=bool(ok), message_id=wamid)
+            result = client.send_message_result(
+                message.recipient_id,
+                body_text,
+                formato=(message.format or "imagem") if message.media_url else "texto",
+                media_url=message.media_url,
+            )
+            return ChannelResult(ok=result.ok, message_id=result.message_id, error=result.error)
         except Exception as exc:
             logger.exception("[WHATSAPP_ADAPTER] Erro ao enviar: %s", exc)
             return ChannelResult(ok=False, error=str(exc))

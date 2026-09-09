@@ -131,8 +131,8 @@ def _execute_cakto(action: str, cfg: Dict[str, Any], vault_data: Dict[str, Any],
         
     if action == "create_checkout":
         product_id = cfg.get("product_id")
-        # In a real scenario, this would call the Cakto API to generate a unique checkout link
-        # For demonstration of the integration node architecture, we return a mock success
-        return f"https://pay.cakto.com.br/checkout/{product_id}?ref={_lead_value(flow_vars, 'id')}"
+        if not product_id:
+            raise ValueError("O ID do produto é obrigatório para criar um checkout Cakto.")
+        raise ValueError("A criação de checkout Cakto ainda não possui adaptador oficial configurado.")
         
     raise ValueError(f"Ação {action} não suportada para Cakto")

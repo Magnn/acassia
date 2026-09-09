@@ -68,3 +68,15 @@ def claim_payment_event(
         return False
     finally:
         db.close()
+
+
+def release_payment_event(provider: str, event_id: str, tenant_id: str = "default") -> None:
+    """Libera uma claim quando o evento não chegou à fila durável."""
+    db = SessionLocal()
+    try:
+        db.query(models.PaymentEventReceipt).filter_by(
+            tenant_id=tenant_id, provider=provider, event_id=event_id
+        ).delete(synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()

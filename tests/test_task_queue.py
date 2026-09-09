@@ -67,7 +67,7 @@ def test_lease_heartbeat_renews_processing_lease():
 def test_get_queue_metrics():
     redis = MagicMock()
     pipe = redis.pipeline.return_value
-    pipe.execute.return_value = [2, 1, 0, 0, 3]
+    pipe.execute.return_value = [2, 1, 0, 0, 3, None]
     with patch.object(task_queue, "_get_redis", return_value=redis):
         metrics = task_queue.get_queue_metrics()
         assert metrics["available"] is True
@@ -99,6 +99,4 @@ def test_api_health_queues_endpoint():
     with patch.object(task_queue, "get_queue_metrics", return_value={"available": False, "reason": "redis_unavailable"}):
         resp = client.get("/api/health/queues")
         assert resp.status_code == 503
-
-
 

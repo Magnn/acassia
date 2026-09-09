@@ -9,9 +9,7 @@ Emite e rastreia notas fiscais usando uma API terceirizada
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from sqlalchemy.orm import Session
-from datetime import datetime
 import traceback
-import requests
 import os
 
 from db.database import SessionLocal, set_tenant_rls
@@ -19,35 +17,21 @@ from db.models import NotaFiscal, Lead
 
 fiscal_bp = Blueprint("saas_fiscal_bp", __name__, url_prefix="/api/saas/fiscal")
 
-# ─── Configurações Mockadas (Adaptar para a API Real escolhida) ───
+# ─── Configuração do provedor fiscal ───
 NUVEM_FISCAL_API_URL = os.getenv("NUVEM_FISCAL_API_URL", "https://api.nuvemfiscal.com.br/v1")
 NUVEM_FISCAL_CLIENT_ID = os.getenv("NUVEM_FISCAL_CLIENT_ID", "")
 NUVEM_FISCAL_CLIENT_SECRET = os.getenv("NUVEM_FISCAL_CLIENT_SECRET", "")
 
 def emitir_nota_na_api(tenant_id: str, dados_nota: dict) -> dict:
+    """Falha de forma explícita enquanto o provedor fiscal não está integrado.
+
+    Uma nota nunca pode ser marcada como autorizada com número, chave ou PDF
+    inventados. A integração deve implementar OAuth e o contrato oficial do
+    provedor escolhido antes de habilitar emissão.
     """
-    Função mock que simula a chamada à API da Nuvem Fiscal ou Focus NFe.
-    Num cenário real, aqui seria montado o payload JSON e feito o requests.post.
-    """
-    # Exemplo real:
-    # headers = {"Authorization": f"Bearer {obter_token_oauth()}"}
-    # resp = requests.post(f"{NUVEM_FISCAL_API_URL}/nfse", json=dados_nota, headers=headers)
-    # return resp.json()
-    
-    # Mock return
-    import uuid
-    import random
-    
-    return {
-        "id": f"nf_{uuid.uuid4().hex[:12]}",
-        "status": "autorizada",
-        "ambiente": dados_nota.get("ambiente", "homologacao"),
-        "numero": random.randint(1000, 9999),
-        "serie": "1",
-        "chave_acesso": "".join([str(random.randint(0, 9)) for _ in range(44)]),
-        "pdf_url": "https://api.nuvemfiscal.com.br/v1/nfse/pdf/mock_123",
-        "xml_url": "https://api.nuvemfiscal.com.br/v1/nfse/xml/mock_123",
-    }
+    if not NUVEM_FISCAL_CLIENT_ID or not NUVEM_FISCAL_CLIENT_SECRET:
+        raise RuntimeError("fiscal_provider_not_configured")
+    raise RuntimeError("fiscal_provider_adapter_not_implemented")
 
 
 def emitir_nota_automatica_webhook(tenant_id: str, lead_id: int, valor: float, cpf_cnpj: str, nome_cliente: str, descricao: str) -> bool:
@@ -180,9 +164,15 @@ def emitir_nota():
             }
         }), 201
 
+    except RuntimeError as e:
+        db.rollback()
+        code = str(e)
+        if code.startswith("fiscal_provider_"):
+            return jsonify({"ok": False, "error": code}), 503
+        return jsonify({"ok": False, "error": code}), 502
     except Exception as e:
         db.rollback()
-        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         db.close()
 

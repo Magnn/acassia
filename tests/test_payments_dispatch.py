@@ -114,8 +114,8 @@ def test_dispatch_blueprint_de_outro_tenant_nao_serve():
 
 # ─── Caminho feliz ───────────────────────────────────────────────────────────
 
-@patch("api.payments.dispatch.threading.Thread")
-def test_dispatch_inicia_thread_quando_tudo_certo(mock_thread):
+@patch("api.utils.task_queue.enqueue_post_payment", return_value=True)
+def test_dispatch_enfileira_job_duravel_quando_tudo_certo(mock_enqueue):
     lead_id = _seed_lead()
     _seed_blueprint()
 
@@ -128,14 +128,11 @@ def test_dispatch_inicia_thread_quando_tudo_certo(mock_thread):
     )
 
     assert ok is True
-    assert mock_thread.called
-    mock_thread.return_value.start.assert_called_once()
-    # Thread foi marcada como daemon
-    assert mock_thread.call_args.kwargs.get("daemon") is True
+    mock_enqueue.assert_called_once()
 
 
-@patch("api.payments.dispatch.threading.Thread")
-def test_dispatch_passa_args_corretos_pra_thread(mock_thread):
+@patch("api.utils.task_queue.enqueue_post_payment", return_value=True)
+def test_dispatch_passa_payload_correto_pra_fila(mock_enqueue):
     lead_id = _seed_lead()
     _seed_blueprint()
 
@@ -147,18 +144,17 @@ def test_dispatch_passa_args_corretos_pra_thread(mock_thread):
         payment_metadata={"product": "tiragem"},
     )
 
-    args = mock_thread.call_args.kwargs["args"]
-    # (tenant_id, blueprint_id, lead_id, provider, event_id, payment_metadata)
-    assert args[0] == "default"
-    assert isinstance(args[1], int)  # blueprint_id
-    assert args[2] == lead_id
-    assert args[3] == "cakto"
-    assert args[4] == "evt_args"
-    assert args[5] == {"product": "tiragem"}
+    args = mock_enqueue.call_args.kwargs
+    assert args["tenant_id"] == "default"
+    assert isinstance(args["blueprint_id"], int)
+    assert args["lead_id"] == lead_id
+    assert args["provider"] == "cakto"
+    assert args["event_id"] == "evt_args"
+    assert args["payment_metadata"] == {"product": "tiragem"}
 
 
-@patch("api.payments.dispatch.threading.Thread")
-def test_dispatch_payment_metadata_default_eh_dict_vazio(mock_thread):
+@patch("api.utils.task_queue.enqueue_post_payment", return_value=True)
+def test_dispatch_payment_metadata_default_eh_dict_vazio(mock_enqueue):
     lead_id = _seed_lead()
     _seed_blueprint()
 
@@ -169,7 +165,7 @@ def test_dispatch_payment_metadata_default_eh_dict_vazio(mock_thread):
         event_id="evt_empty",
         # sem payment_metadata
     )
-    assert mock_thread.call_args.kwargs["args"][5] == {}
+    assert mock_enqueue.call_args.kwargs["payment_metadata"] == {}
 
 
 # ─── _run_post_payment isolado ───────────────────────────────────────────────
@@ -179,6 +175,11 @@ def test_run_post_payment_compila_blueprint_e_injeta_payment_no_context():
     bp_id = _seed_blueprint()
 
     fake_acoes = ["acao1", "acao2", "acao3"]
+    fake_engine = type("Runtime", (), {
+        "personalizer": None,
+        "_buscar_historico": lambda self, db, lead_id, limit: [],
+        "_processar_fila": lambda self, lead_id, ctx, acoes: None,
+    })()
     with patch("flow_executor.document_to_acoes", return_value=fake_acoes) as m_compile:
         with patch("flow_executor.flow_context_from_lead", return_value={"nome": "Maria"}) as m_ctx:
             _run_post_payment(
@@ -187,7 +188,7 @@ def test_run_post_payment_compila_blueprint_e_injeta_payment_no_context():
                 lead_id=lead_id,
                 provider="stripe",
                 event_id="evt_y",
-                payment_metadata={"amount": 1990, "product": "tiragem"},
+                payment_metadata={"amount": 1990, "product": "tiragem"}, engine=fake_engine,
             )
 
     m_ctx.assert_called_once()
@@ -202,41 +203,33 @@ def test_run_post_payment_compila_blueprint_e_injeta_payment_no_context():
 
 
 def test_run_post_payment_passa_tenant_e_blueprint_id_pra_compile():
-    lead_id = _seed_lead()
-    bp_id = _seed_blueprint()
+    lead_id = _seed_lead(tenant_id="tenant_x")
+    bp_id = _seed_blueprint(tenant_id="tenant_x")
 
     with patch("flow_executor.document_to_acoes", return_value=[]) as m_compile:
         with patch("flow_executor.flow_context_from_lead", return_value={}):
-            _run_post_payment(
-                tenant_id="tenant_x",
-                blueprint_id=bp_id,
-                lead_id=lead_id,
-                provider="stripe",
-                event_id="evt_z",
-                payment_metadata={},
-            )
+            with pytest.raises(ValueError, match="without_actions"):
+                _run_post_payment(
+                    tenant_id="tenant_x", blueprint_id=bp_id, lead_id=lead_id,
+                    provider="stripe", event_id="evt_z", payment_metadata={},
+                )
 
     kwargs = m_compile.call_args.kwargs
     assert kwargs["tenant_id"] == "tenant_x"
     assert kwargs["blueprint_id"] == bp_id
 
 
-def test_run_post_payment_nao_propaga_excecao_da_compilacao():
-    """Erros do flow_executor não devem matar a thread silenciosamente."""
+def test_run_post_payment_propaga_excecao_para_retry_da_fila():
     lead_id = _seed_lead()
     bp_id = _seed_blueprint()
 
     with patch("flow_executor.document_to_acoes", side_effect=RuntimeError("blueprint quebrou")):
         with patch("flow_executor.flow_context_from_lead", return_value={}):
-            # Não deve raise
-            _run_post_payment(
-                tenant_id="default",
-                blueprint_id=bp_id,
-                lead_id=lead_id,
-                provider="cakto",
-                event_id="evt_crash",
-                payment_metadata={},
-            )
+            with pytest.raises(RuntimeError, match="blueprint quebrou"):
+                _run_post_payment(
+                    tenant_id="default", blueprint_id=bp_id, lead_id=lead_id,
+                    provider="cakto", event_id="evt_crash", payment_metadata={},
+                )
 
 
 def test_run_post_payment_aborta_se_blueprint_sumir_entre_dispatch_e_execucao():

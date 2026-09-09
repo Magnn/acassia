@@ -2064,6 +2064,9 @@ class BroadcastRecipient(Base):
     # pending → sent → delivered → failed → replied
     sent_at = Column(DateTime(timezone=True), nullable=True)
     error_reason = Column(String(200), nullable=True)
+    idempotency_key = Column(String(128), nullable=True, index=True)
+    provider_message_id = Column(String(128), nullable=True)
+    attempt = Column(Integer, default=0, nullable=False)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -3172,3 +3175,29 @@ class NotaFiscal(Base):
 
     # Relacionamentos
     lead = relationship("Lead", backref="notas_fiscais")
+
+
+class PaymentDelivery(Base):
+    """
+    Outbox durável para processamento assíncrono e idempotente de pós-venda/pagamentos.
+    Evita falsos sucessos e garante execução durável de blueprints pós-checkout.
+    """
+    __tablename__ = "payment_deliveries"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "provider", "event_id", name="uq_payment_delivery_event"),
+        Index("ix_payment_delivery_tenant_status", "tenant_id", "status"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(64), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True)
+    provider = Column(String(32), nullable=False)
+    event_id = Column(String(128), nullable=False)
+    blueprint_id = Column(String(128), nullable=True)
+
+    status = Column(String(20), default="pending", nullable=False)  # pending, delivering, delivered, failed
+    attempts = Column(Integer, default=0, nullable=False)
+    last_error = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)

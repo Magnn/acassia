@@ -78,14 +78,37 @@ class WhatsAppProvider(ABC):
         Usado pela UI pra saber se a conexão está pronta.
         """
 
+    def send_message_result(
+        self, numero: str, conteudo: str, formato: str = "texto", media_url: Optional[str] = None
+    ) -> SendResult:
+        """Contrato estruturado para novos consumidores, preservando o legado bool."""
+        kwargs = {"formato": formato}
+        if media_url is not None:
+            kwargs["media_url"] = media_url
+        try:
+            ok = self.enviar_mensagem(numero, conteudo, **kwargs)
+        except TypeError:
+            ok = self.enviar_mensagem(numero, conteudo, formato=formato)
+        message_id = None
+        if self.mode == ProviderMode.META_CLOUD:
+            try:
+                from .meta_cloud import pop_last_wamid
+                message_id = pop_last_wamid()
+            except Exception:
+                pass
+        elif self.mode == ProviderMode.EVOLUTION:
+            try:
+                from .evolution import pop_last_evolution_msg_id
+                message_id = pop_last_evolution_msg_id()
+            except Exception:
+                pass
+        return SendResult(ok=bool(ok), message_id=message_id, error=None if ok else "envio_falhou")
+
     def test_connection(self, target_number: str) -> SendResult:
         """
         Manda uma mensagem-teste curta. Default: usa enviar_mensagem texto.
         Providers podem sobrescrever para fazer ping específico.
         """
-        ok = self.enviar_mensagem(
-            target_number,
-            "Teste de conexão Sibila — se você recebeu, a integração está OK.",
-            formato="texto",
+        return self.send_message_result(
+            target_number, "Teste de conexão Sibila — se você recebeu, a integração está OK.", formato="texto"
         )
-        return SendResult(ok=ok, error=None if ok else "envio falhou")

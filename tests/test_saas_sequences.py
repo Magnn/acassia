@@ -205,7 +205,7 @@ def test_sequence_dispatch_idempotency_and_transactional_claim(auth_client):
         assert dispatch.provider_message_id == "wamid.test.456"
         assert dispatch.attempt == 1
         assert dispatch.enrollment_id == enrollment_id
-        assert dispatch.idempotency_key == f"seq:{seq.id}:step:{step.id}:lead:{lead.id}:attempt:1"
+        assert dispatch.idempotency_key == f"seq:{user.tenant_id}:enrollment:{enrollment_id}:step:{step.id}"
         step_db = db.query(models.SequenceStep).filter_by(id=step.id).one()
         sent_count = step_db.sent_count
 

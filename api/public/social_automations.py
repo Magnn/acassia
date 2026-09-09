@@ -284,13 +284,42 @@ def meta_social_webhook():
             if field in ["comments", "feed", "live_comments", "mentions"]:
                 post_id = val.get("post_id") or val.get("media", {}).get("id")
                 logger.info("[COMMENT_DETECTED] tenant=%s post=%s field=%s", tenant_id, post_id, field)
-                db_proc = SessionLocal()
-                try:
-                    process_social_comment(tenant_id, val, db_proc)
-                except Exception as exc:
-                    logger.warning("[COMMENT_PROC_ERROR] tenant=%s: %s", tenant_id, exc)
-                finally:
-                    db_proc.close()
+                comment_id = val.get("id") or val.get("comment_id") or ""
+                if comment_id:
+                    event_key = f"comment:{comment_id}"
+                    db_proc = SessionLocal()
+                    try:
+                        receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
+                            tenant_id=tenant_id, provider="meta", event_key=event_key
+                        ).first()
+                        if not receipt:
+                            try:
+                                receipt = models.SocialWebhookReceipt(
+                                    tenant_id=tenant_id, provider="meta", event_key=event_key, status="processing"
+                                )
+                                db_proc.add(receipt)
+                                db_proc.commit()
+                            except IntegrityError:
+                                db_proc.rollback()
+                        elif receipt.status != "sent":
+                            receipt.status = "processing"
+                            db_proc.commit()
+                    finally:
+                        db_proc.close()
+
+                    # Enqueue to durable task queue, falling back to direct execution
+                    from api.utils.task_queue import enqueue_social_effect
+                    enqueued = enqueue_social_effect(
+                        effect_type="comment", tenant_id=tenant_id, payload=val
+                    )
+                    if not enqueued:
+                        db_proc = SessionLocal()
+                        try:
+                            process_social_comment(tenant_id, val, db_proc)
+                        except Exception as exc:
+                            logger.warning("[COMMENT_PROC_ERROR] tenant=%s: %s", tenant_id, exc)
+                        finally:
+                            db_proc.close()
 
         # Respostas e reações a Stories chegam via entry.messaging
         messaging_events = entry.get("messaging", [])
@@ -301,17 +330,15 @@ def meta_social_webhook():
             story_ref = message.get("reply_to", {}).get("story") or message.get("story")
             if sender and story_ref:
                 logger.info("[STORY_REPLY_DETECTED] tenant=%s sender=%s", tenant_id, sender)
+                message_id = message.get("mid") or msg_ev.get("timestamp") or hashlib.sha256(
+                    json.dumps(msg_ev, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+                event_key = f"story:{sender}:{message_id}"
                 db_proc = SessionLocal()
                 try:
-                    message_id = message.get("mid") or msg_ev.get("timestamp") or hashlib.sha256(
-                        json.dumps(msg_ev, sort_keys=True).encode("utf-8")
-                    ).hexdigest()
-                    event_key = f"story:{sender}:{message_id}"
                     receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
                         tenant_id=tenant_id, provider="meta", event_key=event_key
                     ).first()
-                    if receipt and receipt.status == "sent":
-                        continue
                     if not receipt:
                         try:
                             receipt = models.SocialWebhookReceipt(
@@ -321,34 +348,26 @@ def meta_social_webhook():
                             db_proc.commit()
                         except IntegrityError:
                             db_proc.rollback()
-                            receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
-                                tenant_id=tenant_id, provider="meta", event_key=event_key
-                            ).first()
-                            if receipt and receipt.status == "sent":
-                                continue
-                    else:
+                    elif receipt.status != "sent":
                         receipt.status = "processing"
                         db_proc.commit()
-
-                    story_cfg = _get_variable(db_proc, tenant_id, "social.story_reply_config", {
-                        "active": True,
-                        "reply_text": "Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?",
-                    })
-                    sent_ok = False
-                    if story_cfg.get("active", True):
-                        access_token = _get_secret(db_proc, tenant_id, "meta_social.access_token")
-                        sent_ok = send_instagram_direct_message(
-                            sender,
-                            story_cfg.get("reply_text", "Obrigada por responder nosso Story! ✨"),
-                            access_token,
-                        )
-                    if receipt:
-                        receipt.status = "sent" if sent_ok else "failed"
-                        db_proc.commit()
-                except Exception as exc:
-                    logger.warning("[STORY_REPLY_ERROR] tenant=%s: %s", tenant_id, exc)
                 finally:
                     db_proc.close()
+
+                from api.utils.task_queue import enqueue_social_effect
+                enqueued = enqueue_social_effect(
+                    effect_type="story_reply",
+                    tenant_id=tenant_id,
+                    payload={"sender": sender, "event_key": event_key},
+                )
+                if not enqueued:
+                    db_proc = SessionLocal()
+                    try:
+                        execute_social_effect_job("story_reply", tenant_id, {"sender": sender, "event_key": event_key})
+                    except Exception as exc:
+                        logger.warning("[STORY_REPLY_ERROR] tenant=%s: %s", tenant_id, exc)
+                    finally:
+                        db_proc.close()
 
     return jsonify({"status": "received"}), 200
 
@@ -424,6 +443,114 @@ def story_reply_config():
             return jsonify({"ok": True, "config": cfg})
 
         return jsonify({"ok": True, "config": cfg})
+    finally:
+        db.close()
+
+
+def execute_social_effect_job(effect_type: str, tenant_id: str, payload: dict) -> None:
+    """Executa efeito social assíncrono via worker do task_queue."""
+    db = SessionLocal()
+    try:
+        if effect_type == "comment":
+            process_social_comment(tenant_id, payload, db)
+        elif effect_type == "story_reply":
+            sender = payload.get("sender")
+            event_key = payload.get("event_key")
+            receipt = db.query(models.SocialWebhookReceipt).filter_by(
+                tenant_id=tenant_id, provider="meta", event_key=event_key
+            ).first()
+            if receipt and receipt.status == "sent":
+                return
+            story_cfg = _get_variable(db, tenant_id, "social.story_reply_config", {
+                "active": True,
+                "reply_text": "Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?",
+            })
+            sent_ok = False
+            if story_cfg.get("active", True):
+                access_token = _get_secret(db, tenant_id, "meta_social.access_token")
+                sent_ok = send_instagram_direct_message(
+                    sender,
+                    story_cfg.get("reply_text", "Obrigada por responder nosso Story! ✨"),
+                    access_token,
+                )
+            if receipt:
+                receipt.status = "sent" if sent_ok else "failed"
+                receipt.last_error = None if sent_ok else "dm_send_failed"
+                db.commit()
+            if not sent_ok:
+                raise RuntimeError("Failed to send story reply DM")
+        else:
+            raise ValueError(f"Unknown social effect type: {effect_type}")
+    finally:
+        db.close()
+
+
+@social_bp.route("/saas/social/dlq", methods=["GET"])
+@login_required
+def list_social_dlq():
+    """Lista eventos sociais que falharam no processamento."""
+    db = SessionLocal()
+    try:
+        tenant_id = current_user.tenant_id
+        failed_receipts = db.query(models.SocialWebhookReceipt).filter_by(
+            tenant_id=tenant_id, status="failed"
+        ).order_by(models.SocialWebhookReceipt.created_at.desc()).limit(100).all()
+
+        results = [
+            {
+                "id": r.id,
+                "provider": r.provider,
+                "event_key": r.event_key,
+                "status": r.status,
+                "public_reply_sent": r.public_reply_sent,
+                "private_reply_sent": r.private_reply_sent,
+                "last_error": r.last_error,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in failed_receipts
+        ]
+        return jsonify({"dlq": results, "total": len(results)})
+    finally:
+        db.close()
+
+
+@social_bp.route("/saas/social/retry/<int:receipt_id>", methods=["POST"])
+@login_required
+def retry_social_effect(receipt_id: int):
+    """Retenta processamento de um evento social em falha."""
+    db = SessionLocal()
+    try:
+        tenant_id = current_user.tenant_id
+        receipt = db.query(models.SocialWebhookReceipt).filter_by(
+            id=receipt_id, tenant_id=tenant_id
+        ).first()
+        if not receipt:
+            return jsonify({"error": "receipt_not_found"}), 404
+
+        receipt.status = "processing"
+        db.commit()
+
+        # Enfileira retry no task queue
+        from api.utils.task_queue import enqueue_social_effect
+        if receipt.event_key.startswith("comment:"):
+            cid = receipt.event_key.split(":", 1)[1]
+            enqueued = enqueue_social_effect(
+                effect_type="comment",
+                tenant_id=tenant_id,
+                payload={"id": cid, "comment_id": cid, "text": "", "message": ""},
+            )
+        elif receipt.event_key.startswith("story:"):
+            parts = receipt.event_key.split(":")
+            sender = parts[1] if len(parts) > 1 else ""
+            enqueued = enqueue_social_effect(
+                effect_type="story_reply",
+                tenant_id=tenant_id,
+                payload={"sender": sender, "event_key": receipt.event_key},
+            )
+        else:
+            enqueued = False
+
+        return jsonify({"ok": True, "enqueued": enqueued, "receipt_id": receipt.id})
     finally:
         db.close()
 

@@ -27,10 +27,19 @@ import requests
 
 from .base import ProviderMode, SendResult, WhatsAppProvider
 
+import threading
+
 logger = logging.getLogger(__name__)
 
 TIMEOUT_CONNECT = 5
 TIMEOUT_READ = 15
+_LAST_EVOLUTION_MSG_ID = threading.local()
+
+
+def pop_last_evolution_msg_id() -> str | None:
+    val = getattr(_LAST_EVOLUTION_MSG_ID, "value", None)
+    _LAST_EVOLUTION_MSG_ID.value = None
+    return val
 
 
 class EvolutionProvider(WhatsAppProvider):
@@ -126,6 +135,13 @@ class EvolutionProvider(WhatsAppProvider):
                 timeout=(TIMEOUT_CONNECT, TIMEOUT_READ),
             )
             if resp.status_code in (200, 201):
+                try:
+                    data = resp.json() if resp.text else {}
+                    msg_id = (data.get("key") or {}).get("id") or data.get("messageId") or data.get("id")
+                    if msg_id:
+                        _LAST_EVOLUTION_MSG_ID.value = str(msg_id)
+                except Exception:
+                    pass
                 logger.info(
                     "[evolution] tenant=%s %s enviado para %s",
                     self.tenant_id, formato.upper(), numero,

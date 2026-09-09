@@ -660,20 +660,25 @@ def process_due_sequence_steps(tenant_id: Optional[str] = None) -> int:
             newly_sent = False
             if not already_sent:
                 attempt = len(previous_dispatches) + 1
-                idem_key = f"seq:{en.sequence_id}:step:{step.id}:lead:{en.lead_id}:attempt:{attempt}"
-                dispatch = models.SequenceDispatch(
-                    tenant_id=en.tenant_id,
-                    sequence_id=en.sequence_id,
-                    step_id=step.id,
-                    lead_id=en.lead_id,
-                    enrollment_id=en.id,
-                    idempotency_key=idem_key,
-                    attempt=attempt,
-                    run_at=now,
-                    status="claimed",
-                    dispatched_at=now,
-                )
-                db.add(dispatch)
+                # A chave representa a ocorrência lógica do passo e permanece
+                # igual em todas as tentativas. Se o processo cair depois do
+                # aceite do provedor, a nova tentativa não cria outra mensagem.
+                idem_key = f"seq:{en.tenant_id}:enrollment:{en.id}:step:{step.id}"
+                dispatch = previous_dispatches[-1] if previous_dispatches else None
+                if dispatch:
+                    dispatch.status = "claimed"
+                    dispatch.attempt = attempt
+                    dispatch.idempotency_key = idem_key
+                    dispatch.error_reason = None
+                    dispatch.dispatched_at = now
+                else:
+                    dispatch = models.SequenceDispatch(
+                        tenant_id=en.tenant_id, sequence_id=en.sequence_id,
+                        step_id=step.id, lead_id=en.lead_id, enrollment_id=en.id,
+                        idempotency_key=idem_key, attempt=attempt, run_at=now,
+                        status="claimed", dispatched_at=now,
+                    )
+                    db.add(dispatch)
                 db.commit()
                 db.refresh(dispatch)
 

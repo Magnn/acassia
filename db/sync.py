@@ -132,6 +132,9 @@ def sync_database():
         _add_column_if_missing(inspector, "sequence_dispatches", "run_at", "TIMESTAMP")
         _add_column_if_missing(inspector, "sequence_dispatches", "attempt", "INTEGER NOT NULL DEFAULT 1")
         _add_column_if_missing(inspector, "sequence_dispatches", "provider_message_id", "VARCHAR(128)")
+        _add_column_if_missing(inspector, "broadcast_recipients", "idempotency_key", "VARCHAR(128)")
+        _add_column_if_missing(inspector, "broadcast_recipients", "provider_message_id", "VARCHAR(128)")
+        _add_column_if_missing(inspector, "broadcast_recipients", "attempt", "INTEGER NOT NULL DEFAULT 0")
 
         logger.info("✅ [DATABASE] Tabelas sincronizadas (%s).", DB_DRIVER)
     except Exception as e:

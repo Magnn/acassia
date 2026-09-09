@@ -13,7 +13,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 _PREFIX = "acassia:tasks"
-_KINDS = ("broadcast", "sequence")
+_KINDS = ("broadcast", "sequence", "post_payment", "flow", "social_effect")
 _LEASE_SECONDS = int(os.getenv("TASK_QUEUE_LEASE_SECONDS", "300"))
 _MAX_ATTEMPTS = int(os.getenv("TASK_QUEUE_MAX_ATTEMPTS", "5"))
 
@@ -65,6 +65,18 @@ def enqueue_campaign_send(campaign_id: int, tenant_id: str) -> bool:
 
 def enqueue_sequence_process(tenant_id: Optional[str] = None) -> bool:
     return _enqueue("sequence", {"tenant_id": tenant_id})
+
+
+def enqueue_post_payment(**payload) -> bool:
+    return _enqueue("post_payment", payload)
+
+
+def enqueue_flow_execution(**payload) -> bool:
+    return _enqueue("flow", payload)
+
+
+def enqueue_social_effect(**payload) -> bool:
+    return _enqueue("social_effect", payload)
 
 
 _RESERVE_SCRIPT = """
@@ -155,6 +167,15 @@ def _execute(job: dict) -> None:
     elif job["kind"] == "sequence":
         from api.saas.sequences import process_due_sequence_steps
         process_due_sequence_steps(tenant_id=payload.get("tenant_id"))
+    elif job["kind"] == "post_payment":
+        from api.payments.dispatch import _run_post_payment
+        _run_post_payment(**payload)
+    elif job["kind"] == "flow":
+        from api.flow_runtime import execute_flow_job
+        execute_flow_job(**payload)
+    elif job["kind"] == "social_effect":
+        from api.public.social_automations import execute_social_effect_job
+        execute_social_effect_job(**payload)
     else:
         raise ValueError(f"Unsupported task kind: {job['kind']}")
 
@@ -169,6 +190,7 @@ def worker_loop(kind: str) -> None:
             time.sleep(5)
             continue
         try:
+            r.set(_key(kind, "worker_heartbeat"), str(time.time()), ex=30)
             job = _reserve(r, kind)
             if not job:
                 time.sleep(1)
@@ -233,15 +255,21 @@ def get_queue_metrics() -> dict:
             pipe.zcard(_key(kind, "delayed"))
             pipe.llen(_key(kind, "dead"))
             pipe.hlen(_key(kind, "jobs"))
-            ready, processing, delayed, dead, jobs = pipe.execute()
+            pipe.get(_key(kind, "worker_heartbeat"))
+            ready, processing, delayed, dead, jobs, heartbeat = pipe.execute()
+            try:
+                heartbeat_age = max(0.0, time.time() - float(heartbeat)) if heartbeat else None
+            except (TypeError, ValueError):
+                heartbeat_age = None
             metrics["queues"][kind] = {
                 "ready": ready,
                 "processing": processing,
                 "delayed": delayed,
                 "dead": dead,
                 "total_jobs": jobs,
+                "worker_alive": heartbeat_age is not None and heartbeat_age <= 30,
+                "worker_heartbeat_age_seconds": round(heartbeat_age, 1) if heartbeat_age is not None else None,
             }
         except Exception as exc:
             metrics["queues"][kind] = {"error": str(exc)[:100]}
     return metrics
-
