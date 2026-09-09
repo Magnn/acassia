@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   QrCode, RefreshCw, AlertTriangle, CheckCircle2, ShieldCheck, Signal, Phone,
   ExternalLink, Zap, Plus, Star, Trash2, X, Save, KeyRound, Globe, Smartphone,
-  MessageSquare, Send, BookOpen, Copy, Sparkles,
+  MessageSquare, Send, BookOpen, Copy, Sparkles, Eye, EyeOff,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { toast } from '../lib/toast';
@@ -55,6 +55,7 @@ export default function WAConnection() {
     evolution_instance: '',
     evolution_api_key: '',
   });
+  const [showToken, setShowToken] = useState(false);
 
   const { data } = useQuery({ queryKey: ['devices'], queryFn: () => api.get<any>('/saas/devices/') });
   const devices: Device[] = data?.devices || [];
@@ -259,113 +260,249 @@ export default function WAConnection() {
 
       {/* Modal Novo Dispositivo */}
       {showAdd && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="bg-bg-surface border border-border rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
-            <header className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <h3 className="font-bold text-lg text-primary">Novo Dispositivo</h3>
-              <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg hover:bg-bg-primary text-secondary">
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6" onClick={() => setShowAdd(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-950 border border-zinc-800 rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <header className="flex items-center justify-between px-6 py-5 border-b border-zinc-800 bg-zinc-900/40">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#25D366]/20 to-[#128C7E]/20 border border-[#25D366]/30 flex items-center justify-center text-[#25D366]">
+                  <WaLogo className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-zinc-100">Novo Número WhatsApp</h3>
+                  <p className="text-xs text-zinc-400">Conecte via Meta Cloud Oficial ou WhatsApp Web / QR Code</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAdd(false)} className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </header>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-secondary block mb-1">Apelido *</label>
-                <input
-                  value={form.nickname}
-                  onChange={(e) => setForm((f) => ({ ...f, nickname: e.target.value }))}
-                  placeholder="Ex: WhatsApp Comercial, Vendas, Atendimento VIP..."
-                  className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary focus:outline-none focus:border-[#25D366]"
-                />
+
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {/* Opção Rápida: Embedded Signup oficial */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-transparent border border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-400 mb-0.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Conexão Oficial em 1 Clique (Recomendado)</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    Autorize diretamente com sua conta do Facebook / Meta sem precisar preencher IDs e tokens manualmente.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdd(false);
+                    setShowMetaModal(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0082FB] hover:bg-[#0070db] text-white transition-all shadow-md shadow-[#0082FB]/20 flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <MetaLogo className="w-3.5 h-3.5" />
+                  <span>Entrar com Meta</span>
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-bold text-secondary block mb-1">Número do chip (formato internacional)</label>
-                <input
-                  value={form.phone_display}
-                  onChange={(e) => setForm((f) => ({ ...f, phone_display: e.target.value }))}
-                  placeholder="+55 69 8105-1492"
-                  className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary focus:outline-none focus:border-[#25D366]"
-                />
+
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-zinc-800 flex-1" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">ou cadastro manual</span>
+                <div className="h-px bg-zinc-800 flex-1" />
               </div>
-              <div>
-                <label className="text-xs font-bold text-secondary block mb-2">Provedor</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: 'meta_cloud', label: 'Meta Cloud API', sub: 'Oficial Meta', color: 'from-[#0a1a12] to-[#0f2318]', border: 'border-[#25D366]/30' },
-                    { id: 'evolution', label: 'Evolution API', sub: 'QR Code', color: 'from-purple-900/20 to-purple-950/20', border: 'border-purple-500/30' },
-                  ].map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, provider: p.id }))}
-                      className={`text-left p-3.5 rounded-xl border transition-all ${
-                        form.provider === p.id
-                          ? `bg-gradient-to-br ${p.color} ${p.border} ring-1 ring-[#25D366]/20`
-                          : 'bg-bg-primary border-border hover:border-border'
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-primary">{p.label}</div>
-                      <div className="text-[10px] text-secondary">{p.sub}</div>
-                    </button>
-                  ))}
+
+              {/* Informações Básicas */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
+                    Apelido do Dispositivo <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    value={form.nickname}
+                    onChange={(e) => setForm((f) => ({ ...f, nickname: e.target.value }))}
+                    placeholder="Ex: Comercial, Vendas, Suporte..."
+                    className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700/70 rounded-xl text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]/30 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-zinc-300 block mb-1.5">
+                    Número do WhatsApp (com DDI e DDD)
+                  </label>
+                  <input
+                    value={form.phone_display}
+                    onChange={(e) => setForm((f) => ({ ...f, phone_display: e.target.value }))}
+                    placeholder="+55 69 98105-1492"
+                    className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700/70 rounded-xl text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]/30 transition-all font-mono"
+                  />
                 </div>
               </div>
+
+              {/* Seletor de Provedor */}
+              <div>
+                <label className="text-xs font-semibold text-zinc-300 block mb-2">Provedor de Conexão</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    {
+                      id: 'meta_cloud',
+                      label: 'Meta Cloud API Oficial',
+                      badge: 'Oficial Meta',
+                      desc: 'Envio ativo, alta entrega, botões interativos e sem risco de ban.',
+                      color: 'border-emerald-500/60 bg-emerald-950/20 text-emerald-400 ring-1 ring-emerald-500/30',
+                    },
+                    {
+                      id: 'evolution',
+                      label: 'Evolution API (QR Code)',
+                      badge: 'Conexão Web',
+                      desc: 'Conecte lendo o QR Code do WhatsApp tradicional no celular.',
+                      color: 'border-purple-500/60 bg-purple-950/20 text-purple-400 ring-1 ring-purple-500/30',
+                    },
+                  ].map((p) => {
+                    const isSelected = form.provider === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, provider: p.id }))}
+                        className={`text-left p-3.5 rounded-2xl border transition-all ${
+                          isSelected
+                            ? p.color
+                            : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-xs text-zinc-100">{p.label}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+                            {p.badge}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 leading-snug">{p.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Campos Meta Cloud API */}
               {form.provider === 'meta_cloud' && (
-                <div className="space-y-3 p-4 bg-[#0a1a12]/50 rounded-xl border border-[#25D366]/20">
-                  <input
-                    value={form.meta_phone_number_id}
-                    onChange={(e) => setForm((f) => ({ ...f, meta_phone_number_id: e.target.value }))}
-                    placeholder="phone_number_id (ex: 574220792437648)"
-                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
-                  />
-                  <input
-                    value={form.meta_waba_id}
-                    onChange={(e) => setForm((f) => ({ ...f, meta_waba_id: e.target.value }))}
-                    placeholder="waba_id (ex: 9876543210)"
-                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
-                  />
-                  <input
-                    value={form.meta_access_token}
-                    onChange={(e) => setForm((f) => ({ ...f, meta_access_token: e.target.value }))}
-                    placeholder="access_token permanente (EAAB...)"
-                    type="password"
-                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
-                  />
+                <div className="space-y-3.5 p-4 bg-zinc-900/80 rounded-2xl border border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                      Credenciais Meta Cloud (Graph API)
+                    </span>
+                    <a
+                      href="https://developers.facebook.com/apps"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 underline"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Abrir Meta Developers
+                    </a>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-zinc-300 block mb-1">
+                      ID do Número de Telefone (<code className="font-mono text-emerald-400">phone_number_id</code>)
+                    </label>
+                    <input
+                      value={form.meta_phone_number_id}
+                      onChange={(e) => setForm((f) => ({ ...f, meta_phone_number_id: e.target.value }))}
+                      placeholder="Ex: 1126244453895124"
+                      className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-[#25D366] font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-zinc-300 block mb-1">
+                      ID da Conta de WhatsApp Business (<code className="font-mono text-emerald-400">waba_id</code>)
+                    </label>
+                    <input
+                      value={form.meta_waba_id}
+                      onChange={(e) => setForm((f) => ({ ...f, meta_waba_id: e.target.value }))}
+                      placeholder="Ex: 1443823057400060"
+                      className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-[#25D366] font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-zinc-300">
+                        Token de Acesso Permanente (System User)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowToken(!showToken)}
+                        className="text-[11px] text-zinc-400 hover:text-zinc-200 flex items-center gap-1"
+                      >
+                        {showToken ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        <span>{showToken ? 'Ocultar' : 'Mostrar'}</span>
+                      </button>
+                    </div>
+                    <input
+                      value={form.meta_access_token}
+                      onChange={(e) => setForm((f) => ({ ...f, meta_access_token: e.target.value }))}
+                      placeholder="EAAB... (Token permanente do Gerenciador de Negócios)"
+                      type={showToken ? 'text' : 'password'}
+                      className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-[#25D366] font-mono"
+                    />
+                  </div>
                 </div>
               )}
+
+              {/* Campos Evolution API */}
               {form.provider === 'evolution' && (
-                <div className="space-y-3 p-4 bg-purple-900/10 rounded-xl border border-purple-500/20">
-                  <input
-                    value={form.evolution_server_url}
-                    onChange={(e) => setForm((f) => ({ ...f, evolution_server_url: e.target.value }))}
-                    placeholder="URL Servidor (ex: https://evo.example.com)"
-                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
-                  />
-                  <input
-                    value={form.evolution_instance}
-                    onChange={(e) => setForm((f) => ({ ...f, evolution_instance: e.target.value }))}
-                    placeholder="Nome da Instância"
-                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
-                  />
-                  <input
-                    value={form.evolution_api_key}
-                    onChange={(e) => setForm((f) => ({ ...f, evolution_api_key: e.target.value }))}
-                    placeholder="API Key"
-                    type="password"
-                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-primary font-mono"
-                  />
+                <div className="space-y-3.5 p-4 bg-purple-950/20 rounded-2xl border border-purple-500/20">
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-400 block">
+                    Servidor Evolution API (QR Code)
+                  </span>
+
+                  <div>
+                    <label className="text-xs font-medium text-zinc-300 block mb-1">URL do Servidor Evolution</label>
+                    <input
+                      value={form.evolution_server_url}
+                      onChange={(e) => setForm((f) => ({ ...f, evolution_server_url: e.target.value }))}
+                      placeholder="https://evo.seu-dominio.com"
+                      className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-zinc-300 block mb-1">Nome da Instância</label>
+                      <input
+                        value={form.evolution_instance}
+                        onChange={(e) => setForm((f) => ({ ...f, evolution_instance: e.target.value }))}
+                        placeholder="minha-instancia"
+                        className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-300 block mb-1">Chave Global / API Key</label>
+                      <input
+                        value={form.evolution_api_key}
+                        onChange={(e) => setForm((f) => ({ ...f, evolution_api_key: e.target.value }))}
+                        placeholder="API Key do servidor"
+                        type="password"
+                        className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-purple-500 font-mono"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-            <footer className="px-6 py-4 border-t border-border flex justify-end gap-3">
-              <button onClick={() => setShowAdd(false)} className="px-4 py-2 text-xs text-secondary hover:text-primary">
+
+            <footer className="px-6 py-4 border-t border-zinc-800 bg-zinc-900/40 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowAdd(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={() => createMut.mutate(form)}
-                disabled={!form.nickname || createMut.isPending}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl text-xs font-bold disabled:opacity-40 shadow-sm"
+                disabled={!form.nickname.trim() || createMut.isPending}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#22bf5b] hover:to-[#0f7a6e] text-white rounded-xl text-xs font-bold disabled:opacity-40 shadow-md shadow-[#25D366]/20 transition-all active:scale-[0.98]"
               >
-                <Save className="w-3.5 h-3.5" /> {createMut.isPending ? 'Salvando...' : 'Salvar Dispositivo'}
+                <Save className="w-4 h-4" />
+                <span>{createMut.isPending ? 'Conectando...' : 'Salvar e Conectar'}</span>
               </button>
             </footer>
           </div>
