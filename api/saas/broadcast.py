@@ -783,6 +783,24 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
                 ).all():
                     leads_cache[l.id] = l
 
+            try:
+                db.refresh(campaign)
+            except Exception:
+                pass
+            if campaign.status in ("cancelled", "paused"):
+                # Reverter lote claimed para pending imediatamente
+                candidate_ids = [c.id for c in candidates]
+                if candidate_ids:
+                    db.query(models.BroadcastRecipient).filter(
+                        models.BroadcastRecipient.id.in_(candidate_ids),
+                        models.BroadcastRecipient.status == "claimed",
+                    ).update({
+                        models.BroadcastRecipient.status: "pending",
+                        models.BroadcastRecipient.claimed_at: None,
+                    }, synchronize_session=False)
+                    db.commit()
+                break
+
             # Envio concorrente por chunk com controle de concorrência e cadência
             # Para evitar gargalo linear (ex: 1000 msgs * 2s = 33 minutos em uma thread única travada),
             # dividimos o chunk em mini-lotes processados paralelamente com max_workers controlado,
