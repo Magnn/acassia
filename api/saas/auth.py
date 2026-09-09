@@ -494,19 +494,38 @@ def forgot_password():
             user.id, request.remote_addr, email, reset_url,
         )
 
+        # Tenta envio por e-mail (Resend ou SMTP se configurados)
+        from api.utils.email_sender import send_password_reset_email, is_email_service_configured
+
+        email_sent = False
+        if is_email_service_configured():
+            try:
+                email_sent = send_password_reset_email(user.email, reset_url)
+            except Exception as exc:
+                logger.warning("[saas_auth] Falha ao despachar e-mail de reset: %s", exc)
+
         resp_payload = {
             "ok": True,
-            "message": "Se o e-mail informado estiver cadastrado, você receberá as instruções em instantes.",
+            "email_sent": email_sent,
         }
 
-        # Em ambiente local / dev ou teste, expõe o link diretamente
-        if os.getenv("FLASK_ENV") != "production" or os.getenv("ENABLE_DEV_RESET_LINK") == "1":
+        if email_sent:
+            resp_payload["message"] = (
+                "Enviamos um link de recuperação para seu e-mail. Verifique a caixa de entrada e também a pasta de spam."
+            )
+        else:
+            # Se o servidor não possui envio de e-mail ativo (SMTP/Resend não configurados)
+            # OU se estiver em dev/teste, fornece o link seguro diretamente para não travar o usuário
+            resp_payload["message"] = (
+                "Como o envio automático de e-mails ainda não possui credenciais SMTP/Resend configuradas no servidor, "
+                "utilize o link de recuperação direto abaixo para redefinir sua senha agora mesmo:"
+            )
             resp_payload["reset_url"] = reset_url
 
         if request.is_json:
             return jsonify(resp_payload)
 
-        flash("Se o e-mail informado estiver cadastrado, você receberá as instruções em instantes.", "info")
+        flash(resp_payload["message"], "success" if email_sent else "info")
         return redirect(url_for("saas_auth.login"))
     finally:
         db.close()

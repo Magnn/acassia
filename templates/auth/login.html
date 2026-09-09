@@ -327,15 +327,23 @@
         });
 
         const data = await resp.json();
-        forgotAlert.className = 'mb-4 p-3.5 rounded-xl text-xs flex flex-col gap-2 bg-emerald-950/70 border border-emerald-800/60 text-emerald-200';
+        const isSuccess = data.ok !== false;
+        forgotAlert.className = 'mb-4 p-3.5 rounded-xl text-xs flex flex-col gap-2.5 ' + 
+          (isSuccess ? 'bg-emerald-950/70 border border-emerald-800/60 text-emerald-200' : 'bg-rose-950/70 border border-rose-800/60 text-rose-200');
         
-        let htmlContent = `<div>${data.message || 'Se o e-mail estiver cadastrado, as instruções foram processadas.'}</div>`;
+        let htmlContent = `<div class="leading-relaxed">${data.message || 'Se o e-mail estiver cadastrado, as instruções foram processadas.'}</div>`;
         if (data.reset_url) {
-          htmlContent += `<a href="${data.reset_url}" class="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition self-start">Redefinir Senha Agora &rarr;</a>`;
+          htmlContent += `
+            <div class="pt-2 border-t border-emerald-800/60 flex flex-col gap-1.5">
+              <a href="${data.reset_url}" class="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 transition text-center">
+                Redefinir Minha Senha Agora &rarr;
+              </a>
+            </div>
+          `;
         }
         forgotAlert.innerHTML = htmlContent;
         forgotAlert.classList.remove('hidden');
-        forgotBtnText.textContent = 'Link Enviado';
+        forgotBtnText.textContent = data.reset_url ? 'Acesse Acima' : 'E-mail Enviado';
       } catch (err) {
         forgotAlert.className = 'mb-4 p-3.5 rounded-xl text-xs flex flex-col gap-1.5 bg-rose-950/70 border border-rose-800/60 text-rose-200';
         forgotAlert.textContent = 'Não foi possível processar a solicitação no momento. Tente novamente.';
