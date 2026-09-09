@@ -135,6 +135,14 @@ class WhatsAppAPI:
                 pass
         return ok
 
+    def send_message_result(
+        self, numero: str, conteudo: str, formato: str = "texto", media_url: str | None = None
+    ):
+        """Encaminha send_message_result para o provider resolvido do tenant."""
+        tid = _current_tenant_id()
+        provider = get_provider_for_tenant(tid)
+        return provider.send_message_result(numero, conteudo, formato=formato, media_url=media_url)
+
     def simulate_presence(
         self,
         numero: str,
