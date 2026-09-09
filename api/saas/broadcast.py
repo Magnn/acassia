@@ -783,70 +783,94 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
                 ).all():
                     leads_cache[l.id] = l
 
-            for rec in candidates:
-                try:
-                    db.refresh(campaign)
-                except Exception:
-                    pass
-                if campaign.status in ("cancelled", "paused"):
-                    # Reverter não processados deste lote para pending
-                    db.query(models.BroadcastRecipient).filter_by(
-                        id=rec.id, status="claimed"
-                    ).update({
-                        models.BroadcastRecipient.status: "pending",
-                        models.BroadcastRecipient.claimed_at: None,
-                    }, synchronize_session=False)
-                    db.commit()
-                    continue
+            # Envio concorrente por chunk com controle de concorrência e cadência
+            # Para evitar gargalo linear (ex: 1000 msgs * 2s = 33 minutos em uma thread única travada),
+            # dividimos o chunk em mini-lotes processados paralelamente com max_workers controlado,
+            # mantendo a proteção anti-ban e persistindo o progresso com muito menor tempo de ocupação.
+            from concurrent.futures import ThreadPoolExecutor, as_completed
 
+            # Número de envios simultâneos calibrado para não sobrecarregar gateway / API
+            # Se throttle_secs for alto (> 5), roda com menos concorrência (ex: 2). Se baixo (1-2), roda com até 5 workers.
+            concurrency = 2 if throttle_secs >= 5 else 5
+
+            def _send_single_recipient(rec_id: int, lead_phone: str) -> dict:
+                res_dict = {
+                    "rec_id": rec_id,
+                    "ok": False,
+                    "msg_id": None,
+                    "error": None,
+                }
+                if not wa_client:
+                    res_dict["error"] = "wa_client_unavailable"
+                    return res_dict
+
+                try:
+                    media_fmt = (campaign.message_media_type or "imagem") if campaign.message_media_url else "texto"
+                    res = wa_client.send_message_result(
+                        lead_phone,
+                        campaign.message_text,
+                        formato=media_fmt,
+                        media_url=campaign.message_media_url,
+                    )
+                    res_dict["ok"] = bool(res.ok)
+                    res_dict["msg_id"] = res.message_id
+                    res_dict["error"] = res.error or ("" if res.ok else "send_returned_false")
+                except Exception as exc:
+                    res_dict["error"] = str(exc)[:200]
+                return res_dict
+
+            # Filtra apenas registros válidos do lote
+            valid_tasks = []
+            for rec in candidates:
                 lead = leads_cache.get(rec.lead_id)
                 if not lead or not lead.telefone:
                     rec.status = "failed"
                     rec.claimed_at = None
                     rec.error_reason = "no_phone"
                     failed += 1
-                    db.commit()
-                    continue
+                else:
+                    rec.attempt = (rec.attempt or 0) + 1
+                    rec.idempotency_key = f"bcast:{campaign.id}:rec:{rec.id}"
+                    valid_tasks.append((rec, lead.telefone))
 
-                rec.attempt = (rec.attempt or 0) + 1
-                rec.idempotency_key = f"bcast:{campaign.id}:rec:{rec.id}"
+            if valid_tasks:
+                # Dispara o lote em paralelo controlado
+                results_map = {}
+                with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="bcast-send") as executor:
+                    futures = {
+                        executor.submit(_send_single_recipient, rec.id, phone): rec
+                        for rec, phone in valid_tasks
+                    }
+                    for future in as_completed(futures):
+                        rec_item = futures[future]
+                        try:
+                            res_val = future.result()
+                            results_map[rec_item.id] = res_val
+                        except Exception as exc:
+                            results_map[rec_item.id] = {"ok": False, "error": str(exc)[:200]}
 
-                try:
-                    if wa_client:
-                        media_fmt = (campaign.message_media_type or "imagem") if campaign.message_media_url else "texto"
-                        res = wa_client.send_message_result(
-                            lead.telefone,
-                            campaign.message_text,
-                            formato=media_fmt,
-                            media_url=campaign.message_media_url,
-                        )
-                        if res.ok:
-                            rec.status = "sent"
-                            rec.claimed_at = None
-                            rec.sent_at = datetime.now(timezone.utc)
-                            rec.provider_message_id = res.message_id
-                            sent += 1
-                        else:
-                            rec.status = "failed"
-                            rec.claimed_at = None
-                            rec.error_reason = res.error or "send_returned_false"
-                            failed += 1
+                now_utc = datetime.now(timezone.utc)
+                for rec, _ in valid_tasks:
+                    res_info = results_map.get(rec.id) or {"ok": False, "error": "unknown_failure"}
+                    rec.claimed_at = None
+                    if res_info.get("ok"):
+                        rec.status = "sent"
+                        rec.sent_at = now_utc
+                        rec.provider_message_id = res_info.get("msg_id")
+                        sent += 1
                     else:
                         rec.status = "failed"
-                        rec.claimed_at = None
-                        rec.error_reason = "wa_client_unavailable"
+                        rec.error_reason = res_info.get("error") or "send_failed"
                         failed += 1
-                except Exception as exc:
-                    rec.status = "failed"
-                    rec.claimed_at = None
-                    rec.error_reason = str(exc)[:200]
-                    failed += 1
 
-                campaign.sent_count = sent
-                campaign.failed_count = failed
-                db.commit()
+            # Commit em lote do chunk inteiro reduz contenção de I/O no banco
+            campaign.sent_count = sent
+            campaign.failed_count = failed
+            db.commit()
 
-                time.sleep(throttle_secs)
+            # Pausa curta e proporcional entre chunks inteiros de 50 mensagens
+            chunk_delay = max(0.5, float(throttle_secs) / concurrency)
+            time.sleep(chunk_delay)
 
         try:
             db.refresh(campaign)

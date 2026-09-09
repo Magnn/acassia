@@ -215,17 +215,22 @@ class OpenWAProvider(WhatsAppProvider):
             )
             ok = resp.status_code in (200, 201, 204)
 
-            # Se foi solicitado delay para simular o tempo de digitação/gravação
+            # Se foi solicitado delay para simular o tempo de digitação/gravação,
+            # executa o desligamento em background thread para não travar a requisição HTTP do servidor
             if delay_seconds > 0:
                 sleep_time = min(max(delay_seconds, 0.5), 5.0)
-                time.sleep(sleep_time)
-                # Desliga a digitação após o delay
-                requests.post(
-                    url_typing,
-                    json={"to": to_jid, "on": False, "presence": "paused"},
-                    headers=self._headers(),
-                    timeout=(TIMEOUT_CONNECT, 3),
-                )
+                def _off_presence():
+                    try:
+                        time.sleep(sleep_time)
+                        requests.post(
+                            url_typing,
+                            json={"to": to_jid, "on": False, "presence": "paused"},
+                            headers=self._headers(),
+                            timeout=(TIMEOUT_CONNECT, 3),
+                        )
+                    except Exception:
+                        pass
+                threading.Thread(target=_off_presence, daemon=True, name="openwa-presence-off").start()
             return ok
         except Exception as exc:
             logger.debug("[openwa.simulate_presence] Falha silenciosa: %s", exc)

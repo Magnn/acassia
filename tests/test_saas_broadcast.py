@@ -141,3 +141,75 @@ def test_broadcast_lifecycle_and_chatbotx_parity(auth_client):
     tags = res_tags.get_json()["tags"]
     assert "vip" in tags
     assert "black_friday" in tags
+
+
+def test_send_campaign_worker_concurrent_batch():
+    """Valida que o worker dispara em lotes concorrentes e persiste status sent/failed."""
+    from unittest.mock import MagicMock, patch
+    from api.saas.broadcast import _send_campaign_worker
+    from api.whatsapp_providers.base import SendResult
+
+    db = SessionLocal()
+    user = models.User(email="bcast_worker_test@acassia.com", password_hash="hash123", tenant_id="tenant_bcast_test")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    campaign = models.BroadcastCampaign(
+        tenant_id="tenant_bcast_test",
+        created_by_user_id=user.id,
+        title="Campanha Teste Concorrente",
+        message_text="Mensagem de teste",
+        status="sending",
+        total_recipients=3,
+        sent_count=0,
+        failed_count=0,
+    )
+    db.add(campaign)
+    db.commit()
+    db.refresh(campaign)
+
+    # Cria 3 leads e 3 recipients
+    recipients = []
+    for i in range(1, 4):
+        lead = models.Lead(
+            tenant_id="tenant_bcast_test",
+            telefone=f"551190000000{i}",
+            nome=f"Lead {i}",
+        )
+        db.add(lead)
+        db.commit()
+        db.refresh(lead)
+
+        rec = models.BroadcastRecipient(
+            campaign_id=campaign.id,
+            lead_id=lead.id,
+            status="pending",
+        )
+        db.add(rec)
+        db.commit()
+        db.refresh(rec)
+        recipients.append(rec)
+    db.close()
+
+    mock_client = MagicMock()
+    mock_client.send_message_result.side_effect = [
+        SendResult(ok=True, message_id="wamid_1"),
+        SendResult(ok=True, message_id="wamid_2"),
+        SendResult(ok=False, error="provider_error"),
+    ]
+
+    with patch("horoscope._get_whatsapp_client", return_value=mock_client):
+        _send_campaign_worker(campaign.id, "tenant_bcast_test")
+
+    db = SessionLocal()
+    updated_camp = db.query(models.BroadcastCampaign).filter_by(id=campaign.id).first()
+    assert updated_camp.status == "completed"
+    assert updated_camp.sent_count == 2
+    assert updated_camp.failed_count == 1
+
+    recs = db.query(models.BroadcastRecipient).filter_by(campaign_id=campaign.id).all()
+    statuses = [r.status for r in recs]
+    assert statuses.count("sent") == 2
+    assert statuses.count("failed") == 1
+    db.close()
