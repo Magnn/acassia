@@ -7,7 +7,7 @@ V2: Asaas, Pagar.me adapters com mesma interface.
 Use case: tenant configura access_token MP em TenantFlowSecret. Endpoint
 POST /api/payments/pix cria QR code dinâmico, retorna {qr_image, qr_text, expires_at}.
 
-Webhook (TODO): MP envia POST → atualiza PixPayment.status=approved.
+O webhook consulta o pagamento na API antes de aceitar qualquer mudança de status.
 """
 
 from __future__ import annotations
@@ -65,8 +65,9 @@ def _mp_token(tenant_id: str) -> Optional[str]:
             row = db.query(models.TenantFlowSecret).filter_by(
                 tenant_id=tenant_id, key="mercadopago.access_token",
             ).first()
-            if row and row.value:
-                return row.value
+            if row and row.value_cipher:
+                from api.utils.tenant_secrets import decrypt_tenant_secret
+                return decrypt_tenant_secret(row.value_cipher, allow_plaintext_legacy=True)
         finally:
             db.close()
     except Exception:

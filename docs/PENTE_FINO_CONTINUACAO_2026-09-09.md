@@ -27,7 +27,15 @@ Referência usada para comparação: [ChatbotX](https://github.com/ChatbotXIO/Ch
 - Endpoint oficial da Cakto para criação de checkout.
 - Coex, sincronização retroativa do WhatsApp e webhook completo do Pix.
 - Messenger, Instagram Messaging, e-mail e TikTok como canais completos.
-- SDK, CLI, MCP e expansão da API pública v1 conforme prioridade comercial.
+- Expansão da API pública v1 e distribuição versionada dos clientes conforme prioridade comercial.
 - Nós ainda exibidos como `stub` no simulador precisam de semântica de simulação definida para cada integração externa.
 
 Esses itens não devem simular sucesso. Até serem implementados, permanecem explicitamente indisponíveis ou falham de forma controlada.
+
+## Ferramentas para desenvolvedores
+
+- SDK Python: `sdk/client.py`.
+- CLI: `python scripts/meu_misterio_cli.py --help`.
+- MCP stdio: `MM_BASE_URL=... MM_API_KEY=... python mcp_server.py`.
+
+As três ferramentas usam a API pública v1 e, portanto, herdam autenticação por escopo, isolamento por tenant e os mesmos erros HTTP.

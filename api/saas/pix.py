@@ -52,6 +52,17 @@ def create_pix():
     payer_email = (body.get("payer_email") or "").strip() or None
 
     tenant_id = current_user.tenant_id
+    if lead_id:
+        db = SessionLocal()
+        try:
+            try:
+                lead_id = int(lead_id)
+            except (TypeError, ValueError):
+                return jsonify({"error": "lead_id_invalid"}), 422
+            if not db.query(models.Lead).filter_by(id=lead_id, tenant_id=tenant_id).first():
+                return jsonify({"error": "lead_not_found"}), 404
+        finally:
+            db.close()
 
     try:
         result = create_pix_mercadopago(
@@ -73,7 +84,7 @@ def create_pix():
     try:
         pix = models.PixPayment(
             tenant_id=tenant_id,
-            lead_id=int(lead_id) if lead_id else None,
+            lead_id=lead_id if lead_id else None,
             provider="mercadopago",
             provider_payment_id=result.provider_payment_id,
             amount_brl_cents=result.amount_brl_cents,
@@ -252,7 +263,7 @@ def mp_webhook():
                 pix.paid_at = datetime.now(timezone.utc)
                 # Se vinculado a lead, marca conversão
                 if pix.lead_id:
-                    lead = db.query(models.Lead).filter_by(id=pix.lead_id).first()
+                    lead = db.query(models.Lead).filter_by(id=pix.lead_id, tenant_id=pix.tenant_id).first()
                     if lead:
                         lead.convertido = True
                         # ── A/B Test Attribution Lookback (48h) ──
@@ -298,6 +309,22 @@ def mp_webhook():
                 "[pix.webhook] tenant=%s pix=%s status_change=%s→%s",
                 pix.tenant_id, pix.id, pix.status, new_status,
             )
+
+        # Executado também em redeliveries: se a primeira tentativa não chegou
+        # ao Redis, o outbox reaproveita a mesma chave e permite novo enqueue.
+        if new_status == "approved" and pix.lead_id:
+            from api.payments.dispatch import dispatch_post_payment_blueprint
+            queued = dispatch_post_payment_blueprint(
+                tenant_id=pix.tenant_id, lead_id=pix.lead_id,
+                provider="mercadopago", event_id=f"pix:{provider_payment_id}",
+                payment_metadata={
+                    "amount": (pix.amount_brl_cents or 0) / 100,
+                    "description": pix.description, "pix_payment_id": pix.id,
+                },
+            )
+            if not queued:
+                logger.error("[pix.webhook] entrega pós-pagamento não enfileirada pix=%s", pix.id)
+                return "POST_PAYMENT_QUEUE_UNAVAILABLE", 503
 
         return "OK", 200
     finally:
