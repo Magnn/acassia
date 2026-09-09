@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import time
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
@@ -732,6 +732,16 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
                 throttle_secs = 2
 
         BATCH_SIZE = 50
+        stale_before = datetime.now(timezone.utc) - timedelta(minutes=15)
+        db.query(models.BroadcastRecipient).filter(
+            models.BroadcastRecipient.campaign_id == campaign_id,
+            models.BroadcastRecipient.status == "claimed",
+            models.BroadcastRecipient.claimed_at < stale_before,
+        ).update({
+            models.BroadcastRecipient.status: "pending",
+            models.BroadcastRecipient.claimed_at: None,
+        }, synchronize_session=False)
+        db.commit()
         while True:
             try:
                 db.refresh(campaign)
@@ -748,18 +758,29 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
             if not candidates:
                 break
 
-            candidate_ids = [c.id for c in candidates]
-            db.query(models.BroadcastRecipient).filter(
-                models.BroadcastRecipient.id.in_(candidate_ids),
-                models.BroadcastRecipient.status == "pending",
-            ).update({models.BroadcastRecipient.status: "claimed"}, synchronize_session=False)
-            db.commit()
+            claimed = []
+            for candidate in candidates:
+                won = db.query(models.BroadcastRecipient).filter(
+                    models.BroadcastRecipient.id == candidate.id,
+                    models.BroadcastRecipient.status == "pending",
+                ).update({
+                    models.BroadcastRecipient.status: "claimed",
+                    models.BroadcastRecipient.claimed_at: datetime.now(timezone.utc),
+                }, synchronize_session=False)
+                db.commit()
+                if won == 1:
+                    claimed.append(candidate)
+            candidates = claimed
+            if not candidates:
+                continue
 
             # Pre-fetch leads em lote do chunk
             lead_ids = [c.lead_id for c in candidates]
             leads_cache = {}
             if lead_ids:
-                for l in db.query(models.Lead).filter(models.Lead.id.in_(lead_ids)).all():
+                for l in db.query(models.Lead).filter(
+                    models.Lead.id.in_(lead_ids), models.Lead.tenant_id == tenant_id,
+                ).all():
                     leads_cache[l.id] = l
 
             for rec in candidates:
@@ -771,13 +792,17 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
                     # Reverter não processados deste lote para pending
                     db.query(models.BroadcastRecipient).filter_by(
                         id=rec.id, status="claimed"
-                    ).update({models.BroadcastRecipient.status: "pending"}, synchronize_session=False)
+                    ).update({
+                        models.BroadcastRecipient.status: "pending",
+                        models.BroadcastRecipient.claimed_at: None,
+                    }, synchronize_session=False)
                     db.commit()
                     continue
 
                 lead = leads_cache.get(rec.lead_id)
                 if not lead or not lead.telefone:
                     rec.status = "failed"
+                    rec.claimed_at = None
                     rec.error_reason = "no_phone"
                     failed += 1
                     db.commit()
@@ -797,19 +822,23 @@ def _send_campaign_worker(campaign_id: int, tenant_id: str):
                         )
                         if res.ok:
                             rec.status = "sent"
+                            rec.claimed_at = None
                             rec.sent_at = datetime.now(timezone.utc)
                             rec.provider_message_id = res.message_id
                             sent += 1
                         else:
                             rec.status = "failed"
+                            rec.claimed_at = None
                             rec.error_reason = res.error or "send_returned_false"
                             failed += 1
                     else:
                         rec.status = "failed"
+                        rec.claimed_at = None
                         rec.error_reason = "wa_client_unavailable"
                         failed += 1
                 except Exception as exc:
                     rec.status = "failed"
+                    rec.claimed_at = None
                     rec.error_reason = str(exc)[:200]
                     failed += 1
 

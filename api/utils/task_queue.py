@@ -13,7 +13,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 _PREFIX = "acassia:tasks"
-_KINDS = ("broadcast", "sequence", "post_payment", "flow", "social_effect")
+_KINDS = ("broadcast", "sequence", "post_payment", "flow", "social_effect", "contact_import")
 _LEASE_SECONDS = int(os.getenv("TASK_QUEUE_LEASE_SECONDS", "300"))
 _MAX_ATTEMPTS = int(os.getenv("TASK_QUEUE_MAX_ATTEMPTS", "5"))
 
@@ -77,6 +77,10 @@ def enqueue_flow_execution(**payload) -> bool:
 
 def enqueue_social_effect(**payload) -> bool:
     return _enqueue("social_effect", payload)
+
+
+def enqueue_contact_import(import_id: int, tenant_id: str) -> bool:
+    return _enqueue("contact_import", {"import_id": import_id, "tenant_id": tenant_id})
 
 
 _RESERVE_SCRIPT = """
@@ -176,6 +180,9 @@ def _execute(job: dict) -> None:
     elif job["kind"] == "social_effect":
         from api.public.social_automations import execute_social_effect_job
         execute_social_effect_job(**payload)
+    elif job["kind"] == "contact_import":
+        from api.saas.contacts_import import process_contact_import_job
+        process_contact_import_job(**payload)
     else:
         raise ValueError(f"Unsupported task kind: {job['kind']}")
 

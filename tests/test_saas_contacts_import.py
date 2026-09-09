@@ -6,7 +6,8 @@ from flask import Flask
 
 from api.saas.auth import auth_bp, login_manager, signup_user
 from api.saas.sequences import sequences_bp
-from api.saas.contacts_import import contacts_import_bp
+from api.saas.contacts_import import contacts_import_bp, process_contact_import_job
+from unittest.mock import patch
 from db import models
 from db.database import Base, SessionLocal, engine as db_engine
 
@@ -89,13 +90,14 @@ def test_contact_import_flow(auth_client):
             },
         ],
     }
-    res = client.post("/saas/contacts/imports/process", json=payload)
-    assert res.status_code == 201
+    with patch("api.utils.task_queue.enqueue_contact_import", return_value=True):
+        res = client.post("/saas/contacts/imports/process", json=payload)
+    assert res.status_code == 202
     data = res.get_json()
     assert data["ok"] is True
     assert data["total_rows"] == 3
-    assert data["success_rows"] == 2
-    assert data["failed_rows"] == 1
+    assert data["status"] == "queued"
+    process_contact_import_job(data["import_id"], user.tenant_id)
 
     # 4. Verify in DB
     db = SessionLocal()

@@ -24,6 +24,7 @@ def _setup(monkeypatch):
     Base.metadata.create_all(bind=db_engine)
     db = SessionLocal()
     db.query(models.TenantFlowSecret).delete()
+    db.query(models.SocialWebhookReceipt).delete()
     db.query(models.TenantFlowVariable).filter(
         models.TenantFlowVariable.key.in_([
             "social.comment_rules", "tiktok.business", "youtube.integration"
@@ -125,5 +126,35 @@ def test_tiktok_and_youtube_secrets_are_not_stored_in_config(configured_client):
         assert "tiktok-token" not in serialized
         assert "tiktok-hook" not in serialized
         assert "youtube-key" not in serialized
+    finally:
+        db.close()
+
+
+def test_meta_webhook_returns_503_and_persists_payload_when_queue_is_down(configured_client):
+    client, user = configured_client
+    client.post("/saas/social/rules", json={
+        "rules": [],
+        "credentials": {"app_secret": "app-secret"},
+    })
+    body = {"entry": [{"changes": [{"field": "comments", "value": {
+        "id": "comment-durable-1", "text": "EU QUERO", "from": {"id": "ig-1"},
+    }}]}]}
+    payload = json.dumps(body, separators=(",", ":")).encode()
+    signature = "sha256=" + hmac.new(b"app-secret", payload, hashlib.sha256).hexdigest()
+    from unittest.mock import patch
+    with patch("api.utils.task_queue.enqueue_social_effect", return_value=False):
+        response = client.post(
+            f"/api/public/webhooks/meta-social?tenant_id={user.tenant_id}",
+            data=payload, content_type="application/json",
+            headers={"X-Hub-Signature-256": signature},
+        )
+    assert response.status_code == 503
+    db = SessionLocal()
+    try:
+        receipt = db.query(models.SocialWebhookReceipt).filter_by(
+            tenant_id=user.tenant_id, event_key="comment:comment-durable-1"
+        ).one()
+        assert receipt.status == "failed"
+        assert receipt.payload_json["text"] == "EU QUERO"
     finally:
         db.close()

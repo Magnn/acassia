@@ -113,132 +113,116 @@ def process_csv_import():
         import_record = models.ContactImport(
             tenant_id=tenant_id,
             name=name[:200],
-            status="processing",
+            status="queued",
             total_rows=len(rows),
             column_mapping=mapping,
             assigned_tags=assigned_tags,
             enrolled_sequence_id=enroll_seq_id,
+            payload_json={"rows": rows},
             created_at=_agora_utc(),
         )
         db.add(import_record)
         db.commit()
         db.refresh(import_record)
 
-        success_count = 0
-        failed_count = 0
-        error_logs = []
-        enrolled_lead_ids = []
-        leads_for_auto_enroll = []
+        from api.utils.task_queue import enqueue_contact_import
+        if not enqueue_contact_import(import_record.id, tenant_id):
+            import_record.status = "failed"
+            import_record.error_log = [{"reason": "task_queue_unavailable"}]
+            db.commit()
+            return jsonify({"ok": False, "error": "task_queue_unavailable", "import_id": import_record.id}), 503
+        return jsonify({
+            "ok": True, "import_id": import_record.id, "total_rows": len(rows),
+            "status": "queued", "message": "Importação recebida e enfileirada.",
+        }), 202
+    finally:
+        db.close()
 
-        CHUNK_SIZE = 100
-        for chunk_start in range(0, len(rows), CHUNK_SIZE):
-            chunk = rows[chunk_start:chunk_start + CHUNK_SIZE]
-            for offset, row in enumerate(chunk):
-                idx = chunk_start + offset
-                # Extrair campos usando o mapping
-                phone_col = next((col for col, target in mapping.items() if target == "telefone"), None)
-                name_col = next((col for col, target in mapping.items() if target == "nome"), None)
-                email_col = next((col for col, target in mapping.items() if target == "email"), None)
 
+def process_contact_import_job(import_id: int, tenant_id: str) -> None:
+    """Processa a importação persistida em lotes, com progresso retomável."""
+    db = SessionLocal()
+    try:
+        record = db.query(models.ContactImport).filter_by(id=import_id, tenant_id=tenant_id).first()
+        if not record or record.status in ("completed", "completed_with_errors"):
+            return
+        rows = (record.payload_json or {}).get("rows") or []
+        mapping = record.column_mapping or {}
+        tags = record.assigned_tags or []
+        sequence_id = record.enrolled_sequence_id
+        record.status = "processing"
+        db.commit()
+        phone_col = next((c for c, target in mapping.items() if target == "telefone"), None)
+        name_col = next((c for c, target in mapping.items() if target == "nome"), None)
+        email_col = next((c for c, target in mapping.items() if target == "email"), None)
+        errors = list(record.error_log or [])
+        success = int(record.success_rows or 0)
+        failed = int(record.failed_rows or 0)
+        start = int(record.processed_rows or 0)
+        enrolled_ids = []
+        tagged_ids = []
+        for chunk_start in range(start, len(rows), 100):
+            for idx, row in enumerate(rows[chunk_start:chunk_start + 100], start=chunk_start):
                 raw_phone = row.get(phone_col) if phone_col else (row.get("telefone") or row.get("phone") or row.get("tel"))
-                clean_tel = _clean_phone(raw_phone)
-
-                if not clean_tel or len(clean_tel) < 8:
-                    failed_count += 1
-                    error_logs.append({
-                        "row": idx + 1,
-                        "reason": f"Telefone inválido ou ausente: '{raw_phone}'",
-                    })
+                phone = _clean_phone(raw_phone)
+                if not phone or len(phone) < 8:
+                    failed += 1
+                    if len(errors) < 50:
+                        errors.append({"row": idx + 1, "reason": f"Telefone inválido ou ausente: '{raw_phone}'"})
                     continue
-
-                lead_name = (row.get(name_col) if name_col else (row.get("nome") or row.get("name") or "")).strip() or None
-                lead_email = (row.get(email_col) if email_col else (row.get("email") or "")).strip() or None
-
-                # Upsert do lead
-                lead = db.query(models.Lead).filter_by(
-                    tenant_id=tenant_id,
-                    telefone=clean_tel,
-                ).first()
-
+                name = str(row.get(name_col) if name_col else (row.get("nome") or row.get("name") or "")).strip() or None
+                email = str(row.get(email_col) if email_col else (row.get("email") or "")).strip() or None
+                lead = db.query(models.Lead).filter_by(tenant_id=tenant_id, telefone=phone).first()
                 if not lead:
-                    lead = models.Lead(
-                        tenant_id=tenant_id,
-                        telefone=clean_tel,
-                        nome=lead_name,
-                        email=lead_email,
-                        tags=list(set(assigned_tags)),
-                    )
+                    lead = models.Lead(tenant_id=tenant_id, telefone=phone, nome=name, email=email, tags=list(set(tags)))
                     db.add(lead)
                     db.flush()
                 else:
-                    if lead_name and not lead.nome:
-                        lead.nome = lead_name
-                    if lead_email and not lead.email:
-                        lead.email = lead_email
-                    # Merge tags
-                    current_tags = list(lead.tags) if isinstance(lead.tags, list) else []
-                    lead.tags = list(set(current_tags + assigned_tags))
-
-                success_count += 1
-                if enroll_seq_id and lead.id:
-                    enrolled_lead_ids.append(lead.id)
-                if assigned_tags and lead.id:
-                    leads_for_auto_enroll.append(lead.id)
-
+                    if name and not lead.nome:
+                        lead.nome = name
+                    if email and not lead.email:
+                        lead.email = email
+                    lead.tags = list(set(list(lead.tags or []) + tags))
+                success += 1
+                if sequence_id:
+                    enrolled_ids.append(lead.id)
+                if tags:
+                    tagged_ids.append(lead.id)
+            record.processed_rows = min(chunk_start + 100, len(rows))
+            record.success_rows = success
+            record.failed_rows = failed
+            record.error_log = errors
             db.commit()
 
-        # Se tiver sequência configurada, matricula os leads válidos
-        if enroll_seq_id and enrolled_lead_ids:
-            try:
-                seq = db.query(models.Sequence).filter_by(id=enroll_seq_id, tenant_id=tenant_id).first()
-                if seq:
-                    first_step = db.query(models.SequenceStep).filter_by(
-                        sequence_id=seq.id, order=0, is_active=True
+        if sequence_id:
+            seq = db.query(models.Sequence).filter_by(id=sequence_id, tenant_id=tenant_id).first()
+            if seq:
+                now = _agora_utc()
+                for lead_id in set(enrolled_ids):
+                    exists = db.query(models.ContactOnSequence).filter_by(
+                        tenant_id=tenant_id, sequence_id=seq.id, lead_id=lead_id
                     ).first()
-                    now = _agora_utc()
-                    for lid in enrolled_lead_ids:
-                        existing = db.query(models.ContactOnSequence).filter_by(
-                            sequence_id=seq.id, lead_id=lid
-                        ).first()
-                        if not existing:
-                            enrollment = models.ContactOnSequence(
-                                tenant_id=tenant_id,
-                                sequence_id=seq.id,
-                                lead_id=lid,
-                                current_step=0,
-                                status="active",
-                                next_run_at=now,
-                                enrolled_at=now,
-                            )
-                            db.add(enrollment)
-            except Exception as ex:
-                logger.error("Erro ao matricular leads importados na sequência %s: %s", enroll_seq_id, ex)
-
-        # Atualizar import_record
-        import_record.status = "completed" if failed_count == 0 else ("completed_with_errors" if success_count > 0 else "failed")
-        import_record.processed_rows = len(rows)
-        import_record.success_rows = success_count
-        import_record.failed_rows = failed_count
-        import_record.error_log = error_logs[:50]
-        import_record.completed_at = _agora_utc()
+                    if not exists:
+                        db.add(models.ContactOnSequence(
+                            tenant_id=tenant_id, sequence_id=seq.id, lead_id=lead_id,
+                            current_step=0, status="active", next_run_at=now, enrolled_at=now,
+                        ))
+        record.status = "completed" if failed == 0 else ("completed_with_errors" if success else "failed")
+        record.completed_at = _agora_utc()
+        record.payload_json = {}
         db.commit()
-
-        if leads_for_auto_enroll and assigned_tags:
-            try:
-                from api.saas.sequences import check_and_enroll_by_tags
-                for lid in set(leads_for_auto_enroll):
-                    check_and_enroll_by_tags(tenant_id, lid, assigned_tags)
-            except Exception as ex:
-                logger.error("Erro no auto_enroll na importacao: %s", ex)
-
-        return jsonify({
-            "ok": True,
-            "import_id": import_record.id,
-            "total_rows": len(rows),
-            "success_rows": success_count,
-            "failed_rows": failed_count,
-            "message": f"Importação concluída: {success_count} contatos importados com sucesso ({failed_count} falhas).",
-        }), 201
+        if tagged_ids and tags:
+            from api.saas.sequences import check_and_enroll_by_tags
+            for lead_id in set(tagged_ids):
+                check_and_enroll_by_tags(tenant_id, lead_id, tags)
+    except Exception as exc:
+        db.rollback()
+        record = db.query(models.ContactImport).filter_by(id=import_id, tenant_id=tenant_id).first()
+        if record:
+            record.status = "failed"
+            record.error_log = (list(record.error_log or []) + [{"reason": str(exc)[:500]}])[-50:]
+            db.commit()
+        raise
     finally:
         db.close()
 

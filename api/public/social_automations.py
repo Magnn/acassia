@@ -287,6 +287,7 @@ def meta_social_webhook():
                 comment_id = val.get("id") or val.get("comment_id") or ""
                 if comment_id:
                     event_key = f"comment:{comment_id}"
+                    should_enqueue = True
                     db_proc = SessionLocal()
                     try:
                         receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
@@ -295,31 +296,43 @@ def meta_social_webhook():
                         if not receipt:
                             try:
                                 receipt = models.SocialWebhookReceipt(
-                                    tenant_id=tenant_id, provider="meta", event_key=event_key, status="processing"
+                                    tenant_id=tenant_id, provider="meta", event_key=event_key,
+                                    status="queued", payload_json=val,
                                 )
                                 db_proc.add(receipt)
                                 db_proc.commit()
                             except IntegrityError:
                                 db_proc.rollback()
-                        elif receipt.status != "sent":
-                            receipt.status = "processing"
+                        elif receipt.status in ("sent", "queued", "processing"):
+                            should_enqueue = False
+                        else:
+                            receipt.status = "queued"
+                            receipt.payload_json = val
+                            receipt.last_error = None
                             db_proc.commit()
                     finally:
                         db_proc.close()
 
-                    # Enqueue to durable task queue, falling back to direct execution
-                    from api.utils.task_queue import enqueue_social_effect
-                    enqueued = enqueue_social_effect(
-                        effect_type="comment", tenant_id=tenant_id, payload=val
-                    )
+                    if should_enqueue:
+                        from api.utils.task_queue import enqueue_social_effect
+                        enqueued = enqueue_social_effect(
+                            effect_type="comment", tenant_id=tenant_id, payload=val
+                        )
+                    else:
+                        enqueued = True
                     if not enqueued:
                         db_proc = SessionLocal()
                         try:
-                            process_social_comment(tenant_id, val, db_proc)
-                        except Exception as exc:
-                            logger.warning("[COMMENT_PROC_ERROR] tenant=%s: %s", tenant_id, exc)
+                            receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
+                                tenant_id=tenant_id, provider="meta", event_key=event_key
+                            ).first()
+                            if receipt:
+                                receipt.status = "failed"
+                                receipt.last_error = "task_queue_unavailable"
+                                db_proc.commit()
                         finally:
                             db_proc.close()
+                        return jsonify({"error": "task_queue_unavailable"}), 503
 
         # Respostas e reações a Stories chegam via entry.messaging
         messaging_events = entry.get("messaging", [])
@@ -334,6 +347,8 @@ def meta_social_webhook():
                     json.dumps(msg_ev, sort_keys=True).encode("utf-8")
                 ).hexdigest()
                 event_key = f"story:{sender}:{message_id}"
+                story_payload = {"sender": sender, "event_key": event_key}
+                should_enqueue = True
                 db_proc = SessionLocal()
                 try:
                     receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
@@ -342,32 +357,43 @@ def meta_social_webhook():
                     if not receipt:
                         try:
                             receipt = models.SocialWebhookReceipt(
-                                tenant_id=tenant_id, provider="meta", event_key=event_key, status="processing",
+                                tenant_id=tenant_id, provider="meta", event_key=event_key,
+                                status="queued", payload_json=story_payload,
                             )
                             db_proc.add(receipt)
                             db_proc.commit()
                         except IntegrityError:
                             db_proc.rollback()
-                    elif receipt.status != "sent":
-                        receipt.status = "processing"
+                    elif receipt.status in ("sent", "queued", "processing"):
+                        should_enqueue = False
+                    else:
+                        receipt.status = "queued"
+                        receipt.payload_json = story_payload
+                        receipt.last_error = None
                         db_proc.commit()
                 finally:
                     db_proc.close()
 
-                from api.utils.task_queue import enqueue_social_effect
-                enqueued = enqueue_social_effect(
-                    effect_type="story_reply",
-                    tenant_id=tenant_id,
-                    payload={"sender": sender, "event_key": event_key},
-                )
+                if should_enqueue:
+                    from api.utils.task_queue import enqueue_social_effect
+                    enqueued = enqueue_social_effect(
+                        effect_type="story_reply", tenant_id=tenant_id, payload=story_payload,
+                    )
+                else:
+                    enqueued = True
                 if not enqueued:
                     db_proc = SessionLocal()
                     try:
-                        execute_social_effect_job("story_reply", tenant_id, {"sender": sender, "event_key": event_key})
-                    except Exception as exc:
-                        logger.warning("[STORY_REPLY_ERROR] tenant=%s: %s", tenant_id, exc)
+                        receipt = db_proc.query(models.SocialWebhookReceipt).filter_by(
+                            tenant_id=tenant_id, provider="meta", event_key=event_key
+                        ).first()
+                        if receipt:
+                            receipt.status = "failed"
+                            receipt.last_error = "task_queue_unavailable"
+                            db_proc.commit()
                     finally:
                         db_proc.close()
+                    return jsonify({"error": "task_queue_unavailable"}), 503
 
     return jsonify({"status": "received"}), 200
 
@@ -461,6 +487,9 @@ def execute_social_effect_job(effect_type: str, tenant_id: str, payload: dict) -
             ).first()
             if receipt and receipt.status == "sent":
                 return
+            if receipt:
+                receipt.status = "processing"
+                db.commit()
             story_cfg = _get_variable(db, tenant_id, "social.story_reply_config", {
                 "active": True,
                 "reply_text": "Obrigada por interagir com o nosso Story! 🔮 Como posso te ajudar hoje?",
@@ -494,7 +523,7 @@ def list_social_dlq():
         tenant_id = current_user.tenant_id
         failed_receipts = db.query(models.SocialWebhookReceipt).filter_by(
             tenant_id=tenant_id, status="failed"
-        ).order_by(models.SocialWebhookReceipt.created_at.desc()).limit(100).all()
+        ).order_by(models.SocialWebhookReceipt.received_at.desc()).limit(100).all()
 
         results = [
             {
@@ -505,7 +534,7 @@ def list_social_dlq():
                 "public_reply_sent": r.public_reply_sent,
                 "private_reply_sent": r.private_reply_sent,
                 "last_error": r.last_error,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "created_at": r.received_at.isoformat() if r.received_at else None,
             }
             for r in failed_receipts
         ]
@@ -527,17 +556,11 @@ def retry_social_effect(receipt_id: int):
         if not receipt:
             return jsonify({"error": "receipt_not_found"}), 404
 
-        receipt.status = "processing"
-        db.commit()
-
-        # Enfileira retry no task queue
+        payload = receipt.payload_json if isinstance(receipt.payload_json, dict) else {}
         from api.utils.task_queue import enqueue_social_effect
         if receipt.event_key.startswith("comment:"):
-            cid = receipt.event_key.split(":", 1)[1]
             enqueued = enqueue_social_effect(
-                effect_type="comment",
-                tenant_id=tenant_id,
-                payload={"id": cid, "comment_id": cid, "text": "", "message": ""},
+                effect_type="comment", tenant_id=tenant_id, payload=payload,
             )
         elif receipt.event_key.startswith("story:"):
             parts = receipt.event_key.split(":")
@@ -545,12 +568,17 @@ def retry_social_effect(receipt_id: int):
             enqueued = enqueue_social_effect(
                 effect_type="story_reply",
                 tenant_id=tenant_id,
-                payload={"sender": sender, "event_key": receipt.event_key},
+                payload=payload or {"sender": sender, "event_key": receipt.event_key},
             )
         else:
             enqueued = False
 
-        return jsonify({"ok": True, "enqueued": enqueued, "receipt_id": receipt.id})
+        receipt.status = "queued" if enqueued else "failed"
+        receipt.last_error = None if enqueued else "task_queue_unavailable"
+        db.commit()
+        if not enqueued:
+            return jsonify({"ok": False, "error": "task_queue_unavailable"}), 503
+        return jsonify({"ok": True, "enqueued": True, "receipt_id": receipt.id})
     finally:
         db.close()
 

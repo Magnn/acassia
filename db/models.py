@@ -2067,6 +2067,7 @@ class BroadcastRecipient(Base):
     idempotency_key = Column(String(128), nullable=True, index=True)
     provider_message_id = Column(String(128), nullable=True)
     attempt = Column(Integer, default=0, nullable=False)
+    claimed_at = Column(DateTime(timezone=True), nullable=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -2182,6 +2183,7 @@ class SocialWebhookReceipt(Base):
     public_reply_sent = Column(Boolean, default=False, nullable=False)
     private_reply_sent = Column(Boolean, default=False, nullable=False)
     last_error = Column(String(500), nullable=True)
+    payload_json = Column(JSON, default=dict, nullable=False)
     received_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
 
 
@@ -2220,6 +2222,7 @@ class ContactImport(Base):
     assigned_tags = Column(JSON, default=list)
     enrolled_sequence_id = Column(Integer, nullable=True)
     error_log = Column(JSON, default=list)
+    payload_json = Column(JSON, default=dict, nullable=False)
     created_at = Column(DateTime(timezone=True), default=_agora_utc, nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 

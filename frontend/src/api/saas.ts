@@ -330,8 +330,9 @@ export const contactsImportApi = {
       ok: boolean;
       import_id: number;
       total_rows: number;
-      success_rows: number;
-      failed_rows: number;
+      status: 'queued';
+      success_rows?: number;
+      failed_rows?: number;
       message: string;
     }>('/saas/contacts/imports/process', body),
   syncWhatsApp: () =>

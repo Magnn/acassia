@@ -68,6 +68,7 @@ export default function ImportContactsModal({ isOpen, onClose, onSuccess }: Prop
     queryKey: ['contacts-import-history'],
     queryFn: contactsImportApi.list,
     enabled: isOpen && activeTab === 'history',
+    refetchInterval: isOpen && activeTab === 'history' ? 2500 : false,
   });
 
   // Process CSV Import Mutation
