@@ -1823,6 +1823,9 @@ class ExpertScheduleSlot(Base):
     O terapeuta define seus horários disponíveis; o lead/consumidor reserva.
     """
     __tablename__ = "expert_schedule_slots"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "slot_time", name="uq_expert_slot_tenant_time"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(64), nullable=False, index=True)
@@ -1855,6 +1858,9 @@ class Appointment(Base):
     Ligada a um slot, lead, serviço e pagamento.
     """
     __tablename__ = "appointments"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "scheduled_at", name="uq_appointment_tenant_time"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(64), nullable=False, index=True)

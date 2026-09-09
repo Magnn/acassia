@@ -7,9 +7,9 @@ O Meu Mistério já é uma plataforma ampla: builder, inbox, CRM, pagamentos, se
 ## P0 — antes de tráfego pago ou novos clientes
 
 1. **Homologar a jornada dinheiro → entrega com serviços reais.** Executar Cakto e Pix aprovados, outbox, worker, WhatsApp e conteúdo entregue usando contas de produção controladas. Testes automatizados não comprovam credenciais, templates aprovados nem políticas da Meta.
-2. **Aplicar as migrações no ambiente.** A cabeça atual é `c9d0e1f2a3b4`; app e worker devem iniciar somente depois do runner Alembic.
+2. **Aplicar as migrações no ambiente.** A cabeça atual é `d0e1f2a3b4c5`; app e worker devem iniciar somente depois do runner Alembic.
 3. **Monitorar consumidores Redis.** Alertar quando `worker_alive=false`, houver DLQ, crescimento de `ready/delayed` ou entrega pós-pagamento em `failed`.
-4. **Corrigir o agendamento público por disponibilidade real.** O endpoint agora usa os campos corretos, mas ainda aceita data/hora fornecida pelo cliente sem reservar um slot transacional. Deve haver catálogo de slots, timezone, prevenção de dupla reserva e rate limit.
+4. **Homologar o agendamento público.** A API agora lista disponibilidade, valida tenant/slot/data/hora, reserva com bloqueio e unicidade no banco e aplica rate limit. Falta validar timezone e lembretes com usuários reais.
 5. **Concluir a autenticação B2C no frontend.** A API agora emite token assinado e protege cofre/agenda; o cliente deve armazenar e enviar `Authorization: Bearer`, tratar expiração e oferecer logout/recuperação.
 
 ## P1 — para operação SaaS confiável
@@ -37,6 +37,9 @@ O Meu Mistério já é uma plataforma ampla: builder, inbox, CRM, pagamentos, se
 - Signup e login B2C receberam limites de requisição; senha mínima passou a oito caracteres.
 - Agendamento público passou a validar tenant e usar `Lead.telefone`, `Lead.nome` e `Lead.node_atual` corretamente.
 - Falha no processamento Stripe libera a claim idempotente e responde `500`, permitindo redelivery.
+- Agendamento público passou a reservar slots atomicamente e o banco impede duas reservas no mesmo horário por tenant.
+- Telemetria de produto agora fica restrita ao tenant autenticado, mesmo quando a URL tenta solicitar outro tenant.
+- A vitrine deixou de atribuir uma especialidade inventada e esconde experts suspensos, removidos ou inativos.
 
 ## Critério de lançamento
 

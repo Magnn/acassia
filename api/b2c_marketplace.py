@@ -157,7 +157,12 @@ def list_experts():
         services = db.query(ExpertService.tenant_id).filter_by(is_active=True).distinct().all()
         active_tenant_ids = [s[0] for s in services]
 
-        experts = db.query(User).filter(User.tenant_id.in_(active_tenant_ids)).all()
+        experts = db.query(User).filter(
+            User.tenant_id.in_(active_tenant_ids),
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+            User.suspended_at.is_(None),
+        ).all()
         
         result = []
         seen = set()
@@ -166,8 +171,10 @@ def list_experts():
                 seen.add(exp.tenant_id)
                 result.append({
                     "tenant_id": exp.tenant_id,
-                    "name": exp.name or "Especialista Premium",
-                    "specialty": "Terapia Holística e Tarot"
+                    "name": exp.name or "Especialista",
+                    # A especialidade exige um campo de perfil verificável.
+                    # Não inventamos uma credencial comercial para o cliente.
+                    "specialty": None,
                 })
 
         return jsonify({"experts": result})

@@ -94,7 +94,28 @@ def test_public_booking_flow(monkeypatch):
         assert resp_conflict_slot.status_code == 409
         assert resp_conflict_slot.get_json()["error"] == "slot_already_booked"
 
-        # 6. Agendamento com data no passado deve falhar com 400
+        # 6. Um slot válido não pode ser reaproveitado com data/hora adulterada.
+        second_time = data["slots"][1]["time"]
+        explicit_slot = models.ExpertScheduleSlot(
+            tenant_id=tenant_id,
+            slot_date=tomorrow,
+            slot_time=datetime.combine(
+                tomorrow,
+                datetime.strptime(second_time, "%H:%M").time(),
+                tzinfo=timezone.utc,
+            ),
+        )
+        db.add(explicit_slot)
+        db.commit()
+        resp_mismatch = client.post("/api/public/booking/confirm", json={
+            **booking_payload,
+            "time": "23:59",
+            "slot_id": explicit_slot.id,
+        })
+        assert resp_mismatch.status_code == 409
+        assert resp_mismatch.get_json()["error"] == "slot_payload_mismatch"
+
+        # 7. Agendamento com data no passado deve falhar com 400
         past_date = (date.today() - timedelta(days=2)).isoformat()
         resp_past = client.post("/api/public/booking/confirm", json={
             "tenant_id": tenant_id,

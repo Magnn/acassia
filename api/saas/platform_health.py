@@ -157,7 +157,9 @@ def feature_usage():
 
     # Aggregate by event name
     usage: dict[str, int] = defaultdict(int)
-    tenant_filter = request.args.get("tenant_id")
+    # Analytics is tenant-private. Platform-wide aggregation belongs in the
+    # guarded admin API, not in this tenant-facing endpoint.
+    tenant_filter = str(current_user.tenant_id)
 
     for evt in _feature_events:
         if tenant_filter and str(evt.get("tenant_id")) != tenant_filter:
@@ -168,6 +170,9 @@ def feature_usage():
     sorted_usage = sorted(usage.items(), key=lambda x: x[1], reverse=True)
 
     return jsonify({
-        "total_events": len(_feature_events),
+        "total_events": sum(
+            1 for evt in _feature_events
+            if str(evt.get("tenant_id")) == tenant_filter
+        ),
         "features": [{"event": k, "count": v} for k, v in sorted_usage],
     })

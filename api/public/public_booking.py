@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, date, timedelta, timezone
 from flask import Blueprint, jsonify, request, render_template_string
+from sqlalchemy.exc import IntegrityError
 
 from db.database import SessionLocal
 from db import models
@@ -353,6 +354,15 @@ def confirm_public_booking():
                     "error": "slot_already_booked",
                     "message": "Este horário já foi reservado por outro cliente.",
                 }), 409
+            slot_dt = slot.slot_time
+            if slot_dt.tzinfo is None:
+                slot_dt = slot_dt.replace(tzinfo=timezone.utc)
+            if slot.slot_date != target_date or slot_dt != scheduled_dt:
+                return jsonify({
+                    "ok": False,
+                    "error": "slot_payload_mismatch",
+                    "message": "O horário selecionado não corresponde ao slot informado.",
+                }), 409
         else:
             # Verifica se já existe slot criado para este dia/horário
             slot_q = db.query(models.ExpertScheduleSlot).filter_by(
@@ -444,6 +454,13 @@ def confirm_public_booking():
             "slot_id": appt.slot_id,
             "scheduled_at": scheduled_dt.isoformat(),
         })
+    except IntegrityError:
+        db.rollback()
+        return jsonify({
+            "ok": False,
+            "error": "slot_already_booked",
+            "message": "Este horário já foi reservado por outro cliente.",
+        }), 409
     except Exception as exc:
         db.rollback()
         logger.exception("[PUBLIC_BOOKING] Erro ao confirmar agendamento: %s", exc)
