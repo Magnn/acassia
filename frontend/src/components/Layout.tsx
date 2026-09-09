@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -104,11 +104,18 @@ export default function Layout() {
   };
 
   // Consulta do usuário logado
-  const { data: user } = useQuery({
+  const { data: user, error: userError } = useQuery({
     queryKey: ['me'],
     queryFn: authApi.me,
     staleTime: 60_000,
+    retry: false,
   });
+
+  useEffect(() => {
+    if (userError) {
+      window.location.href = '/saas/login?next=' + encodeURIComponent(location.pathname + location.search);
+    }
+  }, [userError, location.pathname, location.search]);
 
   const closeMobile = () => setMobileOpen(false);
 

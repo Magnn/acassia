@@ -19,6 +19,7 @@ import {
   MessageSquare,
   HelpCircle,
   X,
+  LogIn,
 } from 'lucide-react';
 import { blueprintsApi, type BlueprintSummary } from '../api/blueprints';
 import { importBlueprintFromFile } from '../lib/exportImport';
@@ -256,8 +257,28 @@ export default function BlueprintsList() {
       )}
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-sm mb-6">
-          Erro ao carregar fluxos: {(error as Error).message}
+        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-sm mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="font-medium text-rose-200">
+              {(error as Error).message.toLowerCase().includes('unauthorized') || (error as Error).message.includes('401')
+                ? 'Sua sessão expirou ou você não está autenticado.'
+                : `Erro ao carregar fluxos: ${(error as Error).message}`}
+            </p>
+            {((error as Error).message.toLowerCase().includes('unauthorized') || (error as Error).message.includes('401')) && (
+              <p className="text-xs text-rose-400 mt-0.5">
+                Faça login novamente para acessar os fluxos de conversa e automações do workspace.
+              </p>
+            )}
+          </div>
+          {((error as Error).message.toLowerCase().includes('unauthorized') || (error as Error).message.includes('401')) && (
+            <a
+              href={`/saas/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition-all shrink-0 shadow-sm"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Entrar novamente</span>
+            </a>
+          )}
         </div>
       )}
 

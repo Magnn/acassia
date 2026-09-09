@@ -55,6 +55,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
           || (data as { message?: unknown }).message
           || '')
         : '';
+
+    // Sessão expirada ou não autenticado no SaaS: redireciona para login limpo
+    if (res.status === 401 && typeof window !== 'undefined') {
+      const isB2C = path.startsWith('/api/b2c') || path.startsWith('/b2c') || window.location.pathname.startsWith('/portal');
+      const isAlreadyOnAuth = window.location.pathname.includes('/login') || window.location.pathname.includes('/signup');
+      if (!isB2C && !isAlreadyOnAuth) {
+        const nextUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/saas/login?next=${nextUrl}`;
+      }
+    }
+
     throw new ApiError(
       res.status,
       data,
@@ -97,6 +108,16 @@ export const api = {
                 '',
             )
           : '';
+
+      if (res.status === 401 && typeof window !== 'undefined') {
+        const isB2C = path.startsWith('/api/b2c') || path.startsWith('/b2c') || window.location.pathname.startsWith('/portal');
+        const isAlreadyOnAuth = window.location.pathname.includes('/login') || window.location.pathname.includes('/signup');
+        if (!isB2C && !isAlreadyOnAuth) {
+          const nextUrl = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.href = `/saas/login?next=${nextUrl}`;
+        }
+      }
+
       throw new ApiError(
         res.status,
         data,
