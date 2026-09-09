@@ -973,13 +973,13 @@ function MetaEmbeddedModal({
     onError: (err: any) => toast.error(err?.message || 'Falha ao autorizar com a Meta.'),
   });
 
-  const isConfigured = Boolean(config?.configured && config?.app_id);
+  const effectiveAppId = config?.app_id || '2344565976011888';
+  const isConfigured = Boolean(config?.configured || effectiveAppId);
 
   const launchMetaOAuth = () => {
-    if (!config?.app_id) return;
     const redirectUri = `${window.location.origin}/builder/wa-connection`;
-    const version = config.graph_version || 'v20.0';
-    const oauthUrl = `https://www.facebook.com/${version}/dialog/oauth?client_id=${config.app_id}&redirect_uri=${encodeURIComponent(
+    const version = config?.graph_version || 'v20.0';
+    const oauthUrl = `https://www.facebook.com/${version}/dialog/oauth?client_id=${effectiveAppId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&response_type=code&scope=whatsapp_business_management,whatsapp_business_messaging`;
 
@@ -1019,110 +1019,158 @@ function MetaEmbeddedModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-bg-surface border border-border rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden">
-        <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-gradient-to-r from-blue-600/10 to-transparent">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-600/20 flex items-center justify-center text-[#0082FB]">
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-zinc-950 border border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[92vh]">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-[#0082FB]">
               <MetaLogo className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-primary">Conectar via Meta</h3>
-              <p className="text-[10px] text-secondary">WhatsApp Cloud API Oficial (Embedded Signup)</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-zinc-100">Conectar via Meta</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                  Cloud API Oficial
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400">Embedded Signup & Vinculação Direta</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-primary text-secondary">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </header>
 
-        <div className="p-6 space-y-4">
-          {isConfigured ? (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 text-xs text-secondary leading-relaxed">
-                <span className="font-bold text-primary block mb-1">Conexão em 1 Clique</span>
-                Você autorizará o número da sua empresa diretamente no Facebook / WhatsApp Business Manager, sem precisar copiar tokens manualmente.
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          {/* Banner de destaque 1 clique */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-600/15 via-blue-900/10 to-transparent border border-blue-500/30 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 shrink-0 mt-0.5">
+                <Sparkles className="w-4 h-4" />
               </div>
-
               <div>
-                <label className="text-xs font-bold text-secondary block mb-1">Apelido do dispositivo</label>
-                <input
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Ex: WhatsApp Oficial"
-                  className="w-full px-4 py-2.5 bg-bg-primary border border-border rounded-xl text-sm text-primary"
-                />
+                <h4 className="text-xs font-bold text-zinc-100">Conexão Oficial em 1 Clique (Recomendado)</h4>
+                <p className="text-[11px] text-zinc-300 mt-0.5 leading-relaxed">
+                  Autorize o WhatsApp Business diretamente pela janela oficial do Facebook / Meta. Seus números e tokens são configurados automaticamente.
+                </p>
               </div>
+            </div>
 
+            <div>
+              <label className="text-xs font-semibold text-zinc-300 block mb-1">Apelido do número</label>
+              <input
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="Ex: WhatsApp Comercial, Suporte..."
+                className="w-full px-3.5 py-2 bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={launchMetaOAuth}
+              disabled={exchangeMut.isPending}
+              className="w-full flex items-center justify-center gap-2.5 py-3 bg-[#0082FB] hover:bg-[#0070db] text-white rounded-xl font-bold text-xs shadow-lg shadow-[#0082FB]/25 transition-all active:scale-[0.99] disabled:opacity-50"
+            >
+              <MetaLogo className="w-4 h-4" />
+              <span>{exchangeMut.isPending ? 'Autenticando na Meta...' : 'Continuar com Facebook / Meta'}</span>
+            </button>
+          </div>
+
+          {/* Divisor */}
+          <div className="flex items-center gap-3">
+            <div className="h-px bg-zinc-800 flex-1" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">ou autorização por código / manual</span>
+            <div className="h-px bg-zinc-800 flex-1" />
+          </div>
+
+          {/* Opção Manual / Código */}
+          <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-200">Código de Autorização Meta</span>
               <button
                 type="button"
-                onClick={launchMetaOAuth}
-                disabled={exchangeMut.isPending}
-                className="w-full flex items-center justify-center gap-2.5 py-3 bg-[#0082FB] hover:bg-[#0070db] text-white rounded-xl font-bold text-sm shadow-lg shadow-[#0082FB]/20 transition-all"
+                onClick={() => setShowManualCode(!showManualCode)}
+                className="text-[11px] text-blue-400 hover:text-blue-300 font-medium underline"
               >
-                <MetaLogo className="w-4 h-4" />
-                {exchangeMut.isPending ? 'Autenticando...' : 'Entrar com Facebook'}
+                {showManualCode ? 'Ocultar' : 'Inserir código'}
               </button>
+            </div>
 
-              <div className="text-center pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowManualCode(!showManualCode)}
-                  className="text-[11px] text-secondary hover:text-primary underline"
-                >
-                  {showManualCode ? 'Ocultar código manual' : 'Possui um código de autorização manual?'}
-                </button>
-              </div>
-
-              {showManualCode && (
-                <div className="space-y-2.5 p-3.5 bg-bg-primary rounded-xl border border-border">
+            {showManualCode && (
+              <div className="space-y-3 pt-2">
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                  Caso o popup do Facebook retorne um código na URL ou console, você pode colá-lo aqui diretamente para troca imediata de token.
+                </p>
+                <div>
+                  <label className="text-[11px] font-medium text-zinc-400 block mb-1">Authorization Code</label>
                   <input
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder="Cole o código aqui"
-                    className="w-full px-3 py-2 bg-bg-surface border border-border rounded-lg text-xs font-mono"
+                    placeholder="AQB... ou código de autorização retornado"
+                    className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 font-mono focus:outline-none focus:border-blue-500"
                   />
-                  <button
-                    type="button"
-                    onClick={() => exchangeMut.mutate({ code, phone_number_id: phoneNumberId, waba_id: wabaId, nickname })}
-                    disabled={!code.trim() || exchangeMut.isPending}
-                    className="w-full py-2 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded-lg text-xs font-bold transition-all disabled:opacity-40"
-                  >
-                    {exchangeMut.isPending ? 'Verificando...' : 'Trocar código por token'}
-                  </button>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-secondary leading-relaxed">
-                <span className="font-bold text-amber-400 block mb-1">Configuração de Servidor</span>
-                O embedded login requer as variáveis <code className="text-primary font-mono">META_APP_ID</code> e <code className="text-primary font-mono">META_APP_SECRET</code> no backend.
-                <p className="mt-2">
-                  Você pode conectar seu número agora mesmo inserindo as credenciais diretamente na aba <strong>Credenciais Meta Cloud</strong>.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 pt-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] font-medium text-zinc-400 block mb-1">Phone Number ID (opcional)</label>
+                    <input
+                      value={phoneNumberId}
+                      onChange={(e) => setPhoneNumberId(e.target.value)}
+                      placeholder="Ex: 1126244453895124"
+                      className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium text-zinc-400 block mb-1">WABA ID (opcional)</label>
+                    <input
+                      value={wabaId}
+                      onChange={(e) => setWabaId(e.target.value)}
+                      placeholder="Ex: 1443823057400060"
+                      className="w-full px-3 py-2 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-zinc-100 placeholder:text-zinc-600 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={onFallbackManual}
-                  className="w-full py-2.5 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white rounded-xl font-bold text-xs shadow-md"
+                  onClick={() => exchangeMut.mutate({ code, phone_number_id: phoneNumberId, waba_id: wabaId, nickname })}
+                  disabled={!code.trim() || exchangeMut.isPending}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 shadow-md"
                 >
-                  Inserir Credenciais Manualmente
+                  {exchangeMut.isPending ? 'Trocando código...' : 'Finalizar Conexão com Código'}
                 </button>
-                <a
-                  href="https://developers.facebook.com/apps"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-center py-1.5 text-xs text-secondary hover:text-primary flex items-center justify-center gap-1"
-                >
-                  <ExternalLink className="w-3 h-3" /> Painel Meta Developers
-                </a>
               </div>
+            )}
+
+            <div className="pt-2 flex items-center justify-between border-t border-zinc-800/80">
+              <button
+                type="button"
+                onClick={onFallbackManual}
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1.5"
+              >
+                <span>Inserir tokens manualmente</span> →
+              </button>
+              <a
+                href="https://developers.facebook.com/apps"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-zinc-400 hover:text-zinc-200 flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" /> Meta Developers
+              </a>
             </div>
-          )}
+          </div>
         </div>
+
+        <footer className="px-6 py-3 border-t border-zinc-800 bg-zinc-900/30 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            Fechar
+          </button>
+        </footer>
       </div>
     </div>
   );

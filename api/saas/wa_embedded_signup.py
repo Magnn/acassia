@@ -28,8 +28,8 @@ GRAPH_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
 
 def _get_meta_app_credentials():
-    app_id = os.getenv("META_APP_ID", "").strip()
-    app_secret = os.getenv("META_APP_SECRET", "").strip()
+    app_id = (os.getenv("META_APP_ID") or os.getenv("APP_ID") or "2344565976011888").strip()
+    app_secret = (os.getenv("META_APP_SECRET") or os.getenv("APP_SECRET") or "").strip()
     config_id = os.getenv("META_CONFIG_ID", "").strip()
     return app_id, app_secret, config_id
 
