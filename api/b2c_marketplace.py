@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, g
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import or_
 
 from db.database import SessionLocal
 from db.models import (
@@ -13,6 +14,7 @@ from db.models import (
     ConsumerPurchase,
     MemberAreaAsset,
     ExpertScheduleSlot,
+    Appointment,
     User  # Used for finding expert profiles
 )
 from extensions import limiter
@@ -121,6 +123,29 @@ def consumer_login():
         db.close()
 
 
+@b2c_bp.route("/auth/me", methods=["GET"])
+@consumer_required
+def get_current_consumer():
+    """Retorna o perfil do consumidor autenticado via Bearer Token."""
+    db = SessionLocal()
+    try:
+        consumer = db.query(ConsumerProfile).filter_by(id=g.consumer_id).first()
+        if not consumer:
+            return jsonify({"error": "consumer_not_found"}), 404
+        return jsonify({
+            "ok": True,
+            "consumer": {
+                "id": consumer.id,
+                "name": consumer.name,
+                "phone": consumer.phone,
+                "email": consumer.email,
+                "created_at": consumer.created_at.isoformat() if consumer.created_at else None,
+            }
+        })
+    finally:
+        db.close()
+
+
 # ─── MARKETPLACE DISCOVERY (O "iFOOD") ──────────────────────────────────────
 
 @b2c_bp.route("/experts", methods=["GET"])
@@ -129,15 +154,12 @@ def list_experts():
     db = SessionLocal()
     try:
         # Puxa usuários que são experts e têm serviços ativos
-        # Aqui simplificamos puxando Tenants que tenham ExpertServices ativos
         services = db.query(ExpertService.tenant_id).filter_by(is_active=True).distinct().all()
         active_tenant_ids = [s[0] for s in services]
 
-        # Em produção, enriqueceríamos isso com foto de perfil, rating e categorias
         experts = db.query(User).filter(User.tenant_id.in_(active_tenant_ids)).all()
         
         result = []
-        # Evitar duplicações de tenant
         seen = set()
         for exp in experts:
             if exp.tenant_id not in seen:
@@ -145,7 +167,7 @@ def list_experts():
                 result.append({
                     "tenant_id": exp.tenant_id,
                     "name": exp.name or "Especialista Premium",
-                    "specialty": "Terapia Holística e Tarot" # Mockado, viria do profile
+                    "specialty": "Terapia Holística e Tarot"
                 })
 
         return jsonify({"experts": result})
@@ -198,33 +220,110 @@ def get_member_vault(consumer_id):
     finally:
         db.close()
 
+
 @b2c_bp.route("/me/<int:consumer_id>/appointments", methods=["GET"])
 @consumer_required
 def get_consumer_appointments(consumer_id):
     """
     Retorna a agenda do consumidor (Sessões ao vivo marcadas).
+    Unifica agendamentos diretos e slots vinculados a compras sem duplicatas.
     """
     db = SessionLocal()
     try:
-        # Busca compras do consumidor
+        consumer = db.query(ConsumerProfile).filter_by(id=consumer_id).first()
+        if not consumer:
+            return jsonify({"error": "consumer_not_found"}), 404
+
+        now_utc = _agora_utc()
+
+        # 1. Agendamentos diretos associados ao consumer_id ou telefone
+        appt_filters = [Appointment.consumer_id == consumer_id]
+        if consumer.phone:
+            appt_filters.append(Appointment.client_phone == consumer.phone)
+        
+        appts = (
+            db.query(Appointment)
+            .filter(or_(*appt_filters))
+            .filter(Appointment.status.notin_(["cancelled"]))
+            .order_by(Appointment.scheduled_at.asc())
+            .all()
+        )
+
+        # 2. Slots comprados via marketplace
         purchases = db.query(ConsumerPurchase.id).filter_by(consumer_id=consumer_id).all()
         purchase_ids = [p[0] for p in purchases]
+        slot_filters = [ExpertScheduleSlot.consumer_id == consumer_id]
+        if purchase_ids:
+            slot_filters.append(ExpertScheduleSlot.purchase_id.in_(purchase_ids))
 
-        if not purchase_ids:
-            return jsonify({"appointments": []})
+        slots = (
+            db.query(ExpertScheduleSlot)
+            .filter(or_(*slot_filters))
+            .order_by(ExpertScheduleSlot.slot_time.asc())
+            .all()
+        )
 
-        slots = db.query(ExpertScheduleSlot).filter(ExpertScheduleSlot.purchase_id.in_(purchase_ids)).all()
-        
-        return jsonify({"appointments": [
-            {
+        # Prepara nomes de especialistas e serviços
+        tenant_ids = {a.tenant_id for a in appts} | {s.tenant_id for s in slots}
+        expert_users = db.query(User).filter(User.tenant_id.in_(tenant_ids)).all() if tenant_ids else []
+        expert_name_map = {u.tenant_id: (u.name or "Especialista") for u in expert_users}
+
+        service_ids = {a.service_id for a in appts if a.service_id}
+        services = db.query(ExpertService).filter(ExpertService.id.in_(service_ids)).all() if service_ids else []
+        service_title_map = {s.id: s.title for s in services}
+
+        results = []
+        seen_slot_ids = set()
+        seen_appt_ids = set()
+
+        for a in appts:
+            seen_appt_ids.add(a.id)
+            if a.slot_id:
+                seen_slot_ids.add(a.slot_id)
+            expert_name = expert_name_map.get(a.tenant_id, "Especialista")
+            service_title = service_title_map.get(a.service_id, a.appointment_type or "Consulta Online")
+            sched_dt = a.scheduled_at
+            if sched_dt and sched_dt.tzinfo is None:
+                sched_dt = sched_dt.replace(tzinfo=timezone.utc)
+            results.append({
+                "id": a.id,
+                "slot_id": a.slot_id,
+                "expert_tenant_id": a.tenant_id,
+                "expert_name": expert_name,
+                "title": service_title,
+                "datetime": a.scheduled_at.isoformat() if a.scheduled_at else None,
+                "duration_minutes": a.duration_minutes or 60,
+                "status": "scheduled" if (sched_dt and sched_dt > now_utc) else "completed",
+                "meeting_url": a.meeting_url,
+            })
+
+        for s in slots:
+            if s.id in seen_slot_ids:
+                continue
+            if s.appointment_id and s.appointment_id in seen_appt_ids:
+                continue
+            expert_name = expert_name_map.get(s.tenant_id, "Especialista")
+            slot_dt = s.slot_time
+            if slot_dt and slot_dt.tzinfo is None:
+                slot_dt = slot_dt.replace(tzinfo=timezone.utc)
+            results.append({
+                "id": None,
                 "slot_id": s.id,
                 "expert_tenant_id": s.tenant_id,
-                "datetime": s.slot_time.isoformat(),
-                "status": "scheduled" if s.slot_time > _agora_utc() else "completed"
-            } for s in slots
-        ]})
+                "expert_name": expert_name,
+                "title": "Sessão com Especialista",
+                "datetime": s.slot_time.isoformat() if s.slot_time else None,
+                "duration_minutes": s.duration_minutes or 60,
+                "status": "scheduled" if (slot_dt and slot_dt > now_utc) else "completed",
+                "meeting_url": None,
+            })
+
+        results.sort(key=lambda x: x["datetime"] or "")
+
+        return jsonify({"appointments": results})
     finally:
         db.close()
+
 
 # ─── EXPERT CATALOG MANAGEMENT (B2B) ────────────────────────────────────────
 

@@ -34,6 +34,12 @@ export class ApiError extends Error {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+  const b2cToken = typeof window !== 'undefined' ? localStorage.getItem('b2c_access_token') : null;
+  if (b2cToken && (path.startsWith('/api/b2c') || path.startsWith('/b2c'))) {
+    headers['Authorization'] = `Bearer ${b2cToken}`;
+  }
+
   const res = await fetch(path, {
     method,
     credentials: 'include',
