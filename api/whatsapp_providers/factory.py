@@ -11,6 +11,7 @@ from .base import ProviderMode, WhatsAppProvider
 from .coex import CoexProvider
 from .evolution import EvolutionProvider
 from .meta_cloud import MetaCloudProvider
+from .openwa import OpenWAProvider
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ def get_provider_for_tenant(tenant_id: str) -> WhatsAppProvider:
     """
     Retorna o provider configurado pro tenant. Lê:
 
-      - whatsapp.provider     (variable)  meta_cloud | coex | evolution
+      - whatsapp.provider     (variable)  meta_cloud | coex | evolution | openwa
         Default: meta_cloud (retro com env).
 
     Cada provider lê as próprias chaves do tenant_config.
@@ -51,9 +52,17 @@ def get_provider_for_tenant(tenant_id: str) -> WhatsAppProvider:
         "evolution_instance": evo_cfg.get("instance"),
         "evolution_api_key": evo_cfg.get("api_key"),
     })
+    openwa_cfg = wa.get("openwa") if isinstance(wa.get("openwa"), dict) else {}
+    flat.update({
+        "openwa_server_url": openwa_cfg.get("server_url"),
+        "openwa_session_id": openwa_cfg.get("session_id"),
+        "openwa_api_key": openwa_cfg.get("api_key"),
+    })
 
     if mode == ProviderMode.COEX.value:
         return CoexProvider(tid, flat)
     if mode == ProviderMode.EVOLUTION.value:
         return EvolutionProvider(tid, flat)
+    if mode == ProviderMode.OPENWA.value:
+        return OpenWAProvider(tid, flat)
     return MetaCloudProvider(tid, flat)

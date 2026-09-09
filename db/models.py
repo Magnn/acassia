@@ -2854,13 +2854,18 @@ class WADevice(Base):
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(64), nullable=False, index=True)
     nickname = Column(String(100), nullable=False)  # "Spanda Principal", "Suporte"
-    provider = Column(String(30), nullable=False, default="evolution")  # meta_cloud, evolution, coex
+    provider = Column(String(30), nullable=False, default="evolution")  # meta_cloud, evolution, coex, openwa
     phone_display = Column(String(30), nullable=True)  # "+55 11 99999-0000"
 
     # Evolution credentials
     evolution_server_url = Column(String(500), nullable=True)
     evolution_instance = Column(String(100), nullable=True)
     evolution_api_key = Column(String(500), nullable=True)
+
+    # OpenWA credentials
+    openwa_server_url = Column(String(500), nullable=True)
+    openwa_session_id = Column(String(100), nullable=True)
+    openwa_api_key = Column(String(500), nullable=True)
 
     # Meta Cloud credentials
     meta_phone_number_id = Column(String(100), nullable=True)
@@ -2869,7 +2874,7 @@ class WADevice(Base):
 
     # State
     connected = Column(Boolean, default=False)
-    connection_state = Column(String(30), nullable=True)  # open, close, connecting
+    connection_state = Column(String(30), nullable=True)  # open, close, connecting, CONFLICT
     is_primary = Column(Boolean, default=False)
     active = Column(Boolean, default=True)
     flow_mode = Column(String(30), nullable=False, default="static_funnel")  # static_funnel, ai_agent, flow_builder

@@ -106,6 +106,10 @@ def create_device():
             evolution_server_url=data.get("evolution_server_url"),
             evolution_instance=data.get("evolution_instance"),
             evolution_api_key=None,
+            # OpenWA
+            openwa_server_url=data.get("openwa_server_url"),
+            openwa_session_id=data.get("openwa_session_id"),
+            openwa_api_key=None,
             # Meta Cloud
             meta_phone_number_id=data.get("meta_phone_number_id"),
             meta_waba_id=data.get("meta_waba_id"),
@@ -114,6 +118,7 @@ def create_device():
         db.add(d)
         db.flush()
         _set_device_secret(db, d, "evolution_api_key", data.get("evolution_api_key"))
+        _set_device_secret(db, d, "openwa_api_key", data.get("openwa_api_key"))
         _set_device_secret(db, d, "meta_access_token", data.get("meta_access_token"))
         db.commit()
         return jsonify({"ok": True, "device_id": d.id, "is_primary": d.is_primary}), 201
@@ -135,12 +140,16 @@ def update_device(device_id):
         data = request.json or {}
         for k in ("nickname", "phone_display", "provider",
                    "evolution_server_url", "evolution_instance",
+                   "openwa_server_url", "openwa_session_id",
                    "meta_phone_number_id", "meta_waba_id"):
             if k in data:
                 setattr(d, k, data[k])
         if "evolution_api_key" in data:
             _set_device_secret(db, d, "evolution_api_key", data.get("evolution_api_key"))
             d.evolution_api_key = None
+        if "openwa_api_key" in data:
+            _set_device_secret(db, d, "openwa_api_key", data.get("openwa_api_key"))
+            d.openwa_api_key = None
         if "meta_access_token" in data:
             _set_device_secret(db, d, "meta_access_token", data.get("meta_access_token"))
             d.meta_access_token = None
@@ -160,7 +169,7 @@ def delete_device(device_id):
         ).first()
         if not d:
             return jsonify({"error": "not_found"}), 404
-        for field in ("evolution_api_key", "meta_access_token"):
+        for field in ("evolution_api_key", "openwa_api_key", "meta_access_token"):
             row = db.query(models.TenantFlowSecret).filter_by(
                 tenant_id=d.tenant_id, key=_device_secret_key(d.id, field)
             ).first()
@@ -198,7 +207,7 @@ def set_primary(device_id):
 @devices_bp.route("/<int:device_id>/status", methods=["GET"])
 @login_required
 def device_status(device_id):
-    """Check connection status for a specific device."""
+    """Check connection status for a specific device, detecting CONFLICT explicitly."""
     db = SessionLocal()
     try:
         d = db.query(models.WADevice).filter_by(
@@ -212,18 +221,26 @@ def device_status(device_id):
             return jsonify({"ok": False, "connected": False, "hint": "Provider não configurado"})
 
         status = provider.status()
+        conn_state = status.get("connection_state")
+        is_conflict = (str(conn_state).upper() == "CONFLICT")
+
         # Update device state
-        d.connected = status.get("ok", False)
-        d.connection_state = status.get("connection_state")
+        d.connected = False if is_conflict else status.get("ok", False)
+        d.connection_state = "CONFLICT" if is_conflict else conn_state
         if d.connected:
             d.last_seen_at = datetime.now(timezone.utc)
         db.commit()
 
+        hint = status.get("hint")
+        if is_conflict and not hint:
+            hint = "Conflito de Sessão: o WhatsApp Web foi aberto em outro dispositivo. Desconecte lá e reinicie a sessão aqui."
+
         return jsonify({
-            "ok": status.get("ok", False),
-            "connected": status.get("ok", False),
-            "connection_state": status.get("connection_state"),
-            "hint": status.get("hint"),
+            "ok": d.connected,
+            "connected": d.connected,
+            "connection_state": d.connection_state,
+            "is_conflict": is_conflict,
+            "hint": hint,
         })
     finally:
         db.close()
@@ -232,7 +249,7 @@ def device_status(device_id):
 @devices_bp.route("/<int:device_id>/qr-code", methods=["GET"])
 @login_required
 def device_qr_code(device_id):
-    """Get QR code for a specific Evolution device."""
+    """Get QR code for Evolution or OpenWA devices."""
     db = SessionLocal()
     try:
         d = db.query(models.WADevice).filter_by(
@@ -240,8 +257,8 @@ def device_qr_code(device_id):
         ).first()
         if not d:
             return jsonify({"error": "not_found"}), 404
-        if d.provider != "evolution":
-            return jsonify({"error": "qr_only_evolution"}), 422
+        if d.provider not in ("evolution", "openwa"):
+            return jsonify({"error": "qr_only_qr_providers"}), 422
 
         provider = _get_provider_for_device(d)
         if not provider or not hasattr(provider, "get_qr_code"):
@@ -252,9 +269,39 @@ def device_qr_code(device_id):
             return jsonify({
                 "ok": True,
                 "qr_base64": result.raw.get("base64") if result.raw else None,
-                "qr_code": result.raw.get("code") if result.raw else None,
+                "qr_code": result.raw.get("code") or result.raw.get("qr") if result.raw else None,
             })
         return jsonify({"ok": False, "error": result.error}), 500
+    finally:
+        db.close()
+
+
+@devices_bp.route("/<int:device_id>/restart", methods=["POST"])
+@login_required
+def restart_device(device_id):
+    """Reinicia a sessão do dispositivo (útil para recuperar de CONFLICT ou desconexão)."""
+    db = SessionLocal()
+    try:
+        d = db.query(models.WADevice).filter_by(
+            id=device_id, tenant_id=current_user.tenant_id
+        ).first()
+        if not d:
+            return jsonify({"error": "not_found"}), 404
+
+        provider = _get_provider_for_device(d)
+        if not provider:
+            return jsonify({"error": "provider_not_configured"}), 422
+
+        if hasattr(provider, "restart_session"):
+            ok = provider.restart_session()
+            if ok:
+                d.connection_state = "connecting"
+                db.commit()
+            return jsonify({
+                "ok": ok,
+                "message": "Sessão reiniciada com sucesso" if ok else "Falha ao reiniciar sessão",
+            })
+        return jsonify({"ok": False, "error": "not_supported_by_provider"}), 400
     finally:
         db.close()
 
@@ -322,6 +369,7 @@ def _get_provider_for_device(device: models.WADevice):
         db = SessionLocal()
         try:
             evolution_key = _get_device_secret(db, device, "evolution_api_key", device.evolution_api_key)
+            openwa_key = _get_device_secret(db, device, "openwa_api_key", getattr(device, "openwa_api_key", None))
             meta_token = _get_device_secret(db, device, "meta_access_token", device.meta_access_token)
         finally:
             db.close()
@@ -333,6 +381,16 @@ def _get_provider_for_device(device: models.WADevice):
                     "evolution_server_url": device.evolution_server_url or "",
                     "evolution_instance": device.evolution_instance or "",
                     "evolution_api_key": evolution_key,
+                },
+            )
+        elif device.provider == "openwa":
+            from api.whatsapp_providers.openwa import OpenWAProvider
+            return OpenWAProvider(
+                tenant_id=device.tenant_id,
+                config={
+                    "openwa_server_url": getattr(device, "openwa_server_url", "") or "",
+                    "openwa_session_id": getattr(device, "openwa_session_id", "") or "",
+                    "openwa_api_key": openwa_key,
                 },
             )
         elif device.provider in ("meta_cloud", "coex"):

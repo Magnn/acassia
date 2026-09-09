@@ -14,6 +14,7 @@ class ProviderMode(str, Enum):
     META_CLOUD = "meta_cloud"   # Meta WhatsApp Cloud API direta
     COEX = "coex"               # Coex BSP (parceiro Meta)
     EVOLUTION = "evolution"     # Evolution API (não oficial, QR-based)
+    OPENWA = "openwa"           # OpenWA / WA-Automate Gateway (self-hosted)
 
 
 class ProviderError(Exception):
@@ -45,7 +46,7 @@ class SendResult:
 
 class WhatsAppProvider(ABC):
     """
-    Interface abstrata. Cada modo (meta_cloud/coex/evolution) implementa
+    Interface abstrata. Cada modo (meta_cloud/coex/evolution/openwa) implementa
     estes métodos com a lógica específica do backend.
     """
 
@@ -78,6 +79,19 @@ class WhatsAppProvider(ABC):
         Usado pela UI pra saber se a conexão está pronta.
         """
 
+    def simulate_presence(
+        self,
+        numero: str,
+        presence: str = "composing",
+        delay_seconds: float = 0.0,
+    ) -> bool:
+        """
+        Simula presença humana no WhatsApp ("composing" para digitando...,
+        "recording" para gravando áudio...).
+        Padrão: no-op gracioso caso o provider não implemente.
+        """
+        return False
+
     def send_message_result(
         self, numero: str, conteudo: str, formato: str = "texto", media_url: Optional[str] = None
     ) -> SendResult:
@@ -100,6 +114,12 @@ class WhatsAppProvider(ABC):
             try:
                 from .evolution import pop_last_evolution_msg_id
                 message_id = pop_last_evolution_msg_id()
+            except Exception:
+                pass
+        elif self.mode == ProviderMode.OPENWA:
+            try:
+                from .openwa import pop_last_openwa_msg_id
+                message_id = pop_last_openwa_msg_id()
             except Exception:
                 pass
         return SendResult(ok=bool(ok), message_id=message_id, error=None if ok else "envio_falhou")

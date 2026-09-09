@@ -173,3 +173,36 @@ class EvolutionProvider(WhatsAppProvider):
             return SendResult(ok=False, error=f"HTTP {resp.status_code}", raw=data)
         except requests.exceptions.RequestException as exc:
             return SendResult(ok=False, error=str(exc))
+
+    def simulate_presence(
+        self,
+        numero: str,
+        presence: str = "composing",
+        delay_seconds: float = 0.0,
+    ) -> bool:
+        """
+        Simula presença humana no Evolution API v2:
+        POST /chat/sendPresence/{instance} com presence ∈ {'composing', 'recording', 'paused'}.
+        """
+        if not (self.server_url and self.instance and self.api_key):
+            return False
+        clean_num = "".join(ch for ch in str(numero) if ch.isdigit())
+        p_val = "recording" if presence in ("recording", "audio") else "composing"
+        url = f"{self.server_url}/chat/sendPresence/{self.instance}"
+        payload = {
+            "number": clean_num,
+            "presence": p_val,
+            "delay": int((delay_seconds or 1.0) * 1000),
+        }
+        try:
+            resp = requests.post(
+                url,
+                json=payload,
+                headers=self._headers(),
+                timeout=(TIMEOUT_CONNECT, 5),
+            )
+            return resp.status_code in (200, 201)
+        except Exception as exc:
+            logger.debug("[evolution.simulate_presence] Falha: %s", exc)
+            return False
+

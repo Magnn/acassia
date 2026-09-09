@@ -23,13 +23,18 @@ declare global {
   }
 }
 
-type Step = 'type' | 'meta_req' | 'meta_costs' | 'meta_coex' | 'meta_nickname' | 'evolution_form';
+type Step = 'type' | 'meta_req' | 'meta_costs' | 'meta_coex' | 'meta_nickname' | 'evolution_form' | 'openwa_form';
 
 export function WizardModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const [step, setStep] = useState<Step>('type');
   
-  const emptyForm = { nickname: '', provider: 'meta_cloud', phone_display: '', meta_phone_number_id: '', meta_waba_id: '', meta_access_token: '', evolution_server_url: '', evolution_instance: '', evolution_api_key: '' };
+  const emptyForm = {
+    nickname: '', provider: 'meta_cloud', phone_display: '',
+    meta_phone_number_id: '', meta_waba_id: '', meta_access_token: '',
+    evolution_server_url: '', evolution_instance: '', evolution_api_key: '',
+    openwa_server_url: '', openwa_session_id: '', openwa_api_key: ''
+  };
   const [form, setForm] = useState(emptyForm);
 
   const createMut = useMutation({
@@ -107,11 +112,24 @@ export function WizardModal({ onClose }: { onClose: () => void }) {
             <div className="space-y-4">
               <button onClick={() => { setForm(f => ({...f, provider: 'evolution'})); setStep('evolution_form'); }} className="w-full flex items-center gap-4 p-5 rounded-xl border border-gray-200 hover:border-[#25D366] shadow-sm hover:shadow-md transition bg-white text-left">
                 <WaLogo className="w-10 h-10 text-[#25D366]" />
-                <span className="text-lg font-bold text-gray-800">WhatsApp Business</span>
+                <div>
+                  <span className="text-lg font-bold text-gray-800 block">WhatsApp Business</span>
+                  <span className="text-xs text-gray-500">Conexão via QR Code com Evolution API</span>
+                </div>
+              </button>
+              <button onClick={() => { setForm(f => ({...f, provider: 'openwa'})); setStep('openwa_form'); }} className="w-full flex items-center gap-4 p-5 rounded-xl border border-gray-200 hover:border-emerald-500 shadow-sm hover:shadow-md transition bg-white text-left">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-sm flex-shrink-0 shadow-sm">WA</div>
+                <div>
+                  <span className="text-lg font-bold text-gray-800 block">OpenWA / Self-Hosted</span>
+                  <span className="text-xs text-gray-500">Gateway wa-automate: áudio PTT nativo e proteção contra conflito</span>
+                </div>
               </button>
               <button onClick={() => { setForm(f => ({...f, provider: 'meta_cloud'})); setStep('meta_req'); }} className="w-full flex items-center gap-4 p-5 rounded-xl border border-gray-200 hover:border-[#0082FB] shadow-sm hover:shadow-md transition bg-white text-left">
                 <MetaLogo className="w-10 h-10 text-[#0082FB]" />
-                <span className="text-lg font-bold text-gray-800">API Oficial</span>
+                <div>
+                  <span className="text-lg font-bold text-gray-800 block">API Oficial</span>
+                  <span className="text-xs text-gray-500">Meta Cloud API (Graph API) oficial</span>
+                </div>
               </button>
             </div>
           )}
@@ -264,6 +282,70 @@ export function WizardModal({ onClose }: { onClose: () => void }) {
               <div className="pt-4 flex justify-end">
                 <button onClick={() => createMut.mutate(form)} disabled={!form.nickname || createMut.isPending} className="flex items-center gap-2 px-8 py-3 bg-[#25D366] hover:bg-green-600 text-white rounded-xl font-bold shadow-md disabled:opacity-50 transition">
                   <Save className="w-4 h-4" /> {createMut.isPending ? 'Criando...' : 'Criar Instância'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 'openwa_form' && (
+            <div className="space-y-4">
+              <div className="mb-6 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl mx-auto mb-3 shadow-md">
+                  WA
+                </div>
+                <h3 className="text-xl font-black text-gray-900 mb-1">OpenWA / Self-Hosted</h3>
+                <p className="text-[13px] text-gray-500">Gateway wa-automate com suporte nativo a PTT e anti-conflito.</p>
+              </div>
+
+              <div>
+                <label className="text-[13px] font-bold text-gray-700 block mb-1.5">Apelido Interno *</label>
+                <input
+                  value={form.nickname}
+                  onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))}
+                  placeholder="Ex: WhatsApp Cigana"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none shadow-sm"
+                />
+              </div>
+
+              <div className="p-5 bg-white border border-gray-200 rounded-xl space-y-3 shadow-sm">
+                <p className="text-[13px] font-bold text-gray-700 mb-3">Configurações do Gateway OpenWA</p>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Server URL *</label>
+                  <input
+                    value={form.openwa_server_url}
+                    onChange={e => setForm(f => ({ ...f, openwa_server_url: e.target.value }))}
+                    placeholder="Ex: http://localhost:3000 ou https://openwa.meudominio.com"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:bg-white focus:border-emerald-600 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">Session ID (Nome da Sessão) *</label>
+                  <input
+                    value={form.openwa_session_id}
+                    onChange={e => setForm(f => ({ ...f, openwa_session_id: e.target.value }))}
+                    placeholder="Ex: default ou cigana_session"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:bg-white focus:border-emerald-600 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 font-medium block mb-1">API Key / Token Secreto</label>
+                  <input
+                    value={form.openwa_api_key}
+                    onChange={e => setForm(f => ({ ...f, openwa_api_key: e.target.value }))}
+                    placeholder="Chave AUTHENTICATION_API_KEY do OpenWA"
+                    type="password"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:bg-white focus:border-emerald-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <button
+                  onClick={() => createMut.mutate(form)}
+                  disabled={!form.nickname || !form.openwa_server_url || createMut.isPending}
+                  className="flex items-center gap-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md disabled:opacity-50 transition"
+                >
+                  <Save className="w-4 h-4" /> {createMut.isPending ? 'Salvando...' : 'Conectar OpenWA'}
                 </button>
               </div>
             </div>

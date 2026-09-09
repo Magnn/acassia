@@ -94,6 +94,21 @@ services:
       - ./media:/app/media
       - ./scripts/reports:/app/scripts/reports
 
+  # ── OpenWA REST Gateway (Self-Hosted WhatsApp) ──
+  openwa:
+    image: rmyndharis/openwa:latest
+    container_name: meumisterio-openwa
+    restart: unless-stopped
+    ports:
+      - "${OPENWA_PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - AUTHENTICATION_API_KEY=${OPENWA_API_KEY:-meumisterio_openwa_secret_2026}
+    volumes:
+      - openwadata:/app/sessions
+    profiles:
+      - openwa
+
   # ── Alembic Migration Runner (one-shot) ──
   migrate:
     build:
@@ -115,4 +130,6 @@ volumes:
   pgdata:
     driver: local
   redisdata:
+    driver: local
+  openwadata:
     driver: local

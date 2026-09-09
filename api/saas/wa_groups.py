@@ -699,8 +699,77 @@ def send_button_message(group_id):
         if not msg_body:
             return jsonify({"error": "body_required"}), 422
 
+        # Helper de fallback de botões para menu numerado
+        def _build_text_fallback() -> str:
+            lines = []
+            if body.get("header"):
+                lines.append(f"*{str(body['header']).strip()}*\n")
+            lines.append(msg_body)
+            if msg_type == "reply_buttons":
+                buttons = body.get("buttons", [])
+                lines.append("")
+                for i, b in enumerate(buttons, 1):
+                    t = (b.get("title") or "").strip()
+                    if t:
+                        lines.append(f"{i}️⃣ {t}")
+            elif msg_type == "cta_url":
+                cta_url = body.get("cta_url", "").strip()
+                cta_text = body.get("cta_text", "Acessar").strip()
+                if cta_url:
+                    lines.append(f"\n👉 {cta_text}: {cta_url}")
+            elif msg_type == "list":
+                sections = body.get("sections", [])
+                lines.append("")
+                opt_idx = 1
+                for s in sections:
+                    s_title = s.get("title")
+                    if s_title:
+                        lines.append(f"\n*{s_title}*")
+                    for r in s.get("rows", []):
+                        r_title = r.get("title", "")
+                        r_desc = r.get("description", "")
+                        desc_str = f" - {r_desc}" if r_desc else ""
+                        lines.append(f"{opt_idx}. {r_title}{desc_str}")
+                        opt_idx += 1
+            if body.get("footer"):
+                lines.append(f"\n_{str(body['footer']).strip()}_")
+            return "\n".join(lines).strip()
+
+        # Se o dispositivo associado for OpenWA ou Evolution, usa fallback textual diretamente
+        dev = g.device if g.device_id else None
+        if not dev:
+            dev = db.query(models.WADevice).filter_by(tenant_id=current_user.tenant_id, is_primary=True, active=True).first()
+
+        if dev and dev.provider in ("evolution", "openwa"):
+            from api.saas.wa_devices import _get_provider_for_device
+            prov = _get_provider_for_device(dev)
+            if prov:
+                fallback_text = _build_text_fallback()
+                ok = prov.enviar_mensagem(g.group_jid, fallback_text, formato="texto")
+                if ok:
+                    msg = models.WAGroupMessage(
+                        tenant_id=current_user.tenant_id,
+                        group_id=group_id,
+                        content=f"[{msg_type}] {msg_body[:300]}",
+                        media_type=f"fallback_text_{msg_type}",
+                        status="sent",
+                        sent_at=datetime.now(timezone.utc),
+                    )
+                    db.add(msg)
+                    db.commit()
+                    return jsonify({"ok": True, "fallback": True, "provider": dev.provider})
+
         wa = _get_wa_credentials(current_user.tenant_id, db)
         if not wa:
+            # Fallback geral
+            try:
+                from api.whatsapp_providers import get_provider_for_tenant
+                prov = get_provider_for_tenant(current_user.tenant_id)
+                fallback_text = _build_text_fallback()
+                if prov.enviar_mensagem(g.group_jid, fallback_text, formato="texto"):
+                    return jsonify({"ok": True, "fallback": True})
+            except Exception:
+                pass
             return jsonify({"error": "whatsapp_not_connected"}), 422
 
         ver = os.getenv("META_GRAPH_API_VERSION", "v21.0")
@@ -773,7 +842,15 @@ def send_button_message(group_id):
                 return jsonify({"ok": True, "message_id": result.get("messages", [{}])[0].get("id")})
         except urllib.error.HTTPError as e:
             err = e.read().decode()[:300]
-            logger.error("[groups] Button msg failed: %s", err)
+            logger.warning("[groups] Falha interativa Meta (%s), tentando fallback textual...", err)
+            try:
+                from api.whatsapp_providers import get_provider_for_tenant
+                prov = get_provider_for_tenant(current_user.tenant_id)
+                fallback_text = _build_text_fallback()
+                if prov.enviar_mensagem(g.group_jid, fallback_text, formato="texto"):
+                    return jsonify({"ok": True, "fallback": True, "note": "Enviado como menu em texto"})
+            except Exception:
+                pass
             return jsonify({"ok": False, "error": err}), 500
     finally:
         db.close()

@@ -155,8 +155,19 @@ function DeviceCard({
     refetchInterval: 20000,
   });
   const isConnected = liveStatus?.connected ?? d.connected;
+  const isConflict = (liveStatus?.connection_state === 'CONFLICT' || d.connection_state === 'CONFLICT');
   const isMeta = d.provider === 'meta_cloud' || d.provider === 'coex';
+  const isOpenWA = d.provider === 'openwa';
   const currentMode = d.flow_mode || 'static_funnel';
+
+  const restartMut = useMutation({
+    mutationFn: () => api.post(`/saas/devices/${d.id}/restart`, {}),
+    onSuccess: () => {
+      toast.success('Comando de reinício enviado!');
+      refetch();
+    },
+    onError: (e: any) => toast.error(e?.message || 'Falha ao reiniciar sessão'),
+  });
 
   return (
     <div className="relative rounded-[24px] bg-[#F2F4F7] p-8 shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition-all group overflow-hidden max-w-[600px]">
@@ -165,6 +176,29 @@ function DeviceCard({
         <div className="absolute top-5 right-5 flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
           <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
           <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Principal</span>
+        </div>
+      )}
+
+      {/* Conflict Alert Banner */}
+      {isConflict && (
+        <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-bold text-rose-900">Conflito de Sessão Detectado</h4>
+              <p className="text-xs text-rose-700 mt-0.5">
+                O WhatsApp Web foi aberto em outro navegador ou computador. Desconecte lá e reinicie aqui para reativar o robô.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => restartMut.mutate()}
+            disabled={restartMut.isPending}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5 self-end sm:self-center disabled:opacity-50 flex-shrink-0"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${restartMut.isPending ? 'animate-spin' : ''}`} />
+            Reconectar
+          </button>
         </div>
       )}
 
@@ -185,7 +219,12 @@ function DeviceCard({
       {/* Middle: Status + Disconnect */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          {isConnected ? (
+          {isConflict ? (
+            <>
+              <div className="w-[16px] h-[16px] rounded-full bg-rose-500 shadow-[0_0_16px_5px_rgba(244,63,94,0.5)] animate-bounce" />
+              <span className="text-[22px] font-medium text-rose-600">Conflito de Sessão</span>
+            </>
+          ) : isConnected ? (
             <>
               <div className="w-[16px] h-[16px] rounded-full bg-[#25D366] shadow-[0_0_16px_5px_rgba(37,211,102,0.5)] animate-pulse" />
               <span className="text-[22px] font-medium text-[#25D366]">Conectado</span>
@@ -265,7 +304,7 @@ function DeviceCard({
         </div>
       </div>
 
-      {/* Bottom Right: Meta / Evolution Logo */}
+      {/* Bottom Right: Meta / OpenWA / Evolution Logo */}
       <div className="flex justify-end mt-4">
         <div className="flex flex-col items-end">
           {isMeta ? (
@@ -277,6 +316,14 @@ function DeviceCard({
                 <span className="text-[28px] font-bold text-[#1D2B36] tracking-tight">Meta</span>
               </div>
               <span className="text-[14px] font-medium text-[#0866FF]">Official Meta API Connection</span>
+            </>
+          ) : isOpenWA ? (
+            <>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">WA</div>
+                <span className="text-[28px] font-bold text-[#1D2B36] tracking-tight">OpenWA</span>
+              </div>
+              <span className="text-[14px] font-medium text-emerald-600">Self-Hosted Gateway</span>
             </>
           ) : (
             <>

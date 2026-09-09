@@ -138,6 +138,9 @@ def sync_database():
         _add_column_if_missing(inspector, "broadcast_recipients", "idempotency_key", "VARCHAR(128)")
         _add_column_if_missing(inspector, "broadcast_recipients", "provider_message_id", "VARCHAR(128)")
         _add_column_if_missing(inspector, "broadcast_recipients", "attempt", "INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing(inspector, "wa_devices", "openwa_server_url", "VARCHAR(500)")
+        _add_column_if_missing(inspector, "wa_devices", "openwa_session_id", "VARCHAR(100)")
+        _add_column_if_missing(inspector, "wa_devices", "openwa_api_key", "VARCHAR(500)")
 
         logger.info("✅ [DATABASE] Tabelas sincronizadas (%s).", DB_DRIVER)
     except Exception as e:
