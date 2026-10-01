@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import requests
 from flask import Flask, jsonify, request
 from flask_login import login_required
+from sqlalchemy import text
 
 from api.saas.auth import require_role
 from db import models
@@ -90,6 +91,14 @@ def _is_blocked_webhook_host(hostname: str) -> bool:
 
 def _bp_row(db, tid: str, bid: int) -> Optional[models.FlowBlueprint]:
     return db.query(models.FlowBlueprint).filter_by(id=bid, tenant_id=tid).first()
+
+
+def _lock_tenant_publications(db, tenant_id: str) -> None:
+    """Serialize publication changes so two concurrent flows cannot claim one trigger."""
+    if db.bind and db.bind.dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:tenant_id))"), {"tenant_id": tenant_id})
+    elif db.bind and db.bind.dialect.name == "sqlite":
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
 
 
 def _next_version_number(db, bid: int) -> int:
@@ -224,6 +233,10 @@ def register_flow_platform_routes(app: Flask) -> None:
                 }), 200
                 
             if request.method == "DELETE":
+                db.query(models.FlowPublish).filter_by(
+                    tenant_id=tid,
+                    published_blueprint_id=bid,
+                ).delete(synchronize_session=False)
                 db.delete(bp)
                 db.commit()
                 return jsonify({"ok": True}), 200
@@ -268,18 +281,18 @@ def register_flow_platform_routes(app: Flask) -> None:
         db = SessionLocal()
         try:
             bid = int(bid) if bid is not None else None
+            _lock_tenant_publications(db, tid)
             if request.method == "DELETE":
-                pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
-                if pub and (
-                    bid is None
-                    or pub.published_blueprint_id is None
-                    or int(pub.published_blueprint_id) == bid
-                ):
-                    pub.published_blueprint_id = None
-                    db.commit()
+                query = db.query(models.FlowPublish).filter_by(tenant_id=tid)
+                if bid is None:
+                    query.delete(synchronize_session=False)
+                else:
+                    removed = query.filter_by(published_blueprint_id=bid).delete(synchronize_session=False)
+                    if not removed:
+                        return jsonify({"ok": False, "error": "este fluxo não está publicado"}), 409
+                db.commit()
+                if bid is None:
                     return jsonify({"ok": True, "published_blueprint_id": None}), 200
-                if pub and bid is not None:
-                    return jsonify({"ok": False, "error": "este fluxo não está publicado"}), 409
                 return jsonify({"ok": True, "published_blueprint_id": None}), 200
 
             bp = _bp_row(db, tid, bid)
@@ -302,13 +315,43 @@ def register_flow_platform_routes(app: Flask) -> None:
                     ),
                     422,
                 )
+
+            published = (
+                db.query(models.FlowPublish, models.FlowBlueprint)
+                .join(models.FlowBlueprint, models.FlowBlueprint.id == models.FlowPublish.published_blueprint_id)
+                .filter(models.FlowPublish.tenant_id == tid)
+                .filter(models.FlowPublish.published_blueprint_id.isnot(None))
+                .filter(models.FlowPublish.published_blueprint_id != bid)
+                .all()
+            )
+            from flow_trigger_conflicts import find_conflicting_trigger
+
+            conflict = find_conflicting_trigger(
+                doc,
+                [
+                    (
+                        int(flow_blueprint.id),
+                        flow_blueprint.title,
+                        flow_blueprint.body_json if isinstance(flow_blueprint.body_json, dict) else {},
+                    )
+                    for publication_row, flow_blueprint in published
+                ],
+            )
+            if conflict:
+                db.rollback()
+                return jsonify({
+                    "ok": False,
+                    "error": f'Este gatilho já inicia o fluxo "{conflict[1]}". Escolha outro gatilho ou desative aquele fluxo.',
+                    "code": "gatilho_inicial_em_uso",
+                    "message": f'Este gatilho já inicia o fluxo "{conflict[1]}". Escolha outro gatilho ou desative aquele fluxo.',
+                    "conflicting_blueprint_id": conflict[0],
+                    "conflicting_flow": conflict[1],
+                }), 409
                 
-            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid, published_blueprint_id=bid).first()
             if not pub:
                 pub = models.FlowPublish(tenant_id=tid, published_blueprint_id=bid)
                 db.add(pub)
-            else:
-                pub.published_blueprint_id = bid
                 
             db.commit()
             return jsonify({
@@ -329,21 +372,24 @@ def register_flow_platform_routes(app: Flask) -> None:
         tid = get_request_tenant_id()
         db = SessionLocal()
         try:
-            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
-            if not pub or not pub.published_blueprint_id:
-                return jsonify({"ok": True, "published": None}), 200
-                
-            bp = _bp_row(db, tid, pub.published_blueprint_id)
-            if not bp:
-                return jsonify({"ok": True, "published": None}), 200
+            rows = (
+                db.query(models.FlowPublish, models.FlowBlueprint)
+                .join(models.FlowBlueprint, models.FlowBlueprint.id == models.FlowPublish.published_blueprint_id)
+                .filter(models.FlowPublish.tenant_id == tid)
+                .filter(models.FlowPublish.published_blueprint_id.isnot(None))
+                .order_by(models.FlowPublish.id.asc())
+                .all()
+            )
+            published_flows = [
+                {"blueprint_id": int(bp.id), "slug": bp.slug, "title": bp.title}
+                for publication_row, bp in rows
+            ]
+            legacy_published = published_flows[0] if published_flows else None
                 
             return jsonify({
                 "ok": True,
-                "published": {
-                    "blueprint_id": bp.id,
-                    "slug": bp.slug,
-                    "title": bp.title
-                }
+                "published": legacy_published,
+                "published_flows": published_flows,
             }), 200
         except Exception as e:
             logger.error("[API] publish status: %s", e)

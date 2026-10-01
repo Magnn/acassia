@@ -239,6 +239,28 @@ def test_purchase_event_starts_matching_checkout_trigger_only():
     assert matched.handled is True
     assert [action.conteudo for action in matched.actions] == ["Compra Oráculo aprovada"]
 
+    wrong_platform = execute_published_flow_turn(
+        doc,
+        blueprint_id=11,
+        tenant_id="tenant-test",
+        lead_id=22,
+        message="",
+        event_type="purchase_approved",
+        context={"event.platform": "kiwify"},
+    )
+    assert wrong_platform.handled is False
+
+    unspecified_platform = execute_published_flow_turn(
+        doc,
+        blueprint_id=11,
+        tenant_id="tenant-test",
+        lead_id=22,
+        message="",
+        event_type="purchase_approved",
+        context={},
+    )
+    assert unspecified_platform.handled is False
+
     ignored = execute_published_flow_turn(
         doc,
         blueprint_id=11,

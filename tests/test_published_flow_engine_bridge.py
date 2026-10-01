@@ -44,9 +44,36 @@ def test_engine_reads_published_blueprint_and_executes_canvas_path():
                 },
             },
         )
-        db.add_all([lead, blueprint])
+        second_lead = Lead(
+            tenant_id=tenant_id,
+            telefone="5592999990003",
+            nome="Caio",
+            metadata_json={},
+        )
+        second_blueprint = FlowBlueprint(
+            tenant_id=tenant_id,
+            slug="bridge-test-support",
+            title="Bridge support",
+            body_json={
+                "format": "meumisterio-flow",
+                "version": 1,
+                "title": "Bridge support",
+                "graph": {
+                    "nodes": [
+                        {"id": "trigger", "type": "trigger", "config": {"integration": "whatsapp", "event": "keyword", "keyword": "ajuda"}},
+                        {"id": "message", "type": "conteudo", "config": {"body": "Support for {{lead.nome}}"}},
+                        {"id": "end", "type": "end", "config": {}},
+                    ],
+                    "edges": [{"from": "trigger", "to": "message"}, {"from": "message", "to": "end"}],
+                },
+            },
+        )
+        db.add_all([lead, blueprint, second_lead, second_blueprint])
         db.flush()
-        db.add(FlowPublish(tenant_id=tenant_id, published_blueprint_id=blueprint.id))
+        db.add_all([
+            FlowPublish(tenant_id=tenant_id, published_blueprint_id=blueprint.id),
+            FlowPublish(tenant_id=tenant_id, published_blueprint_id=second_blueprint.id),
+        ])
         db.commit()
 
         ctx = ContextoConversa(
@@ -64,6 +91,18 @@ def test_engine_reads_published_blueprint_and_executes_canvas_path():
         assert handled is True
         assert [action.conteudo for action in actions] == ["Olá Bia"]
         assert ctx.metadata["flow_builder_runtime"]["status"] == "completed"
+
+        second_ctx = ContextoConversa(
+            lead_id=second_lead.id,
+            telefone=second_lead.telefone,
+            node_atual=second_lead.node_atual,
+            texto_recebido="ajuda",
+            nome_lead=second_lead.nome or "",
+        )
+        second_handled, second_actions = flow_engine._try_published_flow_turn(db, second_lead, second_ctx)
+        assert second_handled is True
+        assert [action.conteudo for action in second_actions] == ["Support for Caio"]
+        assert second_ctx.metadata["flow_builder_runtime"]["blueprint_id"] == second_blueprint.id
     finally:
         db.rollback()
         lead_ids = [row[0] for row in db.query(Lead.id).filter_by(tenant_id=tenant_id).all()]

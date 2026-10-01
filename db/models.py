@@ -310,12 +310,15 @@ class FlowBlueprint(Base):
 
 
 class FlowPublish(Base):
-    """Blueprint publicado por tenant (referência para executor / metadados no motor)."""
+    """Blueprints publicados por tenant (referência para executor / metadados no motor)."""
 
     __tablename__ = "flow_publish"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "published_blueprint_id", name="uq_flow_publish_tenant_blueprint"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tenant_id = Column(String(64), nullable=False, unique=True, index=True, default="default")
+    tenant_id = Column(String(64), nullable=False, index=True, default="default")
     published_blueprint_id = Column(
         Integer,
         ForeignKey("flow_blueprints.id", ondelete="SET NULL"),

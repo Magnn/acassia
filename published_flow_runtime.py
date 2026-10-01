@@ -125,7 +125,9 @@ def _trigger_matches(
         if incoming_event not in accepted:
             return False
         event_platform = _norm(context.get("event.platform") or context.get("platform"))
-        return integration in ("", "whatsapp") or not event_platform or integration == event_platform
+        if integration in ("", "whatsapp"):
+            return True
+        return bool(event_platform) and integration == event_platform
     if integration not in ("", "whatsapp", "whatsapp oficial", "whatsapp_official", "business"):
         return False
     if event in ("message", "message_received", "mensagem", "mensagem_recebida", "any_message"):

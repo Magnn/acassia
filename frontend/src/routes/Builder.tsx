@@ -260,6 +260,7 @@ function BuilderInner({ blueprint }: { blueprint: BlueprintDetail }) {
     queryFn: () => blueprintsApi.publishStatus(),
   });
   const isPublished =
+    pubStatus?.published_flows?.some((flow) => flow.blueprint_id === blueprint.id) ??
     pubStatus?.published?.blueprint_id === blueprint.id;
 
   // Atalhos globais do builder

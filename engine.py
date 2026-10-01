@@ -2471,20 +2471,18 @@ class Engine:
             from published_flow_runtime import RUNTIME_STATE_KEY, execute_published_flow_turn
 
             tenant_id = str(getattr(lead, "tenant_id", None) or self.tenant_id or "default")
-            published = db.query(FlowPublish).filter_by(tenant_id=tenant_id).first()
-            if not published or not published.published_blueprint_id:
-                return False, []
-            blueprint = (
-                db.query(FlowBlueprint)
-                .filter_by(id=published.published_blueprint_id, tenant_id=tenant_id)
-                .first()
-            )
-            if not blueprint or not isinstance(blueprint.body_json, dict):
-                return False, []
-
             existing_state = ctx.metadata.get(RUNTIME_STATE_KEY)
             if not isinstance(existing_state, dict):
                 existing_state = (getattr(lead, "metadata_json", None) or {}).get(RUNTIME_STATE_KEY)
+            published = (
+                db.query(FlowPublish)
+                .filter_by(tenant_id=tenant_id)
+                .filter(FlowPublish.published_blueprint_id.isnot(None))
+                .all()
+            )
+            if not published:
+                return False, []
+
             runtime_context = flow_context_from_lead(lead, tenant_id=tenant_id)
             runtime_context.update(ctx.metadata or {})
             runtime_context["chat.message"] = ctx.texto_recebido or ""
@@ -2496,23 +2494,56 @@ class Engine:
                 for key, value in event_data.items():
                     runtime_context[f"event.{key}"] = value
 
-            turn = execute_published_flow_turn(
-                blueprint.body_json,
-                blueprint_id=int(blueprint.id),
-                tenant_id=tenant_id,
-                lead_id=int(lead.id),
-                message=ctx.texto_recebido or "",
-                interactive_reply_id=ctx.interactive_reply_id,
-                event_type=event_type,
-                existing_state=(
-                    existing_state
-                    if event_type == "message" and isinstance(existing_state, dict)
-                    else None
-                ),
-                context=runtime_context,
-            )
-            if not turn.handled:
+            active_blueprint_id = None
+            if event_type == "message" and isinstance(existing_state, dict):
+                if str(existing_state.get("status") or "") in ("running", "waiting"):
+                    try:
+                        active_blueprint_id = int(existing_state.get("blueprint_id") or 0)
+                    except (TypeError, ValueError):
+                        active_blueprint_id = None
+
+            matched_turns = []
+            for publication in published:
+                blueprint = (
+                    db.query(FlowBlueprint)
+                    .filter_by(id=publication.published_blueprint_id, tenant_id=tenant_id)
+                    .first()
+                )
+                if not blueprint or not isinstance(blueprint.body_json, dict):
+                    continue
+                if active_blueprint_id and int(blueprint.id) != active_blueprint_id:
+                    continue
+                turn_candidate = execute_published_flow_turn(
+                    blueprint.body_json,
+                    blueprint_id=int(blueprint.id),
+                    tenant_id=tenant_id,
+                    lead_id=int(lead.id),
+                    message=ctx.texto_recebido or "",
+                    interactive_reply_id=ctx.interactive_reply_id,
+                    event_type=event_type,
+                    existing_state=(existing_state if active_blueprint_id == int(blueprint.id) else None),
+                    context=runtime_context,
+                )
+                if turn_candidate.handled:
+                    matched_turns.append((blueprint, turn_candidate))
+
+            if not matched_turns:
                 return False, []
+            if len(matched_turns) > 1:
+                logger.error(
+                    "event=flow_builder_ambiguous_trigger tenant=%s lead=%s blueprints=%s",
+                    tenant_id,
+                    lead.id,
+                    [int(item[0].id) for item in matched_turns],
+                )
+                db.add(EventoAudit(
+                    lead_id=lead.id,
+                    evento="flow_builder_ambiguous_trigger",
+                    dados={"blueprint_ids": [int(item[0].id) for item in matched_turns]},
+                ))
+                return True, []
+
+            blueprint, turn = matched_turns[0]
 
             ctx.metadata[RUNTIME_STATE_KEY] = turn.state
             flow_vars = turn.state.get("vars") if isinstance(turn.state, dict) else {}

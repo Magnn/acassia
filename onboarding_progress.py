@@ -189,7 +189,12 @@ def auto_detect_for_tenant(tenant_id: str, db_session=None) -> int:
                 marked += 1
 
         # first_flow_published — FlowPublish com published_blueprint_id != null
-        pub = db.query(models.FlowPublish).filter_by(tenant_id=tenant_id).first()
+        pub = (
+            db.query(models.FlowPublish)
+            .filter_by(tenant_id=tenant_id)
+            .filter(models.FlowPublish.published_blueprint_id.isnot(None))
+            .first()
+        )
         if pub and pub.published_blueprint_id:
             if mark_milestone(uid, "first_flow_published", db_session=db):
                 marked += 1

@@ -76,11 +76,14 @@ export default function BlueprintsList() {
 
   // Consulta do status de publicação
   const { data: publishStatus } = useQuery({
-    queryKey: ['publishStatus'],
+    queryKey: ['publish-status'],
     queryFn: blueprintsApi.publishStatus,
   });
 
-  const publishedId = publishStatus?.published?.blueprint_id ?? null;
+  const publishedIds = new Set(
+    publishStatus?.published_flows?.map((flow) => flow.blueprint_id) ??
+      (publishStatus?.published ? [publishStatus.published.blueprint_id] : []),
+  );
 
   // Mutação para criar novo fluxo
   const { mutate: createBlueprint, isPending: isCreating } = useMutation({
@@ -291,7 +294,7 @@ export default function BlueprintsList() {
             </div>
           ) : (
             filteredBlueprints.map((bp) => {
-              const isPublished = bp.id === publishedId;
+              const isPublished = publishedIds.has(bp.id);
               const formattedDate = bp.updated_at
                 ? new Date(bp.updated_at).toLocaleDateString('pt-BR', {
                     day: '2-digit',

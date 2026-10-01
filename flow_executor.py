@@ -1131,7 +1131,12 @@ def tenant_has_published_content(tenant_id: Optional[str]) -> bool:
         tid = (tenant_id or "default").strip() or "default"
         db = SessionLocal()
         try:
-            flow_pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            flow_pub = (
+                db.query(models.FlowPublish)
+                .filter_by(tenant_id=tid)
+                .filter(models.FlowPublish.published_blueprint_id.isnot(None))
+                .first()
+            )
             if flow_pub and flow_pub.published_blueprint_id:
                 return True
             try:
@@ -1159,7 +1164,13 @@ def inject_published_flow_metadata(metadata: Optional[dict], tenant_id: Optional
         tid = (tenant_id or "default").strip() or "default"
         db = SessionLocal()
         try:
-            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
+            pub = (
+                db.query(models.FlowPublish)
+                .filter_by(tenant_id=tid)
+                .filter(models.FlowPublish.published_blueprint_id.isnot(None))
+                .order_by(models.FlowPublish.id.asc())
+                .first()
+            )
             if not pub or not pub.published_blueprint_id:
                 metadata.pop("__meumisterio_flow_blueprint__", None)
                 return

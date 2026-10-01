@@ -16,11 +16,29 @@ def launch_readiness(tenant_id: str) -> dict:
         connected = bool(binding and binding.status == "active" and binding.last_verified_at)
         agent = db.query(models.StudioAgent).filter_by(tenant_id=tenant_id).first()
         blueprint = db.query(models.FlowBlueprint).filter_by(tenant_id=tenant_id).first()
-        publication = db.query(models.FlowPublish).filter_by(tenant_id=tenant_id).first()
-        published = db.query(models.FlowBlueprint).filter_by(
-            tenant_id=tenant_id, id=publication.published_blueprint_id
-        ).first() if publication and publication.published_blueprint_id else None
-        valid = bool(published and validate_flow_document(published.body_json or {}, strict=True).get("ok"))
+        published_ids = [
+            row[0]
+            for row in (
+                db.query(models.FlowPublish.published_blueprint_id)
+                .filter_by(tenant_id=tenant_id)
+                .filter(models.FlowPublish.published_blueprint_id.isnot(None))
+                .all()
+            )
+        ]
+        published_blueprints = (
+            db.query(models.FlowBlueprint)
+            .filter(
+                models.FlowBlueprint.tenant_id == tenant_id,
+                models.FlowBlueprint.id.in_(published_ids),
+            )
+            .all()
+            if published_ids
+            else []
+        )
+        valid = any(
+            validate_flow_document(published.body_json or {}, strict=True).get("ok")
+            for published in published_blueprints
+        )
         sent = db.query(models.Mensagem).join(models.Lead, models.Mensagem.lead_id == models.Lead.id).filter(
             models.Lead.tenant_id == tenant_id, models.Mensagem.remetente == "bot",
             models.Mensagem.delivery_status.in_(("sent", "delivered", "read")),

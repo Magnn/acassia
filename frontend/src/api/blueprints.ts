@@ -99,7 +99,7 @@ export const blueprintsApi = {
       { blueprint_id: blueprintId },
     ),
   publishStatus: () =>
-    api.get<{ ok: boolean; published: PublishStatus | null }>(
+    api.get<{ ok: boolean; published: PublishStatus | null; published_flows: PublishStatus[] }>(
       '/api/flows/publish/status',
     ),
 

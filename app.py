@@ -1060,7 +1060,12 @@ def api_health_multi_tenant_summary():
 
         out = []
         for b in bindings:
-            pub = db.query(models.FlowPublish).filter_by(tenant_id=b.tenant_id).first()
+            pub = (
+                db.query(models.FlowPublish)
+                .filter_by(tenant_id=b.tenant_id)
+                .filter(models.FlowPublish.published_blueprint_id.isnot(None))
+                .first()
+            )
             has_flow = bool(pub and pub.published_blueprint_id)
             out.append({
                 "tenant_id": b.tenant_id,
@@ -1530,9 +1535,9 @@ def api_flows_blueprint_one(bid: int):
             body = row.body_json if isinstance(row.body_json, dict) else {}
             return jsonify({"ok": True, "blueprint": {**_serialize_flow_blueprint_row(row), "body": body}}), 200
         if request.method == "DELETE":
-            pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
-            if pub and pub.published_blueprint_id == bid:
-                pub.published_blueprint_id = None
+            db.query(models.FlowPublish).filter_by(
+                tenant_id=tid, published_blueprint_id=bid
+            ).delete(synchronize_session=False)
             db.delete(row)
             db.commit()
             return jsonify({"ok": True}), 200
@@ -1602,7 +1607,6 @@ def _ensure_flow_publish_row(db, tenant_id: str) -> models.FlowPublish:
     return row
 
 
-@app.route("/api/flows/publish", methods=["POST"])
 @login_required
 @require_admin
 def api_flows_publish_blueprint():
@@ -1621,8 +1625,10 @@ def api_flows_publish_blueprint():
         bp = db.query(models.FlowBlueprint).filter_by(id=bid, tenant_id=tid).first()
         if not bp:
             return jsonify({"ok": False, "error": "blueprint não encontrado neste tenant"}), 404
-        pub = _ensure_flow_publish_row(db, tid)
-        pub.published_blueprint_id = bid
+        pub = db.query(models.FlowPublish).filter_by(tenant_id=tid, published_blueprint_id=bid).first()
+        if pub is None:
+            pub = models.FlowPublish(tenant_id=tid, published_blueprint_id=bid)
+            db.add(pub)
         db.commit()
         return jsonify({"ok": True, "published_blueprint_id": bid}), 200
     except Exception as e:
@@ -1639,18 +1645,23 @@ def api_flows_publish_blueprint_status():
     tid = get_request_tenant_id()
     db = SessionLocal()
     try:
-        pub = db.query(models.FlowPublish).filter_by(tenant_id=tid).first()
-        if not pub or not pub.published_blueprint_id:
-            return jsonify({"ok": True, "published": None}), 200
-        bp = db.query(models.FlowBlueprint).filter_by(id=pub.published_blueprint_id, tenant_id=tid).first()
+        rows = (
+            db.query(models.FlowPublish, models.FlowBlueprint)
+            .join(models.FlowBlueprint, models.FlowBlueprint.id == models.FlowPublish.published_blueprint_id)
+            .filter(models.FlowPublish.tenant_id == tid)
+            .filter(models.FlowPublish.published_blueprint_id.isnot(None))
+            .order_by(models.FlowPublish.id.asc())
+            .all()
+        )
+        published_flows = [
+            {"blueprint_id": int(bp.id), "slug": bp.slug, "title": bp.title}
+            for publication_row, bp in rows
+        ]
         return jsonify(
             {
                 "ok": True,
-                "published": {
-                    "blueprint_id": pub.published_blueprint_id,
-                    "slug": bp.slug if bp else "",
-                    "title": bp.title if bp else "",
-                },
+                "published": published_flows[0] if published_flows else None,
+                "published_flows": published_flows,
             }
         ), 200
     except Exception as e:
